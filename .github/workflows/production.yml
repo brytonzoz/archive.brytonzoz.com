@@ -18,9 +18,9 @@ jobs:
     name: Build and deploy to brytonzoz.com
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v5
 
-      - uses: actions/setup-node@v4
+      - uses: actions/setup-node@v5
         with:
           node-version: 22
           cache: npm
@@ -28,6 +28,15 @@ jobs:
       - run: npm ci
 
       - run: npm run build
+
+      - name: Check deploy credentials
+        env:
+          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+        run: |
+          if [ -z "$CLOUDFLARE_API_TOKEN" ]; then
+            echo "::error::The CLOUDFLARE_API_TOKEN secret is not set, so production cannot be deployed."
+            exit 1
+          fi
 
       - name: Deploy site
         env:

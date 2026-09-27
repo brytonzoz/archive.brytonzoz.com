@@ -3,6 +3,7 @@
   // Static-only Worker: every request is served straight from Cloudflare's edge asset store,
   // with no Worker script invocation.
   "name": "archive",
+  "account_id": "480a4eebfef4c5ba2d0e225fde891ae8",
   "compatibility_date": "2026-09-01",
   "assets": {
     "directory": "./out",

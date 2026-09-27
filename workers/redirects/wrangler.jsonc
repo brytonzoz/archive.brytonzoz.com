@@ -3,6 +3,7 @@
   // Sends secondary hostnames to the canonical site with a permanent redirect.
   "name": "archive-redirects",
   "main": "index.js",
+  "account_id": "480a4eebfef4c5ba2d0e225fde891ae8",
   "compatibility_date": "2026-09-01",
   "routes": [
     { "pattern": "www.brytonzoz.com", "custom_domain": true },

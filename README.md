@@ -96,6 +96,16 @@ The production build is exported as static files in `out/`. That directory is ge
 - **Later scenes load after the first.** Their artwork starts downloading once the first scene has finished loading, or as soon as the visitor scrolls.
 - **Caching:** files under `/_next/static/` and `/media/` are cached for a year (`public/_headers`); HTML is revalidated on every request, so deploys show up immediately.
 
+## Release workflow
+
+Changes ship through GitHub, with no local machine required:
+
+1. A pull request into `main` runs **Staging** (`.github/workflows/staging.yml`): lint, build, deploy to the `archive-staging` Worker, and a comment on the PR with the staging link.
+2. Merging the pull request runs **Production** (`.github/workflows/production.yml`), which deploys https://brytonzoz.com and the www/archive redirects.
+3. Only one pull request may be open at a time; the **One open PR** check fails otherwise.
+
+Deploys need the `CLOUDFLARE_API_TOKEN` GitHub Actions secret. See `CLAUDE.md` and `.claude/skills/site-manager/` for how Claude sessions work on this repo.
+
 ## Hosting
 
 ### Cloudflare Workers (production)
@@ -104,7 +114,7 @@ The production build is exported as static files in `out/`. That directory is ge
 
 ```bash
 npx wrangler login          # once per machine
-npm run deploy              # builds and deploys brytonzoz.com
+npm run deploy              # manual production deploy (normally done by the Production workflow)
 npm run deploy:redirects    # deploys the www/archive redirects (only needed once, or when they change)
 npm run deploy:staging      # builds and deploys the "archive-staging" Worker on workers.dev
 npm run preview             # builds and serves the site locally in the Workers runtime

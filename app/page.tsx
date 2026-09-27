@@ -1,15 +1,1593 @@
 'use client';
 
 import React, { useEffect, useState } from 'react';
-import { ProjectCard } from '../components/ProjectCard';
+import Image from 'next/image';
+import { ProjectCard, StreamingModal } from '../components/ProjectCard';
 import { getProjects } from '../lib/projects';
-import { Navigation } from '../components/Navigation';
+import { cautionSceneAssets, reminderSceneAssets, scrapwrkSceneAssets, solenyaSceneAssets } from '../lib/assets';
+import { Project, isProjectReleased } from '../lib/utils';
+
+const clamp = (value: number, min: number, max: number) => Math.min(Math.max(value, min), max);
+const easeOutCubic = (value: number) => 1 - Math.pow(1 - value, 3);
+
+type SceneStickerMotion = {
+  x: number;
+  y: number;
+  rotate: number;
+  scale: number;
+  fadeRate: number;
+};
+
+type SceneStickerIntro = {
+  x: number;
+  y: number;
+  rotate: number;
+};
+
+type SceneStickerConfig = {
+  movement: SceneStickerMotion;
+  intro: SceneStickerIntro;
+  baseRotate?: number;
+};
+
+type SlideBackground = {
+  base: string;
+  overlay: string;
+  topGlow: string;
+  bottomGlow: string;
+  edgeGlow: string;
+};
+
+function getSceneStickerState(sticker: SceneStickerConfig, distance: number) {
+  const baseRotate = sticker.baseRotate || 0;
+
+  if (distance < 0) {
+    const incomingProgress = clamp(Math.abs(distance) / 0.78, 0, 1);
+
+    return {
+      opacity: 1 - incomingProgress,
+      scale: 1 - (incomingProgress * 0.18),
+      translateX: sticker.intro.x * incomingProgress,
+      translateY: sticker.intro.y * incomingProgress,
+      rotate: baseRotate + (sticker.intro.rotate * incomingProgress),
+    };
+  }
+
+  const distanceMagnitude = clamp(Math.abs(distance), 0, 1);
+  const outgoingProgress = easeOutCubic(clamp(distance / 0.42, 0, 1));
+  const departure = outgoingProgress * 2.35;
+
+  return {
+    opacity: Math.max(0, 1 - (outgoingProgress * sticker.movement.fadeRate * 1.25)),
+    scale: 1 - Math.min(distanceMagnitude * sticker.movement.scale, 0.12),
+    translateX: sticker.movement.x * departure,
+    translateY: sticker.movement.y * departure,
+    rotate: baseRotate + (sticker.movement.rotate * departure),
+  };
+}
+
+const FOOTER_BACKGROUND: SlideBackground = {
+  base: 'linear-gradient(135deg, #020202 0%, #0A0A0D 38%, #141722 100%)',
+  overlay: 'radial-gradient(circle at 22% 18%, rgba(118, 134, 170, 0.22), transparent 34%), radial-gradient(circle at 78% 82%, rgba(161, 66, 66, 0.18), transparent 32%)',
+  topGlow: 'rgba(132, 156, 204, 0.18)',
+  bottomGlow: 'rgba(141, 54, 54, 0.18)',
+  edgeGlow: 'rgba(210, 210, 210, 0.06)',
+};
+
+const HOMEPAGE_PROJECT_ORDER = [
+  'SOLENYA',
+  'CAUTION',
+  'Just A Reminder To Live Life',
+  'Scrapwrk Store',
+  'Loopless Collection (Episodes)',
+  'The Archive (Music)',
+];
+
+const HIDDEN_HOMEPAGE_PROJECTS = new Set([
+  'Loopless Collection (Episodes)',
+  'The Archive (Music)',
+]);
+
+function getProjectBackground(project: Project): SlideBackground {
+  if (project.name === 'SOLENYA') {
+    return {
+      base: 'linear-gradient(139.07deg, #174E6C 2.05%, #720102 101.73%)',
+      overlay: 'radial-gradient(circle at 18% 16%, rgba(121, 211, 243, 0.18), transparent 28%), radial-gradient(circle at 82% 78%, rgba(255, 144, 107, 0.18), transparent 30%)',
+      topGlow: 'rgba(80, 181, 217, 0.24)',
+      bottomGlow: 'rgba(191, 53, 53, 0.22)',
+      edgeGlow: 'rgba(255, 176, 115, 0.08)',
+    };
+  }
+
+  if (project.name === 'CAUTION') {
+    return {
+      base: 'linear-gradient(139.07deg, #C59B7F 2.05%, #371D0A 101.73%)',
+      overlay: 'radial-gradient(circle at 16% 18%, rgba(255, 229, 188, 0.24), transparent 28%), radial-gradient(circle at 82% 78%, rgba(117, 61, 26, 0.24), transparent 34%)',
+      topGlow: 'rgba(255, 225, 176, 0.22)',
+      bottomGlow: 'rgba(126, 69, 38, 0.24)',
+      edgeGlow: 'rgba(255, 202, 142, 0.08)',
+    };
+  }
+
+  if (project.name === 'Just A Reminder To Live Life') {
+    return {
+      base: 'linear-gradient(139.07deg, #EDDDD2 2.05%, #432F21 101.73%)',
+      overlay: 'radial-gradient(circle at 16% 18%, rgba(255, 255, 255, 0.34), transparent 26%), radial-gradient(circle at 84% 82%, rgba(109, 77, 58, 0.24), transparent 34%)',
+      topGlow: 'rgba(255, 244, 236, 0.24)',
+      bottomGlow: 'rgba(96, 67, 49, 0.2)',
+      edgeGlow: 'rgba(242, 225, 213, 0.08)',
+    };
+  }
+
+  if (project.name === 'Scrapwrk Store') {
+    return {
+      base: 'linear-gradient(339.49deg, #41271B 15.13%, #2A3040 97.51%)',
+      overlay: 'radial-gradient(circle at 18% 16%, rgba(84, 92, 122, 0.22), transparent 28%), radial-gradient(circle at 80% 84%, rgba(142, 83, 46, 0.18), transparent 34%)',
+      topGlow: 'rgba(102, 111, 145, 0.16)',
+      bottomGlow: 'rgba(118, 64, 34, 0.2)',
+      edgeGlow: 'rgba(212, 183, 157, 0.06)',
+    };
+  }
+
+  switch (project.type) {
+    case 'mixtape':
+      return {
+        base: 'linear-gradient(135deg, #F8F6EF 0%, #E4E0EF 42%, #CBC4DD 100%)',
+        overlay: 'radial-gradient(circle at 18% 16%, rgba(255, 255, 255, 0.55), transparent 22%), radial-gradient(circle at 82% 84%, rgba(171, 158, 209, 0.35), transparent 28%)',
+        topGlow: 'rgba(255, 255, 255, 0.28)',
+        bottomGlow: 'rgba(175, 157, 213, 0.2)',
+        edgeGlow: 'rgba(131, 110, 167, 0.08)',
+      };
+    case 'multi-purpose-stream':
+      return {
+        base: 'linear-gradient(135deg, #08131A 0%, #102A3A 38%, #17495A 100%)',
+        overlay: 'radial-gradient(circle at 20% 18%, rgba(64, 174, 215, 0.24), transparent 28%), radial-gradient(circle at 78% 82%, rgba(31, 117, 109, 0.22), transparent 30%)',
+        topGlow: 'rgba(77, 182, 212, 0.2)',
+        bottomGlow: 'rgba(35, 141, 128, 0.18)',
+        edgeGlow: 'rgba(111, 231, 205, 0.06)',
+      };
+    case 'video-series':
+      return {
+        base: 'linear-gradient(135deg, #27110E 0%, #5B1F14 44%, #A0392B 100%)',
+        overlay: 'radial-gradient(circle at 18% 20%, rgba(255, 170, 114, 0.24), transparent 28%), radial-gradient(circle at 84% 80%, rgba(231, 83, 116, 0.18), transparent 30%)',
+        topGlow: 'rgba(255, 145, 87, 0.2)',
+        bottomGlow: 'rgba(210, 76, 97, 0.18)',
+        edgeGlow: 'rgba(255, 197, 128, 0.08)',
+      };
+    default:
+      return {
+        base: 'linear-gradient(135deg, #071511 0%, #0E2D24 42%, #1B564B 100%)',
+        overlay: 'radial-gradient(circle at 18% 20%, rgba(142, 239, 207, 0.2), transparent 28%), radial-gradient(circle at 82% 82%, rgba(53, 117, 101, 0.22), transparent 30%)',
+        topGlow: 'rgba(112, 226, 189, 0.18)',
+        bottomGlow: 'rgba(52, 127, 108, 0.2)',
+        edgeGlow: 'rgba(198, 255, 232, 0.06)',
+      };
+  }
+}
+
+function getSlideBackground(index: number, projects: Project[]): SlideBackground {
+  if (index >= projects.length) {
+    return FOOTER_BACKGROUND;
+  }
+
+  return getProjectBackground(projects[index]);
+}
+
+function BackgroundLayer({
+  background,
+  opacity,
+}: {
+  background: SlideBackground;
+  opacity: number;
+}) {
+  return (
+    <div
+      className="pointer-events-none fixed inset-0"
+      style={{
+        opacity,
+        willChange: 'opacity',
+      }}
+    >
+      <div className="absolute inset-0" style={{ background: background.base }} />
+      <div className="absolute inset-0" style={{ background: background.overlay }} />
+      <div
+        className="absolute left-[18%] top-[15%] h-96 w-96 rounded-full blur-3xl"
+        style={{ background: background.topGlow }}
+      />
+      <div
+        className="absolute bottom-[18%] right-[14%] h-[28rem] w-[28rem] rounded-full blur-3xl"
+        style={{ background: background.bottomGlow }}
+      />
+      <div
+        className="absolute left-1/2 top-[56%] h-[24rem] w-[24rem] -translate-x-1/2 rounded-full blur-[120px]"
+        style={{ background: background.edgeGlow }}
+      />
+    </div>
+  );
+}
+
+function FooterSocialLink({
+  href,
+  label,
+  children,
+}: {
+  href: string;
+  label: string;
+  children: React.ReactNode;
+}) {
+  return (
+    <a
+      href={href}
+      target="_blank"
+      rel="noopener noreferrer"
+      aria-label={label}
+      className="flex h-11 w-11 items-center justify-center rounded-full bg-white/10 text-white/72 transition-colors duration-300 hover:bg-white/16 hover:text-white"
+    >
+      {children}
+    </a>
+  );
+}
+
+function FacebookIcon() {
+  return (
+    <svg width="15" height="15" viewBox="0 0 24 24" fill="none" aria-hidden="true">
+      <path
+        d="M13.25 21V12.75H16L16.4 9.5H13.25V7.43C13.25 6.49 13.51 5.85 14.86 5.85H16.5V2.94C15.7 2.86 14.9 2.82 14.1 2.82C11.72 2.82 10.08 4.27 10.08 6.95V9.5H7.5V12.75H10.08V21H13.25Z"
+        fill="currentColor"
+      />
+    </svg>
+  );
+}
+
+function InstagramIcon() {
+  return (
+    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" aria-hidden="true">
+      <rect x="3.25" y="3.25" width="17.5" height="17.5" rx="5.25" stroke="currentColor" strokeWidth="1.8" />
+      <circle cx="12" cy="12" r="4.1" stroke="currentColor" strokeWidth="1.8" />
+      <circle cx="17.35" cy="6.7" r="1.15" fill="currentColor" />
+    </svg>
+  );
+}
+
+function TikTokIcon() {
+  return (
+    <svg width="15" height="15" viewBox="0 0 24 24" fill="none" aria-hidden="true">
+      <path
+        d="M14.2 4.5C14.86 6.3 16.15 7.55 18 8.15V10.85C16.63 10.81 15.31 10.39 14.2 9.64V14.75C14.2 18.09 11.95 20.25 8.86 20.25C5.8 20.25 3.5 17.96 3.5 14.98C3.5 11.82 5.93 9.7 8.97 9.7C9.28 9.7 9.57 9.73 9.9 9.82V12.63C9.59 12.49 9.25 12.42 8.88 12.42C7.39 12.42 6.25 13.57 6.25 14.99C6.25 16.47 7.4 17.52 8.79 17.52C10.34 17.52 11.46 16.31 11.46 14.54V3.75H14.2V4.5Z"
+        fill="currentColor"
+      />
+    </svg>
+  );
+}
+
+function XIcon() {
+  return (
+    <svg width="15" height="15" viewBox="0 0 24 24" fill="none" aria-hidden="true">
+      <path d="M5 4.5L18.6 19.5H15.45L11.2 14.86L7.1 19.5H5.5L10.47 13.88L4 6.75V4.5H5Z" fill="currentColor" />
+      <path d="M8.74 4.5L18.95 19.5" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" />
+      <path d="M18.2 4.5L5.8 19.5" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" />
+    </svg>
+  );
+}
+
+const SOLENYA_FRAME = {
+  width: 961,
+  height: 1758,
+};
+
+const solenyaStickers = [
+  {
+    key: 'light-cloud',
+    src: solenyaSceneAssets.lightCloud,
+    alt: 'Light cloud',
+    frame: { left: -215, top: -284, size: 696 },
+    zIndex: 2,
+    movement: { x: -18, y: -70, rotate: -4, scale: 0.05, fadeRate: 0.7 },
+    float: { x: -8, y: -12, rotate: -2, duration: '8.5s', delay: '0s' },
+    intro: { x: -130, y: -70, rotate: -8, delay: '0.12s' },
+  },
+  {
+    key: 'dark-cloud',
+    src: solenyaSceneAssets.darkCloud,
+    alt: 'Dark cloud',
+    frame: { left: 575, top: -268, size: 696 },
+    zIndex: 2,
+    movement: { x: 26, y: -96, rotate: 6, scale: 0.06, fadeRate: 0.8 },
+    float: { x: 10, y: -10, rotate: 2, duration: '9.4s', delay: '0.6s' },
+    intro: { x: 140, y: -90, rotate: 9, delay: '0.18s' },
+  },
+  {
+    key: 'birds',
+    src: solenyaSceneAssets.birds,
+    alt: 'Birds',
+    frame: { left: 613, top: 439, size: 696 },
+    zIndex: 25,
+    movement: { x: 52, y: -116, rotate: 10, scale: 0.08, fadeRate: 1.2 },
+    float: { x: 12, y: -8, rotate: 4, duration: '6.6s', delay: '1s' },
+    intro: { x: 150, y: -24, rotate: 12, delay: '0.34s' },
+  },
+  {
+    key: 'flowers',
+    src: solenyaSceneAssets.flowers,
+    alt: 'Flowers',
+    frame: { left: -348, top: 543, size: 696 },
+    zIndex: 12,
+    movement: { x: -36, y: -128, rotate: -8, scale: 0.08, fadeRate: 1.1 },
+    float: { x: -9, y: -18, rotate: -3, duration: '7.8s', delay: '0.2s' },
+    intro: { x: -160, y: 110, rotate: -12, delay: '0.28s' },
+  },
+  {
+    key: 'grass',
+    src: solenyaSceneAssets.grass,
+    alt: 'Grass',
+    frame: { left: -554, top: 1002, size: 946.6 },
+    zIndex: 4,
+    baseRotate: 20.99,
+    movement: { x: -24, y: -92, rotate: -5, scale: 0.07, fadeRate: 0.9 },
+    float: { x: -6, y: -10, rotate: -2, duration: '8.2s', delay: '0.3s' },
+    intro: { x: -120, y: 140, rotate: -6, delay: '0.4s' },
+  },
+  {
+    key: 'waterfall',
+    src: solenyaSceneAssets.waterfall,
+    alt: 'Waterfall',
+    frame: { left: 398, top: 1135, size: 888 },
+    zIndex: 4,
+    movement: { x: 34, y: -110, rotate: 4, scale: 0.06, fadeRate: 1 },
+    float: { x: 8, y: -14, rotate: 1.5, duration: '9.8s', delay: '0.9s' },
+    intro: { x: 130, y: 150, rotate: 8, delay: '0.48s' },
+  },
+];
+
+const cautionStickers = [
+  {
+    key: 'christler',
+    src: cautionSceneAssets.christler,
+    alt: 'Chrysler Building',
+    frame: { left: -370, top: 890, size: 1025 },
+    zIndex: 4,
+    movement: { x: -22, y: 108, rotate: -2, scale: 0.05, fadeRate: 0.7 },
+    float: { x: -7, y: -10, rotate: -1.2, duration: '9.1s', delay: '0.3s' },
+    intro: { x: -120, y: 180, rotate: -8, delay: '0.2s' },
+  },
+  {
+    key: 'empire',
+    src: cautionSceneAssets.empire,
+    alt: 'Empire State Building',
+    frame: { left: 143, top: 428, size: 1555 },
+    zIndex: 2,
+    movement: { x: 22, y: 138, rotate: 3, scale: 0.05, fadeRate: 0.7 },
+    float: { x: 8, y: -12, rotate: 1.6, duration: '10.4s', delay: '0.1s' },
+    intro: { x: 150, y: 160, rotate: 6, delay: '0.14s' },
+  },
+  {
+    key: 'owt',
+    src: cautionSceneAssets.owt,
+    alt: 'One World Trade',
+    frame: { left: -41, top: 1287, size: 696 },
+    zIndex: 5,
+    movement: { x: -14, y: 120, rotate: -2, scale: 0.06, fadeRate: 0.9 },
+    float: { x: -4, y: -12, rotate: -1, duration: '8.6s', delay: '0.5s' },
+    intro: { x: 0, y: 170, rotate: -4, delay: '0.28s' },
+  },
+  {
+    key: 'pigeon-top',
+    src: cautionSceneAssets.pigeon,
+    alt: 'Flying pigeon',
+    frame: { left: 449, top: -209, size: 696 },
+    zIndex: 18,
+    movement: { x: 56, y: -122, rotate: 11, scale: 0.08, fadeRate: 1.15 },
+    float: { x: 12, y: -8, rotate: 4, duration: '6.8s', delay: '0.9s' },
+    intro: { x: 130, y: -120, rotate: 12, delay: '0.34s' },
+  },
+  {
+    key: 'pigeon-left',
+    src: cautionSceneAssets.pigeon,
+    alt: 'Flying pigeon',
+    frame: { left: -218, top: 208, size: 412.54 },
+    zIndex: 18,
+    baseRotate: 14,
+    flipX: true,
+    movement: { x: -54, y: -92, rotate: -9, scale: 0.08, fadeRate: 1.15 },
+    float: { x: -12, y: -8, rotate: -3.5, duration: '6.1s', delay: '0.4s' },
+    intro: { x: -140, y: -24, rotate: -14, delay: '0.24s' },
+  },
+];
+
+const reminderStickers = [
+  {
+    key: 'pencil',
+    src: reminderSceneAssets.pencil,
+    alt: 'Pencil',
+    frame: { left: -359, top: -393, size: 696 },
+    zIndex: 18,
+    baseRotate: -69.49,
+    movement: { x: -82, y: -116, rotate: -8, scale: 0.06, fadeRate: 0.95 },
+    float: { x: -9, y: -8, rotate: -2.6, duration: '8.5s', delay: '0.1s' },
+    intro: { x: -180, y: -130, rotate: -12, delay: '0.12s' },
+  },
+  {
+    key: 'pen',
+    src: reminderSceneAssets.pen,
+    alt: 'Pen',
+    frame: { left: 458, top: -248, size: 696 },
+    zIndex: 18,
+    baseRotate: -14.01,
+    movement: { x: 70, y: -108, rotate: 4, scale: 0.06, fadeRate: 0.92 },
+    float: { x: 8, y: -10, rotate: 1.8, duration: '8.8s', delay: '0.55s' },
+    intro: { x: 170, y: -120, rotate: 10, delay: '0.18s' },
+  },
+  {
+    key: 'paper',
+    src: reminderSceneAssets.paper,
+    alt: 'Paper',
+    frame: { left: 567, top: 651, size: 544 },
+    zIndex: 8,
+    baseRotate: -30.36,
+    movement: { x: 92, y: 28, rotate: -6, scale: 0.07, fadeRate: 1.02 },
+    float: { x: 10, y: -6, rotate: 1.8, duration: '7.1s', delay: '0.72s' },
+    intro: { x: 142, y: 22, rotate: -8, delay: '0.28s' },
+  },
+  {
+    key: 'notepad',
+    src: reminderSceneAssets.notepad,
+    alt: 'Notepad',
+    frame: { left: -264, top: 1218, size: 696 },
+    zIndex: 4,
+    baseRotate: 15.59,
+    movement: { x: -70, y: 122, rotate: 5, scale: 0.08, fadeRate: 1.04 },
+    float: { x: -8, y: -10, rotate: -1.7, duration: '8.9s', delay: '0.26s' },
+    intro: { x: -180, y: 168, rotate: 10, delay: '0.36s' },
+  },
+  {
+    key: 'microphone',
+    src: reminderSceneAssets.microphone,
+    alt: 'Microphone',
+    frame: { left: 426, top: 1188, size: 696 },
+    zIndex: 5,
+    baseRotate: -22.25,
+    movement: { x: 78, y: 132, rotate: -4, scale: 0.08, fadeRate: 1.08 },
+    float: { x: 9, y: -9, rotate: 1.8, duration: '8.2s', delay: '0.62s' },
+    intro: { x: 160, y: 176, rotate: -10, delay: '0.44s' },
+  },
+];
+
+const scrapwrkStickers = [
+  {
+    key: 'hat',
+    src: scrapwrkSceneAssets.hat,
+    alt: 'Hat',
+    frame: { left: -385, top: -200, size: 754.83 },
+    zIndex: 18,
+    baseRotate: -33.34,
+    movement: { x: -76, y: -118, rotate: -7, scale: 0.07, fadeRate: 0.96 },
+    float: { x: -8, y: -8, rotate: -2.2, duration: '8.4s', delay: '0.12s' },
+    intro: { x: -184, y: -128, rotate: -10, delay: '0.12s' },
+  },
+  {
+    key: 'hoodie-top',
+    src: scrapwrkSceneAssets.hoodieTop,
+    alt: 'Folded hoodie',
+    frame: { left: 444, top: -340, size: 696 },
+    zIndex: 18,
+    baseRotate: -27.03,
+    movement: { x: 82, y: -124, rotate: 5, scale: 0.07, fadeRate: 0.96 },
+    float: { x: 8, y: -8, rotate: 2, duration: '8.9s', delay: '0.48s' },
+    intro: { x: 168, y: -140, rotate: 10, delay: '0.18s' },
+  },
+  {
+    key: 'hoodie-bottom',
+    src: scrapwrkSceneAssets.hoodieBottom,
+    alt: 'Patchwork hoodie',
+    frame: { left: -43, top: 1250, size: 524.54 },
+    zIndex: 5,
+    baseRotate: 1.82,
+    movement: { x: -64, y: 110, rotate: 4, scale: 0.08, fadeRate: 1.02 },
+    float: { x: -7, y: -8, rotate: -1.4, duration: '8.2s', delay: '0.28s' },
+    intro: { x: -152, y: 160, rotate: 8, delay: '0.34s' },
+  },
+  {
+    key: 'pants',
+    src: scrapwrkSceneAssets.pants,
+    alt: 'Patchwork pants',
+    frame: { left: 444, top: 1060, size: 696 },
+    zIndex: 5,
+    baseRotate: -25.85,
+    movement: { x: 78, y: 126, rotate: -5, scale: 0.08, fadeRate: 1.04 },
+    float: { x: 9, y: -10, rotate: 1.6, duration: '8.6s', delay: '0.56s' },
+    intro: { x: 170, y: 164, rotate: -8, delay: '0.42s' },
+  },
+];
+
+function SolenyaScene({
+  project,
+  distance,
+  sceneScale,
+  showScrollPrompt,
+  onScrollPromptClick,
+  onModalStateChange,
+}: {
+  project: Project;
+  distance: number;
+  sceneScale: number;
+  showScrollPrompt: boolean;
+  onScrollPromptClick: () => void;
+  onModalStateChange?: (isOpen: boolean) => void;
+}) {
+  const [isStreamingModalOpen, setIsStreamingModalOpen] = useState(false);
+  const scaleValue = (value: number) => value * sceneScale;
+  const isReleased = isProjectReleased(project);
+  const currentDescription = isReleased
+    ? (project.postReleaseDescription || project.description)
+    : (project.preReleaseDescription || project.description);
+  const currentStreamingLinks = isReleased
+    ? (project.postReleaseStreamingLinks || project.streamingLinks)
+    : project.streamingLinks;
+  const primaryActionUrl =
+    currentStreamingLinks?.applemusic ||
+    currentStreamingLinks?.spotify ||
+    currentStreamingLinks?.youtubemusic ||
+    project.url;
+
+  const distanceMagnitude = clamp(Math.abs(distance), 0, 1);
+  const outgoingCardProgress = easeOutCubic(clamp((distance - 0.08) / 0.78, 0, 1));
+  const incomingCardProgress = easeOutCubic(clamp(Math.abs(Math.min(distance, 0)) / 0.9, 0, 1));
+  const cardScale = distance >= 0
+    ? 1 - (outgoingCardProgress * 0.26)
+    : 1 - (incomingCardProgress * 0.18);
+  const cardOpacity = 1 - (distanceMagnitude * 0.18);
+  const cardTranslateY = outgoingCardProgress * 58;
+  const frameWidth = scaleValue(SOLENYA_FRAME.width);
+  const frameHeight = scaleValue(SOLENYA_FRAME.height);
+  const sceneLeft = (value: number) => `calc(50% - ${frameWidth / 2}px + ${scaleValue(value)}px)`;
+  const sceneTop = (value: number) => `calc(50% - ${frameHeight / 2}px + ${scaleValue(value)}px)`;
+
+  return (
+    <div className="relative h-full w-full overflow-hidden">
+      {solenyaStickers.map((sticker) => {
+        const stickerState = getSceneStickerState(sticker, distance);
+
+        return (
+          <div
+            key={sticker.key}
+            className="pointer-events-none absolute solenya-sticker-enter"
+            style={{
+              left: sceneLeft(sticker.frame.left),
+              top: sceneTop(sticker.frame.top),
+              width: scaleValue(sticker.frame.size),
+              height: scaleValue(sticker.frame.size),
+              zIndex: sticker.zIndex,
+              '--intro-x': `${scaleValue(sticker.intro.x)}px`,
+              '--intro-y': `${scaleValue(sticker.intro.y)}px`,
+              '--intro-rotate': `${sticker.intro.rotate}deg`,
+              animationDelay: sticker.intro.delay,
+            } as React.CSSProperties}
+          >
+            <div
+              style={{
+                opacity: stickerState.opacity,
+                transform: `translate3d(${scaleValue(stickerState.translateX)}px, ${scaleValue(stickerState.translateY)}px, 0) rotate(${stickerState.rotate}deg) scale(${stickerState.scale})`,
+                willChange: 'transform, opacity',
+                transition: 'transform 520ms cubic-bezier(0.22, 1, 0.36, 1), opacity 320ms ease-out',
+              }}
+            >
+              <div
+                className="solenya-sticker-float h-full w-full"
+                style={
+                  {
+                    '--float-x': `${scaleValue(sticker.float.x)}px`,
+                    '--float-y': `${scaleValue(sticker.float.y)}px`,
+                    '--float-rotate': `${sticker.float.rotate}deg`,
+                    '--float-duration': sticker.float.duration,
+                    animationDelay: sticker.float.delay,
+                  } as React.CSSProperties
+                }
+              >
+                <img
+                  src={sticker.src}
+                  alt={sticker.alt}
+                  draggable={false}
+                  loading="eager"
+                  className="h-full w-full object-contain select-none"
+                />
+              </div>
+            </div>
+          </div>
+        );
+      })}
+
+      <div className="absolute inset-0 flex items-center justify-center">
+        <div
+          className="relative"
+          style={{
+            width: frameWidth,
+            height: frameHeight,
+          }}
+        >
+          <div
+            className="absolute solenya-card-enter"
+            style={{
+              left: scaleValue(120),
+              top: scaleValue(208),
+              width: scaleValue(722),
+              height: scaleValue(1086),
+              zIndex: 10,
+              animationDelay: '0.14s',
+            }}
+          >
+            <div
+              style={{
+                position: 'relative',
+                width: '100%',
+                height: '100%',
+                background: '#1F0E08',
+                borderRadius: scaleValue(100),
+                boxShadow: '0px 4px 4px rgba(0, 0, 0, 0.25)',
+                opacity: cardOpacity,
+                transform: `translate3d(0, ${scaleValue(cardTranslateY)}px, 0) scale(${cardScale})`,
+                transformOrigin: 'center center',
+                willChange: 'transform, opacity',
+                transition: 'transform 760ms cubic-bezier(0.22, 1, 0.36, 1), opacity 420ms ease-out',
+              }}
+            >
+            <div
+              style={{
+                position: 'absolute',
+                left: scaleValue(45),
+                top: scaleValue(51),
+                width: scaleValue(632),
+                height: scaleValue(632),
+                overflow: 'hidden',
+                borderRadius: scaleValue(53),
+              }}
+            >
+              <Image
+                src={project.image || ''}
+                alt={project.name}
+                fill
+                priority
+                sizes={`${Math.round(scaleValue(632))}px`}
+                className="object-cover object-center"
+              />
+            </div>
+
+            <h2
+              style={{
+                position: 'absolute',
+                left: scaleValue(45),
+                top: scaleValue(718),
+                margin: 0,
+                fontFamily: 'Inter, sans-serif',
+                fontSize: scaleValue(64),
+                lineHeight: `${scaleValue(77)}px`,
+                fontWeight: 700,
+                letterSpacing: '-0.04em',
+                color: '#FFFFFF',
+              }}
+            >
+              {project.name}
+            </h2>
+
+            <p
+              style={{
+                position: 'absolute',
+                left: scaleValue(45),
+                top: scaleValue(807),
+                width: scaleValue(632),
+                margin: 0,
+                fontFamily: 'Inter, sans-serif',
+                fontSize: scaleValue(36),
+                lineHeight: `${scaleValue(44)}px`,
+                fontWeight: 300,
+                color: '#FFFFFF',
+              }}
+            >
+              {currentDescription}
+            </p>
+
+            {primaryActionUrl ? (
+              <button
+                type="button"
+                onClick={() => {
+                  setIsStreamingModalOpen(true);
+                  onModalStateChange?.(true);
+                }}
+                style={{
+                  position: 'absolute',
+                  left: scaleValue(45),
+                  top: scaleValue(902),
+                  width: scaleValue(632),
+                  height: scaleValue(146),
+                  background: '#AF7D6B',
+                  borderRadius: scaleValue(51),
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'space-between',
+                  paddingLeft: scaleValue(49),
+                  paddingRight: scaleValue(37),
+                  textDecoration: 'none',
+                  color: '#FFFFFF',
+                  border: 'none',
+                  cursor: 'pointer',
+                }}
+              >
+                <span
+                  style={{
+                    fontFamily: 'Inter, sans-serif',
+                    fontSize: scaleValue(40),
+                    lineHeight: `${scaleValue(48)}px`,
+                    fontWeight: 700,
+                }}
+              >
+                Listen Now
+              </span>
+                <svg
+                  width={scaleValue(81)}
+                  height={scaleValue(40)}
+                  viewBox="0 0 81 40"
+                  fill="none"
+                >
+                  <path d="M0 20H63" stroke="white" strokeWidth={6} strokeLinecap="round" />
+                  <path d="M58 6L75 20L58 34" stroke="white" strokeWidth={6} strokeLinecap="round" strokeLinejoin="round" />
+                </svg>
+              </button>
+            ) : null}
+            </div>
+          </div>
+
+          {showScrollPrompt ? (
+            <button
+              onClick={onScrollPromptClick}
+              className="absolute transition-transform duration-300 hover:-translate-y-0.5"
+              style={{
+                left: scaleValue(277),
+                top: scaleValue(1552),
+                width: scaleValue(407),
+                height: scaleValue(121),
+                background: 'rgba(47, 47, 47, 0.68)',
+                borderRadius: scaleValue(100),
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'space-between',
+                paddingLeft: scaleValue(38),
+                paddingRight: scaleValue(34),
+                backdropFilter: 'blur(18px)',
+                WebkitBackdropFilter: 'blur(18px)',
+                color: '#FFFFFF',
+                zIndex: 14,
+                opacity: 1 - clamp(distance / 0.16, 0, 1),
+                transform: `translate3d(0, ${scaleValue(clamp(distance, 0, 1) * 38)}px, 0)`,
+                transition: 'transform 300ms ease-out, opacity 220ms ease-out',
+              }}
+            >
+              <span
+                style={{
+                  fontFamily: 'Inter, sans-serif',
+                  fontSize: scaleValue(32),
+                  lineHeight: `${scaleValue(39)}px`,
+                  fontWeight: 700,
+                }}
+              >
+                Scroll for more
+              </span>
+              <svg
+                width={scaleValue(55)}
+                height={scaleValue(55)}
+                viewBox="0 0 55 55"
+                fill="none"
+              >
+                <path d="M27.5 4V43" stroke="white" strokeWidth={6} strokeLinecap="round" />
+                <path d="M10 27.5L27.5 45L45 27.5" stroke="white" strokeWidth={6} strokeLinecap="round" strokeLinejoin="round" />
+              </svg>
+            </button>
+          ) : null}
+        </div>
+      </div>
+
+      <StreamingModal
+        project={project}
+        isOpen={isStreamingModalOpen}
+        onClose={() => {
+          setIsStreamingModalOpen(false);
+          onModalStateChange?.(false);
+        }}
+      />
+    </div>
+  );
+}
+
+function CautionScene({
+  project,
+  distance,
+  sceneScale,
+  onModalStateChange,
+}: {
+  project: Project;
+  distance: number;
+  sceneScale: number;
+  onModalStateChange?: (isOpen: boolean) => void;
+}) {
+  const [isStreamingModalOpen, setIsStreamingModalOpen] = useState(false);
+  const scaleValue = (value: number) => value * sceneScale;
+  const currentDescription = project.description;
+  const currentStreamingLinks = project.streamingLinks;
+  const primaryActionUrl =
+    currentStreamingLinks?.applemusic ||
+    currentStreamingLinks?.spotify ||
+    currentStreamingLinks?.youtubemusic ||
+    project.url;
+
+  const distanceMagnitude = clamp(Math.abs(distance), 0, 1);
+  const outgoingCardProgress = easeOutCubic(clamp((distance - 0.08) / 0.78, 0, 1));
+  const incomingCardProgress = easeOutCubic(clamp(Math.abs(Math.min(distance, 0)) / 0.9, 0, 1));
+  const cardScale = distance >= 0
+    ? 1 - (outgoingCardProgress * 0.26)
+    : 1 - (incomingCardProgress * 0.18);
+  const cardOpacity = 1 - (distanceMagnitude * 0.18);
+  const cardTranslateY = outgoingCardProgress * 58;
+  const frameWidth = scaleValue(SOLENYA_FRAME.width);
+  const frameHeight = scaleValue(SOLENYA_FRAME.height);
+  const sceneLeft = (value: number) => `calc(50% - ${frameWidth / 2}px + ${scaleValue(value)}px)`;
+  const sceneTop = (value: number) => `calc(50% - ${frameHeight / 2}px + ${scaleValue(value)}px)`;
+
+  return (
+    <div className="relative h-full w-full overflow-hidden">
+      {cautionStickers.map((sticker) => {
+        const stickerState = getSceneStickerState(sticker, distance);
+
+        return (
+          <div
+            key={sticker.key}
+            className="pointer-events-none absolute solenya-sticker-enter"
+            style={{
+              left: sceneLeft(sticker.frame.left),
+              top: sceneTop(sticker.frame.top),
+              width: scaleValue(sticker.frame.size),
+              height: scaleValue(sticker.frame.size),
+              zIndex: sticker.zIndex,
+              '--intro-x': `${scaleValue(sticker.intro.x)}px`,
+              '--intro-y': `${scaleValue(sticker.intro.y)}px`,
+              '--intro-rotate': `${sticker.intro.rotate}deg`,
+              animationDelay: sticker.intro.delay,
+            } as React.CSSProperties}
+          >
+            <div
+              style={{
+                opacity: stickerState.opacity,
+                transform: `translate3d(${scaleValue(stickerState.translateX)}px, ${scaleValue(stickerState.translateY)}px, 0) rotate(${stickerState.rotate}deg) scale(${stickerState.scale})`,
+                willChange: 'transform, opacity',
+                transition: 'transform 520ms cubic-bezier(0.22, 1, 0.36, 1), opacity 320ms ease-out',
+              }}
+            >
+              <div
+                className="solenya-sticker-float h-full w-full"
+                style={
+                  {
+                    '--float-x': `${scaleValue(sticker.float.x)}px`,
+                    '--float-y': `${scaleValue(sticker.float.y)}px`,
+                    '--float-rotate': `${sticker.float.rotate}deg`,
+                    '--float-duration': sticker.float.duration,
+                    animationDelay: sticker.float.delay,
+                  } as React.CSSProperties
+                }
+              >
+                <img
+                  src={sticker.src}
+                  alt={sticker.alt}
+                  draggable={false}
+                  loading="eager"
+                  className="h-full w-full object-contain select-none"
+                  style={sticker.flipX ? { transform: 'scaleX(-1)' } : undefined}
+                />
+              </div>
+            </div>
+          </div>
+        );
+      })}
+
+      <div className="absolute inset-0 flex items-center justify-center">
+        <div
+          className="relative"
+          style={{
+            width: frameWidth,
+            height: frameHeight,
+          }}
+        >
+          <div
+            className="absolute solenya-card-enter"
+            style={{
+              left: scaleValue(120),
+              top: scaleValue(208),
+              width: scaleValue(722),
+              height: scaleValue(1086),
+              zIndex: 10,
+              animationDelay: '0.14s',
+            }}
+          >
+            <div
+              style={{
+                position: 'relative',
+                width: '100%',
+                height: '100%',
+                background: '#241804',
+                borderRadius: scaleValue(100),
+                boxShadow: '0px 4px 4px rgba(0, 0, 0, 0.25)',
+                opacity: cardOpacity,
+                transform: `translate3d(0, ${scaleValue(cardTranslateY)}px, 0) scale(${cardScale})`,
+                transformOrigin: 'center center',
+                willChange: 'transform, opacity',
+                transition: 'transform 760ms cubic-bezier(0.22, 1, 0.36, 1), opacity 420ms ease-out',
+              }}
+            >
+              <div
+                style={{
+                  position: 'absolute',
+                  left: scaleValue(47),
+                  top: scaleValue(52),
+                  width: scaleValue(630),
+                  height: scaleValue(630),
+                  overflow: 'hidden',
+                  borderRadius: scaleValue(48),
+                }}
+              >
+                <Image
+                  src={project.image || ''}
+                  alt={project.name}
+                  fill
+                  priority
+                  sizes={`${Math.round(scaleValue(630))}px`}
+                  className="object-cover"
+                  style={{ objectPosition: 'center top' }}
+                />
+              </div>
+
+              <h2
+                style={{
+                  position: 'absolute',
+                  left: scaleValue(45),
+                  top: scaleValue(718),
+                  margin: 0,
+                  fontFamily: 'Inter, sans-serif',
+                  fontSize: scaleValue(64),
+                  lineHeight: `${scaleValue(77)}px`,
+                  fontWeight: 700,
+                  letterSpacing: '-0.04em',
+                  color: '#FFFFFF',
+                }}
+              >
+                {project.name}
+              </h2>
+
+              <p
+                style={{
+                  position: 'absolute',
+                  left: scaleValue(45),
+                  top: scaleValue(807),
+                  width: scaleValue(632),
+                  margin: 0,
+                  fontFamily: 'Inter, sans-serif',
+                  fontSize: scaleValue(36),
+                  lineHeight: `${scaleValue(44)}px`,
+                  fontWeight: 300,
+                  color: '#FFFFFF',
+                }}
+              >
+                {currentDescription}
+              </p>
+
+              {primaryActionUrl ? (
+                <button
+                  type="button"
+                  onClick={() => {
+                    setIsStreamingModalOpen(true);
+                    onModalStateChange?.(true);
+                  }}
+                  style={{
+                    position: 'absolute',
+                    left: scaleValue(45),
+                    top: scaleValue(902),
+                    width: scaleValue(632),
+                    height: scaleValue(146),
+                    background: '#B4907B',
+                    borderRadius: scaleValue(51),
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'space-between',
+                    paddingLeft: scaleValue(49),
+                    paddingRight: scaleValue(37),
+                    color: '#FFFFFF',
+                    border: 'none',
+                    cursor: 'pointer',
+                  }}
+                >
+                  <span
+                    style={{
+                      fontFamily: 'Inter, sans-serif',
+                      fontSize: scaleValue(40),
+                      lineHeight: `${scaleValue(48)}px`,
+                      fontWeight: 700,
+                    }}
+                  >
+                    Listen Now
+                  </span>
+                  <svg
+                    width={scaleValue(81)}
+                    height={scaleValue(40)}
+                    viewBox="0 0 81 40"
+                    fill="none"
+                  >
+                    <path d="M0 20H63" stroke="white" strokeWidth={6} strokeLinecap="round" />
+                    <path d="M58 6L75 20L58 34" stroke="white" strokeWidth={6} strokeLinecap="round" strokeLinejoin="round" />
+                  </svg>
+                </button>
+              ) : null}
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <StreamingModal
+        project={project}
+        isOpen={isStreamingModalOpen}
+        onClose={() => {
+          setIsStreamingModalOpen(false);
+          onModalStateChange?.(false);
+        }}
+      />
+    </div>
+  );
+}
+
+function ReminderScene({
+  project,
+  distance,
+  sceneScale,
+}: {
+  project: Project;
+  distance: number;
+  sceneScale: number;
+}) {
+  const scaleValue = (value: number) => value * sceneScale;
+  const displayTitle = 'Just a reminder to live life';
+  const displayDescription = 'thoughts, moments, and in-between';
+  const primaryActionUrl = project.url;
+
+  const distanceMagnitude = clamp(Math.abs(distance), 0, 1);
+  const outgoingCardProgress = easeOutCubic(clamp((distance - 0.08) / 0.78, 0, 1));
+  const incomingCardProgress = easeOutCubic(clamp(Math.abs(Math.min(distance, 0)) / 0.9, 0, 1));
+  const cardScale = distance >= 0
+    ? 1 - (outgoingCardProgress * 0.26)
+    : 1 - (incomingCardProgress * 0.18);
+  const cardOpacity = 1 - (distanceMagnitude * 0.18);
+  const cardTranslateY = outgoingCardProgress * 58;
+  const frameWidth = scaleValue(SOLENYA_FRAME.width);
+  const frameHeight = scaleValue(SOLENYA_FRAME.height);
+  const sceneLeft = (value: number) => `calc(50% - ${frameWidth / 2}px + ${scaleValue(value)}px)`;
+  const sceneTop = (value: number) => `calc(50% - ${frameHeight / 2}px + ${scaleValue(value)}px)`;
+
+  return (
+    <div className="relative h-full w-full overflow-hidden">
+      {reminderStickers.map((sticker) => {
+        const stickerState = getSceneStickerState(sticker, distance);
+
+        return (
+          <div
+            key={sticker.key}
+            className="pointer-events-none absolute solenya-sticker-enter"
+            style={{
+              left: sceneLeft(sticker.frame.left),
+              top: sceneTop(sticker.frame.top),
+              width: scaleValue(sticker.frame.size),
+              height: scaleValue(sticker.frame.size),
+              zIndex: sticker.zIndex,
+              '--intro-x': `${scaleValue(sticker.intro.x)}px`,
+              '--intro-y': `${scaleValue(sticker.intro.y)}px`,
+              '--intro-rotate': `${sticker.intro.rotate}deg`,
+              animationDelay: sticker.intro.delay,
+            } as React.CSSProperties}
+          >
+            <div
+              style={{
+                opacity: stickerState.opacity,
+                transform: `translate3d(${scaleValue(stickerState.translateX)}px, ${scaleValue(stickerState.translateY)}px, 0) rotate(${stickerState.rotate}deg) scale(${stickerState.scale})`,
+                willChange: 'transform, opacity',
+                transition: 'transform 520ms cubic-bezier(0.22, 1, 0.36, 1), opacity 320ms ease-out',
+              }}
+            >
+              <div
+                className="solenya-sticker-float h-full w-full"
+                style={
+                  {
+                    '--float-x': `${scaleValue(sticker.float.x)}px`,
+                    '--float-y': `${scaleValue(sticker.float.y)}px`,
+                    '--float-rotate': `${sticker.float.rotate}deg`,
+                    '--float-duration': sticker.float.duration,
+                    animationDelay: sticker.float.delay,
+                  } as React.CSSProperties
+                }
+              >
+                <img
+                  src={sticker.src}
+                  alt={sticker.alt}
+                  draggable={false}
+                  loading="eager"
+                  className="h-full w-full object-contain select-none"
+                />
+              </div>
+            </div>
+          </div>
+        );
+      })}
+
+      <div className="absolute inset-0 flex items-center justify-center">
+        <div
+          className="relative"
+          style={{
+            width: frameWidth,
+            height: frameHeight,
+          }}
+        >
+          <div
+            className="absolute solenya-card-enter"
+            style={{
+              left: scaleValue(120),
+              top: scaleValue(208),
+              width: scaleValue(722),
+              height: scaleValue(1176),
+              zIndex: 10,
+              animationDelay: '0.14s',
+            }}
+          >
+            <div
+              style={{
+                position: 'relative',
+                width: '100%',
+                height: '100%',
+                background: '#1F1F1F',
+                borderRadius: scaleValue(100),
+                boxShadow: '0px 4px 4px rgba(0, 0, 0, 0.25)',
+                opacity: cardOpacity,
+                transform: `translate3d(0, ${scaleValue(cardTranslateY)}px, 0) scale(${cardScale})`,
+                transformOrigin: 'center center',
+                willChange: 'transform, opacity',
+                transition: 'transform 760ms cubic-bezier(0.22, 1, 0.36, 1), opacity 420ms ease-out',
+              }}
+            >
+              <div
+                style={{
+                  position: 'absolute',
+                  left: scaleValue(46),
+                  top: scaleValue(51),
+                  width: scaleValue(631),
+                  height: scaleValue(631),
+                  overflow: 'hidden',
+                  borderRadius: scaleValue(49),
+                }}
+              >
+                <Image
+                  src={reminderSceneAssets.cover}
+                  alt={displayTitle}
+                  fill
+                  priority
+                  sizes={`${Math.round(scaleValue(631))}px`}
+                  className="object-cover object-center"
+                />
+              </div>
+
+              <h2
+                style={{
+                  position: 'absolute',
+                  left: scaleValue(45),
+                  top: scaleValue(718),
+                  width: scaleValue(632),
+                  margin: 0,
+                  fontFamily: 'Inter, sans-serif',
+                  fontSize: scaleValue(64),
+                  lineHeight: `${scaleValue(77)}px`,
+                  fontWeight: 700,
+                  letterSpacing: '-0.04em',
+                  color: '#FFFFFF',
+                }}
+              >
+                {displayTitle}
+              </h2>
+
+              <p
+                style={{
+                  position: 'absolute',
+                  left: scaleValue(45),
+                  top: scaleValue(885),
+                  width: scaleValue(632),
+                  margin: 0,
+                  fontFamily: 'Inter, sans-serif',
+                  fontSize: scaleValue(36),
+                  lineHeight: `${scaleValue(44)}px`,
+                  fontWeight: 300,
+                  color: '#FFFFFF',
+                }}
+              >
+                {displayDescription}
+              </p>
+
+              {primaryActionUrl ? (
+                <button
+                  type="button"
+                  onClick={() => window.open(primaryActionUrl, '_blank', 'noopener,noreferrer')}
+                  style={{
+                    position: 'absolute',
+                    left: scaleValue(45),
+                    top: scaleValue(980),
+                    width: scaleValue(632),
+                    height: scaleValue(146),
+                    background: '#525252',
+                    borderRadius: scaleValue(51),
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'space-between',
+                    paddingLeft: scaleValue(49),
+                    paddingRight: scaleValue(37),
+                    color: '#FFFFFF',
+                    border: 'none',
+                    cursor: 'pointer',
+                  }}
+                >
+                  <span
+                    style={{
+                      fontFamily: 'Inter, sans-serif',
+                      fontSize: scaleValue(40),
+                      lineHeight: `${scaleValue(48)}px`,
+                      fontWeight: 700,
+                    }}
+                  >
+                    Listen Now
+                  </span>
+                  <svg
+                    width={scaleValue(81)}
+                    height={scaleValue(40)}
+                    viewBox="0 0 81 40"
+                    fill="none"
+                  >
+                    <path d="M0 20H63" stroke="white" strokeWidth={6} strokeLinecap="round" />
+                    <path d="M58 6L75 20L58 34" stroke="white" strokeWidth={6} strokeLinecap="round" strokeLinejoin="round" />
+                  </svg>
+                </button>
+              ) : null}
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+function ScrapwrkScene({
+  project,
+  distance,
+  sceneScale,
+}: {
+  project: Project;
+  distance: number;
+  sceneScale: number;
+}) {
+  const scaleValue = (value: number) => value * sceneScale;
+  const displayTitle = 'SCRAPWRK';
+  const displayDescription = 'reconstructed pieces and identity';
+  const primaryActionUrl = project.url;
+
+  const distanceMagnitude = clamp(Math.abs(distance), 0, 1);
+  const outgoingCardProgress = easeOutCubic(clamp((distance - 0.08) / 0.78, 0, 1));
+  const incomingCardProgress = easeOutCubic(clamp(Math.abs(Math.min(distance, 0)) / 0.9, 0, 1));
+  const cardScale = distance >= 0
+    ? 1 - (outgoingCardProgress * 0.26)
+    : 1 - (incomingCardProgress * 0.18);
+  const cardOpacity = 1 - (distanceMagnitude * 0.18);
+  const cardTranslateY = outgoingCardProgress * 58;
+  const frameWidth = scaleValue(SOLENYA_FRAME.width);
+  const frameHeight = scaleValue(SOLENYA_FRAME.height);
+  const sceneLeft = (value: number) => `calc(50% - ${frameWidth / 2}px + ${scaleValue(value)}px)`;
+  const sceneTop = (value: number) => `calc(50% - ${frameHeight / 2}px + ${scaleValue(value)}px)`;
+
+  return (
+    <div className="relative h-full w-full overflow-hidden">
+      {scrapwrkStickers.map((sticker) => {
+        const stickerState = getSceneStickerState(sticker, distance);
+
+        return (
+          <div
+            key={sticker.key}
+            className="pointer-events-none absolute solenya-sticker-enter"
+            style={{
+              left: sceneLeft(sticker.frame.left),
+              top: sceneTop(sticker.frame.top),
+              width: scaleValue(sticker.frame.size),
+              height: scaleValue(sticker.frame.size),
+              zIndex: sticker.zIndex,
+              '--intro-x': `${scaleValue(sticker.intro.x)}px`,
+              '--intro-y': `${scaleValue(sticker.intro.y)}px`,
+              '--intro-rotate': `${sticker.intro.rotate}deg`,
+              animationDelay: sticker.intro.delay,
+            } as React.CSSProperties}
+          >
+            <div
+              style={{
+                opacity: stickerState.opacity,
+                transform: `translate3d(${scaleValue(stickerState.translateX)}px, ${scaleValue(stickerState.translateY)}px, 0) rotate(${stickerState.rotate}deg) scale(${stickerState.scale})`,
+                willChange: 'transform, opacity',
+                transition: 'transform 520ms cubic-bezier(0.22, 1, 0.36, 1), opacity 320ms ease-out',
+              }}
+            >
+              <div
+                className="solenya-sticker-float h-full w-full"
+                style={
+                  {
+                    '--float-x': `${scaleValue(sticker.float.x)}px`,
+                    '--float-y': `${scaleValue(sticker.float.y)}px`,
+                    '--float-rotate': `${sticker.float.rotate}deg`,
+                    '--float-duration': sticker.float.duration,
+                    animationDelay: sticker.float.delay,
+                  } as React.CSSProperties
+                }
+              >
+                <img
+                  src={sticker.src}
+                  alt={sticker.alt}
+                  draggable={false}
+                  loading="eager"
+                  className="h-full w-full object-contain select-none"
+                />
+              </div>
+            </div>
+          </div>
+        );
+      })}
+
+      <div className="absolute inset-0 flex items-center justify-center">
+        <div
+          className="relative"
+          style={{
+            width: frameWidth,
+            height: frameHeight,
+          }}
+        >
+          <div
+            className="absolute solenya-card-enter"
+            style={{
+              left: scaleValue(120),
+              top: scaleValue(208),
+              width: scaleValue(722),
+              height: scaleValue(1094),
+              zIndex: 10,
+              animationDelay: '0.14s',
+            }}
+          >
+            <div
+              style={{
+                position: 'relative',
+                width: '100%',
+                height: '100%',
+                background: '#1F1F1F',
+                borderRadius: scaleValue(100),
+                boxShadow: '0px 4px 4px rgba(0, 0, 0, 0.25)',
+                opacity: cardOpacity,
+                transform: `translate3d(0, ${scaleValue(cardTranslateY)}px, 0) scale(${cardScale})`,
+                transformOrigin: 'center center',
+                willChange: 'transform, opacity',
+                transition: 'transform 760ms cubic-bezier(0.22, 1, 0.36, 1), opacity 420ms ease-out',
+              }}
+            >
+              <div
+                style={{
+                  position: 'absolute',
+                  left: scaleValue(46),
+                  top: scaleValue(51),
+                  width: scaleValue(631),
+                  height: scaleValue(632),
+                  overflow: 'hidden',
+                  borderRadius: scaleValue(50),
+                }}
+              >
+                <Image
+                  src={scrapwrkSceneAssets.cover}
+                  alt={displayTitle}
+                  fill
+                  priority
+                  sizes={`${Math.round(scaleValue(631))}px`}
+                  className="object-cover object-center"
+                />
+              </div>
+
+              <h2
+                style={{
+                  position: 'absolute',
+                  left: scaleValue(45),
+                  top: scaleValue(718),
+                  width: scaleValue(632),
+                  margin: 0,
+                  fontFamily: 'Inter, sans-serif',
+                  fontSize: scaleValue(64),
+                  lineHeight: `${scaleValue(77)}px`,
+                  fontWeight: 700,
+                  letterSpacing: '-0.04em',
+                  color: '#FFFFFF',
+                }}
+              >
+                {displayTitle}
+              </h2>
+
+              <p
+                style={{
+                  position: 'absolute',
+                  left: scaleValue(45),
+                  top: scaleValue(807),
+                  width: scaleValue(632),
+                  margin: 0,
+                  fontFamily: 'Inter, sans-serif',
+                  fontSize: scaleValue(36),
+                  lineHeight: `${scaleValue(44)}px`,
+                  fontWeight: 300,
+                  color: '#FFFFFF',
+                }}
+              >
+                {displayDescription}
+              </p>
+
+              {primaryActionUrl ? (
+                <button
+                  type="button"
+                  onClick={() => window.open(primaryActionUrl, '_blank', 'noopener,noreferrer')}
+                  style={{
+                    position: 'absolute',
+                    left: scaleValue(45),
+                    top: scaleValue(896),
+                    width: scaleValue(632),
+                    height: scaleValue(146),
+                    background: '#525252',
+                    borderRadius: scaleValue(51),
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'space-between',
+                    paddingLeft: scaleValue(49),
+                    paddingRight: scaleValue(37),
+                    color: '#FFFFFF',
+                    border: 'none',
+                    cursor: 'pointer',
+                  }}
+                >
+                  <span
+                    style={{
+                      fontFamily: 'Inter, sans-serif',
+                      fontSize: scaleValue(40),
+                      lineHeight: `${scaleValue(48)}px`,
+                      fontWeight: 700,
+                    }}
+                  >
+                    Visit
+                  </span>
+                  <svg
+                    width={scaleValue(81)}
+                    height={scaleValue(40)}
+                    viewBox="0 0 81 40"
+                    fill="none"
+                  >
+                    <path d="M0 20H63" stroke="white" strokeWidth={6} strokeLinecap="round" />
+                    <path d="M58 6L75 20L58 34" stroke="white" strokeWidth={6} strokeLinecap="round" strokeLinejoin="round" />
+                  </svg>
+                </button>
+              ) : null}
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+}
 
 export default function HomePage() {
   const { music, fashion } = getProjects();
-  const allProjects = [...music, ...fashion]; // Music first, then fashion
+  const allProjects = [...music, ...fashion]
+    .filter((project) => !HIDDEN_HOMEPAGE_PROJECTS.has(project.name))
+    .sort((leftProject, rightProject) => {
+      const leftIndex = HOMEPAGE_PROJECT_ORDER.indexOf(leftProject.name);
+      const rightIndex = HOMEPAGE_PROJECT_ORDER.indexOf(rightProject.name);
+      const safeLeftIndex = leftIndex === -1 ? Number.MAX_SAFE_INTEGER : leftIndex;
+      const safeRightIndex = rightIndex === -1 ? Number.MAX_SAFE_INTEGER : rightIndex;
+
+      return safeLeftIndex - safeRightIndex;
+    });
   const [activeIndex, setActiveIndex] = useState(0);
+  const [scrollProgress, setScrollProgress] = useState(0);
   const [isTransitioning, setIsTransitioning] = useState(false);
+  const [isModalOpen, setIsModalOpen] = useState(false);
+  const [showScrollPrompt, setShowScrollPrompt] = useState(true);
+  const [solenyaScale, setSolenyaScale] = useState<number | null>(null);
+  const [isSceneReady, setIsSceneReady] = useState(false);
+  const [containerSize, setContainerSize] = useState({ width: 0, height: 0, imageAspectRatio: 16 / 9 });
+  const clampedBackgroundProgress = clamp(scrollProgress, 0, allProjects.length);
+  const currentBackgroundIndex = Math.floor(clampedBackgroundProgress);
+  const nextBackgroundIndex = Math.min(currentBackgroundIndex + 1, allProjects.length);
+  const backgroundBlend = clampedBackgroundProgress - currentBackgroundIndex;
+  const currentBackground = getSlideBackground(currentBackgroundIndex, allProjects);
+  const nextBackground = getSlideBackground(nextBackgroundIndex, allProjects);
+
+  const handleModalStateChange = (isOpen: boolean) => {
+    setIsModalOpen(isOpen);
+  };
+
+  const calculateContainerSize = () => {
+    const vw = window.innerWidth;
+    const vh = window.innerHeight;
+    const horizontalPadding = Math.max(24, vw * 0.05);
+    const topPadding = 48;
+    const bottomSpacing = isModalOpen ? 10 : 40;
+    const availableWidth = vw - (horizontalPadding * 2);
+    const availableHeight = vh - topPadding - bottomSpacing;
+
+    const containerWidth = Math.min(availableWidth, Math.max(320, vw * 0.45));
+    const containerHeight = Math.min(availableHeight, Math.max(380, vh * 0.4));
+    const maxImageWidth = containerWidth - 48;
+    const maxImageHeight = containerHeight * 0.55;
+    const naturalImageRatio = maxImageWidth / maxImageHeight;
+    let imageAspectRatio = Math.min(1, naturalImageRatio);
+
+    imageAspectRatio = Math.max(0.6, Math.min(1, imageAspectRatio));
+
+    return {
+      width: Math.max(320, containerWidth),
+      height: Math.max(400, containerHeight),
+      imageAspectRatio,
+    };
+  };
+
+  const calculateSolenyaScale = () => {
+    return Math.min(
+      window.innerWidth / SOLENYA_FRAME.width,
+      window.innerHeight / SOLENYA_FRAME.height
+    );
+  };
+
+  const handleScrollToNext = () => {
+    const container = document.querySelector('.scroll-container');
+    if (container) {
+      container.scrollTo({
+        top: container.clientHeight,
+        behavior: 'smooth',
+      });
+    }
+    setShowScrollPrompt(false);
+  };
+
+  useEffect(() => {
+    const updateLayout = () => {
+      setContainerSize(calculateContainerSize());
+      setSolenyaScale(calculateSolenyaScale());
+      setIsSceneReady(true);
+    };
+
+    updateLayout();
+    window.addEventListener('resize', updateLayout);
+
+    return () => window.removeEventListener('resize', updateLayout);
+  }, [isModalOpen]);
+
+  useEffect(() => {
+    if (activeIndex > 0) {
+      setShowScrollPrompt(false);
+    }
+  }, [activeIndex]);
+
+  useEffect(() => {
+    const initializeScroll = () => {
+      const container = document.querySelector('.scroll-container');
+      if (container) {
+        container.scrollTop = 0;
+        setActiveIndex(0);
+        setScrollProgress(0);
+      }
+    };
+
+    const timer = setTimeout(initializeScroll, 100);
+    return () => clearTimeout(timer);
+  }, []);
 
   useEffect(() => {
     const handleScroll = () => {
@@ -19,183 +1597,208 @@ export default function HomePage() {
       const scrollTop = container.scrollTop;
       const containerHeight = container.clientHeight;
       const newIndex = Math.round(scrollTop / containerHeight);
-      
-      if (newIndex !== activeIndex && newIndex >= 0 && newIndex <= allProjects.length) {
-        setIsTransitioning(true);
-        setActiveIndex(newIndex);
-        
-        // Shorter transition reset for smoother feel
-        setTimeout(() => setIsTransitioning(false), 400);
-      }
-    };
 
-    // Initialize the first container as active on mount
-    const initializeActiveState = () => {
-      const container = document.querySelector('.scroll-container');
-      if (container) {
-        const scrollTop = container.scrollTop;
-        const containerHeight = container.clientHeight;
-        const initialIndex = Math.round(scrollTop / containerHeight);
-        setActiveIndex(initialIndex);
-      }
-    };
+      setScrollProgress(scrollTop / containerHeight);
 
-    // Set initial state after component mounts
-    setTimeout(initializeActiveState, 100);
+      setActiveIndex((currentIndex) => {
+        if (newIndex !== currentIndex && newIndex >= 0 && newIndex <= allProjects.length) {
+          setIsTransitioning(true);
+          setTimeout(() => setIsTransitioning(false), 400);
+          return newIndex;
+        }
+        return currentIndex;
+      });
+    };
 
     const container = document.querySelector('.scroll-container');
     if (container) {
       container.addEventListener('scroll', handleScroll);
       return () => container.removeEventListener('scroll', handleScroll);
     }
-  }, [activeIndex, allProjects.length]);
+  }, [allProjects.length]);
 
   return (
     <div className="min-h-screen bg-black relative overflow-hidden">
-      {/* Navigation Component */}
-      <Navigation />
+      <div className="fixed inset-0 bg-black" />
+      <BackgroundLayer background={currentBackground} opacity={1} />
+      {nextBackgroundIndex !== currentBackgroundIndex ? (
+        <BackgroundLayer background={nextBackground} opacity={backgroundBlend} />
+      ) : null}
+      <div className="solenya-gradient-reveal pointer-events-none fixed inset-0 z-[1] bg-black" />
 
-      {/* Enhanced Apple-inspired Ambient Background with Better Depth */}
-      <div className="absolute inset-0">
-        {/* Multi-layered gradient base for depth */}
-        <div className="absolute inset-0 bg-gradient-to-br from-gray-900/12 via-black to-gray-800/12"></div>
-        <div className="absolute inset-0 bg-gradient-to-tr from-purple-900/5 via-transparent to-blue-900/5"></div>
-        
-        {/* Refined floating orbs with better positioning and depth */}
-        <div className="absolute top-[15%] left-[18%] w-96 h-96 sm:w-[600px] sm:h-[600px] bg-purple-500/3 rounded-full blur-3xl animate-pulse"></div>
-        <div className="absolute bottom-[20%] right-[15%] w-80 h-80 sm:w-[500px] sm:h-[500px] bg-blue-500/3 rounded-full blur-3xl animate-pulse delay-1000"></div>
-        <div className="absolute top-[65%] left-[65%] w-64 h-64 sm:w-96 sm:h-96 bg-violet-500/2 rounded-full blur-3xl animate-pulse delay-500"></div>
-        
-        {/* Subtle mesh pattern for texture */}
-        <div className="absolute inset-0 opacity-[0.015]" style={{
-          backgroundImage: `radial-gradient(circle at 3px 3px, rgba(255,255,255,0.3) 1px, transparent 0)`,
-          backgroundSize: '80px 80px'
-        }}></div>
-        
-        {/* Enhanced vignette for focus */}
-        <div className="absolute inset-0 bg-gradient-to-r from-black/15 via-transparent to-black/15"></div>
-        <div className="absolute inset-0 bg-gradient-to-b from-black/8 via-transparent to-black/25"></div>
-      </div>
-
-      {/* Main Content Container with enhanced scroll animations */}
-      <div className="scroll-container relative z-10 h-screen overflow-y-auto snap-y snap-mandatory scroll-smooth pt-20">
-        {/* Projects Container with smooth transition animations */}
-        <div className="w-full max-w-none px-6 sm:px-8 md:px-12 lg:px-16 xl:px-20 2xl:px-24">
+      <div className="scroll-container relative z-10 h-screen overflow-y-auto snap-y snap-mandatory scroll-smooth">
+        <div className="w-full max-w-none">
           {allProjects.map((project, index) => {
             const isActive = index === activeIndex;
             const isPrevious = index === activeIndex - 1;
             const isNext = index === activeIndex + 1;
-            
-            return (
+            const isSolenya = project.name === 'SOLENYA';
+            const isCaution = project.name === 'CAUTION';
+            const isReminder = project.name === 'Just A Reminder To Live Life';
+            const isScrapwrk = project.name === 'Scrapwrk Store';
+            const distanceFromCenter = Math.abs(scrollProgress - index);
+            const continuousDistance = clamp(distanceFromCenter, 0, 1.2);
+
+            if (isSolenya) {
+              if (!isSceneReady || solenyaScale === null) {
+                return (
+                  <div key={project.name} className="relative h-screen snap-center overflow-hidden" />
+                );
+              }
+
+              return (
+                <div key={project.name} className="relative h-screen snap-center overflow-hidden">
+                  <SolenyaScene
+                    project={project}
+                    distance={scrollProgress - index}
+                    sceneScale={solenyaScale}
+                    showScrollPrompt={showScrollPrompt && activeIndex === 0 && !isModalOpen}
+                    onScrollPromptClick={handleScrollToNext}
+                    onModalStateChange={handleModalStateChange}
+                  />
+                </div>
+              );
+            }
+
+            if (isCaution) {
+              if (!isSceneReady || solenyaScale === null) {
+                return (
+                  <div key={project.name} className="relative h-screen snap-center overflow-hidden" />
+                );
+              }
+
+              return (
+                <div key={project.name} className="relative h-screen snap-center overflow-hidden">
+                  <CautionScene
+                    project={project}
+                    distance={scrollProgress - index}
+                    sceneScale={solenyaScale}
+                    onModalStateChange={handleModalStateChange}
+                  />
+                </div>
+              );
+            }
+
+            if (isReminder) {
+              if (!isSceneReady || solenyaScale === null) {
+                return (
+                  <div key={project.name} className="relative h-screen snap-center overflow-hidden" />
+                );
+              }
+
+              return (
+                <div key={project.name} className="relative h-screen snap-center overflow-hidden">
+                  <ReminderScene
+                    project={project}
+                    distance={scrollProgress - index}
+                    sceneScale={solenyaScale}
+                  />
+                </div>
+              );
+            }
+
+            if (isScrapwrk) {
+              if (!isSceneReady || solenyaScale === null) {
+                return (
+                  <div key={project.name} className="relative h-screen snap-center overflow-hidden" />
+                );
+              }
+
+              return (
+                <div key={project.name} className="relative h-screen snap-center overflow-hidden">
+                  <ScrapwrkScene
+                    project={project}
+                    distance={scrollProgress - index}
+                    sceneScale={solenyaScale}
+                  />
+                </div>
+              );
+            }
+
+            const projectCard = (
               <div
-                key={project.name}
-                className="h-screen snap-center flex items-start justify-center pt-24"
-              >
-                <div 
-                  className={`
-                    w-full max-w-sm sm:max-w-md md:max-w-lg lg:max-w-2xl xl:max-w-3xl 2xl:max-w-4xl 
-                    relative z-0 transform-gpu origin-center
-                    hover:scale-105 hover:duration-200 hover:ease-out
-                    ${isActive ? 
-                      'scale-100 opacity-100' : 
-                      isPrevious ? 
+                className={`
+                  relative z-0 origin-center transform-gpu hover:scale-105 hover:duration-200 hover:ease-out
+                  ${isActive ?
+                    'scale-100 opacity-100' :
+                    isPrevious ?
+                      'scale-75 opacity-30' :
+                      isNext ?
                         'scale-75 opacity-30' :
-                        isNext ?
-                          'scale-75 opacity-30' :
-                          'scale-50 opacity-0'
-                    }
-                  `}
-                  style={{
-                    filter: isActive ? 'blur(0px)' : 'blur(1px)',
-                    transition: isTransitioning 
-                      ? 'all 0.35s cubic-bezier(0.25, 0.46, 0.45, 0.94), filter 0.25s ease-out' 
-                      : 'all 0.4s cubic-bezier(0.23, 1, 0.32, 1), filter 0.3s ease-out'
-                  }}
-                >
-                  <ProjectCard project={project} />
+                        'scale-50 opacity-0'
+                  }
+                `}
+                style={{
+                  width: `${containerSize.width || 360}px`,
+                  maxWidth: `${containerSize.width || 360}px`,
+                  transform: `scale(${1 - (continuousDistance * 0.25)})`,
+                  opacity: Math.max(0, 1 - (continuousDistance * 0.72)),
+                  filter: `blur(${Math.min(continuousDistance * 1.1, 1.2)}px)`,
+                  transition: isTransitioning
+                    ? 'all 0.35s cubic-bezier(0.25, 0.46, 0.45, 0.94), filter 0.25s ease-out'
+                    : 'all 0.4s cubic-bezier(0.23, 1, 0.32, 1), filter 0.3s ease-out',
+                }}
+              >
+                <ProjectCard
+                  project={project}
+                  onModalStateChange={handleModalStateChange}
+                  imageAspectRatio={containerSize.imageAspectRatio || 16 / 9}
+                />
+              </div>
+            );
+
+            return (
+              <div key={project.name} className="relative h-screen snap-center">
+                <div className="flex h-full w-full items-start justify-center px-6 pt-20 sm:px-8 md:px-12 lg:px-16 xl:px-20 2xl:px-24">
+                  {projectCard}
                 </div>
               </div>
             );
           })}
-        </div>
 
-        {/* Bottom Tab Section with enhanced transition */}
-        <div className="h-[calc(100vh-80px)] snap-center flex items-start justify-center px-6 sm:px-8 md:px-12 lg:px-16 xl:px-20 2xl:px-24 pt-4">
-          <div 
-            className={`
-              w-full max-w-4xl relative z-0 h-full transform-gpu origin-center
-              ${activeIndex === allProjects.length ? 
-                'scale-100 opacity-100' : 
-                'scale-90 opacity-60'
-              }
-            `}
-            style={{
-              filter: activeIndex === allProjects.length ? 'blur(0px)' : 'blur(0.5px)',
-              transition: 'all 0.4s cubic-bezier(0.23, 1, 0.32, 1), filter 0.3s ease-out'
-            }}
-          >
-            {/* Glass morphism tab container with controlled height */}
-            <div className="bg-white/5 backdrop-blur-xl border border-white/10 rounded-t-3xl p-8 sm:p-12 h-full overflow-y-auto">
-              {/* Tab handle indicator */}
-              <div className="flex justify-center mb-8">
-                <div className="w-12 h-1 bg-white/30 rounded-full"></div>
-              </div>
-              
-              {/* Content */}
-              <div className="space-y-8 text-center">
-                {/* Company branding */}
-                <div className="space-y-4">
-                  <h2 className="text-3xl sm:text-4xl font-bold text-white tracking-tight">
+          <div className="h-[calc(100vh-80px)] snap-center flex items-start justify-center px-6 sm:px-8 md:px-12 lg:px-16 xl:px-20 2xl:px-24 pt-4">
+            <div
+              className={`
+                w-full max-w-4xl relative z-0 h-full transform-gpu origin-center
+                ${activeIndex === allProjects.length ?
+                  'scale-100 opacity-100' :
+                  'scale-90 opacity-60'
+                }
+              `}
+              style={{
+                filter: activeIndex === allProjects.length ? 'blur(0px)' : 'blur(0.5px)',
+                transition: 'all 0.4s cubic-bezier(0.23, 1, 0.32, 1), filter 0.3s ease-out',
+              }}
+            >
+              <div className="h-full overflow-y-auto rounded-[2rem] bg-black/18 px-8 py-10 shadow-[0_24px_80px_rgba(0,0,0,0.24)] backdrop-blur-2xl sm:px-12 sm:py-12">
+                <div className="mx-auto flex max-w-3xl flex-col items-start text-left">
+                  <p className="text-[0.68rem] font-medium uppercase tracking-[0.38em] text-white/42">
                     NONPARALLEL
-                  </h2>
-                  <div className="w-20 h-px bg-gradient-to-r from-transparent via-white/40 to-transparent mx-auto"></div>
-                </div>
-                
-                {/* Project description */}
-                <div className="space-y-6 max-w-2xl mx-auto">
-                  <h3 className="text-xl sm:text-2xl font-semibold text-white/90">
-                    archive.bryton.studio
-                  </h3>
-                  <p className="text-gray-300 text-base sm:text-lg leading-relaxed">
-                    An experiment to push the limitations of combining music, fashion, and software. 
-                    This creative archive is always evolving, showcasing the intersection of digital 
-                    artistry and human expression.
                   </p>
-                </div>
-                
-                {/* Social Media Links */}
-                <div className="space-y-6 pt-8">
-                  <div className="flex items-center gap-4 justify-center">
-                    <div className="w-16 h-px bg-gradient-to-r from-transparent via-white/20 to-white/10"></div>
-                    <div className="w-2 h-2 bg-white/20 rounded-full"></div>
-                    <div className="w-16 h-px bg-gradient-to-l from-transparent via-white/20 to-white/10"></div>
+                  <h2 className="mt-4 text-3xl font-semibold tracking-tight text-white sm:text-4xl">
+                    Archive for music, fashion, and software experiments.
+                  </h2>
+                  <p className="mt-4 max-w-2xl text-sm leading-relaxed text-white/62 sm:text-base">
+                    A living body of work documenting releases, garments, and the systems built around them.
+                  </p>
+
+                  <div className="mt-8 flex items-center gap-4">
+                    <FooterSocialLink href="https://facebook.com/brytonzoz" label="Facebook">
+                      <FacebookIcon />
+                    </FooterSocialLink>
+                    <FooterSocialLink href="https://instagram.com/brytonzoz" label="Instagram">
+                      <InstagramIcon />
+                    </FooterSocialLink>
+                    <FooterSocialLink href="https://tiktok.com/@brytonzoz" label="TikTok">
+                      <TikTokIcon />
+                    </FooterSocialLink>
+                    <FooterSocialLink href="https://x.com/zozbryton" label="X">
+                      <XIcon />
+                    </FooterSocialLink>
                   </div>
-                  
-                  {/* Social Links */}
-                  <div className="grid grid-cols-2 sm:grid-cols-4 gap-4 max-w-md mx-auto">
-                    <a href="https://facebook.com/brytonzoz" target="_blank" rel="noopener noreferrer" 
-                       className="text-gray-400 hover:text-white transition-colors duration-300 text-sm">
-                      Facebook
-                    </a>
-                    <a href="https://instagram.com/brytonzoz" target="_blank" rel="noopener noreferrer"
-                       className="text-gray-400 hover:text-white transition-colors duration-300 text-sm">
-                      Instagram
-                    </a>
-                    <a href="https://tiktok.com/@brytonzoz" target="_blank" rel="noopener noreferrer"
-                       className="text-gray-400 hover:text-white transition-colors duration-300 text-sm">
-                      TikTok
-                    </a>
-                    <a href="https://x.com/zozbryton" target="_blank" rel="noopener noreferrer"
-                       className="text-gray-400 hover:text-white transition-colors duration-300 text-sm">
-                      X (Twitter)
-                    </a>
-                  </div>
-                </div>
-                
-                {/* Footer */}
-                <div className="pt-12 pb-8">
-                  <p className="text-gray-600 text-xs sm:text-sm font-light tracking-wide">
-                    © 2025 Bryton Zoz • NONPARALLEL™
+
+                  <p className="mt-7 text-[0.72rem] font-light tracking-[0.22em] text-white/34 sm:text-xs">
+                    © 2026 Bryton Zoz • NONPARALLEL™
                   </p>
                 </div>
               </div>
@@ -205,4 +1808,4 @@ export default function HomePage() {
       </div>
     </div>
   );
-} 
+}

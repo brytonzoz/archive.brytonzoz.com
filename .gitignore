@@ -90,6 +90,9 @@ yarn-error.log*
 # vercel
 .vercel
 
+# Nested standalone projects
+lisa-comic-glow-up/
+
 # typescript
 *.tsbuildinfo
 next-env.d.ts

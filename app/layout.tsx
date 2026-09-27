@@ -9,20 +9,21 @@ const inter = Inter({
 })
 
 export const metadata: Metadata = {
-  title: 'archive.bryton.studio - Creative Projects',
+  metadataBase: new URL('https://brytonzoz.com'),
+  title: 'Bryton Zoz - Creative Projects',
   description: 'Find music and fashion creative projects by Bryton',
-  keywords: 'music, fashion, creative, archive, bryton studio',
+  keywords: 'Bryton Zoz, music, fashion, creative, archive',
   authors: [{ name: 'Bryton' }],
   openGraph: {
-    title: 'archive.bryton.studio - Creative Projects',
+    title: 'Bryton Zoz - Creative Projects',
     description: 'Find music and fashion creative projects by Bryton',
-    url: 'https://archive.bryton.studio',
-    siteName: 'archive.bryton.studio',
+    url: 'https://brytonzoz.com',
+    siteName: 'Bryton Zoz',
     type: 'website',
   },
   twitter: {
     card: 'summary_large_image',
-    title: 'archive.bryton.studio - Creative Projects',
+    title: 'Bryton Zoz - Creative Projects',
     description: 'Find music and fashion creative projects by Bryton',
   },
   robots: {

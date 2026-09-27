@@ -9,10 +9,15 @@
     "html_handling": "auto-trailing-slash",
     "not_found_handling": "404-page"
   },
-  "workers_dev": true,
+  // `npm run deploy` -> production on brytonzoz.com (www/archive redirect via workers/redirects).
+  "routes": [
+    { "pattern": "brytonzoz.com", "custom_domain": true }
+  ],
+  "workers_dev": false,
   "env": {
     // `npm run deploy:staging` -> Worker "archive-staging" on workers.dev, separate from production.
     "staging": {
+      "routes": [],
       "workers_dev": true
     }
   }

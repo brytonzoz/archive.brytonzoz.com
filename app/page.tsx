@@ -1,8 +1,8 @@
 'use client';
 
-import React, { useEffect, useState } from 'react';
-import Image from 'next/image';
+import React, { useCallback, useEffect, useState } from 'react';
 import { ProjectCard, StreamingModal } from '../components/ProjectCard';
+import { ResponsiveImage, placeholderBackground } from '../components/ResponsiveImage';
 import { getProjects } from '../lib/projects';
 import { cautionSceneAssets, reminderSceneAssets, scrapwrkSceneAssets, solenyaSceneAssets } from '../lib/assets';
 import { Project, isProjectReleased } from '../lib/utils';
@@ -275,6 +275,20 @@ const SOLENYA_FRAME = {
   height: 1758,
 };
 
+// Scenes are laid out in design units; --scene-unit (globals.css) fits the frame to the viewport
+// in pure CSS so the first scene renders from static HTML before any JavaScript runs.
+const scaleValue = (value: number) => `calc(var(--scene-unit) * ${value})`;
+const sceneLeft = (value: number) => `calc(50% + var(--scene-unit) * ${value - (SOLENYA_FRAME.width / 2)})`;
+const sceneTop = (value: number) => `calc(50% + var(--scene-unit) * ${value - (SOLENYA_FRAME.height / 2)})`;
+const SCENE_FRAME_WIDTH = scaleValue(SOLENYA_FRAME.width);
+const SCENE_FRAME_HEIGHT = scaleValue(SOLENYA_FRAME.height);
+
+const sceneImageSizes = (designWidth: number) => {
+  const byHeight = ((designWidth / SOLENYA_FRAME.height) * 100).toFixed(2);
+  const byWidth = ((designWidth / SOLENYA_FRAME.width) * 100).toFixed(2);
+  return `(min-aspect-ratio: ${SOLENYA_FRAME.width}/${SOLENYA_FRAME.height}) ${byHeight}vh, ${byWidth}vw`;
+};
+
 const solenyaStickers = [
   {
     key: 'light-cloud',
@@ -499,23 +513,22 @@ const scrapwrkStickers = [
   },
 ];
 
-function SolenyaScene({
+const SolenyaScene = React.memo(function SolenyaScene({
   project,
   distance,
-  sceneScale,
+  loadImages,
   showScrollPrompt,
   onScrollPromptClick,
   onModalStateChange,
 }: {
   project: Project;
   distance: number;
-  sceneScale: number;
+  loadImages: boolean;
   showScrollPrompt: boolean;
   onScrollPromptClick: () => void;
   onModalStateChange?: (isOpen: boolean) => void;
 }) {
   const [isStreamingModalOpen, setIsStreamingModalOpen] = useState(false);
-  const scaleValue = (value: number) => value * sceneScale;
   const isReleased = isProjectReleased(project);
   const currentDescription = isReleased
     ? (project.postReleaseDescription || project.description)
@@ -537,10 +550,6 @@ function SolenyaScene({
     : 1 - (incomingCardProgress * 0.18);
   const cardOpacity = 1 - (distanceMagnitude * 0.18);
   const cardTranslateY = outgoingCardProgress * 58;
-  const frameWidth = scaleValue(SOLENYA_FRAME.width);
-  const frameHeight = scaleValue(SOLENYA_FRAME.height);
-  const sceneLeft = (value: number) => `calc(50% - ${frameWidth / 2}px + ${scaleValue(value)}px)`;
-  const sceneTop = (value: number) => `calc(50% - ${frameHeight / 2}px + ${scaleValue(value)}px)`;
 
   return (
     <div className="relative h-full w-full overflow-hidden">
@@ -557,8 +566,8 @@ function SolenyaScene({
               width: scaleValue(sticker.frame.size),
               height: scaleValue(sticker.frame.size),
               zIndex: sticker.zIndex,
-              '--intro-x': `${scaleValue(sticker.intro.x)}px`,
-              '--intro-y': `${scaleValue(sticker.intro.y)}px`,
+              '--intro-x': scaleValue(sticker.intro.x),
+              '--intro-y': scaleValue(sticker.intro.y),
               '--intro-rotate': `${sticker.intro.rotate}deg`,
               animationDelay: sticker.intro.delay,
             } as React.CSSProperties}
@@ -566,7 +575,7 @@ function SolenyaScene({
             <div
               style={{
                 opacity: stickerState.opacity,
-                transform: `translate3d(${scaleValue(stickerState.translateX)}px, ${scaleValue(stickerState.translateY)}px, 0) rotate(${stickerState.rotate}deg) scale(${stickerState.scale})`,
+                transform: `translate3d(${scaleValue(stickerState.translateX)}, ${scaleValue(stickerState.translateY)}, 0) rotate(${stickerState.rotate}deg) scale(${stickerState.scale})`,
                 willChange: 'transform, opacity',
                 transition: 'transform 520ms cubic-bezier(0.22, 1, 0.36, 1), opacity 320ms ease-out',
               }}
@@ -575,21 +584,23 @@ function SolenyaScene({
                 className="solenya-sticker-float h-full w-full"
                 style={
                   {
-                    '--float-x': `${scaleValue(sticker.float.x)}px`,
-                    '--float-y': `${scaleValue(sticker.float.y)}px`,
+                    '--float-x': scaleValue(sticker.float.x),
+                    '--float-y': scaleValue(sticker.float.y),
                     '--float-rotate': `${sticker.float.rotate}deg`,
                     '--float-duration': sticker.float.duration,
                     animationDelay: sticker.float.delay,
                   } as React.CSSProperties
                 }
               >
-                <img
-                  src={sticker.src}
-                  alt={sticker.alt}
-                  draggable={false}
-                  loading="eager"
-                  className="h-full w-full object-contain select-none"
-                />
+                {loadImages ? (
+                  <ResponsiveImage
+                    asset={sticker.src}
+                    alt={sticker.alt}
+                    sizes={sceneImageSizes(sticker.frame.size)}
+                    draggable={false}
+                    className="h-full w-full object-contain select-none"
+                  />
+                ) : null}
               </div>
             </div>
           </div>
@@ -600,8 +611,8 @@ function SolenyaScene({
         <div
           className="relative"
           style={{
-            width: frameWidth,
-            height: frameHeight,
+            width: SCENE_FRAME_WIDTH,
+            height: SCENE_FRAME_HEIGHT,
           }}
         >
           <div
@@ -624,7 +635,7 @@ function SolenyaScene({
                 borderRadius: scaleValue(100),
                 boxShadow: '0px 4px 4px rgba(0, 0, 0, 0.25)',
                 opacity: cardOpacity,
-                transform: `translate3d(0, ${scaleValue(cardTranslateY)}px, 0) scale(${cardScale})`,
+                transform: `translate3d(0, ${scaleValue(cardTranslateY)}, 0) scale(${cardScale})`,
                 transformOrigin: 'center center',
                 willChange: 'transform, opacity',
                 transition: 'transform 760ms cubic-bezier(0.22, 1, 0.36, 1), opacity 420ms ease-out',
@@ -639,16 +650,18 @@ function SolenyaScene({
                 height: scaleValue(632),
                 overflow: 'hidden',
                 borderRadius: scaleValue(53),
+                ...placeholderBackground(solenyaSceneAssets.cover, 'center'),
               }}
             >
-              <Image
-                src={project.image || ''}
-                alt={project.name}
-                fill
-                priority
-                sizes={`${Math.round(scaleValue(632))}px`}
-                className="object-cover object-center"
-              />
+              {loadImages ? (
+                <ResponsiveImage
+                  asset={solenyaSceneAssets.cover}
+                  alt={project.name}
+                  sizes={sceneImageSizes(632)}
+                  priority
+                  className="absolute inset-0 h-full w-full object-cover object-center"
+                />
+              ) : null}
             </div>
 
             <h2
@@ -659,7 +672,7 @@ function SolenyaScene({
                 margin: 0,
                 fontFamily: 'Inter, sans-serif',
                 fontSize: scaleValue(64),
-                lineHeight: `${scaleValue(77)}px`,
+                lineHeight: scaleValue(77),
                 fontWeight: 700,
                 letterSpacing: '-0.04em',
                 color: '#FFFFFF',
@@ -677,7 +690,7 @@ function SolenyaScene({
                 margin: 0,
                 fontFamily: 'Inter, sans-serif',
                 fontSize: scaleValue(36),
-                lineHeight: `${scaleValue(44)}px`,
+                lineHeight: scaleValue(44),
                 fontWeight: 300,
                 color: '#FFFFFF',
               }}
@@ -715,15 +728,14 @@ function SolenyaScene({
                   style={{
                     fontFamily: 'Inter, sans-serif',
                     fontSize: scaleValue(40),
-                    lineHeight: `${scaleValue(48)}px`,
+                    lineHeight: scaleValue(48),
                     fontWeight: 700,
                 }}
               >
                 Listen Now
               </span>
                 <svg
-                  width={scaleValue(81)}
-                  height={scaleValue(40)}
+                  style={{ width: scaleValue(81), height: scaleValue(40) }}
                   viewBox="0 0 81 40"
                   fill="none"
                 >
@@ -756,7 +768,7 @@ function SolenyaScene({
                 color: '#FFFFFF',
                 zIndex: 14,
                 opacity: 1 - clamp(distance / 0.16, 0, 1),
-                transform: `translate3d(0, ${scaleValue(clamp(distance, 0, 1) * 38)}px, 0)`,
+                transform: `translate3d(0, ${scaleValue(clamp(distance, 0, 1) * 38)}, 0)`,
                 transition: 'transform 300ms ease-out, opacity 220ms ease-out',
               }}
             >
@@ -764,15 +776,14 @@ function SolenyaScene({
                 style={{
                   fontFamily: 'Inter, sans-serif',
                   fontSize: scaleValue(32),
-                  lineHeight: `${scaleValue(39)}px`,
+                  lineHeight: scaleValue(39),
                   fontWeight: 700,
                 }}
               >
                 Scroll for more
               </span>
               <svg
-                width={scaleValue(55)}
-                height={scaleValue(55)}
+                style={{ width: scaleValue(55), height: scaleValue(55) }}
                 viewBox="0 0 55 55"
                 fill="none"
               >
@@ -794,21 +805,20 @@ function SolenyaScene({
       />
     </div>
   );
-}
+});
 
-function CautionScene({
+const CautionScene = React.memo(function CautionScene({
   project,
   distance,
-  sceneScale,
+  loadImages,
   onModalStateChange,
 }: {
   project: Project;
   distance: number;
-  sceneScale: number;
+  loadImages: boolean;
   onModalStateChange?: (isOpen: boolean) => void;
 }) {
   const [isStreamingModalOpen, setIsStreamingModalOpen] = useState(false);
-  const scaleValue = (value: number) => value * sceneScale;
   const currentDescription = project.description;
   const currentStreamingLinks = project.streamingLinks;
   const primaryActionUrl =
@@ -825,10 +835,6 @@ function CautionScene({
     : 1 - (incomingCardProgress * 0.18);
   const cardOpacity = 1 - (distanceMagnitude * 0.18);
   const cardTranslateY = outgoingCardProgress * 58;
-  const frameWidth = scaleValue(SOLENYA_FRAME.width);
-  const frameHeight = scaleValue(SOLENYA_FRAME.height);
-  const sceneLeft = (value: number) => `calc(50% - ${frameWidth / 2}px + ${scaleValue(value)}px)`;
-  const sceneTop = (value: number) => `calc(50% - ${frameHeight / 2}px + ${scaleValue(value)}px)`;
 
   return (
     <div className="relative h-full w-full overflow-hidden">
@@ -845,8 +851,8 @@ function CautionScene({
               width: scaleValue(sticker.frame.size),
               height: scaleValue(sticker.frame.size),
               zIndex: sticker.zIndex,
-              '--intro-x': `${scaleValue(sticker.intro.x)}px`,
-              '--intro-y': `${scaleValue(sticker.intro.y)}px`,
+              '--intro-x': scaleValue(sticker.intro.x),
+              '--intro-y': scaleValue(sticker.intro.y),
               '--intro-rotate': `${sticker.intro.rotate}deg`,
               animationDelay: sticker.intro.delay,
             } as React.CSSProperties}
@@ -854,7 +860,7 @@ function CautionScene({
             <div
               style={{
                 opacity: stickerState.opacity,
-                transform: `translate3d(${scaleValue(stickerState.translateX)}px, ${scaleValue(stickerState.translateY)}px, 0) rotate(${stickerState.rotate}deg) scale(${stickerState.scale})`,
+                transform: `translate3d(${scaleValue(stickerState.translateX)}, ${scaleValue(stickerState.translateY)}, 0) rotate(${stickerState.rotate}deg) scale(${stickerState.scale})`,
                 willChange: 'transform, opacity',
                 transition: 'transform 520ms cubic-bezier(0.22, 1, 0.36, 1), opacity 320ms ease-out',
               }}
@@ -863,22 +869,24 @@ function CautionScene({
                 className="solenya-sticker-float h-full w-full"
                 style={
                   {
-                    '--float-x': `${scaleValue(sticker.float.x)}px`,
-                    '--float-y': `${scaleValue(sticker.float.y)}px`,
+                    '--float-x': scaleValue(sticker.float.x),
+                    '--float-y': scaleValue(sticker.float.y),
                     '--float-rotate': `${sticker.float.rotate}deg`,
                     '--float-duration': sticker.float.duration,
                     animationDelay: sticker.float.delay,
                   } as React.CSSProperties
                 }
               >
-                <img
-                  src={sticker.src}
-                  alt={sticker.alt}
-                  draggable={false}
-                  loading="eager"
-                  className="h-full w-full object-contain select-none"
-                  style={sticker.flipX ? { transform: 'scaleX(-1)' } : undefined}
-                />
+                {loadImages ? (
+                  <ResponsiveImage
+                    asset={sticker.src}
+                    alt={sticker.alt}
+                    sizes={sceneImageSizes(sticker.frame.size)}
+                    draggable={false}
+                    className="h-full w-full object-contain select-none"
+                    style={sticker.flipX ? { transform: 'scaleX(-1)' } : undefined}
+                  />
+                ) : null}
               </div>
             </div>
           </div>
@@ -889,8 +897,8 @@ function CautionScene({
         <div
           className="relative"
           style={{
-            width: frameWidth,
-            height: frameHeight,
+            width: SCENE_FRAME_WIDTH,
+            height: SCENE_FRAME_HEIGHT,
           }}
         >
           <div
@@ -913,7 +921,7 @@ function CautionScene({
                 borderRadius: scaleValue(100),
                 boxShadow: '0px 4px 4px rgba(0, 0, 0, 0.25)',
                 opacity: cardOpacity,
-                transform: `translate3d(0, ${scaleValue(cardTranslateY)}px, 0) scale(${cardScale})`,
+                transform: `translate3d(0, ${scaleValue(cardTranslateY)}, 0) scale(${cardScale})`,
                 transformOrigin: 'center center',
                 willChange: 'transform, opacity',
                 transition: 'transform 760ms cubic-bezier(0.22, 1, 0.36, 1), opacity 420ms ease-out',
@@ -928,17 +936,18 @@ function CautionScene({
                   height: scaleValue(630),
                   overflow: 'hidden',
                   borderRadius: scaleValue(48),
+                  ...placeholderBackground(cautionSceneAssets.cover, 'center top'),
                 }}
               >
-                <Image
-                  src={project.image || ''}
-                  alt={project.name}
-                  fill
-                  priority
-                  sizes={`${Math.round(scaleValue(630))}px`}
-                  className="object-cover"
-                  style={{ objectPosition: 'center top' }}
-                />
+                {loadImages ? (
+                  <ResponsiveImage
+                    asset={cautionSceneAssets.cover}
+                    alt={project.name}
+                    sizes={sceneImageSizes(630)}
+                    className="absolute inset-0 h-full w-full object-cover"
+                    style={{ objectPosition: 'center top' }}
+                  />
+                ) : null}
               </div>
 
               <h2
@@ -949,7 +958,7 @@ function CautionScene({
                   margin: 0,
                   fontFamily: 'Inter, sans-serif',
                   fontSize: scaleValue(64),
-                  lineHeight: `${scaleValue(77)}px`,
+                  lineHeight: scaleValue(77),
                   fontWeight: 700,
                   letterSpacing: '-0.04em',
                   color: '#FFFFFF',
@@ -967,7 +976,7 @@ function CautionScene({
                   margin: 0,
                   fontFamily: 'Inter, sans-serif',
                   fontSize: scaleValue(36),
-                  lineHeight: `${scaleValue(44)}px`,
+                  lineHeight: scaleValue(44),
                   fontWeight: 300,
                   color: '#FFFFFF',
                 }}
@@ -1004,15 +1013,14 @@ function CautionScene({
                     style={{
                       fontFamily: 'Inter, sans-serif',
                       fontSize: scaleValue(40),
-                      lineHeight: `${scaleValue(48)}px`,
+                      lineHeight: scaleValue(48),
                       fontWeight: 700,
                     }}
                   >
                     Listen Now
                   </span>
                   <svg
-                    width={scaleValue(81)}
-                    height={scaleValue(40)}
+                    style={{ width: scaleValue(81), height: scaleValue(40) }}
                     viewBox="0 0 81 40"
                     fill="none"
                   >
@@ -1036,18 +1044,17 @@ function CautionScene({
       />
     </div>
   );
-}
+});
 
-function ReminderScene({
+const ReminderScene = React.memo(function ReminderScene({
   project,
   distance,
-  sceneScale,
+  loadImages,
 }: {
   project: Project;
   distance: number;
-  sceneScale: number;
+  loadImages: boolean;
 }) {
-  const scaleValue = (value: number) => value * sceneScale;
   const displayTitle = 'Just a reminder to live life';
   const displayDescription = 'thoughts, moments, and in-between';
   const primaryActionUrl = project.url;
@@ -1060,10 +1067,6 @@ function ReminderScene({
     : 1 - (incomingCardProgress * 0.18);
   const cardOpacity = 1 - (distanceMagnitude * 0.18);
   const cardTranslateY = outgoingCardProgress * 58;
-  const frameWidth = scaleValue(SOLENYA_FRAME.width);
-  const frameHeight = scaleValue(SOLENYA_FRAME.height);
-  const sceneLeft = (value: number) => `calc(50% - ${frameWidth / 2}px + ${scaleValue(value)}px)`;
-  const sceneTop = (value: number) => `calc(50% - ${frameHeight / 2}px + ${scaleValue(value)}px)`;
 
   return (
     <div className="relative h-full w-full overflow-hidden">
@@ -1080,8 +1083,8 @@ function ReminderScene({
               width: scaleValue(sticker.frame.size),
               height: scaleValue(sticker.frame.size),
               zIndex: sticker.zIndex,
-              '--intro-x': `${scaleValue(sticker.intro.x)}px`,
-              '--intro-y': `${scaleValue(sticker.intro.y)}px`,
+              '--intro-x': scaleValue(sticker.intro.x),
+              '--intro-y': scaleValue(sticker.intro.y),
               '--intro-rotate': `${sticker.intro.rotate}deg`,
               animationDelay: sticker.intro.delay,
             } as React.CSSProperties}
@@ -1089,7 +1092,7 @@ function ReminderScene({
             <div
               style={{
                 opacity: stickerState.opacity,
-                transform: `translate3d(${scaleValue(stickerState.translateX)}px, ${scaleValue(stickerState.translateY)}px, 0) rotate(${stickerState.rotate}deg) scale(${stickerState.scale})`,
+                transform: `translate3d(${scaleValue(stickerState.translateX)}, ${scaleValue(stickerState.translateY)}, 0) rotate(${stickerState.rotate}deg) scale(${stickerState.scale})`,
                 willChange: 'transform, opacity',
                 transition: 'transform 520ms cubic-bezier(0.22, 1, 0.36, 1), opacity 320ms ease-out',
               }}
@@ -1098,21 +1101,23 @@ function ReminderScene({
                 className="solenya-sticker-float h-full w-full"
                 style={
                   {
-                    '--float-x': `${scaleValue(sticker.float.x)}px`,
-                    '--float-y': `${scaleValue(sticker.float.y)}px`,
+                    '--float-x': scaleValue(sticker.float.x),
+                    '--float-y': scaleValue(sticker.float.y),
                     '--float-rotate': `${sticker.float.rotate}deg`,
                     '--float-duration': sticker.float.duration,
                     animationDelay: sticker.float.delay,
                   } as React.CSSProperties
                 }
               >
-                <img
-                  src={sticker.src}
-                  alt={sticker.alt}
-                  draggable={false}
-                  loading="eager"
-                  className="h-full w-full object-contain select-none"
-                />
+                {loadImages ? (
+                  <ResponsiveImage
+                    asset={sticker.src}
+                    alt={sticker.alt}
+                    sizes={sceneImageSizes(sticker.frame.size)}
+                    draggable={false}
+                    className="h-full w-full object-contain select-none"
+                  />
+                ) : null}
               </div>
             </div>
           </div>
@@ -1123,8 +1128,8 @@ function ReminderScene({
         <div
           className="relative"
           style={{
-            width: frameWidth,
-            height: frameHeight,
+            width: SCENE_FRAME_WIDTH,
+            height: SCENE_FRAME_HEIGHT,
           }}
         >
           <div
@@ -1147,7 +1152,7 @@ function ReminderScene({
                 borderRadius: scaleValue(100),
                 boxShadow: '0px 4px 4px rgba(0, 0, 0, 0.25)',
                 opacity: cardOpacity,
-                transform: `translate3d(0, ${scaleValue(cardTranslateY)}px, 0) scale(${cardScale})`,
+                transform: `translate3d(0, ${scaleValue(cardTranslateY)}, 0) scale(${cardScale})`,
                 transformOrigin: 'center center',
                 willChange: 'transform, opacity',
                 transition: 'transform 760ms cubic-bezier(0.22, 1, 0.36, 1), opacity 420ms ease-out',
@@ -1162,16 +1167,17 @@ function ReminderScene({
                   height: scaleValue(631),
                   overflow: 'hidden',
                   borderRadius: scaleValue(49),
+                  ...placeholderBackground(reminderSceneAssets.cover, 'center'),
                 }}
               >
-                <Image
-                  src={reminderSceneAssets.cover}
-                  alt={displayTitle}
-                  fill
-                  priority
-                  sizes={`${Math.round(scaleValue(631))}px`}
-                  className="object-cover object-center"
-                />
+                {loadImages ? (
+                  <ResponsiveImage
+                    asset={reminderSceneAssets.cover}
+                    alt={displayTitle}
+                    sizes={sceneImageSizes(631)}
+                    className="absolute inset-0 h-full w-full object-cover object-center"
+                  />
+                ) : null}
               </div>
 
               <h2
@@ -1183,7 +1189,7 @@ function ReminderScene({
                   margin: 0,
                   fontFamily: 'Inter, sans-serif',
                   fontSize: scaleValue(64),
-                  lineHeight: `${scaleValue(77)}px`,
+                  lineHeight: scaleValue(77),
                   fontWeight: 700,
                   letterSpacing: '-0.04em',
                   color: '#FFFFFF',
@@ -1201,7 +1207,7 @@ function ReminderScene({
                   margin: 0,
                   fontFamily: 'Inter, sans-serif',
                   fontSize: scaleValue(36),
-                  lineHeight: `${scaleValue(44)}px`,
+                  lineHeight: scaleValue(44),
                   fontWeight: 300,
                   color: '#FFFFFF',
                 }}
@@ -1235,15 +1241,14 @@ function ReminderScene({
                     style={{
                       fontFamily: 'Inter, sans-serif',
                       fontSize: scaleValue(40),
-                      lineHeight: `${scaleValue(48)}px`,
+                      lineHeight: scaleValue(48),
                       fontWeight: 700,
                     }}
                   >
                     Listen Now
                   </span>
                   <svg
-                    width={scaleValue(81)}
-                    height={scaleValue(40)}
+                    style={{ width: scaleValue(81), height: scaleValue(40) }}
                     viewBox="0 0 81 40"
                     fill="none"
                   >
@@ -1258,18 +1263,17 @@ function ReminderScene({
       </div>
     </div>
   );
-}
+});
 
-function ScrapwrkScene({
+const ScrapwrkScene = React.memo(function ScrapwrkScene({
   project,
   distance,
-  sceneScale,
+  loadImages,
 }: {
   project: Project;
   distance: number;
-  sceneScale: number;
+  loadImages: boolean;
 }) {
-  const scaleValue = (value: number) => value * sceneScale;
   const displayTitle = 'SCRAPWRK';
   const displayDescription = 'reconstructed pieces and identity';
   const primaryActionUrl = project.url;
@@ -1282,10 +1286,6 @@ function ScrapwrkScene({
     : 1 - (incomingCardProgress * 0.18);
   const cardOpacity = 1 - (distanceMagnitude * 0.18);
   const cardTranslateY = outgoingCardProgress * 58;
-  const frameWidth = scaleValue(SOLENYA_FRAME.width);
-  const frameHeight = scaleValue(SOLENYA_FRAME.height);
-  const sceneLeft = (value: number) => `calc(50% - ${frameWidth / 2}px + ${scaleValue(value)}px)`;
-  const sceneTop = (value: number) => `calc(50% - ${frameHeight / 2}px + ${scaleValue(value)}px)`;
 
   return (
     <div className="relative h-full w-full overflow-hidden">
@@ -1302,8 +1302,8 @@ function ScrapwrkScene({
               width: scaleValue(sticker.frame.size),
               height: scaleValue(sticker.frame.size),
               zIndex: sticker.zIndex,
-              '--intro-x': `${scaleValue(sticker.intro.x)}px`,
-              '--intro-y': `${scaleValue(sticker.intro.y)}px`,
+              '--intro-x': scaleValue(sticker.intro.x),
+              '--intro-y': scaleValue(sticker.intro.y),
               '--intro-rotate': `${sticker.intro.rotate}deg`,
               animationDelay: sticker.intro.delay,
             } as React.CSSProperties}
@@ -1311,7 +1311,7 @@ function ScrapwrkScene({
             <div
               style={{
                 opacity: stickerState.opacity,
-                transform: `translate3d(${scaleValue(stickerState.translateX)}px, ${scaleValue(stickerState.translateY)}px, 0) rotate(${stickerState.rotate}deg) scale(${stickerState.scale})`,
+                transform: `translate3d(${scaleValue(stickerState.translateX)}, ${scaleValue(stickerState.translateY)}, 0) rotate(${stickerState.rotate}deg) scale(${stickerState.scale})`,
                 willChange: 'transform, opacity',
                 transition: 'transform 520ms cubic-bezier(0.22, 1, 0.36, 1), opacity 320ms ease-out',
               }}
@@ -1320,21 +1320,23 @@ function ScrapwrkScene({
                 className="solenya-sticker-float h-full w-full"
                 style={
                   {
-                    '--float-x': `${scaleValue(sticker.float.x)}px`,
-                    '--float-y': `${scaleValue(sticker.float.y)}px`,
+                    '--float-x': scaleValue(sticker.float.x),
+                    '--float-y': scaleValue(sticker.float.y),
                     '--float-rotate': `${sticker.float.rotate}deg`,
                     '--float-duration': sticker.float.duration,
                     animationDelay: sticker.float.delay,
                   } as React.CSSProperties
                 }
               >
-                <img
-                  src={sticker.src}
-                  alt={sticker.alt}
-                  draggable={false}
-                  loading="eager"
-                  className="h-full w-full object-contain select-none"
-                />
+                {loadImages ? (
+                  <ResponsiveImage
+                    asset={sticker.src}
+                    alt={sticker.alt}
+                    sizes={sceneImageSizes(sticker.frame.size)}
+                    draggable={false}
+                    className="h-full w-full object-contain select-none"
+                  />
+                ) : null}
               </div>
             </div>
           </div>
@@ -1345,8 +1347,8 @@ function ScrapwrkScene({
         <div
           className="relative"
           style={{
-            width: frameWidth,
-            height: frameHeight,
+            width: SCENE_FRAME_WIDTH,
+            height: SCENE_FRAME_HEIGHT,
           }}
         >
           <div
@@ -1369,7 +1371,7 @@ function ScrapwrkScene({
                 borderRadius: scaleValue(100),
                 boxShadow: '0px 4px 4px rgba(0, 0, 0, 0.25)',
                 opacity: cardOpacity,
-                transform: `translate3d(0, ${scaleValue(cardTranslateY)}px, 0) scale(${cardScale})`,
+                transform: `translate3d(0, ${scaleValue(cardTranslateY)}, 0) scale(${cardScale})`,
                 transformOrigin: 'center center',
                 willChange: 'transform, opacity',
                 transition: 'transform 760ms cubic-bezier(0.22, 1, 0.36, 1), opacity 420ms ease-out',
@@ -1384,16 +1386,17 @@ function ScrapwrkScene({
                   height: scaleValue(632),
                   overflow: 'hidden',
                   borderRadius: scaleValue(50),
+                  ...placeholderBackground(scrapwrkSceneAssets.cover, 'center'),
                 }}
               >
-                <Image
-                  src={scrapwrkSceneAssets.cover}
-                  alt={displayTitle}
-                  fill
-                  priority
-                  sizes={`${Math.round(scaleValue(631))}px`}
-                  className="object-cover object-center"
-                />
+                {loadImages ? (
+                  <ResponsiveImage
+                    asset={scrapwrkSceneAssets.cover}
+                    alt={displayTitle}
+                    sizes={sceneImageSizes(631)}
+                    className="absolute inset-0 h-full w-full object-cover object-center"
+                  />
+                ) : null}
               </div>
 
               <h2
@@ -1405,7 +1408,7 @@ function ScrapwrkScene({
                   margin: 0,
                   fontFamily: 'Inter, sans-serif',
                   fontSize: scaleValue(64),
-                  lineHeight: `${scaleValue(77)}px`,
+                  lineHeight: scaleValue(77),
                   fontWeight: 700,
                   letterSpacing: '-0.04em',
                   color: '#FFFFFF',
@@ -1423,7 +1426,7 @@ function ScrapwrkScene({
                   margin: 0,
                   fontFamily: 'Inter, sans-serif',
                   fontSize: scaleValue(36),
-                  lineHeight: `${scaleValue(44)}px`,
+                  lineHeight: scaleValue(44),
                   fontWeight: 300,
                   color: '#FFFFFF',
                 }}
@@ -1457,15 +1460,14 @@ function ScrapwrkScene({
                     style={{
                       fontFamily: 'Inter, sans-serif',
                       fontSize: scaleValue(40),
-                      lineHeight: `${scaleValue(48)}px`,
+                      lineHeight: scaleValue(48),
                       fontWeight: 700,
                     }}
                   >
                     Visit
                   </span>
                   <svg
-                    width={scaleValue(81)}
-                    height={scaleValue(40)}
+                    style={{ width: scaleValue(81), height: scaleValue(40) }}
                     viewBox="0 0 81 40"
                     fill="none"
                   >
@@ -1480,7 +1482,7 @@ function ScrapwrkScene({
       </div>
     </div>
   );
-}
+});
 
 export default function HomePage() {
   const { music, fashion } = getProjects();
@@ -1499,8 +1501,7 @@ export default function HomePage() {
   const [isTransitioning, setIsTransitioning] = useState(false);
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [showScrollPrompt, setShowScrollPrompt] = useState(true);
-  const [solenyaScale, setSolenyaScale] = useState<number | null>(null);
-  const [isSceneReady, setIsSceneReady] = useState(false);
+  const [loadDeferredScenes, setLoadDeferredScenes] = useState(false);
   const [containerSize, setContainerSize] = useState({ width: 0, height: 0, imageAspectRatio: 16 / 9 });
   const clampedBackgroundProgress = clamp(scrollProgress, 0, allProjects.length);
   const currentBackgroundIndex = Math.floor(clampedBackgroundProgress);
@@ -1509,9 +1510,9 @@ export default function HomePage() {
   const currentBackground = getSlideBackground(currentBackgroundIndex, allProjects);
   const nextBackground = getSlideBackground(nextBackgroundIndex, allProjects);
 
-  const handleModalStateChange = (isOpen: boolean) => {
+  const handleModalStateChange = useCallback((isOpen: boolean) => {
     setIsModalOpen(isOpen);
-  };
+  }, []);
 
   const calculateContainerSize = () => {
     const vw = window.innerWidth;
@@ -1538,14 +1539,7 @@ export default function HomePage() {
     };
   };
 
-  const calculateSolenyaScale = () => {
-    return Math.min(
-      window.innerWidth / SOLENYA_FRAME.width,
-      window.innerHeight / SOLENYA_FRAME.height
-    );
-  };
-
-  const handleScrollToNext = () => {
+  const handleScrollToNext = useCallback(() => {
     const container = document.querySelector('.scroll-container');
     if (container) {
       container.scrollTo({
@@ -1554,13 +1548,11 @@ export default function HomePage() {
       });
     }
     setShowScrollPrompt(false);
-  };
+  }, []);
 
   useEffect(() => {
     const updateLayout = () => {
       setContainerSize(calculateContainerSize());
-      setSolenyaScale(calculateSolenyaScale());
-      setIsSceneReady(true);
     };
 
     updateLayout();
@@ -1574,6 +1566,19 @@ export default function HomePage() {
       setShowScrollPrompt(false);
     }
   }, [activeIndex]);
+
+  // Only the first scene's art is in the initial HTML; the rest starts downloading once that
+  // has finished (window load) or as soon as the visitor starts scrolling.
+  useEffect(() => {
+    if (document.readyState === 'complete') {
+      setLoadDeferredScenes(true);
+      return;
+    }
+
+    const handleLoad = () => setLoadDeferredScenes(true);
+    window.addEventListener('load', handleLoad, { once: true });
+    return () => window.removeEventListener('load', handleLoad);
+  }, []);
 
   useEffect(() => {
     const initializeScroll = () => {
@@ -1599,6 +1604,9 @@ export default function HomePage() {
       const newIndex = Math.round(scrollTop / containerHeight);
 
       setScrollProgress(scrollTop / containerHeight);
+      if (scrollTop > 0) {
+        setLoadDeferredScenes(true);
+      }
 
       setActiveIndex((currentIndex) => {
         if (newIndex !== currentIndex && newIndex >= 0 && newIndex <= allProjects.length) {
@@ -1612,7 +1620,7 @@ export default function HomePage() {
 
     const container = document.querySelector('.scroll-container');
     if (container) {
-      container.addEventListener('scroll', handleScroll);
+      container.addEventListener('scroll', handleScroll, { passive: true });
       return () => container.removeEventListener('scroll', handleScroll);
     }
   }, [allProjects.length]);
@@ -1638,20 +1646,16 @@ export default function HomePage() {
             const isScrapwrk = project.name === 'Scrapwrk Store';
             const distanceFromCenter = Math.abs(scrollProgress - index);
             const continuousDistance = clamp(distanceFromCenter, 0, 1.2);
+            // Scene motion saturates at one screen away; clamping lets memoized far-off scenes skip re-rendering.
+            const sceneDistance = clamp(scrollProgress - index, -1, 1);
 
             if (isSolenya) {
-              if (!isSceneReady || solenyaScale === null) {
-                return (
-                  <div key={project.name} className="relative h-screen snap-center overflow-hidden" />
-                );
-              }
-
               return (
                 <div key={project.name} className="relative h-screen snap-center overflow-hidden">
                   <SolenyaScene
                     project={project}
-                    distance={scrollProgress - index}
-                    sceneScale={solenyaScale}
+                    distance={sceneDistance}
+                    loadImages={index === 0 || loadDeferredScenes}
                     showScrollPrompt={showScrollPrompt && activeIndex === 0 && !isModalOpen}
                     onScrollPromptClick={handleScrollToNext}
                     onModalStateChange={handleModalStateChange}
@@ -1661,18 +1665,12 @@ export default function HomePage() {
             }
 
             if (isCaution) {
-              if (!isSceneReady || solenyaScale === null) {
-                return (
-                  <div key={project.name} className="relative h-screen snap-center overflow-hidden" />
-                );
-              }
-
               return (
                 <div key={project.name} className="relative h-screen snap-center overflow-hidden">
                   <CautionScene
                     project={project}
-                    distance={scrollProgress - index}
-                    sceneScale={solenyaScale}
+                    distance={sceneDistance}
+                    loadImages={index === 0 || loadDeferredScenes}
                     onModalStateChange={handleModalStateChange}
                   />
                 </div>
@@ -1680,36 +1678,24 @@ export default function HomePage() {
             }
 
             if (isReminder) {
-              if (!isSceneReady || solenyaScale === null) {
-                return (
-                  <div key={project.name} className="relative h-screen snap-center overflow-hidden" />
-                );
-              }
-
               return (
                 <div key={project.name} className="relative h-screen snap-center overflow-hidden">
                   <ReminderScene
                     project={project}
-                    distance={scrollProgress - index}
-                    sceneScale={solenyaScale}
+                    distance={sceneDistance}
+                    loadImages={index === 0 || loadDeferredScenes}
                   />
                 </div>
               );
             }
 
             if (isScrapwrk) {
-              if (!isSceneReady || solenyaScale === null) {
-                return (
-                  <div key={project.name} className="relative h-screen snap-center overflow-hidden" />
-                );
-              }
-
               return (
                 <div key={project.name} className="relative h-screen snap-center overflow-hidden">
                   <ScrapwrkScene
                     project={project}
-                    distance={scrollProgress - index}
-                    sceneScale={solenyaScale}
+                    distance={sceneDistance}
+                    loadImages={index === 0 || loadDeferredScenes}
                   />
                 </div>
               );

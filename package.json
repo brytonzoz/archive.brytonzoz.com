@@ -3,10 +3,15 @@
   "version": "0.1.0",
   "private": true,
   "scripts": {
+    "media": "node scripts/build-media.mjs",
+    "predev": "npm run media",
     "dev": "next dev",
+    "prebuild": "npm run media",
     "build": "next build",
     "start": "next start",
-    "lint": "next lint"
+    "lint": "next lint",
+    "preview": "npm run build && wrangler dev",
+    "deploy:staging": "npm run build && wrangler deploy --env staging"
   },
   "dependencies": {
     "autoprefixer": "^10.4.21",
@@ -21,7 +26,9 @@
     "@types/react-dom": "^18",
     "eslint": "^8.57.1",
     "eslint-config-next": "^14.0.4",
+    "sharp": "^0.34.5",
     "tailwindcss": "^3.4.17",
-    "typescript": "^5.8.3"
+    "typescript": "^5.8.3",
+    "wrangler": "^4.142.0"
   }
 }

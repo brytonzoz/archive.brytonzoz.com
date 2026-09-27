@@ -11,6 +11,14 @@
     --muted-foreground: 0 0% 65%; /* Light gray */
     --border: 0 0% 15%;          /* Subtle border */
     --ring: 0 0% 20%;            /* Focus ring */
+    /* One design unit of the 961x1758 homepage scene frame, fitted inside the viewport. */
+    --scene-unit: min(calc(100vw / 961), calc(100vh / 1758));
+  }
+
+  @supports (height: 100dvh) {
+    :root {
+      --scene-unit: min(calc(100vw / 961), calc(100dvh / 1758));
+    }
   }
 
   * {

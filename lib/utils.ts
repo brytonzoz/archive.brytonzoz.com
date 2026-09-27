@@ -1,3 +1,5 @@
+import type { MediaAsset } from './media';
+
 export function cn(...inputs: string[]) {
   return inputs.filter(Boolean).join(' ');
 }
@@ -22,7 +24,7 @@ export type Project = {
   type: string;
   description: string;
   highlight?: string;
-  image?: string;
+  image?: MediaAsset;
   releaseDate?: string; // ISO date string for release date logic
   preReleaseDescription?: string; // Description to show before release
   postReleaseDescription?: string; // Description to show after release

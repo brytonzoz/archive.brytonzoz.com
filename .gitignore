@@ -96,3 +96,10 @@ lisa-comic-glow-up/
 # typescript
 *.tsbuildinfo
 next-env.d.ts
+
+# Generated media (scripts/build-media.mjs)
+public/media/
+
+# Cloudflare Wrangler
+.wrangler/
+.dev.vars*

@@ -1,4 +1,4 @@
-# archive.bryton.studio
+# brytonzoz.com
 
 Creative portfolio and project archive for Bryton's music, fashion, and experimental web work. The homepage is a full-screen, scroll-driven showcase that opens with **SOLENYA** and continues through the current featured projects.
 
@@ -28,7 +28,7 @@ The complete catalog also includes **Loopless Collection (Episodes)** and **The 
 - Tailwind CSS with custom animation and scene styling
 - Next.js static export (`output: 'export'`)
 - Build-time image pipeline (sharp) producing responsive AVIF + WebP
-- Cloudflare Workers static assets (staging) and Firebase Hosting (current production)
+- Cloudflare Workers static assets on brytonzoz.com
 
 ## Project structure
 
@@ -58,8 +58,9 @@ The complete catalog also includes **Loopless Collection (Episodes)** and **The 
 │   └── utils.ts               # Project types and release helpers
 ├── public/                    # Favicon and _headers (cache rules); media/ is generated
 ├── scripts/build-media.mjs    # Image optimization pipeline
-├── firebase.json              # Firebase Hosting configuration (current production)
-├── wrangler.jsonc             # Cloudflare Workers static-assets configuration
+├── firebase.json              # Legacy Firebase Hosting configuration
+├── workers/redirects/         # www/archive -> brytonzoz.com redirect Worker
+├── wrangler.jsonc             # Cloudflare Workers configuration (production + staging)
 ├── next.config.js             # Static-export configuration
 └── package.json               # Commands and dependencies
 ```
@@ -97,21 +98,23 @@ The production build is exported as static files in `out/`. That directory is ge
 
 ## Hosting
 
-### Cloudflare Workers (staging, and the planned production host)
+### Cloudflare Workers (production)
 
-`wrangler.jsonc` serves `out/` as a static-assets-only Worker. There is no Worker script, so requests go straight to Cloudflare's edge cache.
+`wrangler.jsonc` serves `out/` as a static-assets-only Worker on **brytonzoz.com**. There is no Worker script, so requests go straight to Cloudflare's edge cache. `workers/redirects/` is a tiny separate Worker that permanently redirects `www.brytonzoz.com` and `archive.brytonzoz.com` to `https://brytonzoz.com`, keeping the path.
 
 ```bash
 npx wrangler login          # once per machine
-npm run deploy:staging      # builds and deploys the "archive-staging" Worker
+npm run deploy              # builds and deploys brytonzoz.com
+npm run deploy:redirects    # deploys the www/archive redirects (only needed once, or when they change)
+npm run deploy:staging      # builds and deploys the "archive-staging" Worker on workers.dev
 npm run preview             # builds and serves the site locally in the Workers runtime
 ```
 
-The staging Worker is published on its `workers.dev` URL and is completely separate from the Firebase production site.
+The brytonzoz.com DNS zone must be on Cloudflare for the custom domains to attach.
 
-### Firebase Hosting (current production)
+### Firebase Hosting (legacy)
 
-The repository is also configured for Firebase Hosting:
+The repository is still configured for the previous Firebase Hosting setup:
 
 - `.firebaserc` selects the Firebase project `thearchive-nonparallel`.
 - `firebase.json` publishes the generated `out/` directory.
@@ -127,12 +130,12 @@ npx firebase-tools deploy --only hosting
 
 Deployment requires access to the configured Firebase project. Building locally does not deploy or alter the live site.
 
-Because the output is fully static, the `out/` directory can also be hosted by any static hosting provider. Firebase is the configuration committed in this repository.
+Because the output is fully static, the `out/` directory can also be hosted by any static hosting provider. Cloudflare Workers is the production host.
 
 ## Assets and external services
 
 - Artwork lives in `assets-src/`; only the optimized output in `public/media/` is published.
-- The live Firebase site still loads scene artwork from the public Cloudflare R2 bucket; this branch no longer depends on R2.
+- The site no longer depends on the Cloudflare R2 bucket.
 - Streaming and project buttons link to external services such as Apple Music, Spotify, YouTube Music, and the individual project sites.
 - There is no application server, database, authentication layer, or private API key in the current architecture.
 

@@ -1,0 +1,12 @@
+{
+  "$schema": "../../node_modules/wrangler/config-schema.json",
+  // Sends secondary hostnames to the canonical site with a permanent redirect.
+  "name": "archive-redirects",
+  "main": "index.js",
+  "compatibility_date": "2026-09-01",
+  "routes": [
+    { "pattern": "www.brytonzoz.com", "custom_domain": true },
+    { "pattern": "archive.brytonzoz.com", "custom_domain": true }
+  ],
+  "workers_dev": false
+}

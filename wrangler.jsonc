@@ -1,0 +1,19 @@
+{
+  "$schema": "node_modules/wrangler/config-schema.json",
+  // Static-only Worker: every request is served straight from Cloudflare's edge asset store,
+  // with no Worker script invocation.
+  "name": "archive",
+  "compatibility_date": "2026-09-01",
+  "assets": {
+    "directory": "./out",
+    "html_handling": "auto-trailing-slash",
+    "not_found_handling": "404-page"
+  },
+  "workers_dev": true,
+  "env": {
+    // `npm run deploy:staging` -> Worker "archive-staging" on workers.dev, separate from production.
+    "staging": {
+      "workers_dev": true
+    }
+  }
+}

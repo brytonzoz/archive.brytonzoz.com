@@ -2,8 +2,9 @@
 
 import React, { useState } from 'react';
 import Link from 'next/link';
-import Image from 'next/image';
 import { Project, isProjectReleased } from '../lib/utils';
+import { streamingIconAssets } from '../lib/assets';
+import { ResponsiveImage } from './ResponsiveImage';
 
 interface ProjectCardProps {
   project: Project;
@@ -17,15 +18,15 @@ interface ProjectCardProps {
 const streamingServices = {
   applemusic: {
     name: 'Apple Music',
-    image: '/images/Apple Music iOS App Logo.jpg'
+    image: streamingIconAssets.applemusic
   },
   spotify: {
     name: 'Spotify',
-    image: '/images/Spotify Music Logo July 30 2015.webp'
+    image: streamingIconAssets.spotify
   },
   youtubemusic: {
     name: 'YouTube Music',
-    image: '/images/YouTube Music Logo.png'
+    image: streamingIconAssets.youtubemusic
   }
 };
 
@@ -183,11 +184,10 @@ export const StreamingModal = ({
                   <div className="flex items-center space-x-4">
                     {/* Circular Logo */}
                     <div className="w-12 h-12 rounded-full overflow-hidden bg-white/30 p-1 ring-1 ring-white/20">
-                      <Image
-                        src={service.image}
+                      <ResponsiveImage
+                        asset={service.image}
                         alt={service.name}
-                        width={48}
-                        height={48}
+                        sizes="40px"
                         className="w-full h-full object-cover rounded-full"
                       />
                     </div>
@@ -224,11 +224,10 @@ export const StreamingModal = ({
                   <div className="flex items-center space-x-4">
                     {/* Circular Logo */}
                     <div className="w-12 h-12 rounded-full overflow-hidden bg-white/20 p-1 ring-1 ring-white/10">
-                      <Image
-                        src={service.image}
+                      <ResponsiveImage
+                        asset={service.image}
                         alt={service.name}
-                        width={48}
-                        height={48}
+                        sizes="40px"
                         className="w-full h-full object-cover rounded-full opacity-60"
                       />
                     </div>
@@ -290,14 +289,14 @@ const SolenyaCard = ({
 
       <div className="relative z-10 flex flex-col gap-3">
         <div className="relative overflow-hidden rounded-[28px] aspect-square shadow-[0_20px_60px_rgba(0,0,0,0.24)]">
-          <Image
-            src={project.image || ''}
-            alt={project.name}
-            fill
-            priority
-            sizes="(max-width: 640px) calc(100vw - 190px), 260px"
-            className="object-cover object-center"
-          />
+          {project.image ? (
+            <ResponsiveImage
+              asset={project.image}
+              alt={project.name}
+              sizes="(max-width: 640px) calc(100vw - 190px), 260px"
+              className="absolute inset-0 h-full w-full object-cover object-center"
+            />
+          ) : null}
         </div>
 
         <div className="space-y-1 px-2 text-white">
@@ -359,15 +358,14 @@ const CardContent = ({ project, colors, imageAspectRatio = 16/9 }: { project: Pr
           minHeight: '200px'
         }}
       >
-        <Image
-          src={project.image || `/og/${project.name.toLowerCase().replace(/\s+/g, '-').replace(/[^a-z0-9-]/g, '')}.png`}
-          alt={project.name}
-          fill
-          className="object-cover object-top group-hover:scale-105 transition-transform duration-700"
-          onError={(e) => {
-            (e.target as HTMLImageElement).src = `/og/archive-music.png`;
-          }}
-        />
+        {project.image ? (
+          <ResponsiveImage
+            asset={project.image}
+            alt={project.name}
+            sizes="(min-width: 640px) 360px, calc(100vw - 80px)"
+            className="absolute inset-0 h-full w-full object-cover object-top group-hover:scale-105 transition-transform duration-700"
+          />
+        ) : null}
         <div className={`absolute inset-0 bg-gradient-to-t from-black/50 to-transparent opacity-60 group-hover:opacity-40 transition-opacity duration-500`} />
       </div>
 

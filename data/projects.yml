@@ -5,7 +5,7 @@ music:
     releaseDate: "2025-09-01"
     preReleaseDescription: "a project about growth through loss"
     postReleaseDescription: "a project about growth through loss"
-    image: "https://pub-c4515a0205d64d9e849dcafe9141149b.r2.dev/Untitled%20107.PNG"
+    image: "covers/solenya"
     streamingLinks:
       applemusic: "https://music.apple.com/us/album/solenya/1833829863"
     postReleaseStreamingLinks:
@@ -17,6 +17,7 @@ music:
     type: "streaming-ep"
     description: "Debut EP from Bryton Zoz, now available on all streaming services"
     highlight: "New Release"
+    image: "covers/caution"
     streamingLinks:
       applemusic: "https://music.apple.com/us/album/caution-ep/1824528138"
       spotify: "https://open.spotify.com/album/0tdB9n4bTY3rYYv5AmZU9r?si=WyA-7u8hTsirIPzeTP6wJw"
@@ -27,12 +28,14 @@ music:
     type: "procedural-mixtape"
     description: "An evolving procedural mixtape that changes and grows"
     highlight: "Always Something New"
+    image: "covers/just-a-reminder"
 
   - name: "The Archive (Music)"
     url: "https://nonparallel.wixstudio.com/archive"
     type: "multi-purpose-stream"
     description: "Multi-purpose streaming platform for diverse audio content"
     highlight: "Full Experience"
+    image: "covers/archive-music"
 
 fashion:
   - name: "Loopless Collection (Episodes)"
@@ -40,9 +43,11 @@ fashion:
     type: "video-series"
     description: "Video series showcasing design process and collections"
     highlight: "untitled 14"
+    image: "covers/loopless"
 
   - name: "Scrapwrk Store"
     url: "https://scrapwrk.com"
     type: "ecommerce"
     description: "Curated fashion pieces and experimental designs"
     highlight: "Limited Collection"
+    image: "covers/scrapwrk"

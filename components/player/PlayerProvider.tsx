@@ -1,7 +1,7 @@
 'use client';
 
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import { hasPlayableMusic, releases, type Release, type Track } from '../../lib/tracks';
+import { hasPlayableMusic, releases, warmTrack, type Release, type Track } from '../../lib/tracks';
 import { PlayerContext, type PlayerContextValue } from './context';
 import { MiniPlayer } from './MiniPlayer';
 import { NowPlaying } from './NowPlaying';
@@ -191,6 +191,11 @@ function ActivePlayerProvider({ children }: { children: React.ReactNode }) {
   }, [next, previous, seek]);
 
   const current = currentIndex >= 0 ? queue[currentIndex] : null;
+
+  // Once a song is actually playing, get the next one ready.
+  useEffect(() => {
+    if (isPlaying && currentIndex >= 0) warmTrack(queue[currentIndex + 1]);
+  }, [isPlaying, currentIndex]);
 
   useEffect(() => {
     if (!current || !('mediaSession' in navigator)) return;

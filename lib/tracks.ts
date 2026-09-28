@@ -54,3 +54,15 @@ export function formatTime(seconds: number): string {
   const whole = Math.floor(seconds);
   return `${Math.floor(whole / 60)}:${String(whole % 60).padStart(2, '0')}`;
 }
+
+const warmed = new Set<string>();
+
+// Fetches a song's opening bytes in the background so pressing play starts almost instantly;
+// the first request also warms Cloudflare's edge cache for that song.
+export function warmTrack(track: Track | undefined): void {
+  if (!track || warmed.has(track.src) || typeof fetch === 'undefined') return;
+  warmed.add(track.src);
+  fetch(track.src, { headers: { Range: 'bytes=0-131071' }, priority: 'low' } as RequestInit).catch(() => {
+    warmed.delete(track.src);
+  });
+}

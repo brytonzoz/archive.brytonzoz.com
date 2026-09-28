@@ -4,6 +4,7 @@ import React, { useCallback, useEffect, useState } from 'react';
 import { ProjectCard } from '../components/ProjectCard';
 import { ListenSheet } from '../components/ListenSheet';
 import { usePlayer } from '../components/player/context';
+import { CoverPlayButton } from '../components/player/CoverPlayButton';
 import { ResponsiveImage, placeholderBackground } from '../components/ResponsiveImage';
 import { getProjects } from '../lib/projects';
 import { cautionSceneAssets, reminderSceneAssets, scrapwrkSceneAssets, solenyaSceneAssets } from '../lib/assets';
@@ -677,6 +678,10 @@ const SolenyaScene = React.memo(function SolenyaScene({
                   className="absolute inset-0 h-full w-full object-cover object-center"
                 />
               ) : null}
+              <CoverPlayButton
+                projectName={project.name}
+                style={{ right: scaleValue(26), bottom: scaleValue(26), width: scaleValue(116), height: scaleValue(116) }}
+              />
             </div>
 
             <h2
@@ -967,6 +972,10 @@ const CautionScene = React.memo(function CautionScene({
                     style={{ objectPosition: 'center top' }}
                   />
                 ) : null}
+                <CoverPlayButton
+                  projectName={project.name}
+                  style={{ right: scaleValue(26), bottom: scaleValue(26), width: scaleValue(116), height: scaleValue(116) }}
+                />
               </div>
 
               <h2
@@ -1201,6 +1210,10 @@ const ReminderScene = React.memo(function ReminderScene({
                     className="absolute inset-0 h-full w-full object-cover object-center"
                   />
                 ) : null}
+                <CoverPlayButton
+                  projectName={project.name}
+                  style={{ right: scaleValue(26), bottom: scaleValue(26), width: scaleValue(116), height: scaleValue(116) }}
+                />
               </div>
 
               <h2

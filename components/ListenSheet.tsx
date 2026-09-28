@@ -1,9 +1,9 @@
 'use client';
 
-import React, { useId } from 'react';
+import React, { useEffect, useId } from 'react';
 import { Project, getProjectTypeLabel, getStreamingLinks, isProjectReleased } from '../lib/utils';
 import { streamingIconAssets } from '../lib/assets';
-import { getReleaseForProject } from '../lib/tracks';
+import { getReleaseForProject, warmTrack } from '../lib/tracks';
 import { ResponsiveImage, placeholderBackground } from './ResponsiveImage';
 import { usePlayer } from './player/context';
 import { PlayIcon } from './player/icons';
@@ -50,6 +50,10 @@ export function ListenSheet({
   const { sheetRef, isClosing, requestClose, dragHandlers, sheetStyle } = useSheet(isOpen, onClose);
   const player = usePlayer();
   const siteRelease = getReleaseForProject(project.name);
+
+  useEffect(() => {
+    if (isOpen) warmTrack(siteRelease?.tracks[0]);
+  }, [isOpen, siteRelease]);
 
   const links = getStreamingLinks(project);
   if (!isOpen || !links) return null;

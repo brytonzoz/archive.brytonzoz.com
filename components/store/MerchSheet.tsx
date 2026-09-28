@@ -109,6 +109,7 @@ export function MerchSheet({
           <div className="bg-white">
             <Gallery
               images={color.images}
+              views={color.views}
               tone="dark"
               label={`${product.title}, ${color.name}`}
               alt={(i) => `${product.title} in ${color.name}${i ? `, view ${i + 1}` : ''}`}
@@ -151,7 +152,7 @@ export function MerchSheet({
               <div
                 className="mt-2.5 grid gap-2"
                 // Six apparel sizes fit one row on a phone; long names (phone models, poster sizes) get wider cells.
-                style={{ gridTemplateColumns: `repeat(auto-fill, minmax(${Math.max(2.75, Math.max(...color.sizes.map((option) => option.size.length)) * 0.55 + 1.5)}rem, 1fr))` }}
+                style={{ gridTemplateColumns: `repeat(auto-fill, minmax(${Math.max(2.75, Math.max(...color.sizes.map((option) => option.size.length)) * 0.5 + 1.25)}rem, 1fr))` }}
               >
                 {color.sizes.map((option) => (
                   <button

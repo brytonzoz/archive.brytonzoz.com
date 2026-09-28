@@ -233,18 +233,24 @@ export async function sync(printify, root) {
           .sort((a, b) => rank(a) - rank(b))
           .slice(0, line.shots ?? 4);
         const keys = [];
+        const views = [];
+        // Which side each photo shows, for the Front / Back switch on apparel (big logo on the back).
+        const twoSided = 'front' in line.placements && 'back' in line.placements;
+        const sideOf = (shot) => (/^(front|back)(-|$)/.exec(camera(shot)) ?? [])[1] ?? null;
         for (const [n, shot] of shots.entries()) {
           const response = await fetch(shot.src);
           if (!response.ok) continue;
           const file = `${slug(color)}-${n + 1}.jpg`;
           await fs.writeFile(path.join(dir, file), Buffer.from(await response.arrayBuffer()));
           keys.push(`merch/${productSlug}/${slug(color)}-${n + 1}`);
+          views.push(sideOf(shot));
         }
         if (!keys.length) continue;
         colors.push({
           name: color,
           hex: colorVariants[0]?.options?.hex ?? null,
           images: keys,
+          ...(twoSided ? { views } : {}),
           sizes: colorVariants.map((variant) => ({ size: sizeOf(variant), variantId: variant.id, price: priceOf.get(variant.id) })),
         });
       }

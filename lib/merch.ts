@@ -7,7 +7,9 @@ import { media, type MediaAsset, type MediaKey } from './media';
 // checkout Worker reads it too.
 
 export type MerchSize = { size: string; variantId: number; price: number };
-export type MerchColor = { name: string; slug: string; swatch: string; images: MediaAsset[]; sizes: MerchSize[] };
+export type MerchView = 'front' | 'back' | null;
+/** `views` (apparel only) says which side each photo shows. */
+export type MerchColor = { name: string; slug: string; swatch: string; images: MediaAsset[]; views?: MerchView[]; sizes: MerchSize[] };
 export type MerchProduct = {
   slug: string;
   number: string;
@@ -44,8 +46,12 @@ const slugify = (text: string) => text.toLowerCase().replace(/[^a-z0-9]+/g, '-')
 
 const studioKeys = (design: string, color: string) =>
   Object.keys(media).filter((key) => key.startsWith(`merch-studio/${design}/${color}-`)).sort();
+// Studio shots show the back (the big logo) unless the file says otherwise: black-5-front.jpg.
+const studioView = (key: string): MerchView => (key.endsWith('-front') ? 'front' : 'back');
+// Tees synced before views were recorded: Printify's back, front, front, back.
+const LEGACY_TEE_VIEWS: MerchView[] = ['back', 'front', 'front', 'back'];
 
-type RawColor = { name: string; hex: string | null; images: string[]; sizes: MerchSize[] };
+type RawColor = { name: string; hex: string | null; images: string[]; views?: MerchView[]; sizes: MerchSize[] };
 type RawProduct = {
   slug: string; number: string; name: string; title: string; price: number; colors: RawColor[];
   line?: string; lineName?: string; category?: string; blank?: string; details?: string[];
@@ -69,14 +75,23 @@ export const merchProducts: MerchProduct[] = (catalog.products as RawProduct[])
     details: product.details ?? legacy.blueprint?.details ?? [],
     shareImage: (shareImages as { merchCards?: Record<string, string> }).merchCards?.[product.slug],
     colors: product.colors
-      .map((color) => ({
-        name: color.name,
-        slug: slugify(color.name),
-        swatch: color.hex ?? SWATCHES[color.name] ?? '#888888',
+      .map((color) => {
         // Printify's mockups first, then any studio shots in assets-src/merch-studio/<design>/<color>-N.
-        images: [...color.images, ...studioKeys(product.slug, slugify(color.name))].map((key) => media[key as MediaKey]).filter(Boolean),
-        sizes: color.sizes,
-      }))
+        const studio = studioKeys(product.slug, slugify(color.name));
+        const mockupViews = color.views ?? (product.line ? undefined : LEGACY_TEE_VIEWS.slice(0, color.images.length));
+        const pairs = [
+          ...color.images.map((key, i) => ({ key, view: mockupViews?.[i] ?? null })),
+          ...studio.map((key) => ({ key, view: studioView(key) })),
+        ].filter(({ key }) => media[key as MediaKey]);
+        return {
+          name: color.name,
+          slug: slugify(color.name),
+          swatch: color.hex ?? SWATCHES[color.name] ?? '#888888',
+          images: pairs.map(({ key }) => media[key as MediaKey]),
+          views: mockupViews ? pairs.map(({ view }) => view) : undefined,
+          sizes: color.sizes,
+        };
+      })
       .filter((color) => color.images.length && color.sizes.length),
   }))
   .filter((product) => product.colors.length);

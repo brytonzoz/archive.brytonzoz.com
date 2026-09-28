@@ -46,6 +46,7 @@ function TeeCard({ card: { product, color, perColor }, sizes }: { card: MerchCar
       <span className="store-card-face store-card-front merch-card-front">
         <span className="store-card-photo merch-card-photo">
           <ResponsiveImage asset={color.images[0]} alt="" sizes={sizes} draggable={false} loading="lazy" className="h-full w-full object-cover" />
+          {color.views?.[0] ? <span className="shop-tile-side merch-card-side" aria-hidden="true">{color.views[0] === 'front' ? 'Front' : 'Back'}</span> : null}
           {!perColor && product.colors.length > 1 ? (
             <span className="merch-card-swatches" aria-hidden="true">
               {product.colors.slice(0, 5).map((option) => <span key={option.slug} style={{ background: option.swatch }} />)}

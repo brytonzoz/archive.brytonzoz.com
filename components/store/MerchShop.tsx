@@ -102,29 +102,31 @@ export function MerchShop({
   }, []);
 
   const Heading = headingLevel === 1 ? 'h1' : 'h2';
-  const counts = useMemo(() => new Map(merchCategories.map((name) => [name, merchProducts.filter((product) => product.category === name).length])), []);
 
   return (
     <section aria-labelledby="shop-title" className="shop">
       <div className="flex items-end justify-between gap-4">
         <div className="min-w-0">
           {title}
-          <Heading id="shop-title" className="shop-title">Shop NonParallel</Heading>
-          <p className="mt-1.5 text-[14px] text-white/60">{merchProducts.length} pieces · printed to order · US shipping included</p>
+          <p className="shop-eyebrow">NONPARALLEL</p>
+          <Heading id="shop-title" className="shop-title">Shop</Heading>
         </div>
-        <BagButton onOpen={() => setBagOpen(true)} />
+        <div className="flex items-center gap-3">
+          <p className="hidden text-[13px] text-white/50 sm:block">Printed to order · US shipping included</p>
+          <BagButton onOpen={() => setBagOpen(true)} />
+        </div>
       </div>
 
       <div ref={topRef} className="shop-controls">
         <div className="flex gap-2">
           <label className="shop-search">
-            <svg aria-hidden="true" width="17" height="17" viewBox="0 0 24 24" fill="none"><circle cx="11" cy="11" r="7" stroke="currentColor" strokeWidth="2.2" /><path d="m20 20-3.5-3.5" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" /></svg>
+            <svg aria-hidden="true" width="15" height="15" viewBox="0 0 24 24" fill="none"><circle cx="11" cy="11" r="7" stroke="currentColor" strokeWidth="2.4" /><path d="m20 20-3.5-3.5" stroke="currentColor" strokeWidth="2.4" strokeLinecap="round" /></svg>
             <span className="sr-only">Search the shop</span>
             <input
               type="search"
               value={query}
               onChange={(event) => setQuery(event.target.value)}
-              placeholder="Search hoodies, mugs, stickers…"
+              placeholder="Search"
               enterKeyHint="search"
               autoComplete="off"
             />
@@ -144,15 +146,15 @@ export function MerchShop({
           <button type="button" aria-pressed={!category} onClick={() => chooseCategory(null)} className="shop-chip">All</button>
           {merchCategories.map((name) => (
             <button key={name} type="button" aria-pressed={category === name} onClick={() => chooseCategory(category === name ? null : name)} className="shop-chip">
-              {name}<span className="shop-chip-count">{counts.get(name)}</span>
+              {name}
             </button>
           ))}
         </div>
       </div>
 
-      <p className="sr-only" aria-live="polite">{results.length} {results.length === 1 ? 'result' : 'results'}</p>
+      <p className="mt-4 text-[13px] text-white/45 sm:mt-5" aria-live="polite">{results.length} {results.length === 1 ? 'item' : 'items'}</p>
       {results.length ? (
-        <ul className="shop-grid">
+        <ul className="shop-grid !mt-3">
           {results.slice(0, shown).map((product, index) => (
             <li key={product.slug} className="shop-tile-wrap" style={{ '--i': index % PAGE } as React.CSSProperties}>
               <ShopTile product={product} onOpen={openProduct} />
@@ -177,19 +179,24 @@ export function MerchShop({
 const ShopTile = React.memo(function ShopTile({ product, onOpen }: { product: MerchProduct; onOpen: (product: MerchProduct) => void }) {
   const color = product.colors[0];
   const second = color.images[1];
+  const view = color.views?.[0];
+  const altView = second ? color.views?.[1] : undefined;
+  const sideLabel = (side: string) => (side === 'front' ? 'Front' : 'Back');
   const price = `${product.priceVaries ? 'From ' : ''}${formatPrice(product.price)}`;
   return (
     <button
       type="button"
       onClick={() => onOpen(product)}
       aria-label={`${product.displayName}, ${price}`}
-      className="shop-tile group"
+      className={`shop-tile group ${altView && altView !== view ? 'has-alt' : ''}`}
     >
       <span className="shop-tile-photo">
         <ResponsiveImage asset={color.images[0]} alt="" sizes="(min-width: 1024px) 260px, (min-width: 640px) 30vw, 46vw" loading="lazy" draggable={false} className="shop-tile-img" />
         {second ? (
           <ResponsiveImage asset={second} alt="" sizes="(min-width: 1024px) 260px, (min-width: 640px) 30vw, 46vw" loading="lazy" draggable={false} className="shop-tile-img shop-tile-img-alt" />
         ) : null}
+        {view ? <span className="shop-tile-side shop-tile-side-main" aria-hidden="true">{sideLabel(view)}</span> : null}
+        {altView && altView !== view ? <span className="shop-tile-side shop-tile-side-alt" aria-hidden="true">{sideLabel(altView)}</span> : null}
         {product.colors.length > 1 ? (
           <span className="shop-tile-swatches" aria-hidden="true">
             {product.colors.slice(0, 4).map((option) => <span key={option.slug} style={{ background: option.swatch }} />)}

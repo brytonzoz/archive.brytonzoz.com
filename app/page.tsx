@@ -1,16 +1,20 @@
 'use client';
 
 import React, { useCallback, useEffect, useState } from 'react';
+import Link from 'next/link';
 import { ProjectCard } from '../components/ProjectCard';
+import { NotifySheet, hasSignedUp } from '../components/NotifySheet';
+import { SiteFooter } from '../components/SiteFooter';
 import { ReleaseSheet } from '../components/release/ReleaseSheet';
 import { usePlayer } from '../components/player/context';
-import { ArrowUpRightIcon, EqualizerBars } from '../components/player/icons';
+import { ArrowUpRightIcon, ChevronDownIcon, EqualizerBars } from '../components/player/icons';
 import { ResponsiveImage, placeholderBackground } from '../components/ResponsiveImage';
 import { getProjects } from '../lib/projects';
 import { cautionSceneAssets, reminderSceneAssets, scrapwrkSceneAssets, solenyaSceneAssets } from '../lib/assets';
 import type { MediaAsset } from '../lib/media';
+import { nextRelease, nextReleaseProject } from '../lib/next-release';
 import { getStreamingServices, getVisitLabel } from '../lib/streaming';
-import { getReleaseForProject, warmTrack } from '../lib/tracks';
+import { getRelease, getReleaseForProject, releasePath, warmTrack } from '../lib/tracks';
 import { Project, getProjectTypeLabel, isProjectReleased } from '../lib/utils';
 
 const clamp = (value: number, min: number, max: number) => Math.min(Math.max(value, min), max);
@@ -87,6 +91,16 @@ const HIDDEN_HOMEPAGE_PROJECTS = new Set([
 ]);
 
 function getProjectBackground(project: Project): SlideBackground {
+  if (project.type === 'coming-soon') {
+    return {
+      base: 'radial-gradient(120% 90% at 50% 34%, #1c1c1f 0%, #0a0a0b 52%, #000 100%)',
+      overlay: 'radial-gradient(circle at 50% 30%, rgba(255, 255, 255, 0.06), transparent 40%)',
+      topGlow: 'rgba(255, 255, 255, 0.04)',
+      bottomGlow: 'rgba(160, 160, 176, 0.05)',
+      edgeGlow: 'rgba(255, 255, 255, 0.03)',
+    };
+  }
+
   if (project.name === 'SOLENYA') {
     return {
       base: 'linear-gradient(139.07deg, #174E6C 2.05%, #720102 101.73%)',
@@ -196,90 +210,6 @@ function BackgroundLayer({
   );
 }
 
-function FooterSocialLink({
-  href,
-  label,
-  children,
-}: {
-  href: string;
-  label: string;
-  children: React.ReactNode;
-}) {
-  return (
-    <a
-      href={href}
-      target="_blank"
-      rel="noopener noreferrer"
-      aria-label={label}
-      className="rounded-sm text-white/70 transition-colors duration-200 hover:text-white focus-visible:text-white focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-4 focus-visible:outline-white/60"
-    >
-      {children}
-    </a>
-  );
-}
-
-function InstagramIcon() {
-  return (
-    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" aria-hidden="true">
-      <rect x="3" y="3" width="18" height="18" rx="5" stroke="currentColor" strokeWidth="1.8" />
-      <circle cx="12" cy="12" r="4" stroke="currentColor" strokeWidth="1.8" />
-      <circle cx="17.3" cy="6.7" r="1.1" fill="currentColor" />
-    </svg>
-  );
-}
-
-function TikTokIcon() {
-  return (
-    <svg width="15" height="16" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true">
-      <path d="M16.6 2h-3.5v13.4a3.1 3.1 0 1 1-2.2-3V8.8a6.6 6.6 0 1 0 5.7 6.6V8.6a8.2 8.2 0 0 0 4.4 1.3V6.4a4.6 4.6 0 0 1-4.4-4.4Z" />
-    </svg>
-  );
-}
-
-function XIcon() {
-  return (
-    <svg width="14" height="14" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true">
-      <path d="M17.8 2.5h3.3l-7.2 8.2 8.5 10.8h-6.6l-5.2-6.6-6 6.6H1.3l7.7-8.8L.9 2.5h6.8l4.7 6 5.4-6Zm-1.2 17h1.8L7.5 4.4H5.5l11.1 15.1Z" />
-    </svg>
-  );
-}
-
-function FacebookIcon() {
-  return (
-    <svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true">
-      <path d="M13.4 21.9v-7.4h2.5l.4-2.9h-2.9V9.8c0-.8.2-1.4 1.4-1.4h1.5V5.8c-.3 0-1.2-.1-2.2-.1-2.2 0-3.7 1.3-3.7 3.8v2.1H7.9v2.9h2.5v7.4a10 10 0 1 1 3 0Z" />
-    </svg>
-  );
-}
-
-function SiteFooter() {
-  return (
-    <footer
-      className="pointer-events-none absolute inset-x-0 bottom-0 z-30 flex items-center justify-between gap-6 bg-gradient-to-t from-black/75 via-black/50 via-45% to-transparent px-6 pt-24 text-[13px] [text-shadow:0_1px_10px_rgba(0,0,0,0.55)] sm:px-10"
-      style={{ paddingBottom: 'calc(max(1.25rem, env(safe-area-inset-bottom)) + var(--player-offset, 0px))' }}
-    >
-      <p className="text-white/60">
-        <span className="font-medium text-white/85">Bryton Zoz</span>
-        <span className="ml-2">&copy; 2026</span>
-      </p>
-      <nav aria-label="Social" className="pointer-events-auto flex items-center gap-5">
-        <FooterSocialLink href="https://instagram.com/brytonzoz" label="Instagram">
-          <InstagramIcon />
-        </FooterSocialLink>
-        <FooterSocialLink href="https://tiktok.com/@brytonzoz" label="TikTok">
-          <TikTokIcon />
-        </FooterSocialLink>
-        <FooterSocialLink href="https://x.com/brytonzoz" label="X">
-          <XIcon />
-        </FooterSocialLink>
-        <FooterSocialLink href="https://facebook.com/brytonzoz" label="Facebook">
-          <FacebookIcon />
-        </FooterSocialLink>
-      </nav>
-    </footer>
-  );
-}
-
 const SOLENYA_FRAME = {
   width: 961,
   height: 1758,
@@ -386,18 +316,36 @@ function SceneCard({
   // One action. Releases open the full sheet (play right here, streaming apps at the bottom);
   // everything else opens its site.
   let primary: React.ReactNode = null;
-  if (release || services.length) {
+  if (release) {
+    // A real link to the release page (crawlable, works without JavaScript); a plain click opens
+    // the sheet right here instead.
     primary = (
-      <button
-        type="button"
+      <a
+        href={releasePath(release)}
         className="scene-button"
-        onClick={openSheet}
+        onClick={(event) => {
+          if (event.metaKey || event.ctrlKey || event.shiftKey || event.altKey || event.button !== 0) return;
+          event.preventDefault();
+          openSheet();
+        }}
         onPointerEnter={() => warmTrack(firstTrack)}
         onPointerDown={() => warmTrack(firstTrack)}
         aria-haspopup="dialog"
         style={PRIMARY_PILL}
       >
         {isPlayingThis ? <EqualizerBars playing className="scene-eq" /> : null}
+        Listen Now
+      </a>
+    );
+  } else if (services.length) {
+    primary = (
+      <button
+        type="button"
+        className="scene-button"
+        onClick={openSheet}
+        aria-haspopup="dialog"
+        style={PRIMARY_PILL}
+      >
         {isReleased ? 'Listen Now' : 'Pre-save'}
       </button>
     );
@@ -493,6 +441,152 @@ function SceneCard({
     </>
   );
 }
+
+// Quiet on purpose: the only bright thing in this scene is the light inside the cover.
+const TEASER_PILL: React.CSSProperties = {
+  ...PILL_STYLE,
+  background: 'rgba(255, 255, 255, 0.1)',
+  color: 'rgba(255, 255, 255, 0.9)',
+  boxShadow: 'inset 0 0 0 1px rgba(255, 255, 255, 0.14)',
+};
+
+// "4d 12h 3m" until the date in lib/next-release.ts, "Out now" after it, "Coming soon" without one.
+// Starts on "Coming soon" so the static HTML and the first render agree.
+function useReleaseStatus(date: string | null): string {
+  const target = date ? Date.parse(date) : NaN;
+  const [now, setNow] = useState<number | null>(null);
+
+  useEffect(() => {
+    if (!Number.isFinite(target)) return;
+    setNow(Date.now());
+    const timer = window.setInterval(() => setNow(Date.now()), 1000);
+    return () => window.clearInterval(timer);
+  }, [target]);
+
+  if (!Number.isFinite(target) || now === null) return 'Coming soon';
+  const left = target - now;
+  if (left <= 0) return 'Out now';
+  const days = Math.floor(left / 86_400_000);
+  const hours = Math.floor((left % 86_400_000) / 3_600_000);
+  const minutes = Math.floor((left % 3_600_000) / 60_000);
+  const seconds = Math.floor((left % 60_000) / 1000);
+  return days > 0 ? `${days}d ${hours}h ${minutes}m` : `${hours}h ${minutes}m ${seconds}s`;
+}
+
+// Leads the homepage while the next release is being made: the same layout as every release,
+// but the cover is still developing, light moving behind frosted glass. Nothing given away.
+const ComingSoonScene = React.memo(function ComingSoonScene({ distance, onNext }: { distance: number; onNext: () => void }) {
+  const status = useReleaseStatus(nextRelease.date);
+  const distanceMagnitude = clamp(Math.abs(distance), 0, 1);
+  const outgoing = easeOutCubic(clamp((distance - 0.08) / 0.78, 0, 1));
+  const incoming = easeOutCubic(clamp(Math.abs(Math.min(distance, 0)) / 0.9, 0, 1));
+  const scale = distance >= 0 ? 1 - (outgoing * 0.26) : 1 - (incoming * 0.18);
+  const title = nextRelease.title ?? 'New music';
+  const [notifyOpen, setNotifyOpen] = useState(false);
+  const [signedUp, setSignedUp] = useState(false);
+  useEffect(() => setSignedUp(hasSignedUp()), []);
+  // Release day: the teaser becomes the way in, once the songs are actually playable here.
+  const outRelease = status === 'Out now' && nextRelease.releaseId ? getRelease(nextRelease.releaseId) : undefined;
+
+  return (
+    <div className="relative h-full w-full overflow-hidden">
+      <div aria-hidden="true" className="teaser-grain pointer-events-none absolute inset-0" />
+      <div className="absolute inset-0 flex items-center justify-center">
+        <div className="relative" style={{ width: SCENE_FRAME_WIDTH, height: SCENE_FRAME_HEIGHT }}>
+          <div
+            className="absolute solenya-card-enter"
+            style={{ left: scaleValue(120), top: scaleValue(214), width: scaleValue(722), zIndex: 10, animationDelay: '0.1s' }}
+          >
+            <div
+              style={{
+                opacity: 1 - (distanceMagnitude * 0.18),
+                transform: `translate3d(0, ${scaleValue(outgoing * 58)}, 0) scale(${scale})`,
+                transformOrigin: 'center center',
+                willChange: 'transform',
+                transition: 'transform 760ms cubic-bezier(0.22, 1, 0.36, 1), opacity 420ms ease-out',
+              }}
+            >
+              <div
+                role="img"
+                aria-label="Cover art coming soon"
+                className="teaser-cover scene-cover relative w-full overflow-hidden"
+                style={{ aspectRatio: '1 / 1', borderRadius: scaleValue(34) }}
+              >
+                {/* Clipped separately with clip-path: Safari clips the blurred, animated lights (their own
+                    layers) to a square, not to the radius, leaving a lighter box behind the corners. */}
+                <span aria-hidden="true" className="absolute inset-0" style={{ clipPath: `inset(0 round ${scaleValue(34)})` }}>
+                  <span className="teaser-light teaser-light-a" />
+                  <span className="teaser-light teaser-light-b" />
+                  <span className="teaser-light teaser-light-c" />
+                  <span className="teaser-frost" />
+                </span>
+                <span aria-hidden="true" className="teaser-pulse" style={{ width: scaleValue(22), height: scaleValue(22) }} />
+              </div>
+
+              <h2
+                className="scene-title text-balance"
+                style={{
+                  margin: `${scaleValue(52)} 0 0`,
+                  fontFamily: SCENE_FONT,
+                  fontSize: scaleValue(62),
+                  lineHeight: 1.08,
+                  fontWeight: 650,
+                  letterSpacing: '-0.035em',
+                  color: '#FFFFFF',
+                }}
+              >
+                {title}
+              </h2>
+              <p
+                className="scene-title tabular-nums"
+                style={{
+                  margin: `${scaleValue(10)} 0 0`,
+                  fontFamily: SCENE_FONT,
+                  fontSize: scaleValue(34),
+                  lineHeight: 1.2,
+                  fontWeight: 500,
+                  color: 'rgba(255, 255, 255, 0.6)',
+                }}
+              >
+                {status}
+              </p>
+
+              <div className="flex" style={{ marginTop: scaleValue(44), gap: scaleValue(20) }}>
+                {outRelease ? (
+                  <Link href={releasePath(outRelease)} className="scene-button" style={{ ...PILL_STYLE, background: '#FFFFFF', color: '#0B0B0C' }}>
+                    Listen Now
+                  </Link>
+                ) : (
+                  <button
+                    type="button"
+                    className="scene-button"
+                    onClick={() => setNotifyOpen(true)}
+                    disabled={signedUp}
+                    style={signedUp ? TEASER_PILL : { ...PILL_STYLE, background: '#FFFFFF', color: '#0B0B0C' }}
+                  >
+                    {signedUp ? (
+                      <>
+                        <svg style={{ width: scaleValue(34), height: scaleValue(34) }} viewBox="0 0 24 24" fill="none" aria-hidden="true" className="shrink-0">
+                          <path d="m5 12.5 4.5 4.5L19 7.5" stroke="currentColor" strokeWidth="2.4" strokeLinecap="round" strokeLinejoin="round" />
+                        </svg>
+                        On the list
+                      </>
+                    ) : 'Notify me'}
+                  </button>
+                )}
+                <button type="button" className="scene-button" onClick={onNext} style={TEASER_PILL}>
+                  Past releases
+                  <ChevronDownIcon size={scaleValue(34)} className="shrink-0" />
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+      <NotifySheet isOpen={notifyOpen} onClose={() => setNotifyOpen(false)} onDone={() => setSignedUp(true)} />
+    </div>
+  );
+});
 
 const solenyaStickers = [
   {
@@ -1080,7 +1174,8 @@ function SceneDots({ names, activeIndex, onSelect }: { names: string[]; activeIn
 
 export default function HomePage() {
   const { music, fashion } = getProjects();
-  const allProjects = [...music, ...fashion]
+  const teaser = nextReleaseProject();
+  const allProjects = [...(teaser ? [teaser] : []), ...[...music, ...fashion]
     .filter((project) => !HIDDEN_HOMEPAGE_PROJECTS.has(project.name))
     .sort((leftProject, rightProject) => {
       const leftIndex = HOMEPAGE_PROJECT_ORDER.indexOf(leftProject.name);
@@ -1089,7 +1184,7 @@ export default function HomePage() {
       const safeRightIndex = rightIndex === -1 ? Number.MAX_SAFE_INTEGER : rightIndex;
 
       return safeLeftIndex - safeRightIndex;
-    });
+    })];
   const [activeIndex, setActiveIndex] = useState(0);
   const [scrollProgress, setScrollProgress] = useState(0);
   const [isTransitioning, setIsTransitioning] = useState(false);
@@ -1236,7 +1331,16 @@ export default function HomePage() {
             // Scene motion saturates at one screen away; clamping lets memoized far-off scenes skip re-rendering.
             const isLast = index === allProjects.length - 1;
             const sceneDistance = clamp(scrollProgress - index, -1, isLast ? 0 : 1);
-            const footer = isLast ? <SiteFooter /> : null;
+            const footer = isLast ? <SiteFooter variant="overlay" /> : null;
+
+            if (project.type === 'coming-soon') {
+              return (
+                <div key={project.name} className="relative h-screen snap-center overflow-hidden">
+                  <ComingSoonScene distance={sceneDistance} onNext={() => scrollToScene(index + 1)} />
+                  {footer}
+                </div>
+              );
+            }
 
             if (isSolenya) {
               return (

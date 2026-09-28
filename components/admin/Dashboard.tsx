@@ -2,7 +2,9 @@
 
 import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import { isOptedOut, setOptedOut } from '../../lib/analytics';
+import { SITE_URL } from '../../lib/artist';
 import { releases } from '../../lib/tracks';
+import { StoryKit } from './StoryKit';
 
 // /admin: listening metrics for the owner. The password is checked by the Worker on every request
 // (ADMIN_PASSWORD secret); this page only remembers it on this device if asked to.
@@ -24,7 +26,50 @@ type Stats = {
   outbound: Row[];
   shares: Row[];
   opens: Row[];
+  campaigns?: { label: string; visitors: number; plays: number; streams: number }[];
+  loved?: Row[];
+  subscribers?: { total: number; recent: number };
 };
+
+// Links for posts and bios: brytonzoz.com/go/<name> lands on the homepage and credits that name.
+function CampaignLinks({ rows }: { rows: NonNullable<Stats['campaigns']> }) {
+  const [name, setName] = useState('');
+  const [copied, setCopied] = useState(false);
+  const code = name.trim().toLowerCase().replace(/[^a-z0-9_-]+/g, '-').replace(/^-+/, '').slice(0, 40);
+  const link = `${SITE_URL}/go/${code}`;
+  return (
+    <div>
+      <form
+        className="flex gap-2"
+        onSubmit={async (event) => {
+          event.preventDefault();
+          if (!code) return;
+          try { await navigator.clipboard.writeText(link); setCopied(true); window.setTimeout(() => setCopied(false), 1600); } catch { /* ignore */ }
+        }}
+      >
+        <label className="min-w-0 flex-1">
+          <span className="sr-only">Link name</span>
+          <input
+            value={name}
+            onChange={(event) => setName(event.target.value)}
+            placeholder="ig-bio, tiktok-teaser…"
+            className="h-10 w-full rounded-[10px] bg-white/[0.08] px-3 text-[14px] text-white outline-none ring-1 ring-inset ring-white/10 placeholder:text-white/30 focus:ring-2 focus:ring-white/40"
+          />
+        </label>
+        <button type="submit" disabled={!code} className="h-10 shrink-0 rounded-full bg-white px-4 text-[14px] font-semibold text-black disabled:opacity-40">
+          {copied ? 'Copied' : 'Copy link'}
+        </button>
+      </form>
+      <p className="mt-1.5 truncate text-[12px] text-white/40">{code ? link : `${SITE_URL}/go/…`}</p>
+      <div className="mt-4">
+        <RankedList
+          rows={rows.map((row) => ({ label: row.label, value: n(row.visitors), extra: `${fmt(n(row.streams))} streams` }))}
+          empty="No visits from links yet"
+        />
+      </div>
+    </div>
+  );
+}
 
 const RANGES = [
   { days: 1, label: 'Today' },
@@ -286,16 +331,18 @@ export function Dashboard() {
   const onSite = n(t.plays);
   const outbound = n(t.outbound);
 
-  const exportCsv = async () => {
-    const response = await fetch(`/api/admin/export.csv?days=${days}`, { headers: { authorization: `Bearer ${password}` } });
+  const downloadCsv = async (path: string, name: string) => {
+    const response = await fetch(path, { headers: { authorization: `Bearer ${password}` } });
     if (!response.ok) return;
     const url = URL.createObjectURL(await response.blob());
     const link = document.createElement('a');
     link.href = url;
-    link.download = `brytonzoz-listening-${new Date().toISOString().slice(0, 10)}.csv`;
+    link.download = `brytonzoz-${name}-${new Date().toISOString().slice(0, 10)}.csv`;
     link.click();
     URL.revokeObjectURL(url);
   };
+  const exportCsv = () => downloadCsv(`/api/admin/export.csv?days=${days}`, 'listening');
+  const subscribers = stats.subscribers ?? { total: 0, recent: 0 };
 
   return (
     <div className="admin-root mx-auto max-w-[1100px] px-4 pb-24 pt-6 sm:px-8 sm:pt-10">
@@ -410,8 +457,33 @@ export function Dashboard() {
         </Card>
       </div>
 
+      <div className="mt-3 grid gap-3 md:grid-cols-2 lg:grid-cols-3">
+        <Card title="Notify list" subtitle="People waiting for the next release">
+          <p className="text-[34px] font-semibold leading-none tracking-[-0.02em] tabular-nums">{fmt(n(subscribers.total))}</p>
+          <p className="mt-1.5 text-[13px] text-white/45">{fmt(n(subscribers.recent))} joined in this range</p>
+          <button
+            type="button"
+            onClick={() => downloadCsv('/api/admin/subscribers.csv', 'notify-list')}
+            disabled={!n(subscribers.total)}
+            className="mt-5 h-9 rounded-full bg-white/[0.08] px-4 text-[14px] font-semibold text-white/85 hover:bg-white/[0.12] disabled:opacity-40"
+          >
+            Export notify list
+          </button>
+        </Card>
+        <Card title="Most loved" subtitle="Songs people hearted">
+          <RankedList rows={(stats.loved ?? []).map((row) => ({ label: trackTitles.get(String(row.label)) ?? String(row.label), value: n(row.value) }))} empty="No hearts yet" />
+        </Card>
+        <Card title="Links" subtitle="Visitors from each /go link and shared link">
+          <CampaignLinks rows={stats.campaigns ?? []} />
+        </Card>
+      </div>
+
+      <Card title="Story kit" subtitle="A story image from the real cover, sized for Instagram and TikTok" className="mt-3">
+        <StoryKit />
+      </Card>
+
       <footer className="mt-8 flex flex-wrap items-center justify-between gap-3 text-[13px] text-white/40">
-        <p>Anonymous: a random id per browser. No names, emails or IP addresses are stored.</p>
+        <p>Listening is anonymous: a random id per browser, no names or IP addresses. Emails are only the ones people left with Notify me.</p>
         <label className="flex items-center gap-2">
           <input
             type="checkbox"

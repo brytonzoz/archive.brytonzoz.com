@@ -1,7 +1,7 @@
 {
   "$schema": "node_modules/wrangler/config-schema.json",
   // Static assets are served straight from Cloudflare's edge; the script in worker/ only runs for
-  // /audio/* (songs streamed from R2) and /api/* (listening metrics). See run_worker_first.
+  // /audio/* (songs streamed from R2), /api/* (metrics, notify list) and /go/* (campaign links).
   "name": "archive",
   "account_id": "480a4eebfef4c5ba2d0e225fde891ae8",
   "compatibility_date": "2026-09-01",
@@ -11,7 +11,7 @@
     "binding": "ASSETS",
     "html_handling": "auto-trailing-slash",
     "not_found_handling": "404-page",
-    "run_worker_first": ["/audio/*", "/api/*"]
+    "run_worker_first": ["/audio/*", "/api/*", "/go/*"]
   },
   "r2_buckets": [
     { "binding": "MUSIC", "bucket_name": "brytonzoz-media" }

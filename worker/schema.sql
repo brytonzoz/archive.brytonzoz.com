@@ -15,15 +15,27 @@ CREATE TABLE IF NOT EXISTS events (
   detail TEXT,                -- listen: ended|skip|pause|switch|leave; outbound: service; share: method; view: path
   referrer TEXT,              -- host that sent the visitor
   country TEXT,
-  device TEXT                 -- phone | tablet | desktop
+  device TEXT,                -- phone | tablet | desktop
+  campaign TEXT               -- which link brought the visit: brytonzoz.com/go/<code> or ?ref=<code>
 );
 CREATE INDEX IF NOT EXISTS events_type_day ON events (type, day);
 CREATE INDEX IF NOT EXISTS events_play ON events (play);
 CREATE INDEX IF NOT EXISTS events_track ON events (track);
+CREATE INDEX IF NOT EXISTS events_campaign ON events (campaign);
 
 -- Who is listening right now (one row per browser, refreshed while music plays).
 CREATE TABLE IF NOT EXISTS live (
   visitor TEXT PRIMARY KEY,
   ts INTEGER NOT NULL,
   track TEXT
+);
+
+-- The "Notify me" list (exported from /admin as CSV).
+CREATE TABLE IF NOT EXISTS subscribers (
+  email TEXT PRIMARY KEY,
+  ts INTEGER NOT NULL,
+  source TEXT,                -- where they signed up, e.g. teaser
+  campaign TEXT,
+  country TEXT,
+  visitor TEXT
 );

@@ -1,6 +1,7 @@
 import React from 'react';
 import Link from 'next/link';
 import { ProjectCard } from './ProjectCard';
+import { SiteFooter } from './SiteFooter';
 import type { Project } from '../lib/utils';
 
 export function CatalogPage({ title, projects }: { title: string; projects: Project[] }) {
@@ -8,7 +9,7 @@ export function CatalogPage({ title, projects }: { title: string; projects: Proj
     <main className="min-h-screen bg-[#0b0b0c] text-white">
       <div
         className="mx-auto max-w-4xl px-5 pt-6 sm:px-8 sm:pt-10"
-        style={{ paddingBottom: 'calc(6rem + var(--player-offset, 0px))' }}
+        style={{ paddingBottom: '1rem' }}
       >
         <Link
           href="/"
@@ -35,6 +36,7 @@ export function CatalogPage({ title, projects }: { title: string; projects: Proj
           ))}
         </div>
       </div>
+      <SiteFooter />
     </main>
   );
 }

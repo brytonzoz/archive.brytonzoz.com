@@ -1,13 +1,14 @@
 'use client';
 
 import React, { useEffect, useState } from 'react';
+import { toggleLoved, useLoved } from '../../lib/likes';
 import { shareLink } from '../../lib/share';
 import { formatTime, trackPath } from '../../lib/tracks';
 import { ResponsiveImage, placeholderBackground } from '../ResponsiveImage';
 import { useSheet } from '../useSheet';
 import { usePlayer } from './context';
 import {
-  ChevronDownIcon, ExplicitBadge, GripIcon, NextIcon, PauseIcon, PlayIcon, PreviousIcon, QueueIcon, RemoveIcon, RepeatIcon, ShareIcon, ShuffleIcon,
+  ChevronDownIcon, ExplicitBadge, GripIcon, HeartIcon, NextIcon, PauseIcon, PlayIcon, PreviousIcon, QueueIcon, RemoveIcon, RepeatIcon, ShareIcon, ShuffleIcon,
 } from './icons';
 import { useProgress } from './useProgress';
 
@@ -166,6 +167,7 @@ export function NowPlaying() {
   const { current, isPlaying, isLoading, isExpanded, toggle, next, previous, collapse, notify } = usePlayer();
   const { sheetRef, isClosing, requestClose, dragHandlers, sheetStyle } = useSheet(isExpanded, collapse);
   const [showList, setShowList] = useState(false);
+  const loved = useLoved(current?.id);
 
   useEffect(() => {
     if (!isExpanded) setShowList(false);
@@ -187,7 +189,7 @@ export function NowPlaying() {
       <div
         ref={sheetRef}
         tabIndex={-1}
-        className="sheet-panel relative isolate flex h-[calc(100dvh-8px)] w-full max-w-[440px] flex-col overflow-hidden rounded-t-[28px] text-white outline-none sm:h-[min(820px,calc(100dvh-48px))] sm:rounded-[28px]"
+        className="sheet-panel relative isolate flex h-[calc(100dvh-8px)] w-full max-w-[440px] flex-col overflow-hidden rounded-t-[32px] text-white outline-none sm:h-[min(820px,calc(100dvh-48px))] sm:rounded-[32px]"
         style={sheetStyle}
       >
         {/* The artwork itself, blurred, is the backdrop, so every release gets its own colour. */}
@@ -232,6 +234,15 @@ export function NowPlaying() {
               </h2>
               <p className="mt-0.5 truncate text-[17px] text-white/55">{release.title}</p>
             </div>
+            <button
+              type="button"
+              aria-label="Love"
+              aria-pressed={loved}
+              onClick={() => toggleLoved(current.id, release.id)}
+              className={`${iconButton} h-9 w-9 shrink-0 bg-white/10 hover:bg-white/15 ${loved ? 'text-[#ff375f]' : 'text-white/85'}`}
+            >
+              <HeartIcon size={18} filled={loved} className={loved ? 'heart-pop' : ''} />
+            </button>
             <button
               type="button"
               aria-label="Share song"

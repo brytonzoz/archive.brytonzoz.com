@@ -7,7 +7,7 @@ export interface MetricsEnv {
   ADMIN_PASSWORD?: string;
 }
 
-const EVENT_TYPES = new Set(['view', 'play', 'listen', 'share', 'outbound', 'open']);
+const EVENT_TYPES = new Set(['view', 'play', 'listen', 'share', 'outbound', 'open', 'like', 'unlike']);
 const MAX_EVENTS = 25;
 const LIVE_WINDOW_MS = 90_000;
 const STREAM_SECONDS = 30;
@@ -56,15 +56,15 @@ async function ingest(request: Request, env: MetricsEnv): Promise<Response> {
     if (!type || !EVENT_TYPES.has(type)) continue;
     statements.push(
       env.DB.prepare(
-        `INSERT INTO events (ts, day, type, visitor, session, play, release, track, seconds, position, detail, referrer, country, device)
-         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+        `INSERT INTO events (ts, day, type, visitor, session, play, release, track, seconds, position, detail, referrer, country, device, campaign)
+         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
       ).bind(
         now, day, type,
         text(event.visitor, 40), text(event.session, 40), text(event.play, 40),
         text(event.release, 60), text(event.track, 80),
         num(event.seconds, 0, 3600), num(event.position, 0, 1),
         text(event.detail, 120), text(event.referrer, 120),
-        country, device,
+        country, device, text(event.campaign, 40),
       ),
     );
   }
@@ -82,6 +82,28 @@ async function ingest(request: Request, env: MetricsEnv): Promise<Response> {
 
   if (statements.length) await env.DB.batch(statements);
   return noContent;
+}
+
+// The "Notify me" list: an email per person, where they signed up, and which post brought them.
+const EMAIL = /^[^\s@]+@[^\s@]+\.[^\s@]{2,}$/;
+
+async function subscribe(request: Request, env: MetricsEnv): Promise<Response> {
+  let body: Record<string, unknown>;
+  try {
+    body = await request.json();
+  } catch {
+    return json({ error: 'bad-request' }, 400);
+  }
+  const email = typeof body.email === 'string' ? body.email.trim().toLowerCase() : '';
+  if (email.length > 254 || !EMAIL.test(email)) return json({ error: 'invalid-email' }, 400);
+  // Filled only by bots (the field is hidden from people): pretend it worked.
+  if (body.website || BOT_UA.test(request.headers.get('user-agent') ?? '') || !env.DB) return json({ ok: true });
+
+  const cf = (request as Request & { cf?: { country?: string } }).cf;
+  await env.DB.prepare(
+    'INSERT INTO subscribers (email, ts, source, campaign, country, visitor) VALUES (?, ?, ?, ?, ?, ?) ON CONFLICT(email) DO NOTHING',
+  ).bind(email, Date.now(), text(body.source, 40), text(body.campaign, 40), cf?.country ?? null, text(body.visitor, 40)).run();
+  return json({ ok: true });
 }
 
 // Compare hashes so the check takes the same time whatever the guess.
@@ -107,7 +129,7 @@ function sinceDay(url: URL): string {
 }
 
 // One row per play of a song: how long it was actually heard and how far it got.
-const PLAYS = `SELECT play, MIN(day) AS day, visitor, release, track, SUM(seconds) AS heard, MAX(position) AS reached,
+const PLAYS = `SELECT play, MIN(day) AS day, visitor, MAX(campaign) AS campaign, release, track, SUM(seconds) AS heard, MAX(position) AS reached,
   MAX(CASE WHEN detail = 'skip' THEN 1 ELSE 0 END) AS skipped
   FROM events WHERE type = 'listen' AND day >= ?1 AND play IS NOT NULL GROUP BY play`;
 
@@ -116,7 +138,8 @@ async function stats(url: URL, db: D1Database): Promise<Response> {
   const q = (sql: string, ...params: unknown[]) => db.prepare(sql).bind(since, ...params);
   const trackCounts = Object.fromEntries(catalog.releases.map((release) => [release.id, release.tracks.length]));
 
-  const [totals, plays, daily, dailyPlays, tracks, releases, dropoff, countries, devices, referrers, outbound, shares, opens, returning, live, fullListens] =
+  const [totals, plays, daily, dailyPlays, tracks, releases, dropoff, countries, devices, referrers, outbound, shares, opens, returning, live, fullListens,
+    campaigns, campaignPlays, loved, subscribers] =
     await db.batch([
       q(`SELECT
           (SELECT COUNT(DISTINCT visitor) FROM events WHERE day >= ?1) AS visitors,
@@ -156,6 +179,17 @@ async function stats(url: URL, db: D1Database): Promise<Response> {
       db.prepare('SELECT COUNT(*) AS value, track FROM live WHERE ts > ? GROUP BY track ORDER BY value DESC').bind(Date.now() - LIVE_WINDOW_MS),
       // Visitors who heard every song of a release to (nearly) the end.
       q(`SELECT release, visitor, COUNT(DISTINCT track) AS finished FROM (${PLAYS}) WHERE reached >= 0.9 GROUP BY release, visitor`),
+      // Which post or link brought people in, and what they did.
+      q(`SELECT campaign AS label, COUNT(DISTINCT visitor) AS visitors FROM events WHERE campaign IS NOT NULL AND day >= ?1 GROUP BY campaign ORDER BY visitors DESC LIMIT 20`),
+      q(`SELECT campaign AS label, COUNT(*) AS plays, SUM(CASE WHEN heard >= ${STREAM_SECONDS} THEN 1 ELSE 0 END) AS streams
+          FROM (${PLAYS}) WHERE campaign IS NOT NULL GROUP BY campaign`),
+      // Hearts: each person's latest choice per song counts once.
+      q(`SELECT track AS label, COUNT(*) AS value FROM (
+          SELECT visitor, track, type FROM events e WHERE type IN ('like', 'unlike') AND day >= ?1
+            AND ts = (SELECT MAX(ts) FROM events WHERE visitor = e.visitor AND track = e.track AND type IN ('like', 'unlike'))
+        ) WHERE type = 'like' GROUP BY track ORDER BY value DESC LIMIT 12`),
+      q(`SELECT (SELECT COUNT(*) FROM subscribers) AS total,
+          (SELECT COUNT(*) FROM subscribers WHERE ts >= CAST(strftime('%s', ?1) AS INTEGER) * 1000) AS recent`),
     ]);
 
   const full: Record<string, number> = {};
@@ -180,6 +214,12 @@ async function stats(url: URL, db: D1Database): Promise<Response> {
     outbound: outbound.results,
     shares: shares.results,
     opens: opens.results,
+    campaigns: (campaigns.results as { label: string; visitors: number }[]).map((row) => {
+      const played = (campaignPlays.results as { label: string; plays: number; streams: number }[]).find((p) => p.label === row.label);
+      return { ...row, plays: played?.plays ?? 0, streams: played?.streams ?? 0 };
+    }),
+    loved: loved.results,
+    subscribers: subscribers.results[0],
   });
 }
 
@@ -189,23 +229,37 @@ function csvCell(value: unknown): string {
   return /[",\n]/.test(s) ? `"${s.replace(/"/g, '""')}"` : s;
 }
 
+function csvResponse(lines: string[], name: string): Response {
+  return new Response(lines.join('\n'), {
+    headers: {
+      'content-type': 'text/csv; charset=utf-8',
+      'content-disposition': `attachment; filename="brytonzoz-${name}-${new Date().toISOString().slice(0, 10)}.csv"`,
+      'cache-control': 'no-store',
+    },
+  });
+}
+
+// The notify list, ready to import into any email tool.
+async function exportSubscribers(db: D1Database): Promise<Response> {
+  const { results } = await db.prepare('SELECT email, ts, source, campaign, country FROM subscribers ORDER BY ts').all();
+  const lines = ['email,signed_up,source,campaign,country'];
+  for (const row of results as Record<string, unknown>[]) {
+    lines.push([row.email, new Date(row.ts as number).toISOString(), row.source, row.campaign, row.country].map(csvCell).join(','));
+  }
+  return csvResponse(lines, 'notify-list');
+}
+
 async function exportCsv(url: URL, db: D1Database): Promise<Response> {
   const { results } = await db
-    .prepare('SELECT ts, day, type, visitor, session, play, release, track, seconds, position, detail, referrer, country, device FROM events WHERE day >= ? ORDER BY ts LIMIT 200000')
+    .prepare('SELECT ts, day, type, visitor, session, play, release, track, seconds, position, detail, referrer, campaign, country, device FROM events WHERE day >= ? ORDER BY ts LIMIT 200000')
     .bind(sinceDay(url))
     .all();
-  const columns = ['time', 'day', 'type', 'visitor', 'session', 'play', 'release', 'track', 'seconds', 'position', 'detail', 'referrer', 'country', 'device'];
+  const columns = ['time', 'day', 'type', 'visitor', 'session', 'play', 'release', 'track', 'seconds', 'position', 'detail', 'referrer', 'campaign', 'country', 'device'];
   const lines = [columns.join(',')];
   for (const row of results as Record<string, unknown>[]) {
     lines.push([new Date(row.ts as number).toISOString(), ...columns.slice(1).map((c) => row[c])].map(csvCell).join(','));
   }
-  return new Response(lines.join('\n'), {
-    headers: {
-      'content-type': 'text/csv; charset=utf-8',
-      'content-disposition': `attachment; filename="brytonzoz-listening-${new Date().toISOString().slice(0, 10)}.csv"`,
-      'cache-control': 'no-store',
-    },
-  });
+  return csvResponse(lines, 'listening');
 }
 
 export async function handleApi(request: Request, env: MetricsEnv): Promise<Response> {
@@ -214,6 +268,11 @@ export async function handleApi(request: Request, env: MetricsEnv): Promise<Resp
   if (url.pathname === '/api/e') {
     if (request.method !== 'POST') return new Response('Method not allowed', { status: 405 });
     return ingest(request, env);
+  }
+
+  if (url.pathname === '/api/subscribe') {
+    if (request.method !== 'POST') return new Response('Method not allowed', { status: 405 });
+    return subscribe(request, env);
   }
 
   if (url.pathname.startsWith('/api/admin/')) {
@@ -225,6 +284,7 @@ export async function handleApi(request: Request, env: MetricsEnv): Promise<Resp
     }
     if (url.pathname === '/api/admin/stats') return stats(url, env.DB);
     if (url.pathname === '/api/admin/export.csv') return exportCsv(url, env.DB);
+    if (url.pathname === '/api/admin/subscribers.csv') return exportSubscribers(env.DB);
   }
 
   return json({ error: 'not-found' }, 404);

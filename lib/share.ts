@@ -5,7 +5,10 @@ export type ShareTarget = { title: string; text: string; path: string; release?:
 // Opens the phone's or computer's own share sheet; where there isn't one, copies the link.
 // Resolves with what should be confirmed to the person (or null when they cancelled).
 export async function shareLink(target: ShareTarget): Promise<string | null> {
-  const url = new URL(target.path, window.location.origin).href;
+  // Tagged so the dashboard can tell visits from shared links apart (the tag is removed on arrival).
+  const link = new URL(target.path, window.location.origin);
+  link.searchParams.set('ref', 'share');
+  const url = link.href;
   const metric = { type: 'share' as const, release: target.release, track: target.trackId };
 
   if (typeof navigator.share === 'function') {

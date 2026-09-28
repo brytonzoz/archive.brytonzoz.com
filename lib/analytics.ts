@@ -1,7 +1,7 @@
 // Anonymous listening metrics for the /admin dashboard. A random id per browser (no cookies, no
 // personal data); events are batched and sent with sendBeacon so they never slow the site down.
 
-type EventType = 'view' | 'play' | 'listen' | 'share' | 'outbound' | 'open';
+type EventType = 'view' | 'play' | 'listen' | 'share' | 'outbound' | 'open' | 'like' | 'unlike';
 
 export type MetricEvent = {
   type: EventType;
@@ -18,7 +18,7 @@ const ENDPOINT = '/api/e';
 const FLUSH_MS = 3000;
 const OPT_OUT_KEY = 'bz.noTrack';
 
-let queue: (MetricEvent & { visitor: string; session: string })[] = [];
+let queue: (MetricEvent & { visitor: string; session: string; campaign?: string })[] = [];
 let timer: number | undefined;
 let listening = false;
 
@@ -59,7 +59,31 @@ export function setOptedOut(value: boolean): void {
   }
 }
 
-const visitorId = () => stored('localStorage', 'bz.v');
+export const visitorId = () => stored('localStorage', 'bz.v');
+
+// Which post or link brought this visit: `?ref=` (from /go/<code> links or shares) or `utm_source`,
+// kept for the rest of the visit and then taken out of the address bar so it isn't shared onward.
+const REF_KEY = 'bz.ref';
+const REF_FORMAT = /^[a-z0-9][a-z0-9_-]{0,39}$/;
+let campaignCache: string | null | undefined;
+
+export function campaign(): string | undefined {
+  if (campaignCache !== undefined) return campaignCache ?? undefined;
+  campaignCache = null;
+  try {
+    const url = new URL(window.location.href);
+    const raw = (url.searchParams.get('ref') ?? url.searchParams.get('utm_source') ?? '').trim().toLowerCase();
+    if (REF_FORMAT.test(raw)) window.sessionStorage.setItem(REF_KEY, raw);
+    if (url.searchParams.has('ref') || url.searchParams.has('utm_source')) {
+      for (const key of Array.from(url.searchParams.keys())) if (key === 'ref' || key.startsWith('utm_')) url.searchParams.delete(key);
+      window.history.replaceState(window.history.state, '', url.pathname + url.search + url.hash);
+    }
+    campaignCache = window.sessionStorage.getItem(REF_KEY);
+  } catch {
+    // Storage blocked: no attribution.
+  }
+  return campaignCache ?? undefined;
+}
 
 function send(body: object): void {
   const payload = JSON.stringify(body);
@@ -93,7 +117,7 @@ function ensureListeners(): void {
 export function track(event: MetricEvent): void {
   if (typeof window === 'undefined' || isOptedOut()) return;
   ensureListeners();
-  queue.push({ ...event, visitor: visitorId(), session: stored('sessionStorage', 'bz.s') });
+  queue.push({ ...event, campaign: campaign(), visitor: visitorId(), session: stored('sessionStorage', 'bz.s') });
   if (queue.length >= 20) flush();
   else if (timer === undefined) timer = window.setTimeout(flush, FLUSH_MS);
 }

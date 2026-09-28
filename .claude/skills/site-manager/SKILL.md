@@ -27,6 +27,7 @@ Then run `npm ci`.
 | Request | Where |
 | --- | --- |
 | New project, link, description, release date | `lib/projects.ts`, and mirror it in `data/projects.yml` |
+| Next-release teaser: name, countdown date, remove | `lib/next-release.ts` (re-render `public/og.jpg` from the homepage if it changes) |
 | Show, hide, or reorder on the homepage | `HOMEPAGE_PROJECT_ORDER`, `HIDDEN_HOMEPAGE_PROJECTS` in `app/page.tsx` |
 | New cover art | Save the original to `assets-src/covers/<slug>.<ext>`, run `npm run media`, use `media['covers/<slug>']` |
 | New scene stickers | `assets-src/scenes/<scene>/`, then wire them up in `lib/assets.ts` and the scene in `app/page.tsx` |

@@ -1168,6 +1168,30 @@ const ScrapwrkScene = React.memo(function ScrapwrkScene({ distance, loadImages }
   );
 });
 
+// NonParallel's background: an assortment of the tees tossed around the edges, and two small logo
+// stickers. Placed by percentage of the screen (not the portrait scene frame) so they sit in the
+// corners on a phone and spread into the open space on a wide screen; `size` is in units of
+// --np-sticker (globals.css). They move with the scroll like the Scrapwrk stickers. The second logo
+// sits under the grid, where only tablets and larger have room.
+const nonparallelStickers = [
+  { key: 'rainbow', src: nonparallelAssets.tees.rainbow, x: 7, y: 13, size: 1.05, baseRotate: -16,
+    movement: { x: -70, y: -110, rotate: -6, scale: 0.07, fadeRate: 0.96 }, float: { x: -7, y: -8, rotate: -2, duration: '8.4s', delay: '0.1s' }, intro: { x: -170, y: -130, rotate: -10, delay: '0.1s' } },
+  { key: 'blue', src: nonparallelAssets.tees.blue, x: 96, y: 9, size: 0.85, baseRotate: 14,
+    movement: { x: 76, y: -118, rotate: 5, scale: 0.07, fadeRate: 0.96 }, float: { x: 8, y: -7, rotate: 2, duration: '8.9s', delay: '0.4s' }, intro: { x: 160, y: -140, rotate: 10, delay: '0.16s' } },
+  { key: 'red', src: nonparallelAssets.tees.red, x: 3, y: 50, size: 0.85, baseRotate: 11,
+    movement: { x: -96, y: 10, rotate: 4, scale: 0.07, fadeRate: 1 }, float: { x: -6, y: 8, rotate: 1.6, duration: '9.2s', delay: '0.25s' }, intro: { x: -190, y: 20, rotate: -8, delay: '0.22s' } },
+  { key: 'yellow', src: nonparallelAssets.tees.yellow, x: 97, y: 54, size: 0.85, baseRotate: -12,
+    movement: { x: 96, y: 14, rotate: -4, scale: 0.07, fadeRate: 1 }, float: { x: 7, y: 8, rotate: -1.8, duration: '8.7s', delay: '0.6s' }, intro: { x: 190, y: 26, rotate: 8, delay: '0.28s' } },
+  { key: 'green', src: nonparallelAssets.tees.green, x: 11, y: 86, size: 0.95, baseRotate: -7,
+    movement: { x: -64, y: 112, rotate: 4, scale: 0.08, fadeRate: 1.02 }, float: { x: -7, y: -8, rotate: -1.4, duration: '8.2s', delay: '0.3s' }, intro: { x: -150, y: 160, rotate: 8, delay: '0.34s' } },
+  { key: 'purple', src: nonparallelAssets.tees.purple, x: 89, y: 84, size: 1, baseRotate: 17,
+    movement: { x: 78, y: 124, rotate: -5, scale: 0.08, fadeRate: 1.04 }, float: { x: 9, y: -9, rotate: 1.6, duration: '8.6s', delay: '0.55s' }, intro: { x: 170, y: 164, rotate: -8, delay: '0.4s' } },
+  { key: 'logo-a', src: nonparallelAssets.logo, x: 70, y: 10, size: 0.5, baseRotate: 9,
+    movement: { x: 40, y: -120, rotate: 6, scale: 0.06, fadeRate: 1 }, float: { x: 5, y: -6, rotate: 2.4, duration: '7.6s', delay: '0.2s' }, intro: { x: 90, y: -150, rotate: 12, delay: '0.46s' } },
+  { key: 'logo-b', src: nonparallelAssets.logo, x: 50, y: 91, size: 0.42, baseRotate: -10, wideOnly: true,
+    movement: { x: -40, y: 120, rotate: -6, scale: 0.06, fadeRate: 1 }, float: { x: -5, y: -6, rotate: -2.2, duration: '7.9s', delay: '0.7s' }, intro: { x: -90, y: 150, rotate: -12, delay: '0.52s' } },
+];
+
 // NonParallel: the label behind all of this. Its logo (a sticker) heads the scene, a short note
 // says what it is, and the tees follow in the same card system as Scrapwrk.
 const NonParallelScene = React.memo(function NonParallelScene({ distance }: { distance: number }) {
@@ -1177,11 +1201,50 @@ const NonParallelScene = React.memo(function NonParallelScene({ distance }: { di
 
   return (
     <div className="relative flex h-full w-full items-center justify-center overflow-hidden pb-[132px] pt-10">
-      <div aria-hidden="true" className="np-bg-logo np-bg-logo-a">
-        <ResponsiveImage asset={nonparallelAssets.logo} alt="" sizes="60vw" loading="lazy" draggable={false} className="h-full w-full object-contain" />
-      </div>
-      <div aria-hidden="true" className="np-bg-logo np-bg-logo-b">
-        <ResponsiveImage asset={nonparallelAssets.logo} alt="" sizes="50vw" loading="lazy" draggable={false} className="h-full w-full object-contain" />
+      <div aria-hidden="true" className="np-scene-stickers pointer-events-none absolute inset-0 z-0">
+        {nonparallelStickers.map((sticker) => {
+          const stickerState = getSceneStickerState(sticker, distance);
+          const size = `calc(var(--np-sticker) * ${sticker.size})`;
+          return (
+            <div
+              key={sticker.key}
+              className={`pointer-events-none absolute solenya-sticker-enter ${'wideOnly' in sticker ? 'hidden sm:block' : ''}`}
+              style={{
+                left: `${sticker.x}%`,
+                top: `${sticker.y}%`,
+                width: size,
+                height: size,
+                margin: `calc(${size} / -2) 0 0 calc(${size} / -2)`,
+                '--intro-x': scaleValue(sticker.intro.x),
+                '--intro-y': scaleValue(sticker.intro.y),
+                '--intro-rotate': `${sticker.intro.rotate}deg`,
+                animationDelay: sticker.intro.delay,
+              } as React.CSSProperties}
+            >
+              <div
+                style={{
+                  opacity: stickerState.opacity,
+                  transform: `translate3d(${scaleValue(stickerState.translateX)}, ${scaleValue(stickerState.translateY)}, 0) rotate(${stickerState.rotate}deg) scale(${stickerState.scale})`,
+                  willChange: 'transform, opacity',
+                  transition: 'transform 520ms cubic-bezier(0.22, 1, 0.36, 1), opacity 320ms ease-out',
+                }}
+              >
+                <div
+                  className="solenya-sticker-float h-full w-full"
+                  style={{
+                    '--float-x': scaleValue(sticker.float.x),
+                    '--float-y': scaleValue(sticker.float.y),
+                    '--float-rotate': `${sticker.float.rotate}deg`,
+                    '--float-duration': sticker.float.duration,
+                    animationDelay: sticker.float.delay,
+                  } as React.CSSProperties}
+                >
+                  <ResponsiveImage asset={sticker.src} alt="" sizes="(min-width: 640px) 300px, 34vw" loading="lazy" draggable={false} className="h-full w-full select-none object-contain" />
+                </div>
+              </div>
+            </div>
+          );
+        })}
       </div>
       <div
         className="np-scene relative z-10"

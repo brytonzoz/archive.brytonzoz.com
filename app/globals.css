@@ -1386,6 +1386,11 @@ html {
   width: min(88vw, 540px, calc((100dvh - 250px) / (0.5 + var(--row-h, 0.66) * var(--rows, 1))));
 }
 
+/* Its background tees and logo stickers (app/page.tsx) are sized in --np-sticker. */
+.np-scene-stickers {
+  --np-sticker: min(34vmin, 300px);
+}
+
 .np-scene-header {
   margin-bottom: 3cqw;
 }
@@ -1417,40 +1422,9 @@ html {
   box-shadow: inset 0 0 0 1px rgba(255, 255, 255, 0.1), 0 10px 30px -12px rgba(0, 0, 0, 0.5);
 }
 
-.np-bg-logo {
-  position: absolute;
-  z-index: 0;
-  pointer-events: none;
-  opacity: 0.16;
-  filter: blur(1px) saturate(1.2);
-  animation: npBgDrift 14s ease-in-out infinite alternate;
-}
-
-.np-bg-logo-a {
-  left: -18vmin;
-  top: 4vh;
-  width: 58vmin;
-  aspect-ratio: 466 / 216;
-  transform: rotate(-16deg);
-}
-
-.np-bg-logo-b {
-  right: -20vmin;
-  bottom: 18vh;
-  width: 62vmin;
-  aspect-ratio: 466 / 216;
-  transform: rotate(12deg);
-  animation-delay: -6s;
-}
-
-@keyframes npBgDrift {
-  from { translate: 0 0; }
-  to { translate: 2vmin -2vmin; }
-}
 
 @media (prefers-reduced-motion: reduce) {
-  .np-scene-logo,
-  .np-bg-logo {
+  .np-scene-logo {
     animation: none;
   }
 }

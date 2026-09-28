@@ -295,6 +295,48 @@
     "avif": "/media/scenes/nonparallel/logo.d290e81f00-320.avif 320w, /media/scenes/nonparallel/logo.d290e81f00-466.avif 466w",
     "webp": "/media/scenes/nonparallel/logo.d290e81f00-320.webp 320w, /media/scenes/nonparallel/logo.d290e81f00-466.webp 466w"
   },
+  "scenes/nonparallel/tee-blue": {
+    "width": 696,
+    "height": 696,
+    "src": "/media/scenes/nonparallel/tee-blue.cf32c36075-696.webp",
+    "avif": "/media/scenes/nonparallel/tee-blue.cf32c36075-320.avif 320w, /media/scenes/nonparallel/tee-blue.cf32c36075-480.avif 480w, /media/scenes/nonparallel/tee-blue.cf32c36075-696.avif 696w",
+    "webp": "/media/scenes/nonparallel/tee-blue.cf32c36075-320.webp 320w, /media/scenes/nonparallel/tee-blue.cf32c36075-480.webp 480w, /media/scenes/nonparallel/tee-blue.cf32c36075-696.webp 696w"
+  },
+  "scenes/nonparallel/tee-green": {
+    "width": 696,
+    "height": 696,
+    "src": "/media/scenes/nonparallel/tee-green.91fcdd02a8-696.webp",
+    "avif": "/media/scenes/nonparallel/tee-green.91fcdd02a8-320.avif 320w, /media/scenes/nonparallel/tee-green.91fcdd02a8-480.avif 480w, /media/scenes/nonparallel/tee-green.91fcdd02a8-696.avif 696w",
+    "webp": "/media/scenes/nonparallel/tee-green.91fcdd02a8-320.webp 320w, /media/scenes/nonparallel/tee-green.91fcdd02a8-480.webp 480w, /media/scenes/nonparallel/tee-green.91fcdd02a8-696.webp 696w"
+  },
+  "scenes/nonparallel/tee-purple": {
+    "width": 696,
+    "height": 696,
+    "src": "/media/scenes/nonparallel/tee-purple.0c0966a018-696.webp",
+    "avif": "/media/scenes/nonparallel/tee-purple.0c0966a018-320.avif 320w, /media/scenes/nonparallel/tee-purple.0c0966a018-480.avif 480w, /media/scenes/nonparallel/tee-purple.0c0966a018-696.avif 696w",
+    "webp": "/media/scenes/nonparallel/tee-purple.0c0966a018-320.webp 320w, /media/scenes/nonparallel/tee-purple.0c0966a018-480.webp 480w, /media/scenes/nonparallel/tee-purple.0c0966a018-696.webp 696w"
+  },
+  "scenes/nonparallel/tee-rainbow": {
+    "width": 696,
+    "height": 696,
+    "src": "/media/scenes/nonparallel/tee-rainbow.94ccee518c-696.webp",
+    "avif": "/media/scenes/nonparallel/tee-rainbow.94ccee518c-320.avif 320w, /media/scenes/nonparallel/tee-rainbow.94ccee518c-480.avif 480w, /media/scenes/nonparallel/tee-rainbow.94ccee518c-696.avif 696w",
+    "webp": "/media/scenes/nonparallel/tee-rainbow.94ccee518c-320.webp 320w, /media/scenes/nonparallel/tee-rainbow.94ccee518c-480.webp 480w, /media/scenes/nonparallel/tee-rainbow.94ccee518c-696.webp 696w"
+  },
+  "scenes/nonparallel/tee-red": {
+    "width": 696,
+    "height": 696,
+    "src": "/media/scenes/nonparallel/tee-red.0d23f6811f-696.webp",
+    "avif": "/media/scenes/nonparallel/tee-red.0d23f6811f-320.avif 320w, /media/scenes/nonparallel/tee-red.0d23f6811f-480.avif 480w, /media/scenes/nonparallel/tee-red.0d23f6811f-696.avif 696w",
+    "webp": "/media/scenes/nonparallel/tee-red.0d23f6811f-320.webp 320w, /media/scenes/nonparallel/tee-red.0d23f6811f-480.webp 480w, /media/scenes/nonparallel/tee-red.0d23f6811f-696.webp 696w"
+  },
+  "scenes/nonparallel/tee-yellow": {
+    "width": 696,
+    "height": 696,
+    "src": "/media/scenes/nonparallel/tee-yellow.184bef9eac-696.webp",
+    "avif": "/media/scenes/nonparallel/tee-yellow.184bef9eac-320.avif 320w, /media/scenes/nonparallel/tee-yellow.184bef9eac-480.avif 480w, /media/scenes/nonparallel/tee-yellow.184bef9eac-696.avif 696w",
+    "webp": "/media/scenes/nonparallel/tee-yellow.184bef9eac-320.webp 320w, /media/scenes/nonparallel/tee-yellow.184bef9eac-480.webp 480w, /media/scenes/nonparallel/tee-yellow.184bef9eac-696.webp 696w"
+  },
   "scenes/reminder/microphone": {
     "width": 696,
     "height": 696,

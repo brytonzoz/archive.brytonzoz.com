@@ -269,7 +269,7 @@ function SiteFooter() {
         <FooterSocialLink href="https://tiktok.com/@brytonzoz" label="TikTok">
           <TikTokIcon />
         </FooterSocialLink>
-        <FooterSocialLink href="https://x.com/zozbryton" label="X">
+        <FooterSocialLink href="https://x.com/brytonzoz" label="X">
           <XIcon />
         </FooterSocialLink>
         <FooterSocialLink href="https://facebook.com/brytonzoz" label="Facebook">

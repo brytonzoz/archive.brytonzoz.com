@@ -17,6 +17,7 @@ export function StoreExperience({
   sizes,
   title,
   titleEnd,
+  intro,
   headerClassName = '',
   headerStyle,
 }: {
@@ -26,6 +27,8 @@ export function StoreExperience({
   /** The heading row above the grid; the bag button (once something is in it) sits at its end. */
   title: React.ReactNode;
   titleEnd?: React.ReactNode;
+  /** One line under the heading saying what this is. */
+  intro?: React.ReactNode;
   headerClassName?: string;
   headerStyle?: React.CSSProperties;
 }) {
@@ -64,6 +67,7 @@ export function StoreExperience({
           {titleEnd}
         </div>
       </div>
+      {intro}
       <StoreGrid
         active={active}
         sizes={sizes}

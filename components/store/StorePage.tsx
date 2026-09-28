@@ -24,7 +24,8 @@ export function StorePage({ initialProduct }: { initialProduct?: string }) {
             active
             initialProduct={initialProduct}
             sizes="(min-width: 600px) 270px, 46vw"
-            headerClassName="mb-8"
+            headerClassName="mb-3"
+            intro={<p className="store-caption">One-of-one pieces, reworked by hand. Once one sells, it’s gone.</p>}
             title={<h1 className="text-[34px] font-bold leading-none tracking-[-0.03em] sm:text-[44px]">Scrapwrk</h1>}
           />
         </div>

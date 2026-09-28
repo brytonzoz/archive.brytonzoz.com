@@ -1156,6 +1156,7 @@ const ScrapwrkScene = React.memo(function ScrapwrkScene({ distance, loadImages }
           sizes="(min-width: 640px) 280px, 46vw"
           headerClassName="store-scene-header"
           title={<h2 className="store-scene-title scene-title">Scrapwrk</h2>}
+          intro={<p className="store-caption">One-of-one pieces, reworked by hand. Once one sells, it’s gone.</p>}
           titleEnd={(
             <Link href="/scrapwrk/" className="store-scene-link scene-title">
               All pieces
@@ -1267,7 +1268,7 @@ const NonParallelScene = React.memo(function NonParallelScene({ distance }: { di
               <ChevronDownIcon size={16} className="-rotate-90" />
             </Link>
           )}
-          intro={<p className="np-scene-note">The label and company behind all of this. A tee is a way to support it: you get something to wear, and it keeps the work going.</p>}
+          intro={<p className="store-caption">The label and company behind all of this. A tee is a way to support it: you get something to wear, and it keeps the work going.</p>}
         />
       </div>
     </div>

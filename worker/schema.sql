@@ -63,3 +63,26 @@ CREATE TABLE IF NOT EXISTS merch_orders (
   created_at INTEGER,
   updated_at INTEGER
 );
+
+-- One-off Printify orders at cost (samples for Bryton). A row is added by hand (D1 console), never
+-- from the site, so the address stays out of the public repo; the scheduled job quotes it and orders
+-- only if tee + shipping is within max_cents. Managed by placeManualOrders in worker/merch.ts.
+CREATE TABLE IF NOT EXISTS manual_orders (
+  id INTEGER PRIMARY KEY AUTOINCREMENT,
+  design TEXT NOT NULL,
+  variant_id INTEGER NOT NULL,
+  name TEXT NOT NULL,
+  address1 TEXT NOT NULL,
+  address2 TEXT,
+  city TEXT NOT NULL,
+  region TEXT NOT NULL,
+  zip TEXT NOT NULL,
+  country TEXT NOT NULL DEFAULT 'US',
+  max_cents INTEGER NOT NULL,
+  status TEXT NOT NULL DEFAULT 'pending',
+  quote_cents INTEGER,
+  printify_order_id TEXT,
+  error TEXT,
+  created_at INTEGER,
+  updated_at INTEGER
+);

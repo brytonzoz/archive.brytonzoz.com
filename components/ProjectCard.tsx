@@ -4,7 +4,7 @@ import React, { useState } from 'react';
 import { Project, getProjectTypeLabel, isProjectReleased } from '../lib/utils';
 import { getStreamingServices } from '../lib/streaming';
 import { getReleaseForProject } from '../lib/tracks';
-import { ListenSheet } from './ListenSheet';
+import { ReleaseSheet } from './release/ReleaseSheet';
 import { ArrowUpRightIcon } from './player/icons';
 import { ResponsiveImage, placeholderBackground } from './ResponsiveImage';
 
@@ -61,7 +61,7 @@ export function ProjectCard({ project, className = '', style, onModalStateChange
         >
           {content}
         </button>
-        <ListenSheet
+        <ReleaseSheet
           project={project}
           isOpen={isSheetOpen}
           onClose={() => {

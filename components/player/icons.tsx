@@ -68,6 +68,77 @@ export function QueueIcon({ size = 18, className }: IconProps) {
   );
 }
 
+export function ShareIcon({ size = 18, className }: IconProps) {
+  return (
+    <svg className={className} style={{ width: size, height: size }} viewBox="0 0 24 24" fill="none" aria-hidden="true">
+      <path d="M12 3.5v11M8 7.2l4-3.9 4 3.9" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />
+      <path d="M8.5 10.5H7a2 2 0 0 0-2 2V19a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2v-6.5a2 2 0 0 0-2-2h-1.5" stroke="currentColor" strokeWidth="2" strokeLinecap="round" />
+    </svg>
+  );
+}
+
+export function ShuffleIcon({ size = 18, className }: IconProps) {
+  return (
+    <svg className={className} style={{ width: size, height: size }} viewBox="0 0 24 24" fill="none" aria-hidden="true">
+      <path d="M3 6.5h3.2c2 0 3.2 1 4.3 2.7l3 4.6c1.1 1.7 2.3 2.7 4.3 2.7H21M3 17.5h3.2c1.3 0 2.3-.4 3.1-1.2M14.7 7.7c.8-.8 1.8-1.2 3.1-1.2H21" stroke="currentColor" strokeWidth="2" strokeLinecap="round" />
+      <path d="m18.5 4 2.5 2.5L18.5 9M18.5 15l2.5 2.5-2.5 2.5" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />
+    </svg>
+  );
+}
+
+export function RepeatIcon({ size = 18, className, one = false }: IconProps & { one?: boolean }) {
+  return (
+    <svg className={className} style={{ width: size, height: size }} viewBox="0 0 24 24" fill="none" aria-hidden="true">
+      <path d="M4 11V9.5A3.5 3.5 0 0 1 7.5 6H20M17 3l3 3-3 3M20 13v1.5a3.5 3.5 0 0 1-3.5 3.5H4M7 21l-3-3 3-3" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />
+      {one ? <path d="M11.2 10.4 12.4 9.6V14.4" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" /> : null}
+    </svg>
+  );
+}
+
+export function MoreIcon({ size = 18, className }: IconProps) {
+  return (
+    <svg className={className} style={{ width: size, height: size }} viewBox="0 0 24 24" fill="currentColor" aria-hidden="true">
+      <circle cx="5.5" cy="12" r="1.9" />
+      <circle cx="12" cy="12" r="1.9" />
+      <circle cx="18.5" cy="12" r="1.9" />
+    </svg>
+  );
+}
+
+export function GripIcon({ size = 18, className }: IconProps) {
+  return (
+    <svg className={className} style={{ width: size, height: size }} viewBox="0 0 24 24" fill="none" aria-hidden="true">
+      <path d="M5 8.5h14M5 12h14M5 15.5h14" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" />
+    </svg>
+  );
+}
+
+export function RemoveIcon({ size = 18, className }: IconProps) {
+  return (
+    <svg className={className} style={{ width: size, height: size }} viewBox="0 0 24 24" fill="none" aria-hidden="true">
+      <circle cx="12" cy="12" r="9" fill="currentColor" opacity="0.18" />
+      <path d="M8 12h8" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" />
+    </svg>
+  );
+}
+
+export function PlayNextIcon({ size = 18, className }: IconProps) {
+  return (
+    <svg className={className} style={{ width: size, height: size }} viewBox="0 0 24 24" fill="none" aria-hidden="true">
+      <path d="M4 6h10M4 11h7M4 16h5" stroke="currentColor" strokeWidth="2" strokeLinecap="round" />
+      <path d="M14 11.5v7.3a.8.8 0 0 0 1.2.7l5.6-3.7a.8.8 0 0 0 0-1.3l-5.6-3.7a.8.8 0 0 0-1.2.7Z" fill="currentColor" />
+    </svg>
+  );
+}
+
+export function AddToQueueIcon({ size = 18, className }: IconProps) {
+  return (
+    <svg className={className} style={{ width: size, height: size }} viewBox="0 0 24 24" fill="none" aria-hidden="true">
+      <path d="M4 6h10M4 11h10M4 16h6M17 13v7M13.5 16.5h7" stroke="currentColor" strokeWidth="2" strokeLinecap="round" />
+    </svg>
+  );
+}
+
 export function ExplicitBadge() {
   return (
     <span

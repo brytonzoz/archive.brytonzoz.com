@@ -1,8 +1,10 @@
 import React from 'react'
-import type { Metadata } from 'next'
+import type { Metadata, Viewport } from 'next'
 import { Inter } from 'next/font/google'
 import './globals.css'
 import { PlayerProvider } from '../components/player/PlayerProvider'
+import { PageViews } from '../components/PageViews'
+import shareImages from '../lib/share-images.json'
 
 const inter = Inter({ 
   subsets: ['latin'],
@@ -35,7 +37,22 @@ export const metadata: Metadata = {
   robots: {
     index: true,
     follow: true,
-  }
+  },
+  icons: {
+    icon: [{ url: shareImages.icons['32'], sizes: '32x32', type: 'image/png' }],
+    apple: [{ url: shareImages.icons['180'], sizes: '180x180', type: 'image/png' }],
+  },
+  appleWebApp: {
+    capable: true,
+    title: 'Bryton Zoz',
+    statusBarStyle: 'black-translucent',
+  },
+}
+
+export const viewport: Viewport = {
+  themeColor: '#000000',
+  colorScheme: 'dark',
+  viewportFit: 'cover',
 }
 
 export default function RootLayout({
@@ -46,6 +63,7 @@ export default function RootLayout({
   return (
     <html lang="en" className="dark">
       <body className={`${inter.variable} font-body antialiased`}>
+        <PageViews />
         <PlayerProvider>
           <div className="min-h-screen bg-black overflow-x-hidden">
             <main className="relative">

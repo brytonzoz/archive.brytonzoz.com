@@ -41,5 +41,11 @@ push, and give the owner the staging link from the PR comment once the Staging w
   any song of an available release doesn't play.
   Player code lives in `components/player/`; it is mounted in `app/layout.tsx`, so internal links must use
   `next/link` to keep music playing between pages.
+- Release sheet ("Listen Now") and song/album pages: `components/release/`. Every song has a shareable page at
+  `/<release>/<song-slug>/` (`app/[release]/[song]/`) with a preview card from `npm run media`
+  (`scripts/build-share-images.mjs` -> `lib/share-images.json`, also the home-screen icons).
+- Metrics: `lib/analytics.ts` (anonymous, batched) -> `/api/e` in `worker/metrics.ts` -> D1 `brytonzoz-metrics`
+  (`brytonzoz-metrics-staging` for staging; schema `worker/schema.sql`). The dashboard is `/admin`; its password is
+  the `ADMIN_PASSWORD` repository secret, which both deploy workflows copy to the Worker. Never put it in code or chat.
 - Hosting: `wrangler.jsonc` (production + `staging` env), `workers/redirects/` (www/archive → apex),
   `public/_headers` (cache rules). Firebase files are legacy.

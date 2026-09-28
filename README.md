@@ -117,8 +117,13 @@ The site can play Bryton's music itself, and keeps playing while visitors scroll
   exact file names. A release appears in the player only when `"available": true`.
 - `CHECK_ORIGIN=<site> npm run check:tracks` confirms every song of an available release plays; both deploy workflows run it and stop
   if anything is missing. `--all` also reports releases that aren't live yet.
-- UI: a Play button under each cover (and in the Listen sheet on the Music page), a glass mini player at the
-  bottom, and a full Now Playing sheet whose tracklist button swaps the artwork for every song. It works with the phone's lock screen, headphones and car controls through the Media Session API.
+- UI: "Listen Now" opens the whole release (Play, Shuffle, tracklist, and Apple Music / Spotify / YouTube Music
+  floating at the bottom); a glass mini player; Now Playing with an editable Up Next queue, shuffle and repeat.
+  Every song has a shareable page (`/<release>/<song>/`) with a link-preview card, and the site installs to the
+  home screen with the album art as its icon.
+- Metrics: anonymous listening events go to `/api/e` (Worker) and a D1 database; `/admin` shows streams,
+  listeners, time listened, completion and skips per song, shares, taps out to streaming apps, countries,
+  devices and referrers, with CSV export. The password is the `ADMIN_PASSWORD` repository secret. It works with the phone's lock screen, headphones and car controls through the Media Session API.
 
 ## Hosting
 

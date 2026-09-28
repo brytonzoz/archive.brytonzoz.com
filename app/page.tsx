@@ -1,11 +1,10 @@
 'use client';
 
 import React, { useCallback, useEffect, useState } from 'react';
-import { AppStack } from '../components/AppStack';
 import { ProjectCard } from '../components/ProjectCard';
-import { ListenSheet } from '../components/ListenSheet';
+import { ReleaseSheet } from '../components/release/ReleaseSheet';
 import { usePlayer } from '../components/player/context';
-import { ArrowUpRightIcon, PauseIcon, PlayIcon } from '../components/player/icons';
+import { ArrowUpRightIcon, EqualizerBars } from '../components/player/icons';
 import { ResponsiveImage, placeholderBackground } from '../components/ResponsiveImage';
 import { getProjects } from '../lib/projects';
 import { cautionSceneAssets, reminderSceneAssets, scrapwrkSceneAssets, solenyaSceneAssets } from '../lib/assets';
@@ -326,29 +325,13 @@ const SCENE_TONES = {
     ink: '#FFFFFF',
     muted: 'rgba(255, 255, 255, 0.72)',
     primary: { ...PILL_STYLE, background: '#FFFFFF', color: '#0B0B0C' },
-    glass: {
-      ...PILL_STYLE,
-      background: 'rgba(255, 255, 255, 0.2)',
-      color: '#FFFFFF',
-      boxShadow: 'inset 0 0 0 1px rgba(255, 255, 255, 0.16)',
-      backdropFilter: 'blur(24px) saturate(160%)',
-      WebkitBackdropFilter: 'blur(24px) saturate(160%)',
-    },
   },
   dark: {
     ink: DARK_INK,
     muted: 'rgba(30, 23, 18, 0.62)',
     primary: { ...PILL_STYLE, background: DARK_INK, color: '#FFFFFF' },
-    glass: {
-      ...PILL_STYLE,
-      background: 'rgba(255, 255, 255, 0.42)',
-      color: DARK_INK,
-      boxShadow: 'inset 0 0 0 1px rgba(30, 23, 18, 0.1)',
-      backdropFilter: 'blur(24px) saturate(160%)',
-      WebkitBackdropFilter: 'blur(24px) saturate(160%)',
-    },
   },
-} satisfies Record<string, { ink: string; muted: string; primary: React.CSSProperties; glass: React.CSSProperties }>;
+} satisfies Record<string, { ink: string; muted: string; primary: React.CSSProperties }>;
 
 // The release itself, and nothing else: artwork, title, and at most two actions.
 // Play starts it right here; the app icons open the other places to listen.
@@ -375,12 +358,10 @@ function SceneCard({
   const player = usePlayer();
   const colors = SCENE_TONES[tone];
   const PRIMARY_PILL = colors.primary;
-  const GLASS_PILL = colors.glass;
   const isReleased = isProjectReleased(project);
   const release = isReleased ? getReleaseForProject(project.name) : undefined;
   const services = getStreamingServices(project);
-  const isThisRelease = Boolean(release) && player.current?.release.id === release?.id;
-  const isPlayingThis = isThisRelease && player.isPlaying;
+  const isPlayingThis = Boolean(release) && player.current?.release.id === release?.id && player.isPlaying;
 
   const openSheet = () => {
     setIsSheetOpen(true);
@@ -402,56 +383,27 @@ function SceneCard({
   const incoming = easeOutCubic(clamp(Math.abs(Math.min(distance, 0)) / 0.9, 0, 1));
   const scale = distance >= 0 ? 1 - (outgoing * 0.26) : 1 - (incoming * 0.18);
 
+  // One action. Releases open the full sheet (play right here, streaming apps at the bottom);
+  // everything else opens its site.
   let primary: React.ReactNode = null;
-  let secondary: React.ReactNode = null;
-
-  if (release) {
+  if (release || services.length) {
     primary = (
       <button
         type="button"
         className="scene-button"
-        onClick={() => (isThisRelease ? player.toggle() : player.playRelease(release))}
+        onClick={openSheet}
         onPointerEnter={() => warmTrack(firstTrack)}
         onPointerDown={() => warmTrack(firstTrack)}
-        aria-label={`${isPlayingThis ? 'Pause' : 'Play'} ${project.name}`}
+        aria-haspopup="dialog"
         style={PRIMARY_PILL}
       >
-        {isPlayingThis
-          ? <PauseIcon className="shrink-0" size={scaleValue(34)} />
-          : <PlayIcon className="shrink-0" size={scaleValue(34)} />}
-        {isPlayingThis ? 'Pause' : 'Play'}
-      </button>
-    );
-  } else if (services.length) {
-    primary = (
-      <button type="button" className="scene-button" onClick={openSheet} style={PRIMARY_PILL}>
-        {isReleased ? 'Listen' : 'Pre-save'}
+        {isPlayingThis ? <EqualizerBars playing className="scene-eq" /> : null}
+        {isReleased ? 'Listen Now' : 'Pre-save'}
       </button>
     );
   } else if (project.url) {
     primary = (
       <a href={project.url} target="_blank" rel="noopener noreferrer" className="scene-button" style={PRIMARY_PILL}>
-        {getVisitLabel(project)}
-        <ArrowUpRightIcon size={scaleValue(34)} className="shrink-0" />
-      </a>
-    );
-  }
-
-  if (release && services.length) {
-    secondary = (
-      <button
-        type="button"
-        className="scene-button"
-        onClick={openSheet}
-        aria-label={`Listen on ${services.map((service) => service.name).join(', ')}`}
-        style={GLASS_PILL}
-      >
-        <AppStack services={services} size={scaleValue(66)} overlap={scaleValue(8)} ring={scaleValue(4)} />
-      </button>
-    );
-  } else if (release && project.url) {
-    secondary = (
-      <a href={project.url} target="_blank" rel="noopener noreferrer" className="scene-button" style={GLASS_PILL}>
         {getVisitLabel(project)}
         <ArrowUpRightIcon size={scaleValue(34)} className="shrink-0" />
       </a>
@@ -470,7 +422,7 @@ function SceneCard({
             opacity: 1 - (distanceMagnitude * 0.18),
             transform: `translate3d(0, ${scaleValue(outgoing * 58)}, 0) scale(${scale})`,
             transformOrigin: 'center center',
-            // Only transform: will-change on opacity would stop the glass buttons blurring the scene.
+            // Only transform: will-change on opacity would make this a backdrop root for blur effects.
             willChange: 'transform',
             transition: 'transform 760ms cubic-bezier(0.22, 1, 0.36, 1), opacity 420ms ease-out',
           }}
@@ -523,17 +475,15 @@ function SceneCard({
           {primary ? (
             <div className="flex" style={{ gap: scaleValue(20), marginTop: scaleValue(44) }}>
               {primary}
-              {secondary}
             </div>
           ) : null}
         </div>
       </div>
 
-      {services.length ? (
-        <ListenSheet
+      {release || services.length ? (
+        <ReleaseSheet
           project={project}
           isOpen={isSheetOpen}
-          showPlay={false}
           onClose={() => {
             setIsSheetOpen(false);
             onModalStateChange?.(false);

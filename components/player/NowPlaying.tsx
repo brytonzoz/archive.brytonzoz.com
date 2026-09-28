@@ -1,11 +1,14 @@
 'use client';
 
-import React, { useEffect, useRef, useState } from 'react';
-import { formatTime, releases, type Track } from '../../lib/tracks';
+import React, { useEffect, useState } from 'react';
+import { shareLink } from '../../lib/share';
+import { formatTime, trackPath } from '../../lib/tracks';
 import { ResponsiveImage, placeholderBackground } from '../ResponsiveImage';
 import { useSheet } from '../useSheet';
 import { usePlayer } from './context';
-import { ChevronDownIcon, EqualizerBars, ExplicitBadge, NextIcon, PauseIcon, PlayIcon, PreviousIcon, QueueIcon } from './icons';
+import {
+  ChevronDownIcon, ExplicitBadge, GripIcon, NextIcon, PauseIcon, PlayIcon, PreviousIcon, QueueIcon, RemoveIcon, RepeatIcon, ShareIcon, ShuffleIcon,
+} from './icons';
 import { useProgress } from './useProgress';
 
 function Scrubber() {
@@ -45,54 +48,113 @@ function Scrubber() {
   );
 }
 
-function TrackRow({ track }: { track: Track }) {
-  const { current, isPlaying, playTrack, failedTrackIds } = usePlayer();
-  const isCurrent = current?.id === track.id;
-  const failed = failedTrackIds.includes(track.id);
+const ROW_HEIGHT = 60;
+
+// Up Next: what plays after this song. Tap to jump, drag the handle to reorder (or use the arrow
+// keys on it), remove with the minus. Shuffle and repeat live here too, as in Apple Music.
+function QueueView() {
+  const { upNext, shuffle, repeat, toggleShuffle, cycleRepeat, jumpTo, removeFromQueue, moveInQueue, clearUpNext } = usePlayer();
+  const [drag, setDrag] = useState<{ key: string; from: number; startY: number; dy: number } | null>(null);
+  const target = drag ? Math.max(0, Math.min(upNext.length - 1, drag.from + Math.round(drag.dy / ROW_HEIGHT))) : -1;
+
+  const toggleClass = (active: boolean) =>
+    `flex h-8 w-11 items-center justify-center rounded-[9px] transition-colors focus-visible:outline focus-visible:outline-2 focus-visible:outline-white/70 ${active ? 'bg-white text-black' : 'bg-white/10 text-white/80 hover:bg-white/15'}`;
 
   return (
-    <li>
-      <button
-        type="button"
-        onClick={() => playTrack(track)}
-        aria-current={isCurrent ? 'true' : undefined}
-        data-current={isCurrent ? '' : undefined}
-        className="flex w-full items-center gap-4 rounded-[12px] px-3 py-[11px] text-left transition-colors hover:bg-white/[0.06] active:bg-white/[0.1] focus-visible:outline focus-visible:outline-2 focus-visible:outline-white/70"
-      >
-        <span className="flex w-5 shrink-0 justify-center text-[15px] tabular-nums text-white/35">
-          {isCurrent ? <EqualizerBars playing={isPlaying} className="scale-90" /> : track.number}
-        </span>
-        <span className={`min-w-0 flex-1 truncate text-[16px] ${isCurrent ? 'font-semibold text-white' : failed ? 'text-white/35' : 'text-white/85'}`}>
-          {track.title}
-        </span>
-        <span className="shrink-0 text-[14px] tabular-nums text-white/35">
-          {failed ? 'Unavailable' : formatTime(track.durationMs / 1000)}
-        </span>
-      </button>
-    </li>
-  );
-}
+    <div className="flex h-full flex-col">
+      <div className="flex flex-none items-center justify-between px-6 pb-2">
+        <h3 className="text-[17px] font-semibold tracking-[-0.01em]">Playing Next</h3>
+        <div className="flex items-center gap-2">
+          <button type="button" onClick={toggleShuffle} aria-label="Shuffle" aria-pressed={shuffle} className={toggleClass(shuffle)}>
+            <ShuffleIcon size={17} />
+          </button>
+          <button
+            type="button"
+            onClick={cycleRepeat}
+            aria-label={repeat === 'one' ? 'Repeat one' : repeat === 'all' ? 'Repeat all' : 'Repeat'}
+            aria-pressed={repeat !== 'off'}
+            className={toggleClass(repeat !== 'off')}
+          >
+            <RepeatIcon size={17} one={repeat === 'one'} />
+          </button>
+        </div>
+      </div>
 
-function Tracklist() {
-  const listRef = useRef<HTMLDivElement>(null);
-
-  // Open on the song that's playing.
-  useEffect(() => {
-    listRef.current?.querySelector('[data-current]')?.scrollIntoView({ block: 'center' });
-  }, []);
-
-  return (
-    <div ref={listRef} className="tracklist h-full overflow-y-auto overscroll-contain px-3 pb-4">
-      {releases.map((release) => (
-        <section key={release.id} aria-label={release.title} className="pt-4 first:pt-1">
-          <h3 className="px-3 pb-1 text-[13px] font-semibold text-white/45">{release.title}</h3>
-          <ol>
-            {release.tracks.map((track) => (
-              <TrackRow key={track.id} track={track} />
-            ))}
-          </ol>
-        </section>
-      ))}
+      {upNext.length ? (
+        <ol className="tracklist relative min-h-0 flex-1 overflow-y-auto overscroll-contain px-3 pb-2" aria-label="Up next">
+          {upNext.map((entry, i) => {
+            const isDragged = drag?.key === entry.key;
+            let shift = 0;
+            if (drag && !isDragged) {
+              if (drag.from < i && i <= target) shift = -ROW_HEIGHT;
+              else if (target <= i && i < drag.from) shift = ROW_HEIGHT;
+            }
+            return (
+              <li
+                key={entry.key}
+                className={`queue-row relative flex items-center gap-3 rounded-[12px] pr-1 ${isDragged ? 'z-10 bg-white/[0.12] shadow-[0_10px_30px_rgba(0,0,0,0.45)]' : ''}`}
+                style={{
+                  height: ROW_HEIGHT,
+                  transform: `translateY(${isDragged ? drag.dy : shift}px)`,
+                  transition: isDragged ? 'none' : 'transform 200ms cubic-bezier(0.32, 0.72, 0, 1)',
+                }}
+              >
+                <button
+                  type="button"
+                  onClick={() => jumpTo(entry.key)}
+                  className="flex h-full min-w-0 flex-1 items-center gap-3 rounded-[12px] pl-3 text-left focus-visible:outline focus-visible:outline-2 focus-visible:outline-white/70 active:opacity-70"
+                >
+                  <span className="relative h-10 w-10 shrink-0 overflow-hidden rounded-[6px]" style={placeholderBackground(entry.track.release.cover)}>
+                    <ResponsiveImage asset={entry.track.release.cover} alt="" sizes="40px" className="absolute inset-0 h-full w-full object-cover" />
+                  </span>
+                  <span className="min-w-0 flex-1">
+                    <span className="block truncate text-[15px] font-medium text-white/90">{entry.track.title}</span>
+                    <span className="block truncate text-[13px] text-white/45">{entry.track.release.title}</span>
+                  </span>
+                </button>
+                <button
+                  type="button"
+                  onClick={() => removeFromQueue(entry.key)}
+                  aria-label={`Remove ${entry.track.title} from queue`}
+                  className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full text-white/60 transition-colors hover:text-white focus-visible:outline focus-visible:outline-2 focus-visible:outline-white/70"
+                >
+                  <RemoveIcon size={22} />
+                </button>
+                <button
+                  type="button"
+                  aria-label={`Reorder ${entry.track.title}`}
+                  className="flex h-10 w-9 shrink-0 cursor-grab touch-none items-center justify-center rounded-[8px] text-white/45 active:cursor-grabbing focus-visible:outline focus-visible:outline-2 focus-visible:outline-white/70"
+                  onPointerDown={(event) => {
+                    event.currentTarget.setPointerCapture(event.pointerId);
+                    setDrag({ key: entry.key, from: i, startY: event.clientY, dy: 0 });
+                  }}
+                  onPointerMove={(event) => {
+                    if (drag?.key === entry.key) setDrag({ ...drag, dy: event.clientY - drag.startY });
+                  }}
+                  onPointerUp={() => {
+                    if (drag?.key === entry.key && target !== drag.from) moveInQueue(entry.key, target);
+                    setDrag(null);
+                  }}
+                  onPointerCancel={() => setDrag(null)}
+                  onKeyDown={(event) => {
+                    if (event.key === 'ArrowUp' && i > 0) { event.preventDefault(); moveInQueue(entry.key, i - 1); }
+                    if (event.key === 'ArrowDown' && i < upNext.length - 1) { event.preventDefault(); moveInQueue(entry.key, i + 1); }
+                  }}
+                >
+                  <GripIcon size={20} />
+                </button>
+              </li>
+            );
+          })}
+          <li className="flex justify-center pt-3">
+            <button type="button" onClick={clearUpNext} className="rounded-full px-4 py-2 text-[14px] font-semibold text-white/55 transition-colors hover:bg-white/10 hover:text-white focus-visible:outline focus-visible:outline-2 focus-visible:outline-white/70">
+              Clear
+            </button>
+          </li>
+        </ol>
+      ) : (
+        <p className="px-6 pt-6 text-[15px] text-white/45">Nothing up next. Add songs from any album with “…”.</p>
+      )}
     </div>
   );
 }
@@ -101,7 +163,7 @@ const iconButton =
   'flex items-center justify-center rounded-full transition-[transform,background-color] duration-150 active:scale-90 focus-visible:outline focus-visible:outline-2 focus-visible:outline-white/70';
 
 export function NowPlaying() {
-  const { current, isPlaying, isLoading, isExpanded, toggle, next, previous, collapse } = usePlayer();
+  const { current, isPlaying, isLoading, isExpanded, toggle, next, previous, collapse, notify } = usePlayer();
   const { sheetRef, isClosing, requestClose, dragHandlers, sheetStyle } = useSheet(isExpanded, collapse);
   const [showList, setShowList] = useState(false);
 
@@ -142,8 +204,8 @@ export function NowPlaying() {
 
         <div className="relative min-h-0 flex-1">
           {showList ? (
-            <div key="list" className="np-swap absolute inset-0 pt-6">
-              <Tracklist />
+            <div key="list" className="np-swap absolute inset-0 pt-9">
+              <QueueView />
             </div>
           ) : (
             <div key="art" {...dragHandlers} className="np-swap np-art-area absolute inset-0 flex touch-none select-none items-center justify-center px-7 pt-8 pb-2">
@@ -172,8 +234,19 @@ export function NowPlaying() {
             </div>
             <button
               type="button"
+              aria-label="Share song"
+              onClick={() =>
+                shareLink({ title: `${current.title} by Bryton Zoz`, text: `${current.title} · ${release.title}`, path: trackPath(current), release: release.id, trackId: current.id })
+                  .then((message) => message && notify(message))
+              }
+              className={`${iconButton} h-9 w-9 shrink-0 bg-white/10 text-white/85 hover:bg-white/15`}
+            >
+              <ShareIcon size={17} />
+            </button>
+            <button
+              type="button"
               onClick={() => setShowList((value) => !value)}
-              aria-label="Tracklist"
+              aria-label="Up Next"
               aria-pressed={showList}
               className={`${iconButton} h-9 w-9 shrink-0 ${showList ? 'bg-white text-black' : 'bg-white/10 text-white/85 hover:bg-white/15'}`}
             >

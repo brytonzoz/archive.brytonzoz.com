@@ -71,6 +71,18 @@ jobs:
           echo "url=$url" >> "$GITHUB_OUTPUT"
           echo "### Staging: $url" >> "$GITHUB_STEP_SUMMARY"
 
+      # The /admin dashboard's password lives only in the ADMIN_PASSWORD repository secret.
+      - name: Sync admin password
+        env:
+          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          ADMIN_PASSWORD: ${{ secrets.ADMIN_PASSWORD }}
+        run: |
+          if [ -z "$ADMIN_PASSWORD" ]; then
+            echo "::notice::ADMIN_PASSWORD is not set, so /admin stays locked. Add it under Settings > Secrets and variables > Actions."
+            exit 0
+          fi
+          printf '%s' "$ADMIN_PASSWORD" | npx wrangler secret put ADMIN_PASSWORD --env staging
+
       - name: Check every live song plays from staging
         env:
           CHECK_ORIGIN: ${{ steps.deploy.outputs.url }}

@@ -3,6 +3,8 @@ import { media, type MediaAsset, type MediaKey } from './media';
 
 export type Track = {
   id: string;
+  /** URL-safe name, from the file: solenya/04-lift-me-higher.mp3 -> lift-me-higher */
+  slug: string;
   title: string;
   number: number;
   src: string;
@@ -33,6 +35,7 @@ export const releases: Release[] = catalog.releases
     };
     release.tracks = entry.tracks.map((track, index) => ({
       id: `${entry.id}/${index + 1}`,
+      slug: track.file.split('/').pop()!.replace(/^\d+-/, '').replace(/\.[a-z0-9]+$/, ''),
       title: track.title,
       number: index + 1,
       src: `${catalog.baseUrl}/${track.file}`,
@@ -47,6 +50,22 @@ export const hasPlayableMusic = releases.length > 0;
 
 export function getReleaseForProject(projectName: string): Release | undefined {
   return releases.find((release) => release.projectName === projectName);
+}
+
+export function getRelease(id: string): Release | undefined {
+  return releases.find((release) => release.id === id);
+}
+
+export function releasePath(release: Release): string {
+  return `/${release.id}/`;
+}
+
+export function trackPath(track: Track): string {
+  return `/${track.release.id}/${track.slug}/`;
+}
+
+export function releaseMinutes(release: Release): number {
+  return Math.round(release.tracks.reduce((sum, track) => sum + track.durationMs, 0) / 60000);
 }
 
 export function formatTime(seconds: number): string {

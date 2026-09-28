@@ -1,7 +1,9 @@
-// Serves songs from R2 at /audio/<key> on the site's own domain (seekable, edge-cached).
-// Every other path is handled by static assets before this script runs (see run_worker_first).
+// Serves songs from R2 at /audio/<key> on the site's own domain (seekable, edge-cached), and the
+// listening metrics API at /api/* (worker/metrics.ts). Every other path is handled by static
+// assets before this script runs (see run_worker_first).
+import { handleApi, type MetricsEnv } from './metrics';
 
-interface Env {
+interface Env extends MetricsEnv {
   ASSETS: Fetcher;
   MUSIC: R2Bucket;
 }
@@ -103,6 +105,7 @@ export default {
   async fetch(request: Request, env: Env, ctx: ExecutionContext): Promise<Response> {
     const url = new URL(request.url);
     if (url.pathname.startsWith(AUDIO_PREFIX)) return serveAudio(request, env, ctx);
+    if (url.pathname.startsWith('/api/')) return handleApi(request, env);
     return env.ASSETS.fetch(request);
   },
 } satisfies ExportedHandler<Env>;

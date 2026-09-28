@@ -52,6 +52,10 @@ the same PR so the owner can judge it on staging; nothing reaches production unt
   (`CHECK_ORIGIN=<staging url> npm run check:tracks`) blocks a broken release.
 - The player appears automatically once any release is available: a Play button under the cover, a mini player
   while browsing, and Now Playing with the full tracklist.
+- Every song gets a shareable page (`/<release>/<song>/`) automatically once its release is available; link
+  previews use `lib/share-images.json`, rebuilt by `npm run media`.
+- Listening metrics live at `/admin` (password: the `ADMIN_PASSWORD` repository secret, copied to the Worker by
+  both deploy workflows). New events go through `lib/analytics.ts` and `worker/metrics.ts`; keep them anonymous.
 - Design rules for this site: artwork first, one primary action per screen, no taglines or helper captions,
   icons instead of words where an icon is unmistakable (the app icons open the listen sheet). Keep it that way.
 

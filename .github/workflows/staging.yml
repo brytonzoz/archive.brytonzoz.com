@@ -48,6 +48,14 @@ jobs:
 
       - run: npm ci
 
+      # Encoded images (public/media) are named by content hash and pruned when unused, so a cache
+      # from any earlier build is safe and saves re-encoding every photo.
+      - uses: actions/cache@v4
+        with:
+          path: public/media
+          key: media-${{ hashFiles('scripts/build-media.mjs', 'scripts/build-share-images.mjs', 'assets-src/**') }}
+          restore-keys: media-
+
       - run: npm run lint
 
       - run: npm run build

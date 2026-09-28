@@ -148,7 +148,11 @@ export function MerchSheet({
               <legend className="text-[13px] font-semibold text-black/60">
                 Size{chosen ? <> · <span className="text-black">{chosen.size}</span></> : nudge ? <span className="text-[#c4252a]"> · pick one</span> : null}
               </legend>
-              <div className="mt-2.5 grid grid-cols-[repeat(auto-fill,minmax(3.25rem,1fr))] gap-2">
+              <div
+                className="mt-2.5 grid gap-2"
+                // Six apparel sizes fit one row on a phone; long names (phone models, poster sizes) get wider cells.
+                style={{ gridTemplateColumns: `repeat(auto-fill, minmax(${Math.max(2.75, Math.max(...color.sizes.map((option) => option.size.length)) * 0.55 + 1.5)}rem, 1fr))` }}
+              >
                 {color.sizes.map((option) => (
                   <button
                     key={option.variantId}

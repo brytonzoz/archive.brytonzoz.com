@@ -1178,7 +1178,9 @@ html {
 }
 
 .merch-size {
-  height: 2.75rem;
+  min-height: 2.75rem;
+  padding: 6px 8px;
+  line-height: 1.15;
   border-radius: 12px;
   background: #fff;
   font-size: 15px;
@@ -1417,4 +1419,322 @@ html {
     radial-gradient(circle at 90% 100%, rgba(98, 0, 238, 0.22), transparent 45%),
     linear-gradient(160deg, #1a1030 0%, #0d0a16 60%, #07060b 100%);
   background-attachment: fixed;
+}
+
+/* NonParallel shop (components/store/MerchShop.tsx): search, category chips and sort over a grid
+   that keeps loading. Dark like the scenes; the photos sit on Printify's white. */
+.shop-section {
+  background:
+    radial-gradient(120% 60% at 10% 0%, rgba(137, 71, 255, 0.22), transparent 60%),
+    linear-gradient(180deg, #0f0b1a 0%, #0a0810 40%, #070609 100%);
+}
+
+.shop-title {
+  font-size: clamp(28px, 6vw, 40px);
+  font-weight: 700;
+  line-height: 1.05;
+  letter-spacing: -0.03em;
+  color: #fff;
+}
+
+.shop-controls {
+  position: sticky;
+  top: 0;
+  z-index: 20;
+  margin: 18px -16px 0;
+  padding: 10px 16px 12px;
+  scroll-margin-top: 0;
+  background: rgba(12, 9, 20, 0.78);
+  -webkit-backdrop-filter: blur(24px) saturate(160%);
+  backdrop-filter: blur(24px) saturate(160%);
+  box-shadow: 0 1px 0 rgba(255, 255, 255, 0.06);
+}
+
+@media (min-width: 640px) {
+  .shop-controls {
+    margin-left: 0;
+    margin-right: 0;
+    border-radius: 0 0 20px 20px;
+  }
+}
+
+.shop-search {
+  position: relative;
+  display: flex;
+  min-width: 0;
+  flex: 1;
+  align-items: center;
+  gap: 8px;
+  height: 44px;
+  padding: 0 14px;
+  border-radius: 999px;
+  background: rgba(255, 255, 255, 0.09);
+  color: rgba(255, 255, 255, 0.55);
+  transition: background-color 160ms ease, box-shadow 160ms ease;
+}
+
+.shop-search:focus-within {
+  background: rgba(255, 255, 255, 0.13);
+  box-shadow: 0 0 0 2px rgba(255, 255, 255, 0.45);
+}
+
+.shop-search input {
+  min-width: 0;
+  flex: 1;
+  height: 100%;
+  background: transparent;
+  color: #fff;
+  font-size: 16px;
+  outline: none;
+}
+
+.shop-search input::placeholder {
+  color: rgba(255, 255, 255, 0.5);
+}
+
+.shop-search input::-webkit-search-cancel-button {
+  display: none;
+}
+
+.shop-search-clear {
+  display: flex;
+  height: 26px;
+  width: 26px;
+  align-items: center;
+  justify-content: center;
+  border-radius: 999px;
+  background: rgba(255, 255, 255, 0.16);
+  color: #fff;
+  font-size: 18px;
+  line-height: 1;
+}
+
+.shop-sort {
+  position: relative;
+  display: flex;
+  flex-shrink: 0;
+  align-items: center;
+  color: #fff;
+}
+
+.shop-sort select {
+  height: 44px;
+  width: 8.75rem;
+  appearance: none;
+  -webkit-appearance: none;
+  border-radius: 999px;
+  background: rgba(255, 255, 255, 0.09);
+  padding: 0 32px 0 14px;
+  color: #fff;
+  font-size: 14px;
+  font-weight: 600;
+  cursor: pointer;
+}
+
+.shop-sort select:focus-visible {
+  outline: 2px solid rgba(255, 255, 255, 0.6);
+  outline-offset: 2px;
+}
+
+.shop-sort select option {
+  color: #111;
+}
+
+.shop-sort svg {
+  pointer-events: none;
+  position: absolute;
+  right: 13px;
+  opacity: 0.7;
+}
+
+.shop-chips {
+  display: flex;
+  gap: 8px;
+  margin: 10px -16px 0;
+  padding: 0 16px;
+  overflow-x: auto;
+  scrollbar-width: none;
+  -webkit-overflow-scrolling: touch;
+}
+
+.shop-chips::-webkit-scrollbar {
+  display: none;
+}
+
+.shop-chip {
+  display: inline-flex;
+  flex-shrink: 0;
+  align-items: center;
+  gap: 6px;
+  height: 36px;
+  padding: 0 14px;
+  border-radius: 999px;
+  background: rgba(255, 255, 255, 0.08);
+  color: rgba(255, 255, 255, 0.85);
+  font-size: 14px;
+  font-weight: 600;
+  white-space: nowrap;
+  transition: background-color 160ms ease, color 160ms ease, transform 160ms ease;
+}
+
+.shop-chip:hover {
+  background: rgba(255, 255, 255, 0.14);
+}
+
+.shop-chip:active {
+  transform: scale(0.96);
+}
+
+.shop-chip[aria-pressed='true'] {
+  background: #fff;
+  color: #0b0b0c;
+}
+
+.shop-chip:focus-visible {
+  outline: 2px solid rgba(255, 255, 255, 0.7);
+  outline-offset: 2px;
+}
+
+.shop-chip-count {
+  font-size: 12px;
+  font-variant-numeric: tabular-nums;
+  opacity: 0.55;
+}
+
+.shop-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 22px 12px;
+  margin-top: 18px;
+}
+
+@media (min-width: 640px) {
+  .shop-grid {
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+    gap: 28px 18px;
+  }
+}
+
+@media (min-width: 1024px) {
+  .shop-grid {
+    grid-template-columns: repeat(4, minmax(0, 1fr));
+  }
+}
+
+.shop-tile-wrap {
+  animation: shopTileIn 420ms cubic-bezier(0.22, 1, 0.36, 1) both;
+  animation-delay: calc(min(var(--i, 0), 12) * 28ms);
+}
+
+@keyframes shopTileIn {
+  from {
+    opacity: 0;
+    transform: translate3d(0, 14px, 0);
+  }
+}
+
+.shop-tile {
+  display: block;
+  width: 100%;
+  text-align: left;
+  border-radius: 22px;
+  -webkit-tap-highlight-color: transparent;
+}
+
+.shop-tile:focus-visible {
+  outline: 2px solid rgba(255, 255, 255, 0.75);
+  outline-offset: 4px;
+}
+
+.shop-tile-photo {
+  position: relative;
+  display: block;
+  aspect-ratio: 1;
+  overflow: hidden;
+  border-radius: 22px;
+  background: #fff;
+  box-shadow: 0 10px 30px rgba(0, 0, 0, 0.28);
+  transition: transform 260ms cubic-bezier(0.22, 1, 0.36, 1), box-shadow 260ms ease;
+}
+
+.shop-tile:active .shop-tile-photo {
+  transform: scale(0.97);
+}
+
+@media (hover: hover) {
+  .shop-tile:hover .shop-tile-photo {
+    transform: translate3d(0, -3px, 0);
+    box-shadow: 0 18px 40px rgba(0, 0, 0, 0.36);
+  }
+
+  .shop-tile:hover .shop-tile-img-alt {
+    opacity: 1;
+  }
+}
+
+.shop-tile-img {
+  position: absolute;
+  inset: 0;
+  height: 100%;
+  width: 100%;
+  object-fit: cover;
+}
+
+.shop-tile-img-alt {
+  opacity: 0;
+  transition: opacity 280ms ease;
+}
+
+.shop-tile-swatches {
+  position: absolute;
+  bottom: 10px;
+  left: 10px;
+  display: flex;
+  gap: 4px;
+  padding: 4px;
+  border-radius: 999px;
+  background: rgba(255, 255, 255, 0.86);
+}
+
+.shop-tile-swatches span {
+  height: 10px;
+  width: 10px;
+  border-radius: 999px;
+  box-shadow: inset 0 0 0 1px rgba(0, 0, 0, 0.14);
+}
+
+.shop-tile-meta {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  padding: 10px 4px 0;
+}
+
+.shop-tile-name {
+  overflow: hidden;
+  display: -webkit-box;
+  -webkit-line-clamp: 2;
+  -webkit-box-orient: vertical;
+  color: #fff;
+  font-size: 15px;
+  font-weight: 600;
+  line-height: 1.25;
+}
+
+.shop-tile-price {
+  color: rgba(255, 255, 255, 0.72);
+  font-size: 14px;
+  font-variant-numeric: tabular-nums;
+}
+
+.shop-empty {
+  margin-top: 40px;
+  padding: 32px 16px;
+  text-align: center;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .shop-tile-wrap {
+    animation: none;
+  }
 }

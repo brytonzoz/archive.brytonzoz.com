@@ -248,7 +248,7 @@ export async function sync(printify, root) {
         // The side with the full design first (the back on apparel), then the front, then the rest.
         const camera = (image) => new URL(image.src).searchParams.get('camera_label') ?? '';
         const lead = line.lead ?? ('back' in line.placements ? 'back' : 'front');
-        const rank = (image) => (camera(image) === lead ? 0 : camera(image) === 'front' ? 1 : 2 + Number(!image.is_default));
+        const rank = (image) => (camera(image).startsWith(lead) ? 0 : camera(image).startsWith('front') ? 1 : 2 + Number(!image.is_default));
         const shots = images
           .filter((image) => image.variant_ids?.some((id) => ids.has(id)))
           .sort((a, b) => rank(a) - rank(b))

@@ -14,7 +14,7 @@ const drawRing = (element: SVGCircleElement, fraction: number) => {
   element.style.strokeDashoffset = element.dataset.loading ? '0' : String(RING_LENGTH * (1 - fraction));
 };
 
-// A floating glass capsule: artwork and title (tap to open the player), play/pause wrapped in a
+// A floating glass capsule, above the Listen Now sheet too (below Now Playing): artwork and title (tap to open the player), play/pause wrapped in a
 // thin progress ring, and next.
 export function MiniPlayer() {
   const { current, isPlaying, isLoading, failedTrackIds, isExpanded, toggle, next, expand } = usePlayer();
@@ -26,7 +26,7 @@ export function MiniPlayer() {
 
   return (
     <div
-      className={`mini-player pointer-events-none fixed inset-x-0 z-[90] flex justify-center px-3 font-body transition-opacity duration-200 ${isExpanded ? 'opacity-0' : ''}`}
+      className={`mini-player pointer-events-none fixed inset-x-0 z-[105] flex justify-center px-3 font-body transition-opacity duration-200 ${isExpanded ? 'opacity-0' : ''}`}
       aria-hidden={isExpanded || undefined}
       style={{ bottom: 'max(12px, env(safe-area-inset-bottom))' }}
     >

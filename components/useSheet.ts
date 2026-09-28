@@ -3,6 +3,8 @@
 import React, { useCallback, useEffect, useRef, useState } from 'react';
 
 const CLOSE_MS = 220;
+// Open sheets, most recent last: Escape closes only the top one (e.g. Now Playing over Listen Now).
+const openSheets: object[] = [];
 const DISMISS_DRAG_PX = 90;
 
 // Shared bottom-sheet behavior: scroll lock, focus handoff, Escape, swipe-down to dismiss,
@@ -38,12 +40,15 @@ export function useSheet(isOpen: boolean, onClose: () => void) {
     if (scroller) scroller.style.overflow = 'hidden';
     sheetRef.current?.focus({ preventScroll: true });
 
+    const token = {};
+    openSheets.push(token);
     const handleKey = (event: KeyboardEvent) => {
-      if (event.key === 'Escape') requestClose();
+      if (event.key === 'Escape' && openSheets[openSheets.length - 1] === token) requestClose();
     };
     window.addEventListener('keydown', handleKey);
 
     return () => {
+      openSheets.splice(openSheets.indexOf(token), 1);
       window.removeEventListener('keydown', handleKey);
       document.documentElement.style.overflow = previousOverflow[0];
       if (scroller) scroller.style.overflow = previousOverflow[1];

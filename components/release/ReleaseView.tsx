@@ -64,7 +64,7 @@ export function ReleaseView({ project, release, focusTrack, inSheet = true }: { 
     : getProjectTypeLabel(project);
 
   return (
-    <div className={`px-5 ${inSheet ? 'pb-32' : 'pb-2'}`}>
+    <div className={`px-5 ${inSheet ? '' : 'pb-2'}`} style={inSheet ? { paddingBottom: 'calc(8rem + var(--sheet-player-offset, 0px))' } : undefined}>
       <div className="flex flex-col items-center pt-4 text-center">
         {cover ? (
           <div className="release-art relative w-[min(62vw,260px)] overflow-hidden rounded-[12px]" style={{ aspectRatio: '1 / 1', ...placeholderBackground(cover) }}>

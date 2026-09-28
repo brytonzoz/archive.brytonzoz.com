@@ -256,7 +256,7 @@
 
   /* The list fades out under the floating platform bar instead of colliding with it. */
   .platform-fade {
-    background: linear-gradient(to top, rgba(0, 0, 0, 0.75) 35%, rgba(0, 0, 0, 0));
+    background: linear-gradient(to top, rgba(0, 0, 0, 0.97) 0, rgba(0, 0, 0, 0.94) calc(var(--sheet-player-offset, 0px) + 1.5rem), rgba(0, 0, 0, 0.72) calc(var(--sheet-player-offset, 0px) + 4.5rem), rgba(0, 0, 0, 0));
   }
 
   .scene-title {
@@ -428,6 +428,27 @@
     0% { transform: scale(0.6); }
     60% { transform: scale(1.18); }
     100% { transform: scale(1); }
+  }
+
+  /* The mini player floats above bottom sheets. On phones the sheet's bottom content moves up to
+     clear it; on larger screens the centred sheet leaves room for it below instead. */
+  .sheet-dialog {
+    --sheet-player-offset: var(--player-offset, 0px);
+  }
+
+  .sheet-dialog-height {
+    height: calc(100dvh - 8px);
+  }
+
+  @media (min-width: 640px) {
+    .sheet-dialog {
+      --sheet-player-offset: 0px;
+      padding-bottom: calc(1.5rem + var(--player-offset, 0px));
+    }
+
+    .sheet-dialog-height {
+      height: min(860px, calc(100dvh - 48px - var(--player-offset, 0px)));
+    }
   }
 
   /* Content scrolling under a sheet's header fades out instead of being cut off. */

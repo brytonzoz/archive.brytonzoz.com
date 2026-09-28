@@ -38,14 +38,14 @@ export function ReleaseSheet({ project, isOpen, onClose }: { project: Project; i
       role="dialog"
       aria-modal="true"
       aria-labelledby={titleId}
-      className={`fixed inset-0 z-[100] flex items-end justify-center font-body sm:items-center sm:p-6 ${isClosing ? 'is-closing' : ''}`}
+      className={`sheet-dialog fixed inset-0 z-[100] flex items-end justify-center font-body sm:items-center sm:px-6 sm:pt-6 ${isClosing ? 'is-closing' : ''}`}
     >
       <div aria-hidden="true" onClick={requestClose} className="sheet-backdrop absolute inset-0 touch-none bg-black/60" />
 
       <div
         ref={sheetRef}
         tabIndex={-1}
-        className="sheet-panel relative isolate flex h-[calc(100dvh-8px)] w-full max-w-[480px] flex-col overflow-hidden rounded-t-[32px] text-white outline-none sm:h-[min(860px,calc(100dvh-48px))] sm:rounded-[32px]"
+        className="sheet-panel relative isolate sheet-dialog-height flex w-full max-w-[480px] flex-col overflow-hidden rounded-t-[32px] text-white outline-none sm:rounded-[32px]"
         style={sheetStyle}
       >
         <div aria-hidden="true" className="absolute inset-0 -z-10 bg-[#111]" />
@@ -75,7 +75,8 @@ export function ReleaseSheet({ project, isOpen, onClose }: { project: Project; i
           </div>
         </div>
 
-        <div className="sheet-scroll min-h-0 flex-1 overflow-y-auto overscroll-contain scroll-pb-32">
+        <div className="sheet-scroll min-h-0 flex-1 overflow-y-auto overscroll-contain"
+          style={{ scrollPaddingBottom: 'calc(8rem + var(--sheet-player-offset, 0px))' }}>
           <ReleaseView project={project} release={release} />
         </div>
 
@@ -83,7 +84,8 @@ export function ReleaseSheet({ project, isOpen, onClose }: { project: Project; i
           project={project}
           release={release}
           className="platform-fade absolute inset-x-0 bottom-0 pt-10"
-          style={{ paddingBottom: 'max(1rem, env(safe-area-inset-bottom))' }}
+          // Sits just above the mini player when music is playing.
+          style={{ paddingBottom: 'calc(max(1rem, env(safe-area-inset-bottom)) + var(--sheet-player-offset, 0px))', transition: 'padding-bottom 320ms cubic-bezier(0.32, 0.72, 0, 1)' }}
         />
       </div>
     </div>,

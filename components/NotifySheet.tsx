@@ -55,14 +55,14 @@ export function NotifySheet({ isOpen, onClose, onDone }: { isOpen: boolean; onCl
       role="dialog"
       aria-modal="true"
       aria-labelledby={titleId}
-      className={`fixed inset-0 z-[100] flex items-end justify-center font-body sm:items-center sm:p-6 ${isClosing ? 'is-closing' : ''}`}
+      className={`sheet-dialog fixed inset-0 z-[100] flex items-end justify-center font-body sm:items-center sm:px-6 sm:pt-6 ${isClosing ? 'is-closing' : ''}`}
     >
       <div aria-hidden="true" onClick={requestClose} className="sheet-backdrop absolute inset-0 touch-none bg-black/60" />
       <div
         ref={sheetRef}
         tabIndex={-1}
         className="sheet-panel relative w-full max-w-[420px] overflow-hidden rounded-t-[32px] bg-[#161616] text-white outline-none sm:rounded-[32px]"
-        style={{ ...sheetStyle, paddingBottom: 'max(1.75rem, env(safe-area-inset-bottom))' }}
+        style={{ ...sheetStyle, paddingBottom: 'calc(max(1.75rem, env(safe-area-inset-bottom)) + var(--sheet-player-offset, 0px))' }}
       >
         <div aria-hidden="true" className="teaser-notify-glow pointer-events-none absolute inset-x-0 top-0 h-40" />
         <div {...dragHandlers} className="relative touch-none select-none px-3 pt-2">

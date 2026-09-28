@@ -11,7 +11,7 @@
       "slug": "rainbow",
       "name": "Rainbow",
       "design": { "uploadId": "670595816abac27f9d58eb7f" },
-      "placement": { "x": 0.5, "y": 0.42, "scale": 0.92 },
+      "placement": { "x": 0.5, "y": 0.45, "scale": 1 },
       "colors": ["Black", "White"]
     }
   ]

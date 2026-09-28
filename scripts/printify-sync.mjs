@@ -101,8 +101,9 @@ export async function sync(printify, root) {
         .sort((a, b) => config.sizes.indexOf(a.options.size) - config.sizes.indexOf(b.options.size));
       const ids = new Set(colorVariants.map((variant) => variant.id));
       // Front-facing shots first (the design is on the front), then the rest, no back views.
+      const isBack = (image) => image.position === 'back' || /camera_label=back/.test(image.src ?? '');
       const shots = images
-        .filter((image) => image.variant_ids?.some((id) => ids.has(id)) && image.position !== 'back')
+        .filter((image) => image.variant_ids?.some((id) => ids.has(id)) && !isBack(image))
         .sort((a, b) => Number(b.position === 'front') - Number(a.position === 'front') || Number(b.is_default) - Number(a.is_default))
         .slice(0, 4);
       const keys = [];

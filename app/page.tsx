@@ -1,7 +1,8 @@
 'use client';
 
 import React, { useCallback, useEffect, useState } from 'react';
-import { ProjectCard, StreamingModal } from '../components/ProjectCard';
+import { ProjectCard } from '../components/ProjectCard';
+import { ListenSheet } from '../components/ListenSheet';
 import { ResponsiveImage, placeholderBackground } from '../components/ResponsiveImage';
 import { getProjects } from '../lib/projects';
 import { cautionSceneAssets, reminderSceneAssets, scrapwrkSceneAssets, solenyaSceneAssets } from '../lib/assets';
@@ -812,7 +813,7 @@ const SolenyaScene = React.memo(function SolenyaScene({
         </div>
       </div>
 
-      <StreamingModal
+      <ListenSheet
         project={project}
         isOpen={isStreamingModalOpen}
         onClose={() => {
@@ -1055,7 +1056,7 @@ const CautionScene = React.memo(function CautionScene({
         </div>
       </div>
 
-      <StreamingModal
+      <ListenSheet
         project={project}
         isOpen={isStreamingModalOpen}
         onClose={() => {

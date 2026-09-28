@@ -110,10 +110,12 @@ Deploys need the `CLOUDFLARE_API_TOKEN` GitHub Actions secret. See `CLAUDE.md` a
 
 The site can play Bryton's music itself, and keeps playing while visitors scroll and move between pages.
 
-- Songs are MP3s in Cloudflare R2, served from `https://media.brytonzoz.com/music/…`.
+- Songs are MP3s in the `brytonzoz-media` R2 bucket, streamed at `/audio/…` by `worker/index.ts` (seekable, edge-cached).
+  They come from the shared Google Drive folder: `music/sources.json` maps each file, and the **Music sync** workflow
+  uploads them (`scripts/sync-music.py`).
 - `lib/tracks.json` lists each release (SOLENYA, CAUTION, Just A Reminder To Live Life) with its songs and their
   exact file names. A release appears in the player only when `"available": true`.
-- `npm run check:tracks` confirms every song of an available release exists; both deploy workflows run it and stop
+- `CHECK_ORIGIN=<site> npm run check:tracks` confirms every song of an available release plays; both deploy workflows run it and stop
   if anything is missing. `--all` also reports releases that aren't live yet.
 - UI: a "Play here" row in the Listen sheet, a mini player at the bottom, and a full Now Playing sheet with the
   tracklists. It works with the phone's lock screen, headphones and car controls through the Media Session API.

@@ -34,9 +34,11 @@ push, and give the owner the staging link from the PR comment once the Staging w
   hidden projects: `HOMEPAGE_PROJECT_ORDER` / `HIDDEN_HOMEPAGE_PROJECTS` in `app/page.tsx`.
 - Artwork: originals in `assets-src/{covers,scenes/<scene>,icons}/`; `npm run media` builds
   `public/media/` and `lib/media-manifest.json` (commit the manifest). Never put large images in `public/`.
-- Music player: `lib/tracks.json` lists every release and its exact R2 file (`<baseUrl>/<file>`, served from
-  `media.brytonzoz.com`). A release only shows in the player once `"available": true`, and
-  `npm run check:tracks` (also run in both deploy workflows) fails if any song of an available release is missing.
+- Music player: `lib/tracks.json` lists every release and its songs; each plays from `/audio/<file>`, which
+  `worker/index.ts` streams from the `brytonzoz-media` R2 bucket. Songs come from the owner's Google Drive folder:
+  `music/sources.json` maps Drive files to bucket keys and the **Music sync** workflow uploads them. A release only
+  shows in the player once `"available": true`, and `npm run check:tracks` (run in both deploy workflows) fails if
+  any song of an available release doesn't play.
   Player code lives in `components/player/`; it is mounted in `app/layout.tsx`, so internal links must use
   `next/link` to keep music playing between pages.
 - Hosting: `wrangler.jsonc` (production + `staging` env), `workers/redirects/` (www/archive → apex),

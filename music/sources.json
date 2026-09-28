@@ -1,0 +1,162 @@
+{
+  "driveFolder": "https://drive.google.com/drive/folders/1ctk9rbxD6OuYLWiZUUnFlHmEcoQGw8PK",
+  "bucket": "brytonzoz-media",
+  "files": [
+    {
+      "source": "SOLENYA/Track 1 Solenya (final).mp3",
+      "key": "solenya/01-solenya.mp3"
+    },
+    {
+      "source": "SOLENYA/Track 2 no promises (final).mp3",
+      "key": "solenya/02-no-promises.mp3"
+    },
+    {
+      "source": "SOLENYA/track 3 serendiidous mistakes (final).mp3",
+      "key": "solenya/03-serendipitous-mistakes.mp3"
+    },
+    {
+      "source": "SOLENYA/Track 4 take me higher  (final).mp3",
+      "key": "solenya/04-lift-me-higher.mp3"
+    },
+    {
+      "source": "SOLENYA/track 5 rediscover self .mp3",
+      "key": "solenya/05-rediscover-self.mp3"
+    },
+    {
+      "source": "SOLENYA/Track 6 get out your head.mp3",
+      "key": "solenya/06-get-out-your-head.mp3"
+    },
+    {
+      "source": "SOLENYA/Track 7 rolled up emotions  (final).mp3",
+      "key": "solenya/07-rolled-up-emotions.mp3"
+    },
+    {
+      "source": "SOLENYA/Track 8 reconnect.mp3",
+      "key": "solenya/08-reconnect.mp3"
+    },
+    {
+      "source": "SOLENYA/Track 9 disapointing flaws.mp3",
+      "key": "solenya/09-disappointing-flaws.mp3"
+    },
+    {
+      "source": "SOLENYA/Track 10 satisfied (final).mp3",
+      "key": "solenya/10-satisfied.mp3"
+    },
+    {
+      "source": "SOLENYA/track 11 not your friend (final).mp3",
+      "key": "solenya/11-not-your-friend.mp3"
+    },
+    {
+      "source": "SOLENYA/track 12 come over (final).mp3",
+      "key": "solenya/12-spend-the-night.mp3"
+    },
+    {
+      "source": "CAUTION/star.mp3",
+      "key": "caution/01-star.mp3"
+    },
+    {
+      "source": "CAUTION/butter fingers.mp3",
+      "key": "caution/02-butter-fingers.mp3"
+    },
+    {
+      "source": "CAUTION/purpose.mp3",
+      "key": "caution/03-purpose.mp3"
+    },
+    {
+      "source": "CAUTION/machine.mp3",
+      "key": "caution/04-machine.mp3"
+    },
+    {
+      "source": "CAUTION/cars.mp3",
+      "key": "caution/05-cars.mp3"
+    },
+    {
+      "source": "JARTLL/track_00_opening_demo copy.mp3",
+      "key": "just-a-reminder-to-live-life/01-opening.mp3"
+    },
+    {
+      "source": "JARTLL/track_01_glistening_demo copy.mp3",
+      "key": "just-a-reminder-to-live-life/02-glistening.mp3"
+    },
+    {
+      "source": "JARTLL/track_02_dial_tone_demo copy.m4a",
+      "key": "just-a-reminder-to-live-life/03-dial-tone.mp3"
+    },
+    {
+      "source": "JARTLL/track_03_100_degrees_demo copy.mp3",
+      "key": "just-a-reminder-to-live-life/04-100-degrees.mp3"
+    },
+    {
+      "source": "JARTLL/track_04_go_with_the_roll_demo copy.mp3",
+      "key": "just-a-reminder-to-live-life/05-go-with-the-roll.mp3"
+    },
+    {
+      "source": "JARTLL/track_05_just_who_we_are_demo copy.mp3",
+      "key": "just-a-reminder-to-live-life/06-just-who-we-are.mp3"
+    },
+    {
+      "source": "JARTLL/track_06_outer_space_demo copy.mp3",
+      "key": "just-a-reminder-to-live-life/07-outer-space.mp3"
+    },
+    {
+      "source": "JARTLL/track_07_dont_give_a_fuck_demo copy.mp3",
+      "key": "just-a-reminder-to-live-life/08-dont-give-a-fuck.mp3"
+    },
+    {
+      "source": "JARTLL/track_08_love_is_real_demo copy.m4a",
+      "key": "just-a-reminder-to-live-life/09-love-is-real.mp3"
+    },
+    {
+      "source": "JARTLL/track_09_mask_up_demo copy.m4a",
+      "key": "just-a-reminder-to-live-life/10-mask-up.mp3"
+    },
+    {
+      "source": "JARTLL/track_10_i_hope_youre_okay_demo copy.mp3",
+      "key": "just-a-reminder-to-live-life/11-i-hope-youre-okay.mp3"
+    },
+    {
+      "source": "JARTLL/track_11_new_life_demo copy.m4a",
+      "key": "just-a-reminder-to-live-life/12-new-life.mp3"
+    },
+    {
+      "source": "JARTLL/track_12_empty_palace_demo copy.m4a",
+      "key": "just-a-reminder-to-live-life/13-empty-palace.mp3"
+    },
+    {
+      "source": "JARTLL/track_13_unknown_demo copy.m4a",
+      "key": "just-a-reminder-to-live-life/14-unknown.mp3"
+    },
+    {
+      "source": "JARTLL/track_14_walking_through_a_cemetery_demo copy.m4a",
+      "key": "just-a-reminder-to-live-life/15-walking-through-a-cemetery.mp3"
+    },
+    {
+      "source": "JARTLL/track_15_unique_galore_demo copy.m4a",
+      "key": "just-a-reminder-to-live-life/16-unique-galore.mp3"
+    },
+    {
+      "source": "JARTLL/track_16_walked_up_demo copy.mp3",
+      "key": "just-a-reminder-to-live-life/17-walked-up.mp3"
+    },
+    {
+      "source": "JARTLL/track_17_passed_it_demo copy.mp3",
+      "key": "just-a-reminder-to-live-life/18-passed-it.mp3"
+    },
+    {
+      "source": "JARTLL/track_18_end_of_us_demo copy.m4a",
+      "key": "just-a-reminder-to-live-life/19-end-of-us.mp3"
+    },
+    {
+      "source": "JARTLL/track_19_cant_all_be_right_demo copy.mp3",
+      "key": "just-a-reminder-to-live-life/20-cant-all-be-right.mp3"
+    },
+    {
+      "source": "JARTLL/track_20_learn_a_lesson_demo copy.mp3",
+      "key": "just-a-reminder-to-live-life/21-learn-a-lesson.mp3"
+    },
+    {
+      "source": "JARTLL/track_21_conclusion_demo copy.mp3",
+      "key": "just-a-reminder-to-live-life/22-conclusion.mp3"
+    }
+  ]
+}

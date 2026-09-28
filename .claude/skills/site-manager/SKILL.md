@@ -42,12 +42,14 @@ the same PR so the owner can judge it on staging; nothing reaches production unt
 
 ### Music player
 
-- Songs live in R2 under `https://media.brytonzoz.com/music/<release>/<NN>-<title-slug>.mp3` (MP3, 256–320 kbps;
-  Cloudflare caches .mp3 at the edge). `lib/tracks.json` maps each track to its file, with title, duration and
-  explicit flag. For releases on Apple Music, take titles and durations from
-  `https://itunes.apple.com/lookup?id=<albumId>&entity=song`.
-- After the owner uploads, run `NODE_USE_ENV_PROXY=1 node scripts/check-tracks.mjs --all`. Only flip a release to
-  `"available": true` once every file shows `ok`, then push. CI runs the same check and blocks a broken release.
+- New or changed songs: the owner drops files into the shared Google Drive folder. Add each file to
+  `music/sources.json` (Drive path -> bucket key `<release>/<NN>-<title-slug>.mp3`) and to `lib/tracks.json` (title,
+  duration, explicit). For releases on Apple Music, take titles and durations from
+  `https://itunes.apple.com/lookup?id=<albumId>&entity=song` and match files by duration. Pushing
+  `music/sources.json` runs the **Music sync** workflow, which downloads, prepares (MP3s copied as-is, other formats
+  converted to V0 MP3) and uploads to R2. Test locally first with `python3 scripts/sync-music.py --out <dir>`.
+- Only flip a release to `"available": true` after Music sync succeeds, then push; the staging check
+  (`CHECK_ORIGIN=<staging url> npm run check:tracks`) blocks a broken release.
 - The player appears automatically once any release is available: "Play here" in the Listen sheet, a mini player
   while browsing, and Now Playing with the full tracklist.
 

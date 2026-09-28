@@ -29,7 +29,11 @@ jobs:
 
       - run: npm run build
 
+      # Staging and production read the same R2 bucket, so staging proves the songs are there
+      # before production (whose /audio route may not exist yet) is deployed.
       - name: Check every live song exists in R2
+        env:
+          CHECK_ORIGIN: https://archive-staging.bryton-p-zoz.workers.dev
         run: npm run check:tracks
 
       - name: Check deploy credentials

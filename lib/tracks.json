@@ -1,5 +1,5 @@
 {
-  "baseUrl": "https://media.brytonzoz.com/music",
+  "baseUrl": "/audio",
   "releases": [
     {
       "id": "solenya",
@@ -8,18 +8,78 @@
       "cover": "covers/solenya",
       "available": false,
       "tracks": [
-        { "title": "solenya", "file": "solenya/01-solenya.mp3", "durationMs": 218313, "explicit": true },
-        { "title": "no promises", "file": "solenya/02-no-promises.mp3", "durationMs": 121183, "explicit": true },
-        { "title": "serendipitous mistakes", "file": "solenya/03-serendipitous-mistakes.mp3", "durationMs": 154388, "explicit": true },
-        { "title": "lift me higher", "file": "solenya/04-lift-me-higher.mp3", "durationMs": 142987, "explicit": true },
-        { "title": "rediscover self", "file": "solenya/05-rediscover-self.mp3", "durationMs": 176470, "explicit": true },
-        { "title": "get out your head", "file": "solenya/06-get-out-your-head.mp3", "durationMs": 144914, "explicit": true },
-        { "title": "rolled up emotions", "file": "solenya/07-rolled-up-emotions.mp3", "durationMs": 224791, "explicit": true },
-        { "title": "reconnect", "file": "solenya/08-reconnect.mp3", "durationMs": 132933, "explicit": true },
-        { "title": "disappointing flaws", "file": "solenya/09-disappointing-flaws.mp3", "durationMs": 137112, "explicit": true },
-        { "title": "satisfied", "file": "solenya/10-satisfied.mp3", "durationMs": 141710, "explicit": true },
-        { "title": "not your friend", "file": "solenya/11-not-your-friend.mp3", "durationMs": 359258, "explicit": true },
-        { "title": "spend the night", "file": "solenya/12-spend-the-night.mp3", "durationMs": 225023, "explicit": true }
+        {
+          "title": "solenya",
+          "file": "solenya/01-solenya.mp3",
+          "durationMs": 218313,
+          "explicit": true
+        },
+        {
+          "title": "no promises",
+          "file": "solenya/02-no-promises.mp3",
+          "durationMs": 121183,
+          "explicit": true
+        },
+        {
+          "title": "serendipitous mistakes",
+          "file": "solenya/03-serendipitous-mistakes.mp3",
+          "durationMs": 154388,
+          "explicit": true
+        },
+        {
+          "title": "lift me higher",
+          "file": "solenya/04-lift-me-higher.mp3",
+          "durationMs": 142987,
+          "explicit": true
+        },
+        {
+          "title": "rediscover self",
+          "file": "solenya/05-rediscover-self.mp3",
+          "durationMs": 176470,
+          "explicit": true
+        },
+        {
+          "title": "get out your head",
+          "file": "solenya/06-get-out-your-head.mp3",
+          "durationMs": 144914,
+          "explicit": true
+        },
+        {
+          "title": "rolled up emotions",
+          "file": "solenya/07-rolled-up-emotions.mp3",
+          "durationMs": 224791,
+          "explicit": true
+        },
+        {
+          "title": "reconnect",
+          "file": "solenya/08-reconnect.mp3",
+          "durationMs": 132933,
+          "explicit": true
+        },
+        {
+          "title": "disappointing flaws",
+          "file": "solenya/09-disappointing-flaws.mp3",
+          "durationMs": 137112,
+          "explicit": true
+        },
+        {
+          "title": "satisfied",
+          "file": "solenya/10-satisfied.mp3",
+          "durationMs": 141710,
+          "explicit": true
+        },
+        {
+          "title": "not your friend",
+          "file": "solenya/11-not-your-friend.mp3",
+          "durationMs": 359258,
+          "explicit": true
+        },
+        {
+          "title": "spend the night",
+          "file": "solenya/12-spend-the-night.mp3",
+          "durationMs": 225023,
+          "explicit": true
+        }
       ]
     },
     {
@@ -29,11 +89,36 @@
       "cover": "covers/caution",
       "available": false,
       "tracks": [
-        { "title": "star", "file": "caution/01-star.mp3", "durationMs": 218399, "explicit": true },
-        { "title": "butter fingers", "file": "caution/02-butter-fingers.mp3", "durationMs": 138375, "explicit": true },
-        { "title": "purpose", "file": "caution/03-purpose.mp3", "durationMs": 134000, "explicit": true },
-        { "title": "machine", "file": "caution/04-machine.mp3", "durationMs": 154498, "explicit": true },
-        { "title": "cars", "file": "caution/05-cars.mp3", "durationMs": 204975, "explicit": true }
+        {
+          "title": "star",
+          "file": "caution/01-star.mp3",
+          "durationMs": 218399,
+          "explicit": true
+        },
+        {
+          "title": "butter fingers",
+          "file": "caution/02-butter-fingers.mp3",
+          "durationMs": 138375,
+          "explicit": true
+        },
+        {
+          "title": "purpose",
+          "file": "caution/03-purpose.mp3",
+          "durationMs": 134000,
+          "explicit": true
+        },
+        {
+          "title": "machine",
+          "file": "caution/04-machine.mp3",
+          "durationMs": 154498,
+          "explicit": true
+        },
+        {
+          "title": "cars",
+          "file": "caution/05-cars.mp3",
+          "durationMs": 204975,
+          "explicit": true
+        }
       ]
     },
     {
@@ -42,7 +127,140 @@
       "projectName": "Just A Reminder To Live Life",
       "cover": "covers/just-a-reminder",
       "available": false,
-      "tracks": []
+      "tracks": [
+        {
+          "title": "opening",
+          "file": "just-a-reminder-to-live-life/01-opening.mp3",
+          "durationMs": 253150,
+          "explicit": false
+        },
+        {
+          "title": "glistening",
+          "file": "just-a-reminder-to-live-life/02-glistening.mp3",
+          "durationMs": 208070,
+          "explicit": false
+        },
+        {
+          "title": "dial tone",
+          "file": "just-a-reminder-to-live-life/03-dial-tone.mp3",
+          "durationMs": 136720,
+          "explicit": false
+        },
+        {
+          "title": "100 degrees",
+          "file": "just-a-reminder-to-live-life/04-100-degrees.mp3",
+          "durationMs": 153080,
+          "explicit": false
+        },
+        {
+          "title": "go with the roll",
+          "file": "just-a-reminder-to-live-life/05-go-with-the-roll.mp3",
+          "durationMs": 144170,
+          "explicit": false
+        },
+        {
+          "title": "just who we are",
+          "file": "just-a-reminder-to-live-life/06-just-who-we-are.mp3",
+          "durationMs": 86650,
+          "explicit": false
+        },
+        {
+          "title": "outer space",
+          "file": "just-a-reminder-to-live-life/07-outer-space.mp3",
+          "durationMs": 105950,
+          "explicit": false
+        },
+        {
+          "title": "don't give a fuck",
+          "file": "just-a-reminder-to-live-life/08-dont-give-a-fuck.mp3",
+          "durationMs": 118910,
+          "explicit": true
+        },
+        {
+          "title": "love is real",
+          "file": "just-a-reminder-to-live-life/09-love-is-real.mp3",
+          "durationMs": 132960,
+          "explicit": false
+        },
+        {
+          "title": "mask up",
+          "file": "just-a-reminder-to-live-life/10-mask-up.mp3",
+          "durationMs": 172360,
+          "explicit": false
+        },
+        {
+          "title": "i hope you're okay",
+          "file": "just-a-reminder-to-live-life/11-i-hope-youre-okay.mp3",
+          "durationMs": 194690,
+          "explicit": false
+        },
+        {
+          "title": "new life",
+          "file": "just-a-reminder-to-live-life/12-new-life.mp3",
+          "durationMs": 239230,
+          "explicit": false
+        },
+        {
+          "title": "empty palace",
+          "file": "just-a-reminder-to-live-life/13-empty-palace.mp3",
+          "durationMs": 165560,
+          "explicit": false
+        },
+        {
+          "title": "unknown",
+          "file": "just-a-reminder-to-live-life/14-unknown.mp3",
+          "durationMs": 172360,
+          "explicit": false
+        },
+        {
+          "title": "walking through a cemetery",
+          "file": "just-a-reminder-to-live-life/15-walking-through-a-cemetery.mp3",
+          "durationMs": 178310,
+          "explicit": false
+        },
+        {
+          "title": "unique galore",
+          "file": "just-a-reminder-to-live-life/16-unique-galore.mp3",
+          "durationMs": 174150,
+          "explicit": false
+        },
+        {
+          "title": "walked up",
+          "file": "just-a-reminder-to-live-life/17-walked-up.mp3",
+          "durationMs": 203620,
+          "explicit": false
+        },
+        {
+          "title": "passed it",
+          "file": "just-a-reminder-to-live-life/18-passed-it.mp3",
+          "durationMs": 147150,
+          "explicit": false
+        },
+        {
+          "title": "end of us",
+          "file": "just-a-reminder-to-live-life/19-end-of-us.mp3",
+          "durationMs": 237700,
+          "explicit": false
+        },
+        {
+          "title": "can't all be right",
+          "file": "just-a-reminder-to-live-life/20-cant-all-be-right.mp3",
+          "durationMs": 175390,
+          "explicit": false
+        },
+        {
+          "title": "learn a lesson",
+          "file": "just-a-reminder-to-live-life/21-learn-a-lesson.mp3",
+          "durationMs": 194690,
+          "explicit": false
+        },
+        {
+          "title": "conclusion",
+          "file": "just-a-reminder-to-live-life/22-conclusion.mp3",
+          "durationMs": 220000,
+          "explicit": false
+        }
+      ]
     }
   ]
 }

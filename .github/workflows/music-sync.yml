@@ -1,0 +1,44 @@
+name: Music sync
+
+# Copies the songs listed in music/sources.json from the shared Google Drive folder into the
+# brytonzoz-media R2 bucket that /audio/* streams from. Runs when the song list or the sync
+# script changes, or by hand from the Actions tab.
+on:
+  push:
+    paths:
+      - music/sources.json
+      - scripts/sync-music.py
+      - .github/workflows/music-sync.yml
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: music-sync
+  cancel-in-progress: false
+
+jobs:
+  sync:
+    name: Upload songs to R2
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v5
+
+      - uses: actions/setup-node@v5
+        with:
+          node-version: 22
+          cache: npm
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+
+      - run: npm ci
+
+      - run: pip install gdown==6.4.0 imageio-ffmpeg==0.6.0
+
+      - name: Download, prepare and upload songs
+        env:
+          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+        run: python3 scripts/sync-music.py --out "$RUNNER_TEMP/music" --upload

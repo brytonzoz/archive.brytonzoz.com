@@ -33,7 +33,7 @@ function ProductFace({ product, sizes }: { product: Product; sizes: string }) {
     <>
       <span className="store-card-face store-card-front">
         <span className="store-card-photo" style={placeholderBackground(product.images[0])}>
-          <ResponsiveImage asset={product.images[0]} alt="" sizes={sizes} draggable={false} className={`h-full w-full object-cover ${sold ? 'opacity-60 grayscale-[0.6]' : ''}`} />
+          <ResponsiveImage asset={product.images[0]} alt="" sizes={sizes} draggable={false} loading="lazy" className={`h-full w-full object-cover ${sold ? 'opacity-60 grayscale-[0.6]' : ''}`} />
           {status !== 'available' ? <span className="store-chip">{sold ? 'Sold' : 'In checkout'}</span> : null}
         </span>
         <span className="store-card-meta">
@@ -46,7 +46,7 @@ function ProductFace({ product, sizes }: { product: Product; sizes: string }) {
       </span>
       <span className="store-card-face store-card-back" aria-hidden="true">
         <span className="absolute inset-0" style={placeholderBackground(product.images[1] ?? product.images[0])}>
-          <ResponsiveImage asset={product.images[1] ?? product.images[0]} alt="" sizes={sizes} draggable={false} className="h-full w-full object-cover" />
+          <ResponsiveImage asset={product.images[1] ?? product.images[0]} alt="" sizes={sizes} draggable={false} loading="lazy" className="h-full w-full object-cover" />
         </span>
         <span className="store-card-back-shade" />
         <Wordmark />

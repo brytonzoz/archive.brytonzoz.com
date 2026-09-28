@@ -49,6 +49,7 @@ function Gallery({ product }: { product: Product }) {
               alt={i === 0 ? `Scrapwrk ${product.number} ${product.name}` : `${product.name}, photo ${i + 1} of ${count}`}
               sizes="(min-width: 640px) 480px, 100vw"
               priority={i === 0}
+              loading={i < 2 ? 'eager' : 'lazy'}
               draggable={false}
               className="absolute inset-0 h-full w-full object-cover"
             />

@@ -766,7 +766,6 @@ html {
   display: grid;
   grid-template-columns: 1fr 1fr;
   gap: 4cqw;
-  perspective: 1600px;
 }
 
 .store-slot {
@@ -785,6 +784,8 @@ html {
 .store-card {
   display: block;
   width: 100%;
+  /* Perspective on the flip's direct parent, so the turn has real depth. */
+  perspective: 1100px;
   border-radius: var(--card-radius);
   text-align: left;
   color: #fff;
@@ -848,11 +849,12 @@ html {
 .store-card-flip::before {
   content: '';
   position: absolute;
-  inset: 4% 3% -2%;
-  border-radius: var(--card-radius);
-  background: rgba(0, 0, 0, 0.55);
-  filter: blur(4cqw);
-  transform: translateZ(-1px);
+  inset: 2% -6% -8%;
+  border-radius: 12cqw;
+  /* A soft shadow drawn as a gradient: no blur filter to recompute while the card turns. */
+  background: radial-gradient(closest-side, rgba(0, 0, 0, 0.5), rgba(0, 0, 0, 0.28) 55%, transparent);
+  transform: translateZ(-2px);
+  pointer-events: none;
 }
 
 .store-card-back {

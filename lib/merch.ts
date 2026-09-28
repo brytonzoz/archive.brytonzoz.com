@@ -2,18 +2,35 @@ import catalog from './merch-catalog.json';
 import shareImages from './share-images.json';
 import { media, type MediaAsset, type MediaKey } from './media';
 
-// NonParallel tees, printed to order by Printify. lib/merch-catalog.json is written by the Printify
-// workflow (scripts/printify-sync.mjs) from printify/products.json; the checkout Worker reads it too.
+// NonParallel merch (tees, hoodies, stickers, mugs…), printed to order by Printify. lib/merch-catalog.json
+// is written by the Printify workflow (scripts/printify-sync.mjs) from printify/products.json; the
+// checkout Worker reads it too.
 
 export type MerchSize = { size: string; variantId: number; price: number };
 export type MerchColor = { name: string; slug: string; swatch: string; images: MediaAsset[]; sizes: MerchSize[] };
-export type MerchProduct = { slug: string; number: string; name: string; title: string; price: number; colors: MerchColor[]; shareImage?: string };
+export type MerchProduct = {
+  slug: string;
+  number: string;
+  /** The design ("Rainbow"). */
+  name: string;
+  /** The design and the item together ("Rainbow Hoodie"). */
+  displayName: string;
+  /** What the item is ("Hoodie"), and its shop category ("Hoodies"). */
+  lineName: string;
+  line: string;
+  category: string;
+  title: string;
+  price: number;
+  /** Starting price differs by size or color. */
+  priceVaries: boolean;
+  blank: string;
+  details: string[];
+  colors: MerchColor[];
+  shareImage?: string;
+};
 
 export const MERCH_PATH = '/nonparallel/';
 export const MERCH_KEY_PREFIX = 'np:';
-const rawDetails = (catalog.blueprint as { details?: string | string[] } | undefined)?.details;
-export const merchDetails: string[] = Array.isArray(rawDetails) ? rawDetails : [];
-export const merchBlank = `${catalog.blueprint?.name ?? ''}`.trim();
 
 // Swatch colors for the tee colors Printify names.
 const SWATCHES: Record<string, string> = {
@@ -29,15 +46,27 @@ const studioKeys = (design: string, color: string) =>
   Object.keys(media).filter((key) => key.startsWith(`merch-studio/${design}/${color}-`)).sort();
 
 type RawColor = { name: string; hex: string | null; images: string[]; sizes: MerchSize[] };
-type RawProduct = { slug: string; number: string; name: string; title: string; price: number; colors: RawColor[] };
+type RawProduct = {
+  slug: string; number: string; name: string; title: string; price: number; colors: RawColor[];
+  line?: string; lineName?: string; category?: string; blank?: string; details?: string[];
+};
+// Catalogs written before products had lines were all tees.
+const legacy = catalog as { blueprint?: { name?: string; details?: string[] } };
 
 export const merchProducts: MerchProduct[] = (catalog.products as RawProduct[])
   .map((product) => ({
     slug: product.slug,
     number: product.number,
     name: product.name,
+    displayName: `${product.name} ${product.lineName ?? 'Tee'}`,
+    lineName: product.lineName ?? 'Tee',
+    line: product.line ?? 'tee',
+    category: product.category ?? 'Tees',
     title: product.title,
     price: product.price,
+    priceVaries: new Set(product.colors.flatMap((color) => color.sizes.map((size) => size.price))).size > 1,
+    blank: product.blank ?? legacy.blueprint?.name ?? '',
+    details: product.details ?? legacy.blueprint?.details ?? [],
     shareImage: (shareImages as { merchCards?: Record<string, string> }).merchCards?.[product.slug],
     colors: product.colors
       .map((color) => ({
@@ -53,13 +82,17 @@ export const merchProducts: MerchProduct[] = (catalog.products as RawProduct[])
   .filter((product) => product.colors.length);
 
 export const merchPath = (product: MerchProduct) => `${MERCH_PATH}${product.slug}/`;
+// Shop categories in catalog order (the order products.json lists its lines).
+export const merchCategories = merchProducts.map((product) => product.category).filter((category, index, all) => all.indexOf(category) === index);
+// The homepage scene's cards are the tees; everything else is in the shop below it.
+const merchTees = merchProducts.filter((product) => product.line === 'tee');
 
 // The grid's cards: one per colorway while there are only a couple of designs (so each tee shows),
 // one per design (with its color dots) once there are more.
 export type MerchCard = { product: MerchProduct; color: MerchColor; perColor: boolean };
-export const merchCards: MerchCard[] = merchProducts.length < 3
-  ? merchProducts.flatMap((product) => product.colors.map((color) => ({ product, color, perColor: true }))).slice(0, 4)
-  : merchProducts.map((product) => ({ product, color: product.colors[0], perColor: false }));
+export const merchCards: MerchCard[] = merchTees.length < 3
+  ? merchTees.flatMap((product) => product.colors.map((color) => ({ product, color, perColor: true }))).slice(0, 4)
+  : merchTees.map((product) => ({ product, color: product.colors[0], perColor: false }));
 // In two columns, an odd count ends with a "More soon" card in the free spot; two cards get a wide one under them.
 export const merchMoreCard: 'none' | 'slot' | 'wide' = merchCards.length % 2 ? 'slot' : merchCards.length === 2 ? 'wide' : 'none';
 // The homepage scene has one screen to fit in: six (or nine) tees sit three across instead.

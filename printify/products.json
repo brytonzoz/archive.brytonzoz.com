@@ -1,57 +1,1047 @@
 {
-  "_comment": "NonParallel merch, from Bryton's 2024 NP merch spec: a small logo in the middle of the chest, the large logo in the middle of the back, sold for $25 at most. S–XL are $25; 2XL and 3XL cost more to make, so they step up $3 each and carry a little more margin to help the base sizes. Each product is one design on the tee colors in `colors`. `design.uploadId` is an image already in Printify's uploads; `design.url` is a public PNG that Printify fetches once (found again by `fileName` after that). `placements` are Printify print-area coordinates (x, y = centre, scale = width relative to the print area). Prices are in cents and include US shipping. Edit and push: the Printify workflow creates/updates the products and commits lib/merch-catalog.json plus the mockups.",
+  "_comment": "NonParallel merch, made by the Printify workflow (scripts/printify-sync.mjs). `designs` are the artwork (8000px PNGs in Printify's uploads; `url` is a public PNG Printify fetches once, found again by `fileName`). Each of `lines` is one blank (tee, hoodie, sticker, mug…) made in each of its `designs`, on the colors in `designColors` (or `colors`). A blank is `blueprintId` or `find` (regexes tried in order against Printify's \"brand model title\"); without `printProviders` any US printer with those colors is used. `placements` are Printify print-area coordinates (x, y = centre, scale = width of the 8000px design canvas relative to the print area; the art fills ~80% of the canvas width and ~60% of its height). Tees are fixed at $25 (2XL $28, 3XL $31, Bryton's spec). Everything else is priced from what Printify charges: cost + US shipping + Stripe's fee + `margin` (cents), rounded up to a whole dollar. `category` is the shop filter, in this order. Edit and push: the workflow creates/updates the products and commits lib/merch-catalog.json plus the mockups.",
   "shopId": 18462993,
-  "blueprintId": 12,
-  "printProviders": [99, 29, 39],
-  "sizes": ["S", "M", "L", "XL", "2XL", "3XL"],
-  "price": 2500,
-  "sizePrices": { "2XL": 2800, "3XL": 3100 },
-  "placements": {
-    "front": { "x": 0.5, "y": 0.24, "scale": 0.3 },
-    "back": { "x": 0.5, "y": 0.4, "scale": 1 }
-  },
-  "details": [
-    "Small logo on the chest, the full design across the back",
-    "100% Airlume combed and ring-spun cotton (solid colors)",
-    "Lightweight 4.2 oz jersey: soft and breathable",
-    "Unisex retail fit with a ribbed crew neck"
-  ],
-  "products": [
-    {
-      "slug": "rainbow",
+  "designs": {
+    "rainbow": {
       "name": "Rainbow",
-      "design": { "uploadId": "670595816abac27f9d58eb7f" },
-      "colors": ["Black"]
+      "uploadId": "670595816abac27f9d58eb7f"
     },
-    {
-      "slug": "red",
+    "red": {
       "name": "Red",
-      "design": { "fileName": "np-red.png", "url": "https://drive.usercontent.google.com/download?id=1RxfLWGVuirtUuG0VbSwvZF9RZ-Vyojq0&export=download&confirm=t" },
-      "colors": ["White"]
+      "fileName": "np-red.png",
+      "url": "https://drive.usercontent.google.com/download?id=1RxfLWGVuirtUuG0VbSwvZF9RZ-Vyojq0&export=download&confirm=t"
     },
-    {
-      "slug": "yellow",
+    "yellow": {
       "name": "Yellow",
-      "design": { "fileName": "np-yellow.png", "url": "https://drive.usercontent.google.com/download?id=1P5e1K4SU8rLbQnuMg-MiohkAW7INoxpo&export=download&confirm=t" },
-      "colors": ["White"]
+      "fileName": "np-yellow.png",
+      "url": "https://drive.usercontent.google.com/download?id=1P5e1K4SU8rLbQnuMg-MiohkAW7INoxpo&export=download&confirm=t"
     },
-    {
-      "slug": "green",
+    "green": {
       "name": "Green",
-      "design": { "fileName": "np-green.png", "url": "https://drive.usercontent.google.com/download?id=1STWVKhYmKyy1Q-7svSlQwbFlMpp7B9ID&export=download&confirm=t" },
-      "colors": ["White"]
+      "fileName": "np-green.png",
+      "url": "https://drive.usercontent.google.com/download?id=1STWVKhYmKyy1Q-7svSlQwbFlMpp7B9ID&export=download&confirm=t"
     },
-    {
-      "slug": "blue",
+    "blue": {
       "name": "Blue",
-      "design": { "fileName": "np-blue.png", "url": "https://drive.usercontent.google.com/download?id=1CWBBWNsrJakDzxUhdIm7K4EKtd2hebRa&export=download&confirm=t" },
-      "colors": ["White"]
+      "fileName": "np-blue.png",
+      "url": "https://drive.usercontent.google.com/download?id=1CWBBWNsrJakDzxUhdIm7K4EKtd2hebRa&export=download&confirm=t"
+    },
+    "purple": {
+      "name": "Purple",
+      "fileName": "np-purple.png",
+      "url": "https://drive.usercontent.google.com/download?id=1_eZkU-ZKxN85w9MhyUvw5aFlymJzvPaV&export=download&confirm=t"
+    }
+  },
+  "lines": [
+    {
+      "key": "tee",
+      "name": "Tee",
+      "category": "Tees",
+      "slugIsDesign": true,
+      "blueprintId": 12,
+      "printProviders": [
+        99,
+        29,
+        39
+      ],
+      "designs": [
+        "rainbow",
+        "red",
+        "yellow",
+        "green",
+        "blue",
+        "purple"
+      ],
+      "designColors": {
+        "rainbow": [
+          "Black"
+        ],
+        "red": [
+          "White"
+        ],
+        "yellow": [
+          "White"
+        ],
+        "green": [
+          "White"
+        ],
+        "blue": [
+          "White"
+        ],
+        "purple": [
+          "White"
+        ]
+      },
+      "sizes": [
+        "S",
+        "M",
+        "L",
+        "XL",
+        "2XL",
+        "3XL"
+      ],
+      "price": 2500,
+      "sizePrices": {
+        "2XL": 2800,
+        "3XL": 3100
+      },
+      "placements": {
+        "front": {
+          "x": 0.5,
+          "y": 0.24,
+          "scale": 0.3
+        },
+        "back": {
+          "x": 0.5,
+          "y": 0.4,
+          "scale": 1
+        }
+      },
+      "details": [
+        "Small logo on the chest, the full design across the back",
+        "100% Airlume combed and ring-spun cotton (solid colors)",
+        "Lightweight 4.2 oz jersey: soft and breathable",
+        "Unisex retail fit with a ribbed crew neck"
+      ]
     },
     {
-      "slug": "purple",
-      "name": "Purple",
-      "design": { "fileName": "np-purple.png", "url": "https://drive.usercontent.google.com/download?id=1_eZkU-ZKxN85w9MhyUvw5aFlymJzvPaV&export=download&confirm=t" },
-      "colors": ["White"]
+      "key": "heavy-tee",
+      "name": "Heavyweight Tee",
+      "category": "Tees",
+      "find": [
+        "Comfort Colors.*1717"
+      ],
+      "designs": [
+        "rainbow",
+        "purple"
+      ],
+      "designColors": {
+        "rainbow": [
+          "Black",
+          "Pepper"
+        ],
+        "purple": [
+          "White",
+          "Ivory"
+        ]
+      },
+      "sizes": [
+        "S",
+        "M",
+        "L",
+        "XL",
+        "2XL",
+        "3XL"
+      ],
+      "placements": {
+        "front": {
+          "x": 0.5,
+          "y": 0.24,
+          "scale": 0.3
+        },
+        "back": {
+          "x": 0.5,
+          "y": 0.4,
+          "scale": 1
+        }
+      },
+      "margin": 900
+    },
+    {
+      "key": "max-tee",
+      "name": "Max Heavyweight Tee",
+      "category": "Tees",
+      "blueprintId": 1716,
+      "designs": [
+        "rainbow"
+      ],
+      "designColors": {
+        "rainbow": [
+          "Black"
+        ]
+      },
+      "sizes": [
+        "S",
+        "M",
+        "L",
+        "XL",
+        "2XL",
+        "3XL"
+      ],
+      "placements": {
+        "front": {
+          "x": 0.5,
+          "y": 0.24,
+          "scale": 0.3
+        },
+        "back": {
+          "x": 0.5,
+          "y": 0.4,
+          "scale": 1
+        }
+      },
+      "margin": 1000
+    },
+    {
+      "key": "long-sleeve",
+      "name": "Long Sleeve",
+      "category": "Tees",
+      "blueprintId": 710,
+      "designs": [
+        "rainbow",
+        "purple"
+      ],
+      "designColors": {
+        "rainbow": [
+          "Black"
+        ],
+        "purple": [
+          "White"
+        ]
+      },
+      "sizes": [
+        "S",
+        "M",
+        "L",
+        "XL",
+        "2XL",
+        "3XL"
+      ],
+      "placements": {
+        "front": {
+          "x": 0.5,
+          "y": 0.24,
+          "scale": 0.3
+        },
+        "back": {
+          "x": 0.5,
+          "y": 0.4,
+          "scale": 1
+        }
+      },
+      "margin": 1000
+    },
+    {
+      "key": "tank",
+      "name": "Tank",
+      "category": "Tees",
+      "blueprintId": 880,
+      "designs": [
+        "rainbow"
+      ],
+      "designColors": {
+        "rainbow": [
+          "Black"
+        ]
+      },
+      "sizes": [
+        "S",
+        "M",
+        "L",
+        "XL",
+        "2XL"
+      ],
+      "placements": {
+        "front": {
+          "x": 0.5,
+          "y": 0.24,
+          "scale": 0.3
+        },
+        "back": {
+          "x": 0.5,
+          "y": 0.4,
+          "scale": 1
+        }
+      },
+      "margin": 800
+    },
+    {
+      "key": "hoodie",
+      "name": "Hoodie",
+      "category": "Hoodies & Crews",
+      "blueprintId": 77,
+      "designs": [
+        "rainbow",
+        "purple",
+        "blue"
+      ],
+      "designColors": {
+        "rainbow": [
+          "Black"
+        ],
+        "purple": [
+          "White"
+        ],
+        "blue": [
+          "Sport Grey"
+        ]
+      },
+      "sizes": [
+        "S",
+        "M",
+        "L",
+        "XL",
+        "2XL",
+        "3XL"
+      ],
+      "placements": {
+        "front": {
+          "x": 0.5,
+          "y": 0.32,
+          "scale": 0.3
+        },
+        "back": {
+          "x": 0.5,
+          "y": 0.35,
+          "scale": 1
+        }
+      },
+      "margin": 1400
+    },
+    {
+      "key": "heavy-hoodie",
+      "name": "Heavyweight Hoodie",
+      "category": "Hoodies & Crews",
+      "find": [
+        "IND5000P",
+        "Independent Trading.*IND4000\\b",
+        "Premium Heavyweight.*Hood",
+        "Heavyweight.*Hood"
+      ],
+      "designs": [
+        "rainbow",
+        "purple"
+      ],
+      "designColors": {
+        "rainbow": [
+          "Black"
+        ],
+        "purple": [
+          "Bone",
+          "Cement",
+          "Grey Heather",
+          "White"
+        ]
+      },
+      "sizes": [
+        "S",
+        "M",
+        "L",
+        "XL",
+        "2XL",
+        "3XL"
+      ],
+      "placements": {
+        "front": {
+          "x": 0.5,
+          "y": 0.32,
+          "scale": 0.3
+        },
+        "back": {
+          "x": 0.5,
+          "y": 0.35,
+          "scale": 1
+        }
+      },
+      "margin": 1800
+    },
+    {
+      "key": "crewneck",
+      "name": "Crewneck",
+      "category": "Hoodies & Crews",
+      "blueprintId": 49,
+      "designs": [
+        "rainbow",
+        "purple"
+      ],
+      "designColors": {
+        "rainbow": [
+          "Black"
+        ],
+        "purple": [
+          "White",
+          "Sport Grey"
+        ]
+      },
+      "sizes": [
+        "S",
+        "M",
+        "L",
+        "XL",
+        "2XL"
+      ],
+      "placements": {
+        "front": {
+          "x": 0.5,
+          "y": 0.36,
+          "scale": 0.9
+        }
+      },
+      "margin": 1200
+    },
+    {
+      "key": "sweatpants",
+      "name": "Sweatpants",
+      "category": "Bottoms",
+      "blueprintId": 1398,
+      "designs": [
+        "rainbow",
+        "purple"
+      ],
+      "designColors": {
+        "rainbow": [
+          "Black"
+        ],
+        "purple": [
+          "Ash",
+          "Sport Grey"
+        ]
+      },
+      "sizes": [
+        "S",
+        "M",
+        "L",
+        "XL",
+        "2XL",
+        "3XL"
+      ],
+      "placements": {
+        "left_leg_front": {
+          "x": 0.5,
+          "y": 0.12,
+          "scale": 1
+        }
+      },
+      "margin": 1200
+    },
+    {
+      "key": "shorts",
+      "name": "Shorts",
+      "category": "Bottoms",
+      "find": [
+        "Fleece Shorts",
+        "Sweat ?[Ss]horts",
+        "Jersey Shorts",
+        "Unisex.*Shorts"
+      ],
+      "exclude": "AOP|Board|Swim|Beach|Basketball|Youth|Kids|Women",
+      "designs": [
+        "rainbow",
+        "purple"
+      ],
+      "designColors": {
+        "rainbow": [
+          "Black"
+        ],
+        "purple": [
+          "Heather Grey",
+          "Athletic Heather",
+          "Grey Heather",
+          "White"
+        ]
+      },
+      "placements": {
+        "left_leg_front": {
+          "x": 0.5,
+          "y": 0.3,
+          "scale": 0.8
+        },
+        "front_left_leg": {
+          "x": 0.5,
+          "y": 0.3,
+          "scale": 0.8
+        },
+        "left_leg": {
+          "x": 0.5,
+          "y": 0.3,
+          "scale": 0.8
+        }
+      },
+      "margin": 1000
+    },
+    {
+      "key": "socks",
+      "name": "Socks",
+      "category": "Bottoms",
+      "blueprintId": 365,
+      "designs": [
+        "rainbow",
+        "purple"
+      ],
+      "placements": {
+        "front_left_leg": {
+          "x": 0.5,
+          "y": 0.28,
+          "scale": 0.9
+        },
+        "front_right_leg": {
+          "x": 0.5,
+          "y": 0.28,
+          "scale": 0.9
+        }
+      },
+      "margin": 500
+    },
+    {
+      "key": "trucker",
+      "name": "Trucker Hat",
+      "category": "Hats & Bags",
+      "blueprintId": 1128,
+      "designs": [
+        "rainbow",
+        "purple"
+      ],
+      "designColors": {
+        "rainbow": [
+          "Black"
+        ],
+        "purple": [
+          "Black",
+          "Dark Navy"
+        ]
+      },
+      "placements": {
+        "front": {
+          "x": 0.5,
+          "y": 0.5,
+          "scale": 0.7
+        }
+      },
+      "margin": 700,
+      "lead": "front",
+      "shots": 3
+    },
+    {
+      "key": "tote",
+      "name": "Tote",
+      "category": "Hats & Bags",
+      "blueprintId": 609,
+      "designs": [
+        "rainbow",
+        "purple"
+      ],
+      "designColors": {
+        "rainbow": [
+          "Black"
+        ],
+        "purple": [
+          "Natural"
+        ]
+      },
+      "placements": {
+        "front": {
+          "x": 0.5,
+          "y": 0.5,
+          "scale": 0.85
+        }
+      },
+      "margin": 600,
+      "lead": "front",
+      "shots": 3
+    },
+    {
+      "key": "sticker",
+      "name": "Sticker",
+      "category": "Stickers & Pins",
+      "blueprintId": 400,
+      "designs": [
+        "rainbow",
+        "red",
+        "yellow",
+        "green",
+        "blue",
+        "purple"
+      ],
+      "placements": {
+        "front": {
+          "x": 0.5,
+          "y": 0.5,
+          "scale": 1.1
+        }
+      },
+      "margin": 250,
+      "lead": "front",
+      "shots": 3
+    },
+    {
+      "key": "holo-sticker",
+      "name": "Holographic Sticker",
+      "category": "Stickers & Pins",
+      "blueprintId": 811,
+      "designs": [
+        "rainbow",
+        "purple"
+      ],
+      "placements": {
+        "front": {
+          "x": 0.5,
+          "y": 0.5,
+          "scale": 1.05
+        }
+      },
+      "margin": 300,
+      "lead": "front",
+      "shots": 3
+    },
+    {
+      "key": "button",
+      "name": "Button",
+      "category": "Stickers & Pins",
+      "blueprintId": 430,
+      "designs": [
+        "rainbow",
+        "purple",
+        "blue"
+      ],
+      "placements": {
+        "front": {
+          "x": 0.5,
+          "y": 0.5,
+          "scale": 0.95
+        }
+      },
+      "margin": 250,
+      "lead": "front",
+      "shots": 3
+    },
+    {
+      "key": "keychain",
+      "name": "Keychain",
+      "category": "Stickers & Pins",
+      "blueprintId": 2675,
+      "designs": [
+        "rainbow",
+        "purple"
+      ],
+      "placements": {
+        "front": {
+          "x": 0.5,
+          "y": 0.5,
+          "scale": 1
+        }
+      },
+      "margin": 350,
+      "lead": "front",
+      "shots": 3
+    },
+    {
+      "key": "mug",
+      "name": "Mug",
+      "category": "Drinkware",
+      "blueprintId": 68,
+      "designs": [
+        "rainbow",
+        "purple",
+        "blue"
+      ],
+      "placements": {
+        "front": {
+          "x": 0.5,
+          "y": 0.5,
+          "scale": 0.5
+        }
+      },
+      "margin": 500,
+      "lead": "front",
+      "shots": 3
+    },
+    {
+      "key": "camp-mug",
+      "name": "Camping Mug",
+      "category": "Drinkware",
+      "blueprintId": 483,
+      "designs": [
+        "rainbow",
+        "purple"
+      ],
+      "placements": {
+        "front": {
+          "x": 0.5,
+          "y": 0.5,
+          "scale": 0.45
+        }
+      },
+      "margin": 500,
+      "lead": "front",
+      "shots": 3
+    },
+    {
+      "key": "tumbler",
+      "name": "Tumbler",
+      "category": "Drinkware",
+      "blueprintId": 353,
+      "designs": [
+        "rainbow",
+        "purple"
+      ],
+      "placements": {
+        "front": {
+          "x": 0.5,
+          "y": 0.5,
+          "scale": 0.55
+        }
+      },
+      "margin": 600,
+      "lead": "front",
+      "shots": 3
+    },
+    {
+      "key": "bottle",
+      "name": "Water Bottle",
+      "category": "Drinkware",
+      "blueprintId": 646,
+      "designs": [
+        "rainbow",
+        "purple"
+      ],
+      "placements": {
+        "front": {
+          "x": 0.5,
+          "y": 0.5,
+          "scale": 0.55
+        }
+      },
+      "margin": 700,
+      "lead": "front",
+      "shots": 3
+    },
+    {
+      "key": "camelbak",
+      "name": "CamelBak Bottle",
+      "category": "Drinkware",
+      "blueprintId": 597,
+      "designs": [
+        "rainbow"
+      ],
+      "placements": {
+        "front": {
+          "x": 0.5,
+          "y": 0.5,
+          "scale": 0.5
+        }
+      },
+      "margin": 800,
+      "lead": "front",
+      "shots": 3
+    },
+    {
+      "key": "phone-case",
+      "name": "Phone Case",
+      "category": "Tech",
+      "blueprintId": 269,
+      "designs": [
+        "rainbow",
+        "purple"
+      ],
+      "placements": {
+        "front": {
+          "x": 0.5,
+          "y": 0.5,
+          "scale": 0.9
+        }
+      },
+      "margin": 600,
+      "lead": "front",
+      "shots": 3
+    },
+    {
+      "key": "airpods",
+      "name": "AirPods Case",
+      "category": "Tech",
+      "find": [
+        "AirPods"
+      ],
+      "designs": [
+        "rainbow"
+      ],
+      "placements": {
+        "front": {
+          "x": 0.5,
+          "y": 0.5,
+          "scale": 0.85
+        }
+      },
+      "margin": 600,
+      "lead": "front",
+      "shots": 3
+    },
+    {
+      "key": "phone-grip",
+      "name": "Phone Grip",
+      "category": "Tech",
+      "find": [
+        "Phone Grip",
+        "PopSockets",
+        "Phone Stand"
+      ],
+      "designs": [
+        "rainbow",
+        "purple"
+      ],
+      "placements": {
+        "front": {
+          "x": 0.5,
+          "y": 0.5,
+          "scale": 0.95
+        }
+      },
+      "margin": 350,
+      "lead": "front",
+      "shots": 3
+    },
+    {
+      "key": "desk-mat",
+      "name": "Desk Mat",
+      "category": "Tech",
+      "blueprintId": 488,
+      "designs": [
+        "rainbow",
+        "purple"
+      ],
+      "placements": {
+        "front": {
+          "x": 0.5,
+          "y": 0.5,
+          "scale": 0.6
+        }
+      },
+      "margin": 700,
+      "lead": "front",
+      "shots": 3
+    },
+    {
+      "key": "notebook",
+      "name": "Notebook",
+      "category": "Home",
+      "blueprintId": 74,
+      "designs": [
+        "rainbow",
+        "purple"
+      ],
+      "placements": {
+        "front": {
+          "x": 0.5,
+          "y": 0.45,
+          "scale": 0.85
+        }
+      },
+      "margin": 500,
+      "lead": "front",
+      "shots": 3
+    },
+    {
+      "key": "poster",
+      "name": "Poster",
+      "category": "Home",
+      "blueprintId": 282,
+      "designs": [
+        "rainbow",
+        "purple",
+        "blue"
+      ],
+      "sizes": [
+        "11″ x 14″",
+        "12″ x 18″",
+        "18″ x 24″",
+        "24″ x 36″"
+      ],
+      "placements": {
+        "front": {
+          "x": 0.5,
+          "y": 0.45,
+          "scale": 0.9
+        }
+      },
+      "margin": 600,
+      "lead": "front",
+      "shots": 3
+    },
+    {
+      "key": "framed-poster",
+      "name": "Framed Poster",
+      "category": "Home",
+      "blueprintId": 492,
+      "designs": [
+        "rainbow",
+        "purple"
+      ],
+      "designColors": {
+        "rainbow": [
+          "Black"
+        ],
+        "purple": [
+          "White"
+        ]
+      },
+      "sizes": [
+        "11″ x 14″",
+        "18″ x 24″"
+      ],
+      "placements": {
+        "front": {
+          "x": 0.5,
+          "y": 0.45,
+          "scale": 0.9
+        }
+      },
+      "margin": 1200,
+      "lead": "front",
+      "shots": 3
+    },
+    {
+      "key": "flag",
+      "name": "Flag",
+      "category": "Home",
+      "blueprintId": 1347,
+      "designs": [
+        "rainbow"
+      ],
+      "placements": {
+        "front": {
+          "x": 0.5,
+          "y": 0.5,
+          "scale": 0.8
+        }
+      },
+      "margin": 700,
+      "lead": "front",
+      "shots": 3
+    },
+    {
+      "key": "tapestry",
+      "name": "Tapestry",
+      "category": "Home",
+      "blueprintId": 241,
+      "designs": [
+        "rainbow"
+      ],
+      "sizes": [
+        "26\" × 36\"",
+        "50\" × 60\""
+      ],
+      "placements": {
+        "front": {
+          "x": 0.5,
+          "y": 0.45,
+          "scale": 0.8
+        }
+      },
+      "margin": 900,
+      "lead": "front",
+      "shots": 3
+    },
+    {
+      "key": "blanket",
+      "name": "Blanket",
+      "category": "Home",
+      "blueprintId": 522,
+      "designs": [
+        "purple"
+      ],
+      "sizes": [
+        "30\" × 40\"",
+        "50\" × 60\""
+      ],
+      "placements": {
+        "front": {
+          "x": 0.5,
+          "y": 0.5,
+          "scale": 0.7
+        }
+      },
+      "margin": 1200,
+      "lead": "front",
+      "shots": 3
+    },
+    {
+      "key": "candle",
+      "name": "Candle",
+      "category": "Home",
+      "find": [
+        "Scented.*Candle",
+        "Candle"
+      ],
+      "designs": [
+        "purple"
+      ],
+      "placements": {
+        "front": {
+          "x": 0.5,
+          "y": 0.5,
+          "scale": 0.8
+        }
+      },
+      "margin": 600,
+      "maxColors": 3,
+      "lead": "front",
+      "shots": 3
+    },
+    {
+      "key": "kids-tee",
+      "name": "Kids Tee",
+      "category": "Kids & Pets",
+      "blueprintId": 417,
+      "designs": [
+        "rainbow"
+      ],
+      "designColors": {
+        "rainbow": [
+          "Black"
+        ]
+      },
+      "placements": {
+        "front": {
+          "x": 0.5,
+          "y": 0.4,
+          "scale": 0.85
+        }
+      },
+      "lead": "front",
+      "margin": 600,
+      "shots": 3
+    },
+    {
+      "key": "onesie",
+      "name": "Baby Bodysuit",
+      "category": "Kids & Pets",
+      "blueprintId": 561,
+      "designs": [
+        "purple"
+      ],
+      "designColors": {
+        "purple": [
+          "White"
+        ]
+      },
+      "placements": {
+        "front": {
+          "x": 0.5,
+          "y": 0.42,
+          "scale": 0.85
+        }
+      },
+      "lead": "front",
+      "margin": 600,
+      "shots": 3
+    },
+    {
+      "key": "bandana",
+      "name": "Pet Bandana",
+      "category": "Kids & Pets",
+      "blueprintId": 562,
+      "designs": [
+        "rainbow"
+      ],
+      "placements": {
+        "front": {
+          "x": 0.5,
+          "y": 0.32,
+          "scale": 0.5
+        }
+      },
+      "margin": 400,
+      "lead": "front",
+      "shots": 3
     }
   ]
 }

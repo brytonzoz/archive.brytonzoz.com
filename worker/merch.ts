@@ -15,17 +15,17 @@ export interface MerchEnv extends StoreEnv {
   PRINTIFY_API_BASE?: string;
 }
 
-type Variant = { productSlug: string; printifyId: string; variantId: number; name: string; color: string; size: string; price: number };
+type Variant = { productSlug: string; printifyId: string; variantId: number; name: string; title: string; color: string; size: string; price: number };
 
 // Keys the browser sends for a tee: "np:<design>:<variantId>" (repeated for quantity). Printify's
 // variant ids only name the blank's color and size, shared by every design, hence the design slug.
 export const MERCH_PREFIX = 'np:';
 export const VARIANTS = new Map<string, Variant>();
-for (const product of merch.products as { slug: string; printifyId: string; name: string; colors: { name: string; sizes: { size: string; variantId: number; price: number }[] }[] }[]) {
+for (const product of merch.products as { slug: string; printifyId: string; name: string; title: string; colors: { name: string; sizes: { size: string; variantId: number; price: number }[] }[] }[]) {
   for (const color of product.colors) {
     for (const size of color.sizes) {
       VARIANTS.set(`${product.slug}:${size.variantId}`, {
-        productSlug: product.slug, printifyId: product.printifyId, variantId: size.variantId, name: product.name, color: color.name, size: size.size, price: size.price,
+        productSlug: product.slug, printifyId: product.printifyId, variantId: size.variantId, name: product.name, title: product.title, color: color.name, size: size.size, price: size.price,
       });
     }
   }
@@ -55,8 +55,8 @@ export function merchLineItems(counts: Map<string, number>, origin: string) {
         currency: merch.currency,
         unit_amount: variant.price,
         product_data: {
-          name: `NonParallel Tee — ${variant.name}`,
-          description: `${variant.color} · Size ${variant.size} · Printed to order`,
+          name: variant.title,
+          description: `${variant.color}${variant.size === 'One size' ? '' : ` · Size ${variant.size}`} · Printed to order`,
           images: image ? [`${origin}${image}`] : undefined,
           metadata: { tee: line },
         },

@@ -124,7 +124,7 @@ export function MerchGrid({
 }) {
   const cards: { key: string; label: string; face: React.ReactNode; wide?: boolean; onClick: () => void }[] = merchCards.map((card) => ({
     key: `${card.product.slug}-${card.color.slug}`,
-    label: `${card.product.name} tee${card.perColor ? `, ${card.color.name}` : ''}, ${formatPrice(card.product.price)}`,
+    label: `${card.product.displayName}${card.perColor ? `, ${card.color.name}` : ''}, ${formatPrice(card.product.price)}`,
     face: <TeeCard card={card} sizes={sizes} />,
     onClick: () => onOpen(card),
   }));

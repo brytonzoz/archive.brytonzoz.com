@@ -89,6 +89,7 @@ if (command === 'inspect') {
   await catalog();
 }
 else if (command === 'sync') await (await import('./printify-sync.mjs')).sync(printify, ROOT);
+else if (command === 'order') await (await import('./printify-order.mjs')).order(printify, ROOT);
 else {
   console.error(`Unknown command: ${command}`);
   process.exit(1);

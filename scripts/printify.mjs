@@ -76,16 +76,40 @@ async function inspect() {
   }
 }
 
-// The classic tee blanks and who prints them in the US (to pick a blueprint + provider).
+// Blanks worth selling, by category, with who prints them in the US and what each offers (to plan
+// new products: blueprint + provider, colors, sizes, print areas).
+const CATEGORIES = {
+  stickers: /kiss-cut sticker|die-cut sticker/i,
+  'heavyweight tees': /comfort colors 1717|heavyweight.*tee|max heavyweight|garment-dyed heavyweight/i,
+  hoodies: /hoodie|hooded sweatshirt/i,
+  crewnecks: /crewneck sweatshirt/i,
+  shorts: /shorts/i,
+  pants: /sweatpants|joggers/i,
+  socks: /socks/i,
+  hats: /dad hat|snapback|beanie|trucker|bucket hat/i,
+  'long sleeves': /long sleeve tee|long sleeve t-shirt/i,
+  totes: /tote bag/i,
+};
 async function catalog() {
   const blueprints = await printify('GET', '/catalog/blueprints.json');
-  const tees = blueprints.filter((b) => /3001|gildan 5000|comfort colors 1717|heavyweight|unisex jersey short sleeve/i.test(`${b.title} ${b.model} ${b.brand}`));
-  console.log('\n## Tee blueprints');
-  for (const b of tees.slice(0, 12)) console.log(`- ${b.id} · ${b.brand} ${b.model} · ${b.title}`);
-  for (const b of tees.filter((t) => /3001/.test(t.model)).slice(0, 1)) {
-    const providers = await printify('GET', `/catalog/blueprints/${b.id}/print_providers.json`);
-    console.log(`\n## Print providers for ${b.id} (${b.brand} ${b.model})`);
-    for (const p of providers) console.log(`- ${p.id} · ${p.title} · ${p.location?.country ?? ''} ${p.location?.region ?? ''}`);
+  for (const [category, pattern] of Object.entries(CATEGORIES)) {
+    const matches = blueprints.filter((b) => pattern.test(`${b.title} ${b.model} ${b.brand}`)).slice(0, 8);
+    console.log(`\n## ${category} (${matches.length} shown)`);
+    for (const b of matches) {
+      const providers = await printify('GET', `/catalog/blueprints/${b.id}/print_providers.json`);
+      const us = providers.filter((p) => (p.location?.country ?? 'US') === 'US').slice(0, 2);
+      const lines = [];
+      for (const p of us) {
+        const data = await printify('GET', `/catalog/blueprints/${b.id}/print_providers/${p.id}/variants.json?show-out-of-stock=0`);
+        const variants = data.variants ?? [];
+        const colors = [...new Set(variants.map((v) => v.options.color).filter(Boolean))];
+        const sizes = [...new Set(variants.map((v) => v.options.size).filter(Boolean))];
+        const areas = [...new Set(variants.flatMap((v) => (v.placeholders ?? []).map((ph) => `${ph.position} ${ph.width}x${ph.height}`)))];
+        lines.push(`    provider ${p.id} ${p.title}: ${variants.length} variants · colors ${colors.slice(0, 8).join('/')}${colors.length > 8 ? ` (+${colors.length - 8})` : ''} · sizes ${sizes.join('/')} · areas ${areas.slice(0, 4).join(', ')}`);
+      }
+      console.log(`- ${b.id} · ${b.brand} ${b.model} · ${b.title}`);
+      for (const line of lines) console.log(line);
+    }
   }
 }
 

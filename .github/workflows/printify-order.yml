@@ -1,0 +1,48 @@
+# Printify order: a one-off tee at cost (a sample for Bryton), run by hand from the Actions tab.
+# The address is typed in as inputs here, so it never lands in the repo. "quote" only asks Printify
+# for the price; "place" orders and sends it to print, if cost + shipping is within max_cents.
+name: Printify order
+
+on:
+  workflow_dispatch:
+    inputs:
+      mode: { description: 'quote or place', required: true, default: 'quote', type: choice, options: [quote, place] }
+      design: { description: 'Design slug (rainbow, red, yellow, green, blue, purple)', required: true, default: 'rainbow' }
+      color: { description: 'Tee color', required: true, default: 'Black' }
+      size: { description: 'Size', required: true, default: 'XL' }
+      max_cents: { description: 'Most it may cost (tee + shipping, in cents)', required: true }
+      name: { description: 'Name', required: true }
+      address1: { description: 'Street address', required: true }
+      address2: { description: 'Apartment, unit (optional)', required: false }
+      city: { description: 'City', required: true }
+      state: { description: 'State (e.g. NY)', required: true }
+      zip: { description: 'ZIP', required: true }
+      phone: { description: 'Phone (optional)', required: false }
+
+permissions:
+  contents: read
+
+jobs:
+  order:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+      - name: Order from Printify
+        env:
+          PRINTIFY_ACCESS: ${{ secrets.PRINTIFY_ACCESS }}
+          ORDER_MODE: ${{ inputs.mode }}
+          ORDER_DESIGN: ${{ inputs.design }}
+          ORDER_COLOR: ${{ inputs.color }}
+          ORDER_SIZE: ${{ inputs.size }}
+          ORDER_MAX_CENTS: ${{ inputs.max_cents }}
+          ORDER_NAME: ${{ inputs.name }}
+          ORDER_ADDRESS1: ${{ inputs.address1 }}
+          ORDER_ADDRESS2: ${{ inputs.address2 }}
+          ORDER_CITY: ${{ inputs.city }}
+          ORDER_STATE: ${{ inputs.state }}
+          ORDER_ZIP: ${{ inputs.zip }}
+          ORDER_PHONE: ${{ inputs.phone }}
+        run: node scripts/printify.mjs order

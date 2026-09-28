@@ -34,15 +34,29 @@ export async function sync(printify, root) {
     products: [],
   };
 
+  // Designs already in Printify's uploads, so a design given by URL is only fetched once.
+  const uploads = [];
+  for (let page = 1; page <= 20; page++) {
+    const batch = await printify('GET', `/uploads.json?limit=50&page=${page}`);
+    uploads.push(...(batch.data ?? []));
+    if (!batch.next_page_url) break;
+  }
+  const report = [];
+
   for (const [index, spec] of config.products.entries()) {
-    // Design: an existing upload, or a file in printify/ to upload once.
-    let uploadId = spec.design.uploadId;
-    if (!uploadId && spec.design.file) {
+    // Design: an existing upload, a public URL for Printify to fetch, or a file in printify/.
+    let uploadId = spec.design.uploadId ?? uploads.find((upload) => upload.file_name === spec.design.fileName)?.id;
+    if (!uploadId && spec.design.url) {
+      const upload = await printify('POST', '/uploads/images.json', { file_name: spec.design.fileName, url: spec.design.url });
+      uploadId = upload.id;
+      console.log(`Uploaded ${spec.design.fileName} -> ${uploadId} (${upload.width}x${upload.height})`);
+    } else if (!uploadId && spec.design.file) {
       const contents = (await fs.readFile(path.join(root, 'printify', spec.design.file))).toString('base64');
       const upload = await printify('POST', '/uploads/images.json', { file_name: path.basename(spec.design.file), contents });
       uploadId = upload.id;
       console.log(`Uploaded ${spec.design.file} -> ${uploadId}`);
     }
+    if (!uploadId) throw new Error(`No design for ${spec.slug}`);
 
     // First print provider that has every requested color.
     let providerId;
@@ -68,7 +82,11 @@ export async function sync(printify, root) {
       variants: variants.map((variant) => ({ id: variant.id, price: priceOf(variant.options.size), is_enabled: true })),
       print_areas: [{
         variant_ids: variants.map((variant) => variant.id),
-        placeholders: [{ position: 'front', images: [{ id: uploadId, x: spec.placement.x, y: spec.placement.y, scale: spec.placement.scale, angle: 0 }] }],
+        // Small logo on the chest, the full design on the back (or whatever the product overrides).
+        placeholders: Object.entries(spec.placements ?? config.placements).map(([position, { x, y, scale }]) => ({
+          position,
+          images: [{ id: uploadId, x, y, scale, angle: 0 }],
+        })),
       }],
       tags: ['nonparallel', 'brytonzoz.com'],
     };
@@ -115,12 +133,14 @@ export async function sync(printify, root) {
       const colorVariants = variants.filter((variant) => variant.options.color === color)
         .sort((a, b) => config.sizes.indexOf(a.options.size) - config.sizes.indexOf(b.options.size));
       const ids = new Set(colorVariants.map((variant) => variant.id));
-      // Front-facing shots first (the design is on the front), then the rest, no back views.
-      const isBack = (image) => image.position === 'back' || /camera_label=back/.test(image.src ?? '');
+      // The back first (the full design is there), then the front with its chest logo, then the rest.
+      const camera = (image) => new URL(image.src).searchParams.get('camera_label') ?? '';
+      const rank = (image) => (camera(image) === 'back' ? 0 : camera(image) === 'front' ? 1 : 2 + Number(!image.is_default));
       const shots = images
-        .filter((image) => image.variant_ids?.some((id) => ids.has(id)) && !isBack(image))
-        .sort((a, b) => Number(b.position === 'front') - Number(a.position === 'front') || Number(b.is_default) - Number(a.is_default))
+        .filter((image) => image.variant_ids?.some((id) => ids.has(id)))
+        .sort((a, b) => rank(a) - rank(b))
         .slice(0, 4);
+      console.log(`  ${color} shots: ${shots.map(camera).join(', ')}`);
       const keys = [];
       for (const [n, shot] of shots.entries()) {
         const response = await fetch(shot.src);
@@ -139,6 +159,16 @@ export async function sync(printify, root) {
       console.log(`  ${color}: ${keys.length} mockups, ${colorVariants.length} sizes`);
     }
 
+    // What each sale leaves after Printify (tee + both prints + US shipping) and Stripe's fee.
+    const fresh = await printify('GET', `/shops/${shopId}/products/${product.id}.json`);
+    const shipping = await printify('GET', `/catalog/blueprints/${config.blueprintId}/print_providers/${providerId}/shipping.json`);
+    for (const variant of fresh.variants.filter((entry) => entry.is_enabled)) {
+      const profile = shipping.profiles?.find((entry) => entry.variant_ids.includes(variant.id) && entry.countries.includes('US'));
+      const ship = profile?.first_item?.cost ?? 0;
+      const fee = Math.round(variant.price * 0.029) + 30;
+      report.push(`${spec.name.padEnd(8)} ${variant.title.padEnd(16)} price ${variant.price}  cost ${variant.cost}  ship ${ship}  stripe ${fee}  left ${variant.price - variant.cost - ship - fee}`);
+    }
+
     catalog.products.push({
       slug: spec.slug,
       number: String(index + 1).padStart(3, '0'),
@@ -151,6 +181,7 @@ export async function sync(printify, root) {
     });
   }
 
+  console.log(`\n## Per sale, in cents (US, one tee)\n${report.join('\n')}\n`);
   await fs.writeFile(path.join(root, 'lib', 'merch-catalog.json'), `${JSON.stringify(catalog, null, 2)}\n`);
   console.log(`Wrote lib/merch-catalog.json (${catalog.products.length} products)`);
 }

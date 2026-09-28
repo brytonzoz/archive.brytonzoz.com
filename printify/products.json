@@ -1,24 +1,57 @@
 {
-  "_comment": "NonParallel merch. Each product is one design on the tees listed in `colors`. `design.uploadId` is an image already in Printify's uploads; `design.file` is a PNG in this folder to upload. Prices are in cents and include US shipping. Edit and push: the Printify workflow creates/updates the products and commits lib/merch-catalog.json plus the mockups.",
+  "_comment": "NonParallel merch, from Bryton's 2024 NP merch spec: a small logo in the middle of the chest, the large logo in the middle of the back, sold for $25 at most. Each product is one design on the tee colors in `colors`. `design.uploadId` is an image already in Printify's uploads; `design.url` is a public PNG that Printify fetches once (found again by `fileName` after that). `placements` are Printify print-area coordinates (x, y = centre, scale = width relative to the print area). Prices are in cents and include US shipping. Edit and push: the Printify workflow creates/updates the products and commits lib/merch-catalog.json plus the mockups.",
   "shopId": 18462993,
   "blueprintId": 12,
   "printProviders": [99, 29, 39],
   "sizes": ["S", "M", "L", "XL", "2XL", "3XL"],
-  "price": 3500,
-  "bigSizePrice": 3800,
+  "price": 2500,
+  "bigSizePrice": 2500,
+  "placements": {
+    "front": { "x": 0.5, "y": 0.24, "scale": 0.3 },
+    "back": { "x": 0.5, "y": 0.4, "scale": 1 }
+  },
   "details": [
+    "Small logo on the chest, the full design across the back",
     "100% Airlume combed and ring-spun cotton (solid colors)",
     "Lightweight 4.2 oz jersey: soft and breathable",
-    "Unisex retail fit with a ribbed crew neck",
-    "Tear-away label"
+    "Unisex retail fit with a ribbed crew neck"
   ],
   "products": [
     {
       "slug": "rainbow",
       "name": "Rainbow",
       "design": { "uploadId": "670595816abac27f9d58eb7f" },
-      "placement": { "x": 0.5, "y": 0.45, "scale": 1 },
-      "colors": ["Black", "White"]
+      "colors": ["Black"]
+    },
+    {
+      "slug": "red",
+      "name": "Red",
+      "design": { "fileName": "np-red.png", "url": "https://drive.usercontent.google.com/download?id=1RxfLWGVuirtUuG0VbSwvZF9RZ-Vyojq0&export=download&confirm=t" },
+      "colors": ["White"]
+    },
+    {
+      "slug": "yellow",
+      "name": "Yellow",
+      "design": { "fileName": "np-yellow.png", "url": "https://drive.usercontent.google.com/download?id=1P5e1K4SU8rLbQnuMg-MiohkAW7INoxpo&export=download&confirm=t" },
+      "colors": ["White"]
+    },
+    {
+      "slug": "green",
+      "name": "Green",
+      "design": { "fileName": "np-green.png", "url": "https://drive.usercontent.google.com/download?id=1STWVKhYmKyy1Q-7svSlQwbFlMpp7B9ID&export=download&confirm=t" },
+      "colors": ["White"]
+    },
+    {
+      "slug": "blue",
+      "name": "Blue",
+      "design": { "fileName": "np-blue.png", "url": "https://drive.usercontent.google.com/download?id=1CWBBWNsrJakDzxUhdIm7K4EKtd2hebRa&export=download&confirm=t" },
+      "colors": ["White"]
+    },
+    {
+      "slug": "purple",
+      "name": "Purple",
+      "design": { "fileName": "np-purple.png", "url": "https://drive.usercontent.google.com/download?id=1_eZkU-ZKxN85w9MhyUvw5aFlymJzvPaV&export=download&confirm=t" },
+      "colors": ["White"]
     }
   ]
 }

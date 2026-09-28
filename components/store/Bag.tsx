@@ -15,7 +15,6 @@ import { useSheet } from '../useSheet';
 
 // The bag both stores share (Scrapwrk pieces and NonParallel tees), and the checkout they share.
 
-export const lineName = (key: string) => productById(key)?.name ?? (merchVariant(key) ? `${merchVariant(key)!.product.name} Tee` : 'Item');
 export const linePrice = (key: string) => productById(key)?.price ?? merchVariant(key)?.size.price ?? 0;
 
 const stepButton =
@@ -60,8 +59,8 @@ function TeeRow({ id, quantity }: { id: string; quantity: number }) {
         <ResponsiveImage asset={image} alt="" sizes="56px" className="absolute inset-0 h-full w-full object-cover" />
       </span>
       <span className="min-w-0 flex-1">
-        <span className="block truncate text-[16px] font-semibold">{variant.product.name} Tee</span>
-        <span className="block truncate text-[13px] text-white/50">{variant.color.name} · {variant.size.size}</span>
+        <span className="block truncate text-[16px] font-semibold">NonParallel {variant.product.name}</span>
+        <span className="block truncate text-[13px] text-white/50">{variant.color.name} tee · {variant.size.size}</span>
       </span>
       <span className="flex shrink-0 items-center gap-1.5 rounded-full bg-white/[0.06] p-1">
         <button type="button" className={stepButton} onClick={() => removeOneFromBag(id)} aria-label={quantity > 1 ? `One fewer ${name}` : `Remove ${name} from bag`}>

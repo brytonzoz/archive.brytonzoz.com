@@ -113,8 +113,10 @@ export function MerchSheet({
           <div className="px-6 pt-6">
             <div className="flex items-start justify-between gap-4">
               <div className="min-w-0">
-                <p className="text-[13px] font-semibold tracking-[0.18em] text-black/55">NONPARALLEL {product.number}</p>
-                <h2 id={titleId} className="mt-1 text-[30px] font-bold leading-none tracking-[-0.03em]">{product.name} Tee</h2>
+                <p className="text-[13px] font-semibold tracking-[0.18em] text-black/55">
+                  NONPARALLEL {product.number}{product.colors.length === 1 ? ` · ${color.name.toUpperCase()} TEE` : ''}
+                </p>
+                <h2 id={titleId} className="mt-1 text-[30px] font-bold leading-none tracking-[-0.03em]">{product.name}</h2>
               </div>
               <p className="shrink-0 text-[24px] font-semibold tabular-nums tracking-[-0.02em]">{formatPrice(price)}</p>
             </div>

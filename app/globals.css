@@ -140,7 +140,7 @@
   }
 
   .platform-bar {
-    animation: platformIn 480ms 200ms cubic-bezier(0.32, 0.72, 0, 1) backwards;
+    animation: platformIn 360ms 120ms cubic-bezier(0.32, 0.72, 0, 1) backwards;
   }
 
   /* iOS context menu material. */
@@ -179,7 +179,7 @@
   }
 
   .platform-row {
-    animation: platformRowIn 420ms cubic-bezier(0.32, 0.72, 0, 1) backwards;
+    animation: platformRowIn 320ms cubic-bezier(0.32, 0.72, 0, 1) backwards;
   }
 
   /* Next-release teaser: a cover that's still developing. Light drifts behind frosted glass; all
@@ -264,7 +264,7 @@
   }
 
   .catalog-enter {
-    animation: catalogEnter 600ms cubic-bezier(0.16, 1, 0.3, 1) both;
+    animation: catalogEnter 420ms cubic-bezier(0.16, 1, 0.3, 1) both;
   }
 
   .sheet-backdrop {
@@ -272,7 +272,7 @@
   }
 
   .sheet-panel {
-    animation: listenSheetIn 460ms cubic-bezier(0.32, 0.72, 0, 1) backwards;
+    animation: listenSheetIn 380ms cubic-bezier(0.32, 0.72, 0, 1) backwards;
   }
 
   .is-closing .sheet-backdrop {
@@ -295,7 +295,7 @@
   }
 
   .mini-player {
-    animation: miniPlayerIn 520ms cubic-bezier(0.32, 0.72, 0, 1) backwards;
+    animation: miniPlayerIn 380ms cubic-bezier(0.32, 0.72, 0, 1) backwards;
   }
 
   .equalizer {
@@ -774,7 +774,7 @@ html {
 }
 
 .store-grid.is-active .store-slot {
-  animation: storeFly 1050ms cubic-bezier(0.16, 1, 0.3, 1) var(--delay) both;
+  animation: storeFly 680ms cubic-bezier(0.16, 1, 0.3, 1) var(--delay) both;
 }
 
 .store-grid.is-active .store-float {
@@ -821,15 +821,11 @@ html {
 }
 
 .store-grid.is-active .store-card-flip {
-  animation: storeFlip 1050ms cubic-bezier(0.3, 0.9, 0.3, 1.06) var(--delay) both;
+  animation: storeFlip 680ms cubic-bezier(0.3, 0.9, 0.3, 1.04) var(--delay) both;
 }
 
 .store-card-inner {
   height: 100%;
-}
-
-.store-card-inner.is-spinning {
-  animation: storeSpin 1250ms cubic-bezier(0.45, 0, 0.2, 1) both;
 }
 
 .store-card-face {
@@ -1054,15 +1050,6 @@ html {
   }
 }
 
-@keyframes storeSpin {
-  from {
-    transform: rotateY(0deg);
-  }
-  to {
-    transform: rotateY(360deg);
-  }
-}
-
 @keyframes storeFloat {
   from {
     transform: translate3d(0, 0, 0) rotate(0deg);
@@ -1086,7 +1073,6 @@ html {
 
   .store-grid.is-active .store-float,
   .store-grid.is-active .store-card-flip,
-  .store-card-inner.is-spinning,
   .store-bag-button,
   .store-bag-count {
     animation: none;
@@ -1111,13 +1097,13 @@ html {
 }
 
 .order-enter {
-  animation: storeFade 500ms ease-out both;
+  animation: storeFade 300ms ease-out both;
 }
 
 /* The homepage's Scrapwrk scene: as wide as fits (grid ≈ 1.3 × its width tall, plus heading). */
 .store-scene {
   container-type: inline-size;
-  width: min(88vw, 560px, calc((100dvh - 290px) / 1.32));
+  width: min(84vw, 560px, calc((100dvh - 290px) / 1.32));
 }
 
 .store-scene-header {
@@ -1383,7 +1369,7 @@ html {
 /* The homepage's NonParallel scene: sized so heading, note and grid fit above the footer. */
 .np-scene {
   container-type: inline-size;
-  width: min(88vw, 540px, calc((100dvh - 250px) / (0.5 + var(--row-h, 0.66) * var(--rows, 1))));
+  width: min(84vw, 540px, calc((100dvh - 250px) / (0.5 + var(--row-h, 0.66) * var(--rows, 1))));
 }
 
 /* Its background tees and logo stickers (app/page.tsx) are sized in --np-sticker. */
@@ -1396,7 +1382,7 @@ html {
 }
 
 .np-scene-logo {
-  width: 46cqw;
+  width: 30cqw;
   aspect-ratio: 466 / 216;
   margin: 0 0 0 -2cqw;
   filter: drop-shadow(0 1.2cqw 2.4cqw rgba(0, 0, 0, 0.35));

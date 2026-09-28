@@ -160,7 +160,7 @@ export function MerchSheet({
                 ))}
               </div>
               {upcharges.length ? (
-                <p className="mt-2 text-[13px] text-black/50">{upcharges.map((option) => `${option.size} ${formatPrice(option.price)}`).join(' · ')}</p>
+                <p className="mt-2 text-[13px] text-black/60">{upcharges.map((option) => `${option.size} ${formatPrice(option.price)}`).join(' · ')}</p>
               ) : null}
             </fieldset>
 

@@ -862,7 +862,7 @@ const SolenyaScene = React.memo(function SolenyaScene({
                 opacity: stickerState.opacity,
                 transform: `translate3d(${scaleValue(stickerState.translateX)}, ${scaleValue(stickerState.translateY)}, 0) rotate(${stickerState.rotate}deg) scale(${stickerState.scale})`,
                 willChange: 'transform, opacity',
-                transition: 'transform 520ms cubic-bezier(0.22, 1, 0.36, 1), opacity 320ms ease-out',
+                transition: 'transform 400ms cubic-bezier(0.22, 1, 0.36, 1), opacity 260ms ease-out',
               }}
             >
               <div
@@ -948,7 +948,7 @@ const CautionScene = React.memo(function CautionScene({
                 opacity: stickerState.opacity,
                 transform: `translate3d(${scaleValue(stickerState.translateX)}, ${scaleValue(stickerState.translateY)}, 0) rotate(${stickerState.rotate}deg) scale(${stickerState.scale})`,
                 willChange: 'transform, opacity',
-                transition: 'transform 520ms cubic-bezier(0.22, 1, 0.36, 1), opacity 320ms ease-out',
+                transition: 'transform 400ms cubic-bezier(0.22, 1, 0.36, 1), opacity 260ms ease-out',
               }}
             >
               <div
@@ -1030,7 +1030,7 @@ const ReminderScene = React.memo(function ReminderScene({
                 opacity: stickerState.opacity,
                 transform: `translate3d(${scaleValue(stickerState.translateX)}, ${scaleValue(stickerState.translateY)}, 0) rotate(${stickerState.rotate}deg) scale(${stickerState.scale})`,
                 willChange: 'transform, opacity',
-                transition: 'transform 520ms cubic-bezier(0.22, 1, 0.36, 1), opacity 320ms ease-out',
+                transition: 'transform 400ms cubic-bezier(0.22, 1, 0.36, 1), opacity 260ms ease-out',
               }}
             >
               <div
@@ -1112,7 +1112,7 @@ const ScrapwrkScene = React.memo(function ScrapwrkScene({ distance, loadImages }
                   opacity: stickerState.opacity,
                   transform: `translate3d(${scaleValue(stickerState.translateX)}, ${scaleValue(stickerState.translateY)}, 0) rotate(${stickerState.rotate}deg) scale(${stickerState.scale})`,
                   willChange: 'transform, opacity',
-                  transition: 'transform 520ms cubic-bezier(0.22, 1, 0.36, 1), opacity 320ms ease-out',
+                  transition: 'transform 400ms cubic-bezier(0.22, 1, 0.36, 1), opacity 260ms ease-out',
                 }}
               >
                 <div
@@ -1148,7 +1148,7 @@ const ScrapwrkScene = React.memo(function ScrapwrkScene({ distance, loadImages }
         style={{
           opacity: 1 - (distanceMagnitude * 0.3),
           transform: `translate3d(0, ${incoming * 32}px, 0)`,
-          transition: 'transform 700ms cubic-bezier(0.22, 1, 0.36, 1), opacity 400ms ease-out',
+          transition: 'transform 480ms cubic-bezier(0.22, 1, 0.36, 1), opacity 280ms ease-out',
         }}
       >
         <StoreExperience
@@ -1220,7 +1220,7 @@ const NonParallelScene = React.memo(function NonParallelScene({ distance }: { di
                   opacity: stickerState.opacity * sticker.alpha,
                   transform: `translate3d(${scaleValue(stickerState.translateX)}, ${scaleValue(stickerState.translateY)}, 0) rotate(${stickerState.rotate}deg) scale(${stickerState.scale})`,
                   willChange: 'transform, opacity',
-                  transition: 'transform 520ms cubic-bezier(0.22, 1, 0.36, 1), opacity 320ms ease-out',
+                  transition: 'transform 400ms cubic-bezier(0.22, 1, 0.36, 1), opacity 260ms ease-out',
                 }}
               >
                 <div
@@ -1247,7 +1247,7 @@ const NonParallelScene = React.memo(function NonParallelScene({ distance }: { di
           '--row-h': merchScene.rowHeight,
           opacity: 1 - (distanceMagnitude * 0.3),
           transform: `translate3d(0, ${incoming * 32}px, 0)`,
-          transition: 'transform 700ms cubic-bezier(0.22, 1, 0.36, 1), opacity 400ms ease-out',
+          transition: 'transform 480ms cubic-bezier(0.22, 1, 0.36, 1), opacity 280ms ease-out',
         } as React.CSSProperties}
       >
         <MerchExperience

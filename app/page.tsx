@@ -512,10 +512,14 @@ const ComingSoonScene = React.memo(function ComingSoonScene({ distance, onNext }
                 className="teaser-cover scene-cover relative w-full overflow-hidden"
                 style={{ aspectRatio: '1 / 1', borderRadius: scaleValue(34) }}
               >
-                <span aria-hidden="true" className="teaser-light teaser-light-a" />
-                <span aria-hidden="true" className="teaser-light teaser-light-b" />
-                <span aria-hidden="true" className="teaser-light teaser-light-c" />
-                <span aria-hidden="true" className="teaser-frost" />
+                {/* Clipped separately with clip-path: Safari clips the blurred, animated lights (their own
+                    layers) to a square, not to the radius, leaving a lighter box behind the corners. */}
+                <span aria-hidden="true" className="absolute inset-0" style={{ clipPath: `inset(0 round ${scaleValue(34)})` }}>
+                  <span className="teaser-light teaser-light-a" />
+                  <span className="teaser-light teaser-light-b" />
+                  <span className="teaser-light teaser-light-c" />
+                  <span className="teaser-frost" />
+                </span>
                 <span aria-hidden="true" className="teaser-pulse" style={{ width: scaleValue(22), height: scaleValue(22) }} />
               </div>
 

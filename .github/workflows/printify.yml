@@ -1,0 +1,32 @@
+# Printify: runs scripts/printify.mjs with the PRINTIFY_ACCESS secret whenever the NonParallel merch
+# setup changes on a claude/* branch. "sync" commits lib/merch-catalog.json and the rendered mockups
+# back to the branch, so the site is built from what Printify actually has.
+name: Printify
+
+on:
+  push:
+    branches: ['claude/**']
+    paths:
+      - 'printify/**'
+      - 'scripts/printify*.mjs'
+      - '.github/workflows/printify.yml'
+
+permissions:
+  contents: write
+
+concurrency:
+  group: printify-${{ github.ref }}
+  cancel-in-progress: false
+
+jobs:
+  printify:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+      - name: Inspect the Printify account
+        env:
+          PRINTIFY_ACCESS: ${{ secrets.PRINTIFY_ACCESS }}
+        run: node scripts/printify.mjs inspect

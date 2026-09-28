@@ -460,7 +460,11 @@
         }
       },
       "margin": 1000,
-      "lead": "front"
+      "lead": "front",
+      "shotOrder": [
+        1,
+        0
+      ]
     },
     {
       "key": "trucker",
@@ -590,30 +594,6 @@
       "margin": 250,
       "lead": "front",
       "shots": 3
-    },
-    {
-      "key": "keychain",
-      "name": "Keychain",
-      "category": "Stickers & Pins",
-      "designs": [
-        "rainbow",
-        "purple"
-      ],
-      "placements": {
-        "front": {
-          "x": 0.5,
-          "y": 0.5,
-          "scale": 0.95
-        }
-      },
-      "margin": 350,
-      "lead": "front",
-      "shots": 3,
-      "find": [
-        "Acrylic Keychain",
-        "Keychain"
-      ],
-      "exclude": "AOP|Plush|Heart"
     },
     {
       "key": "mug",
@@ -753,30 +733,6 @@
         }
       },
       "margin": 600,
-      "lead": "front",
-      "shots": 3
-    },
-    {
-      "key": "phone-grip",
-      "name": "Phone Grip",
-      "category": "Tech",
-      "find": [
-        "Phone Grip",
-        "PopSockets",
-        "Phone Stand"
-      ],
-      "designs": [
-        "rainbow",
-        "purple"
-      ],
-      "placements": {
-        "front": {
-          "x": 0.5,
-          "y": 0.5,
-          "scale": 0.55
-        }
-      },
-      "margin": 350,
       "lead": "front",
       "shots": 3
     },

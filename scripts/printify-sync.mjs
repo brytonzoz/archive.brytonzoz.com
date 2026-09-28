@@ -249,10 +249,12 @@ export async function sync(printify, root) {
         const camera = (image) => new URL(image.src).searchParams.get('camera_label') ?? '';
         const lead = line.lead ?? ('back' in line.placements ? 'back' : 'front');
         const rank = (image) => (camera(image).startsWith(lead) ? 0 : camera(image).startsWith('front') ? 1 : 2 + Number(!image.is_default));
-        const shots = images
+        let shots = images
           .filter((image) => image.variant_ids?.some((id) => ids.has(id)))
           .sort((a, b) => rank(a) - rank(b))
           .slice(0, line.shots ?? 4);
+        // Some blanks' first photo is the unprinted side: `shotOrder` picks the order by index.
+        if (line.shotOrder) shots.splice(0, shots.length, ...line.shotOrder.map((i) => shots[i]).filter(Boolean), ...shots.filter((_, i) => !line.shotOrder.includes(i)));
         const keys = [];
         const views = [];
         // Which side each photo shows, for the Front / Back switch on apparel (big logo on the back).

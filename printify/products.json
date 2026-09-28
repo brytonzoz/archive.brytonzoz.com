@@ -1,11 +1,11 @@
 {
-  "_comment": "NonParallel merch, from Bryton's 2024 NP merch spec: a small logo in the middle of the chest, the large logo in the middle of the back, sold for $25 at most. Each product is one design on the tee colors in `colors`. `design.uploadId` is an image already in Printify's uploads; `design.url` is a public PNG that Printify fetches once (found again by `fileName` after that). `placements` are Printify print-area coordinates (x, y = centre, scale = width relative to the print area). Prices are in cents and include US shipping. Edit and push: the Printify workflow creates/updates the products and commits lib/merch-catalog.json plus the mockups.",
+  "_comment": "NonParallel merch, from Bryton's 2024 NP merch spec: a small logo in the middle of the chest, the large logo in the middle of the back, sold for $25 at most. S–XL are $25; 2XL and 3XL cost more to make, so they step up $3 each and carry a little more margin to help the base sizes. Each product is one design on the tee colors in `colors`. `design.uploadId` is an image already in Printify's uploads; `design.url` is a public PNG that Printify fetches once (found again by `fileName` after that). `placements` are Printify print-area coordinates (x, y = centre, scale = width relative to the print area). Prices are in cents and include US shipping. Edit and push: the Printify workflow creates/updates the products and commits lib/merch-catalog.json plus the mockups.",
   "shopId": 18462993,
   "blueprintId": 12,
   "printProviders": [99, 29, 39],
   "sizes": ["S", "M", "L", "XL", "2XL", "3XL"],
   "price": 2500,
-  "bigSizePrice": 2500,
+  "sizePrices": { "2XL": 2800, "3XL": 3100 },
   "placements": {
     "front": { "x": 0.5, "y": 0.24, "scale": 0.3 },
     "back": { "x": 0.5, "y": 0.4, "scale": 1 }

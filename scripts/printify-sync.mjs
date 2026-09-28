@@ -72,7 +72,7 @@ export async function sync(printify, root) {
       }
     }
     if (!providerId) throw new Error(`No print provider has all of ${spec.colors.join(', ')} for ${spec.slug}`);
-    const priceOf = (size) => (/^(2XL|3XL|4XL|5XL)$/.test(size) ? config.bigSizePrice : config.price);
+    const priceOf = (size) => config.sizePrices?.[size] ?? config.price;
     const title = `NonParallel Tee — ${spec.name}`;
     const body = {
       title,

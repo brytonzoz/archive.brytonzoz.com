@@ -56,6 +56,8 @@ export function MerchSheet({
   const color = product.colors[Math.min(colorIndex, product.colors.length - 1)];
   const chosen = color.sizes.find((entry) => entry.size === size);
   const price = chosen?.price ?? color.sizes[0]?.price ?? product.price;
+  // Bigger sizes cost more to make; say so under the sizes.
+  const upcharges = color.sizes.filter((option) => option.price > product.price);
 
   // Size first: without one, the size row gives a little shake instead.
   const withSize = (action: (key: string) => void) => () => {
@@ -157,6 +159,9 @@ export function MerchSheet({
                   </button>
                 ))}
               </div>
+              {upcharges.length ? (
+                <p className="mt-2 text-[13px] text-black/50">{upcharges.map((option) => `${option.size} ${formatPrice(option.price)}`).join(' · ')}</p>
+              ) : null}
             </fieldset>
 
             <p className="mt-6 text-[15px] leading-relaxed text-black/70">

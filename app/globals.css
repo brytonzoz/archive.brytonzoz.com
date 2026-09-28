@@ -838,8 +838,6 @@ html {
   display: block;
   overflow: hidden;
   border-radius: var(--card-radius);
-  /* clip-path as well: Safari otherwise draws layered children past the rounded corners. */
-  clip-path: inset(0 round var(--card-radius));
   -webkit-backface-visibility: hidden;
   backface-visibility: hidden;
   background: #2f3547;
@@ -857,8 +855,13 @@ html {
   pointer-events: none;
 }
 
+.store-card-front {
+  /* An explicit 3D transform on both faces is what WebKit needs to honour backface-visibility. */
+  transform: rotateY(0deg) translateZ(0.5px);
+}
+
 .store-card-back {
-  transform: rotateY(180deg);
+  transform: rotateY(180deg) translateZ(0.5px);
 }
 
 .store-card-photo {
@@ -969,6 +972,8 @@ html {
   position: absolute;
   inset: 0;
   overflow: hidden;
+  /* The lights are blurred, animated layers: Safari clips those to a square unless clip-path says otherwise. */
+  clip-path: inset(0 round var(--card-radius) var(--card-radius) 0 0);
 }
 
 .store-next-back {

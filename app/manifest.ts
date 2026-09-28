@@ -14,7 +14,12 @@ export default function manifest(): MetadataRoute.Manifest {
     display: 'standalone',
     background_color: '#000000',
     theme_color: '#000000',
-    categories: ['music', 'entertainment'],
+    categories: ['music', 'entertainment', 'shopping'],
+    // Long-press the home-screen icon for these.
+    shortcuts: [
+      { name: 'Scrapwrk', short_name: 'Scrapwrk', url: '/scrapwrk/' },
+      { name: 'SOLENYA', short_name: 'SOLENYA', url: '/solenya/' },
+    ],
     icons: [
       { src: shareImages.icons['192'], sizes: '192x192', type: 'image/png', purpose: 'any' },
       { src: shareImages.icons['512'], sizes: '512x512', type: 'image/png', purpose: 'any' },

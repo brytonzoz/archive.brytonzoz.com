@@ -92,7 +92,16 @@ export function ProductSheet({
   const status = useAvailability(product?.id ?? '');
 
   useEffect(() => {
-    if (product) track({ type: 'product', detail: product.id });
+    if (!product) return;
+    track({ type: 'product', detail: product.id });
+    // Warm the connection to Stripe's checkout page, so Buy now opens it without a handshake wait.
+    if (!document.querySelector('link[data-stripe-preconnect]')) {
+      const link = document.createElement('link');
+      link.rel = 'preconnect';
+      link.href = 'https://checkout.stripe.com';
+      link.dataset.stripePreconnect = '';
+      document.head.appendChild(link);
+    }
   }, [product]);
 
   if (!product) return null;

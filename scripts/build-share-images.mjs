@@ -1,5 +1,6 @@
 // Link-preview cards (1200x630 JPEG: the cover on a blurred copy of itself) for every release in
-// lib/tracks.json, plus the home-screen app icons. Writes content-hashed files to
+// lib/tracks.json and every Scrapwrk product in lib/store-catalog.json (plus a square JPEG for the
+// Stripe checkout page), and the home-screen app icons. Writes content-hashed files to
 // public/media/share/ and lib/share-images.json. Skips work whose output already exists.
 import crypto from 'node:crypto';
 import fs from 'node:fs/promises';
@@ -55,7 +56,7 @@ async function card(source, out) {
 async function main() {
   const catalog = JSON.parse(await fs.readFile(path.join(ROOT, 'lib', 'tracks.json'), 'utf8'));
   await fs.mkdir(OUT_DIR, { recursive: true });
-  const manifest = { releases: {}, icons: {} };
+  const manifest = { releases: {}, store: {}, icons: {} };
 
   for (const release of catalog.releases) {
     const source = await findSource(release.cover);
@@ -63,6 +64,19 @@ async function main() {
     const out = path.join(OUT_DIR, name);
     if (!(await exists(out))) await card(source, out);
     manifest.releases[release.id] = `/media/share/${name}`;
+  }
+
+  const store = JSON.parse(await fs.readFile(path.join(ROOT, 'lib', 'store-catalog.json'), 'utf8'));
+  for (const product of store.products) {
+    const source = await findSource(product.images[0]);
+    const hash = await hashOf(source);
+    const cardName = `store-${product.slug}.${hash}.jpg`;
+    const squareName = `store-${product.slug}-square.${hash}.jpg`;
+    if (!(await exists(path.join(OUT_DIR, cardName)))) await card(source, path.join(OUT_DIR, cardName));
+    if (!(await exists(path.join(OUT_DIR, squareName)))) {
+      await sharp(source).resize(800, 800).jpeg({ quality: 82, mozjpeg: true }).toFile(path.join(OUT_DIR, squareName));
+    }
+    manifest.store[product.slug] = { card: `/media/share/${cardName}`, square: `/media/share/${squareName}` };
   }
 
   // Home screen / tab icons: the latest cover, full bleed (iOS and Android round the corners).
@@ -76,11 +90,15 @@ async function main() {
   }
 
   // Drop outputs from earlier versions of the sources.
-  const keep = new Set([...Object.values(manifest.releases), ...Object.values(manifest.icons)].map((p) => path.basename(p)));
+  const keep = new Set([
+    ...Object.values(manifest.releases),
+    ...Object.values(manifest.store).flatMap((entry) => [entry.card, entry.square]),
+    ...Object.values(manifest.icons),
+  ].map((p) => path.basename(p)));
   for (const file of await fs.readdir(OUT_DIR)) if (!keep.has(file)) await fs.rm(path.join(OUT_DIR, file));
 
   await fs.writeFile(MANIFEST, `${JSON.stringify(manifest, null, 2)}\n`);
-  console.log(`share images: ${Object.keys(manifest.releases).length} cards, ${Object.keys(manifest.icons).length} icons`);
+  console.log(`share images: ${Object.keys(manifest.releases).length} cards, ${Object.keys(manifest.store).length} products, ${Object.keys(manifest.icons).length} icons`);
 }
 
 main().catch((error) => {

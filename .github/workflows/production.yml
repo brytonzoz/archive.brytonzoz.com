@@ -62,6 +62,23 @@ jobs:
           fi
           printf '%s' "$ADMIN_PASSWORD" | npx wrangler secret put ADMIN_PASSWORD --env=""
 
+      # Scrapwrk checkout: the live Stripe secret key lives only in the STRIPE_SECRET_KEY repository
+      # secret (STRIPE_WEBHOOK_SECRET is optional). Never put either in code or chat.
+      - name: Sync Stripe keys
+        env:
+          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          STRIPE_SECRET_KEY: ${{ secrets.STRIPE_SECRET_KEY }}
+          STRIPE_WEBHOOK_SECRET: ${{ secrets.STRIPE_WEBHOOK_SECRET }}
+        run: |
+          if [ -z "$STRIPE_SECRET_KEY" ]; then
+            echo "::notice::STRIPE_SECRET_KEY is not set, so Scrapwrk checkout stays closed. Add it under Settings > Secrets and variables > Actions."
+          else
+            printf '%s' "$STRIPE_SECRET_KEY" | npx wrangler secret put STRIPE_SECRET_KEY --env=""
+          fi
+          if [ -n "$STRIPE_WEBHOOK_SECRET" ]; then
+            printf '%s' "$STRIPE_WEBHOOK_SECRET" | npx wrangler secret put STRIPE_WEBHOOK_SECRET --env=""
+          fi
+
       - name: Deploy www/archive redirects
         env:
           CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}

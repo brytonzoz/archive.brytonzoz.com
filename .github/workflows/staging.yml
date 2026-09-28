@@ -83,6 +83,23 @@ jobs:
           fi
           printf '%s' "$ADMIN_PASSWORD" | npx wrangler secret put ADMIN_PASSWORD --env staging
 
+      # Scrapwrk checkout on staging uses a Stripe TEST key only (STRIPE_TEST_SECRET_KEY secret),
+      # so trying the store here never charges a real card.
+      - name: Sync Stripe test key
+        env:
+          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          STRIPE_TEST_SECRET_KEY: ${{ secrets.STRIPE_TEST_SECRET_KEY }}
+        run: |
+          if [ -z "$STRIPE_TEST_SECRET_KEY" ]; then
+            echo "::notice::STRIPE_TEST_SECRET_KEY is not set, so checkout on staging stays closed."
+            exit 0
+          fi
+          case "$STRIPE_TEST_SECRET_KEY" in
+            sk_test_*|rk_test_*) ;;
+            *) echo "::error::STRIPE_TEST_SECRET_KEY must be a test key (sk_test_...)."; exit 1 ;;
+          esac
+          printf '%s' "$STRIPE_TEST_SECRET_KEY" | npx wrangler secret put STRIPE_SECRET_KEY --env staging
+
       - name: Check every live song plays from staging
         env:
           CHECK_ORIGIN: ${{ steps.deploy.outputs.url }}

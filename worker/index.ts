@@ -1,9 +1,10 @@
 // Serves songs from R2 at /audio/<key> on the site's own domain (seekable, edge-cached), and the
-// listening metrics API at /api/* (worker/metrics.ts). Every other path is handled by static
+// listening metrics API at /api/* (worker/metrics.ts) and the Scrapwrk checkout (worker/store.ts). Every other path is handled by static
 // assets before this script runs (see run_worker_first).
 import { handleApi, type MetricsEnv } from './metrics';
+import { handleStore, type StoreEnv } from './store';
 
-interface Env extends MetricsEnv {
+interface Env extends MetricsEnv, StoreEnv {
   ASSETS: Fetcher;
   MUSIC: R2Bucket;
 }
@@ -105,7 +106,7 @@ export default {
   async fetch(request: Request, env: Env, ctx: ExecutionContext): Promise<Response> {
     const url = new URL(request.url);
     if (url.pathname.startsWith(AUDIO_PREFIX)) return serveAudio(request, env, ctx);
-    if (url.pathname.startsWith('/api/')) return handleApi(request, env);
+    if (url.pathname.startsWith('/api/')) return (await handleStore(request, env)) ?? handleApi(request, env);
     // Campaign links for posts and bios: brytonzoz.com/go/ig -> the homepage, tagged "ig" in /admin.
     if (url.pathname.startsWith('/go/')) {
       const code = url.pathname.slice(4).replace(/\/+$/, '').toLowerCase();

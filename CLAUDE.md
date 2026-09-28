@@ -46,6 +46,11 @@ push, and give the owner the staging link from the PR comment once the Staging w
 - Release sheet ("Listen Now") and song/album pages: `components/release/`. Every song has a shareable page at
   `/<release>/<song-slug>/` (`app/[release]/[song]/`) with a preview card from `npm run media`
   (`scripts/build-share-images.mjs` -> `lib/share-images.json`, also the home-screen icons).
+- Scrapwrk store (`/scrapwrk/`, and the homepage's last scene): products and prices in `lib/store-catalog.json`,
+  photos in `assets-src/store/<slug>/NN.jpg` (2400px JPEGs; `npm run media` makes the web sizes). UI in `components/store/`;
+  Stripe Checkout, 1-of-1 holds and sold state in `worker/store.ts` (D1 table `store_items`; mark a piece sold/available in
+  `/admin`). The Stripe key is the `STRIPE_SECRET_KEY` repository secret (staging uses `STRIPE_TEST_SECRET_KEY`, a test
+  key); both deploy workflows copy it to the Worker. Never put it in code or chat.
 - Metrics: `lib/analytics.ts` (anonymous, batched) -> `/api/e` in `worker/metrics.ts` -> D1 `brytonzoz-metrics`
   (`brytonzoz-metrics-staging` for staging; schema `worker/schema.sql`). The dashboard is `/admin`; its password is
   the `ADMIN_PASSWORD` repository secret, which both deploy workflows copy to the Worker. Never put it in code or chat.

@@ -47,10 +47,15 @@ async function inspect() {
   const shops = await printify('GET', '/shops.json');
   console.log('## Shops');
   for (const shop of shops) console.log(`- ${shop.id} · ${shop.title} · channel: ${shop.sales_channel}`);
-  const uploads = await printify('GET', '/uploads.json?limit=100');
-  console.log(`\n## Uploaded images (${uploads.total ?? uploads.data?.length ?? 0})`);
-  for (const upload of uploads.data ?? []) {
-    console.log(`- ${upload.id} · ${upload.file_name} · ${upload.width}x${upload.height} · ${upload.mime_type} · ${upload.preview_url}`);
+  const uploads = [];
+  for (let page = 1; page <= 10; page++) {
+    const batch = await printify('GET', `/uploads.json?limit=50&page=${page}`);
+    uploads.push(...(batch.data ?? []));
+    if (!batch.next_page_url) break;
+  }
+  console.log(`\n## Uploaded images (${uploads.length})`);
+  for (const upload of uploads) {
+    console.log(`- ${upload.id} · ${upload.file_name} · ${upload.width}x${upload.height} · ${upload.mime_type} · ${upload.upload_time ?? ''} · ${upload.preview_url}`);
   }
   for (const shop of shops) {
     const products = await printify('GET', `/shops/${shop.id}/products.json?limit=50`);
@@ -63,8 +68,24 @@ async function inspect() {
   }
 }
 
+// The classic tee blanks and who prints them in the US (to pick a blueprint + provider).
+async function catalog() {
+  const blueprints = await printify('GET', '/catalog/blueprints.json');
+  const tees = blueprints.filter((b) => /3001|gildan 5000|comfort colors 1717|heavyweight|unisex jersey short sleeve/i.test(`${b.title} ${b.model} ${b.brand}`));
+  console.log('\n## Tee blueprints');
+  for (const b of tees.slice(0, 12)) console.log(`- ${b.id} · ${b.brand} ${b.model} · ${b.title}`);
+  for (const b of tees.filter((t) => /3001/.test(t.model)).slice(0, 1)) {
+    const providers = await printify('GET', `/catalog/blueprints/${b.id}/print_providers.json`);
+    console.log(`\n## Print providers for ${b.id} (${b.brand} ${b.model})`);
+    for (const p of providers) console.log(`- ${p.id} · ${p.title} · ${p.location?.country ?? ''} ${p.location?.region ?? ''}`);
+  }
+}
+
 const command = process.argv[2] ?? 'inspect';
-if (command === 'inspect') await inspect();
+if (command === 'inspect') {
+  await inspect();
+  await catalog();
+}
 else if (command === 'sync') await (await import('./printify-sync.mjs')).sync(printify, ROOT);
 else {
   console.error(`Unknown command: ${command}`);

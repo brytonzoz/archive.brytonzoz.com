@@ -26,8 +26,10 @@ export async function printify(method, route, body) {
       },
       body: body ? JSON.stringify(body) : undefined,
     });
-    if (response.status === 429) {
-      await new Promise((resolve) => setTimeout(resolve, 2000 * (attempt + 1)));
+    // Rate limits, and Printify's occasional 5xx on requests that are safe to repeat: wait and retry.
+    const retry = response.status === 429 || (response.status >= 500 && (method === 'GET' || method === 'PUT'));
+    if (retry && attempt < 3) {
+      await new Promise((resolve) => setTimeout(resolve, 3000 * (attempt + 1)));
       continue;
     }
     const text = await response.text();
@@ -40,7 +42,7 @@ export async function printify(method, route, body) {
     if (!response.ok) throw new Error(`${method} ${route} -> ${response.status}: ${JSON.stringify(data).slice(0, 600)}`);
     return data;
   }
-  throw new Error(`${method} ${route}: rate limited`);
+  throw new Error(`${method} ${route}: no response after retries`);
 }
 
 async function inspect() {

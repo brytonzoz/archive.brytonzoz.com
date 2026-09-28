@@ -16,7 +16,7 @@ if (!TOKEN) {
 }
 
 export async function printify(method, route, body) {
-  for (let attempt = 0; attempt < 4; attempt++) {
+  for (let attempt = 0; attempt < 6; attempt++) {
     const response = await fetch(`${API}${route}`, {
       method,
       headers: {
@@ -28,8 +28,8 @@ export async function printify(method, route, body) {
     });
     // Rate limits, and Printify's occasional 5xx on requests that are safe to repeat: wait and retry.
     const retry = response.status === 429 || (response.status >= 500 && (method === 'GET' || method === 'PUT'));
-    if (retry && attempt < 3) {
-      await new Promise((resolve) => setTimeout(resolve, 3000 * (attempt + 1)));
+    if (retry && attempt < 5) {
+      await new Promise((resolve) => setTimeout(resolve, (response.status === 429 ? 20000 : 3000) * (attempt + 1)));
       continue;
     }
     const text = await response.text();
@@ -113,33 +113,35 @@ const CATEGORIES = {
   pets: /pet |dog |cat /i,
 };
 async function catalog() {
+  const pause = () => new Promise((resolve) => setTimeout(resolve, 900)); // Printify's catalog allows ~100 calls/min
   const blueprints = await printify('GET', '/catalog/blueprints.json');
+  const out = ['# Printify blanks by category', '', 'Written by `node scripts/printify.mjs catalog` (Printify workflow). One US provider per blank.', ''];
   for (const [category, pattern] of Object.entries(CATEGORIES)) {
     const matches = blueprints.filter((b) => pattern.test(`${b.title} ${b.model} ${b.brand}`)).slice(0, 5);
-    console.log(`\n## ${category} (${matches.length} shown)`);
+    out.push(`## ${category}`);
     for (const b of matches) {
+      await pause();
       const providers = await printify('GET', `/catalog/blueprints/${b.id}/print_providers.json`);
-      const us = providers.filter((p) => (p.location?.country ?? 'US') === 'US').slice(0, 1);
-      const lines = [];
-      for (const p of us) {
-        const data = await printify('GET', `/catalog/blueprints/${b.id}/print_providers/${p.id}/variants.json?show-out-of-stock=0`);
-        const variants = data.variants ?? [];
-        const colors = [...new Set(variants.map((v) => v.options.color).filter(Boolean))];
-        const sizes = [...new Set(variants.map((v) => v.options.size).filter(Boolean))];
-        const areas = [...new Set(variants.flatMap((v) => (v.placeholders ?? []).map((ph) => `${ph.position} ${ph.width}x${ph.height}`)))];
-        lines.push(`    provider ${p.id} ${p.title}: ${variants.length} variants · colors ${colors.slice(0, 8).join('/')}${colors.length > 8 ? ` (+${colors.length - 8})` : ''} · sizes ${sizes.join('/')} · areas ${areas.slice(0, 4).join(', ')}`);
-      }
-      console.log(`- ${b.id} · ${b.brand} ${b.model} · ${b.title}`);
-      for (const line of lines) console.log(line);
+      const p = providers.find((entry) => (entry.location?.country ?? 'US') === 'US');
+      out.push(`- ${b.id} · ${b.brand} ${b.model} · ${b.title}`);
+      if (!p) continue;
+      await pause();
+      const data = await printify('GET', `/catalog/blueprints/${b.id}/print_providers/${p.id}/variants.json?show-out-of-stock=0`);
+      const variants = data.variants ?? [];
+      const colors = [...new Set(variants.map((v) => v.options.color).filter(Boolean))];
+      const sizes = [...new Set(variants.map((v) => v.options.size).filter(Boolean))];
+      const areas = [...new Set(variants.flatMap((v) => (v.placeholders ?? []).map((ph) => `${ph.position} ${ph.width}x${ph.height}`)))];
+      out.push(`  - provider ${p.id} ${p.title}: ${variants.length} variants · colors ${colors.slice(0, 10).join('/')}${colors.length > 10 ? ` (+${colors.length - 10})` : ''} · sizes ${sizes.join('/')} · areas ${areas.slice(0, 4).join(', ')}`);
     }
+    out.push('');
   }
+  await fs.writeFile(path.join(ROOT, 'printify', 'catalog.md'), `${out.join('\n')}\n`);
+  console.log(`Wrote printify/catalog.md`);
 }
 
 const command = process.argv[2] ?? 'inspect';
-if (command === 'inspect') {
-  await inspect();
-  await catalog();
-}
+if (command === 'inspect') await inspect();
+else if (command === 'catalog') await catalog();
 else if (command === 'sync') await (await import('./printify-sync.mjs')).sync(printify, ROOT);
 else if (command === 'order') await (await import('./printify-order.mjs')).order(printify, ROOT);
 else {

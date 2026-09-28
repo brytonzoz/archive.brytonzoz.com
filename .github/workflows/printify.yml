@@ -23,6 +23,8 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
       - uses: actions/setup-node@v4
         with:
           node-version: 20
@@ -44,4 +46,9 @@ jobs:
             exit 0
           fi
           git commit -m "Sync NonParallel merch from Printify"
-          git push origin "HEAD:${GITHUB_REF_NAME}"
+          # The branch may have moved while Printify rendered: replay this commit on top of it.
+          for attempt in 1 2 3; do
+            git pull --rebase origin "${GITHUB_REF_NAME}" && git push origin "HEAD:${GITHUB_REF_NAME}" && exit 0
+            sleep 5
+          done
+          exit 1

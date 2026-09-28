@@ -31,9 +31,9 @@
           ],
           "views": [
             "back",
-            "front",
-            "front",
-            "back"
+            "back",
+            "back",
+            "front"
           ],
           "sizes": [
             {
@@ -100,9 +100,9 @@
           ],
           "views": [
             "back",
-            "front",
-            "front",
-            "back"
+            "back",
+            "back",
+            "front"
           ],
           "sizes": [
             {
@@ -169,9 +169,9 @@
           ],
           "views": [
             "back",
-            "front",
-            "front",
-            "back"
+            "back",
+            "back",
+            "front"
           ],
           "sizes": [
             {
@@ -238,9 +238,9 @@
           ],
           "views": [
             "back",
-            "front",
-            "front",
-            "back"
+            "back",
+            "back",
+            "front"
           ],
           "sizes": [
             {
@@ -307,9 +307,9 @@
           ],
           "views": [
             "back",
-            "front",
-            "front",
-            "back"
+            "back",
+            "back",
+            "front"
           ],
           "sizes": [
             {
@@ -376,9 +376,9 @@
           ],
           "views": [
             "back",
-            "front",
-            "front",
-            "back"
+            "back",
+            "back",
+            "front"
           ],
           "sizes": [
             {
@@ -924,9 +924,9 @@
           ],
           "views": [
             "back",
-            "front",
             "back",
-            null
+            "front",
+            "front"
           ],
           "sizes": [
             {
@@ -994,9 +994,9 @@
           ],
           "views": [
             "back",
-            "front",
             "back",
-            null
+            "front",
+            "front"
           ],
           "sizes": [
             {
@@ -1064,9 +1064,9 @@
           ],
           "views": [
             "back",
-            "front",
             "back",
-            null
+            "front",
+            "front"
           ],
           "sizes": [
             {

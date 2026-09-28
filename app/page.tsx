@@ -5,13 +5,15 @@ import Link from 'next/link';
 import { ProjectCard } from '../components/ProjectCard';
 import { NotifySheet, hasSignedUp } from '../components/NotifySheet';
 import { SiteFooter } from '../components/SiteFooter';
+import { MerchExperience } from '../components/store/MerchExperience';
 import { StoreExperience } from '../components/store/StoreExperience';
 import { ReleaseSheet } from '../components/release/ReleaseSheet';
 import { usePlayer } from '../components/player/context';
 import { ArrowUpRightIcon, ChevronDownIcon, EqualizerBars } from '../components/player/icons';
 import { ResponsiveImage, placeholderBackground } from '../components/ResponsiveImage';
 import { getProjects } from '../lib/projects';
-import { cautionSceneAssets, reminderSceneAssets, scrapwrkSceneAssets, solenyaSceneAssets } from '../lib/assets';
+import { cautionSceneAssets, nonparallelAssets, reminderSceneAssets, scrapwrkSceneAssets, solenyaSceneAssets } from '../lib/assets';
+import { merchScene } from '../lib/merch';
 import type { MediaAsset } from '../lib/media';
 import { nextRelease, nextReleaseProject } from '../lib/next-release';
 import { getStreamingServices, getVisitLabel } from '../lib/streaming';
@@ -82,6 +84,7 @@ const HOMEPAGE_PROJECT_ORDER = [
   'CAUTION',
   'Just A Reminder To Live Life',
   'Scrapwrk Store',
+  'NonParallel',
 ];
 
 const HIDDEN_HOMEPAGE_PROJECTS = new Set<string>([]);
@@ -124,6 +127,16 @@ function getProjectBackground(project: Project): SlideBackground {
       topGlow: 'rgba(255, 244, 236, 0.24)',
       bottomGlow: 'rgba(96, 67, 49, 0.2)',
       edgeGlow: 'rgba(242, 225, 213, 0.08)',
+    };
+  }
+
+  if (project.name === 'NonParallel') {
+    return {
+      base: 'linear-gradient(160deg, #1a1030 0%, #0d0a16 55%, #07060b 100%)',
+      overlay: 'radial-gradient(circle at 20% 14%, rgba(137, 71, 255, 0.28), transparent 32%), radial-gradient(circle at 82% 86%, rgba(98, 0, 238, 0.22), transparent 36%)',
+      topGlow: 'rgba(137, 71, 255, 0.18)',
+      bottomGlow: 'rgba(60, 20, 120, 0.22)',
+      edgeGlow: 'rgba(200, 180, 255, 0.05)',
     };
   }
 
@@ -1155,6 +1168,112 @@ const ScrapwrkScene = React.memo(function ScrapwrkScene({ distance, loadImages }
   );
 });
 
+// NonParallel's background: four of the tees, faint and tucked into the corners, and one small logo
+// sticker. Placed by percentage of the screen (not the portrait scene frame) so they sit in the
+// corners on a phone and spread out on a wide screen; `size` is in units of --np-sticker
+// (globals.css) and `alpha` keeps them in the background. They move with the scroll like the
+// Scrapwrk stickers.
+const nonparallelStickers = [
+  { key: 'rainbow', src: nonparallelAssets.tees.rainbow, x: 3, y: 9, size: 0.95, alpha: 0.35, baseRotate: -16,
+    movement: { x: -70, y: -110, rotate: -6, scale: 0.07, fadeRate: 0.96 }, float: { x: -7, y: -8, rotate: -2, duration: '8.4s', delay: '0.1s' }, intro: { x: -170, y: -130, rotate: -10, delay: '0.1s' } },
+  { key: 'blue', src: nonparallelAssets.tees.blue, x: 99, y: 30, size: 0.85, alpha: 0.2, baseRotate: 14,
+    movement: { x: 76, y: -118, rotate: 5, scale: 0.07, fadeRate: 0.96 }, float: { x: 8, y: -7, rotate: 2, duration: '8.9s', delay: '0.4s' }, intro: { x: 160, y: -140, rotate: 10, delay: '0.16s' } },
+  { key: 'green', src: nonparallelAssets.tees.green, x: 1, y: 70, size: 0.85, alpha: 0.2, baseRotate: -9,
+    movement: { x: -64, y: 112, rotate: 4, scale: 0.08, fadeRate: 1.02 }, float: { x: -7, y: -8, rotate: -1.4, duration: '8.2s', delay: '0.3s' }, intro: { x: -150, y: 160, rotate: 8, delay: '0.34s' } },
+  { key: 'purple', src: nonparallelAssets.tees.purple, x: 97, y: 93, size: 0.95, alpha: 0.2, baseRotate: 17,
+    movement: { x: 78, y: 124, rotate: -5, scale: 0.08, fadeRate: 1.04 }, float: { x: 9, y: -9, rotate: 1.6, duration: '8.6s', delay: '0.55s' }, intro: { x: 170, y: 164, rotate: -8, delay: '0.4s' } },
+  { key: 'logo', src: nonparallelAssets.logo, x: 74, y: 8, size: 0.38, alpha: 0.55, baseRotate: 9,
+    movement: { x: 40, y: -120, rotate: 6, scale: 0.06, fadeRate: 1 }, float: { x: 5, y: -6, rotate: 2.4, duration: '7.6s', delay: '0.2s' }, intro: { x: 90, y: -150, rotate: 12, delay: '0.46s' } },
+];
+
+// NonParallel: the label behind all of this. Its logo (a sticker) heads the scene, a short note
+// says what it is, and the tees follow in the same card system as Scrapwrk.
+const NonParallelScene = React.memo(function NonParallelScene({ distance }: { distance: number }) {
+  const distanceMagnitude = clamp(Math.abs(distance), 0, 1);
+  const active = distanceMagnitude < 0.45;
+  const incoming = easeOutCubic(clamp(Math.abs(Math.min(distance, 0)) / 0.9, 0, 1));
+
+  return (
+    <div className="relative flex h-full w-full items-center justify-center overflow-hidden pb-[132px] pt-10">
+      <div aria-hidden="true" className="np-scene-stickers pointer-events-none absolute inset-0 z-0">
+        {nonparallelStickers.map((sticker) => {
+          const stickerState = getSceneStickerState(sticker, distance);
+          const size = `calc(var(--np-sticker) * ${sticker.size})`;
+          return (
+            <div
+              key={sticker.key}
+              className="pointer-events-none absolute solenya-sticker-enter"
+              style={{
+                left: `${sticker.x}%`,
+                top: `${sticker.y}%`,
+                width: size,
+                height: size,
+                margin: `calc(${size} / -2) 0 0 calc(${size} / -2)`,
+                '--intro-x': scaleValue(sticker.intro.x),
+                '--intro-y': scaleValue(sticker.intro.y),
+                '--intro-rotate': `${sticker.intro.rotate}deg`,
+                animationDelay: sticker.intro.delay,
+              } as React.CSSProperties}
+            >
+              <div
+                style={{
+                  opacity: stickerState.opacity * sticker.alpha,
+                  transform: `translate3d(${scaleValue(stickerState.translateX)}, ${scaleValue(stickerState.translateY)}, 0) rotate(${stickerState.rotate}deg) scale(${stickerState.scale})`,
+                  willChange: 'transform, opacity',
+                  transition: 'transform 520ms cubic-bezier(0.22, 1, 0.36, 1), opacity 320ms ease-out',
+                }}
+              >
+                <div
+                  className="solenya-sticker-float h-full w-full"
+                  style={{
+                    '--float-x': scaleValue(sticker.float.x),
+                    '--float-y': scaleValue(sticker.float.y),
+                    '--float-rotate': `${sticker.float.rotate}deg`,
+                    '--float-duration': sticker.float.duration,
+                    animationDelay: sticker.float.delay,
+                  } as React.CSSProperties}
+                >
+                  <ResponsiveImage asset={sticker.src} alt="" sizes="(min-width: 640px) 300px, 34vw" loading="lazy" draggable={false} className="h-full w-full select-none object-contain" />
+                </div>
+              </div>
+            </div>
+          );
+        })}
+      </div>
+      <div
+        className="np-scene relative z-10"
+        style={{
+          '--rows': merchScene.rows,
+          '--row-h': merchScene.rowHeight,
+          opacity: 1 - (distanceMagnitude * 0.3),
+          transform: `translate3d(0, ${incoming * 32}px, 0)`,
+          transition: 'transform 700ms cubic-bezier(0.22, 1, 0.36, 1), opacity 400ms ease-out',
+        } as React.CSSProperties}
+      >
+        <MerchExperience
+          active={active}
+          columns={merchScene.columns}
+          sizes={merchScene.columns === 3 ? '(min-width: 640px) 180px, 30vw' : '(min-width: 640px) 270px, 44vw'}
+          headerClassName="np-scene-header"
+          title={(
+            <h2 className="np-scene-logo">
+              <span className="sr-only">NonParallel</span>
+              <ResponsiveImage asset={nonparallelAssets.logo} alt="" sizes="(min-width: 640px) 260px, 50vw" draggable={false} className="h-full w-full object-contain" />
+            </h2>
+          )}
+          titleEnd={(
+            <Link href="/nonparallel/" className="store-scene-link scene-title">
+              All tees
+              <ChevronDownIcon size={16} className="-rotate-90" />
+            </Link>
+          )}
+          intro={<p className="np-scene-note">The label and company behind all of this. A tee is a way to support it: you get something to wear, and it keeps the work going.</p>}
+        />
+      </div>
+    </div>
+  );
+});
+
 // Page dots, as on iOS: they show there's more below, where you are, and jump anywhere.
 function SceneDots({ names, activeIndex, onSelect }: { names: string[]; activeIndex: number; onSelect: (index: number) => void }) {
   return (
@@ -1335,6 +1454,7 @@ export default function HomePage() {
             const isCaution = project.name === 'CAUTION';
             const isReminder = project.name === 'Just A Reminder To Live Life';
             const isScrapwrk = project.name === 'Scrapwrk Store';
+            const isNonParallel = project.name === 'NonParallel';
             const distanceFromCenter = Math.abs(scrollProgress - index);
             const continuousDistance = clamp(distanceFromCenter, 0, 1.2);
             // Scene motion saturates at one screen away; clamping lets memoized far-off scenes skip re-rendering.
@@ -1387,6 +1507,15 @@ export default function HomePage() {
                     distance={sceneDistance}
                     loadImages={index === 0 || loadDeferredScenes}
                   />
+                  {footer}
+                </div>
+              );
+            }
+
+            if (isNonParallel) {
+              return (
+                <div key={project.name} className="relative h-screen snap-center overflow-hidden">
+                  <NonParallelScene distance={sceneDistance} />
                   {footer}
                 </div>
               );

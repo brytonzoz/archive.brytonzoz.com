@@ -56,7 +56,7 @@ async function card(source, out) {
 async function main() {
   const catalog = JSON.parse(await fs.readFile(path.join(ROOT, 'lib', 'tracks.json'), 'utf8'));
   await fs.mkdir(OUT_DIR, { recursive: true });
-  const manifest = { releases: {}, store: {}, icons: {} };
+  const manifest = { releases: {}, store: {}, merch: {}, merchCards: {}, icons: {} };
 
   for (const release of catalog.releases) {
     const source = await findSource(release.cover);
@@ -79,6 +79,27 @@ async function main() {
     manifest.store[product.slug] = { card: `/media/share/${cardName}`, square: `/media/share/${squareName}` };
   }
 
+  // NonParallel tees: a square per tee color for Stripe's checkout page, and a link-preview card per design.
+  const merchCatalog = JSON.parse(await fs.readFile(path.join(ROOT, 'lib', 'merch-catalog.json'), 'utf8').catch(() => '{"products":[]}'));
+  for (const product of merchCatalog.products) {
+    for (const [i, color] of product.colors.entries()) {
+      if (!color.images.length) continue;
+      const source = await findSource(color.images[0]);
+      const hash = await hashOf(source);
+      const colorSlug = color.name.toLowerCase().replace(/[^a-z0-9]+/g, '-');
+      const squareName = `merch-${product.slug}-${colorSlug}.${hash}.jpg`;
+      if (!(await exists(path.join(OUT_DIR, squareName)))) {
+        await sharp(source).resize(800, 800).jpeg({ quality: 82, mozjpeg: true }).toFile(path.join(OUT_DIR, squareName));
+      }
+      manifest.merch[`${product.slug}/${colorSlug}`] = `/media/share/${squareName}`;
+      if (i === 0) {
+        const cardName = `merch-${product.slug}.${hash}.jpg`;
+        if (!(await exists(path.join(OUT_DIR, cardName)))) await card(source, path.join(OUT_DIR, cardName));
+        manifest.merchCards[product.slug] = `/media/share/${cardName}`;
+      }
+    }
+  }
+
   // Home screen / tab icons: the latest cover, full bleed (iOS and Android round the corners).
   const iconSource = await findSource(APP_ICON_SOURCE);
   const iconHash = await hashOf(iconSource);
@@ -93,12 +114,14 @@ async function main() {
   const keep = new Set([
     ...Object.values(manifest.releases),
     ...Object.values(manifest.store).flatMap((entry) => [entry.card, entry.square]),
+    ...Object.values(manifest.merch),
+    ...Object.values(manifest.merchCards),
     ...Object.values(manifest.icons),
   ].map((p) => path.basename(p)));
   for (const file of await fs.readdir(OUT_DIR)) if (!keep.has(file)) await fs.rm(path.join(OUT_DIR, file));
 
   await fs.writeFile(MANIFEST, `${JSON.stringify(manifest, null, 2)}\n`);
-  console.log(`share images: ${Object.keys(manifest.releases).length} cards, ${Object.keys(manifest.store).length} products, ${Object.keys(manifest.icons).length} icons`);
+  console.log(`share images: ${Object.keys(manifest.releases).length} cards, ${Object.keys(manifest.store).length} products, ${Object.keys(manifest.merch).length} tee colors, ${Object.keys(manifest.icons).length} icons`);
 }
 
 main().catch((error) => {

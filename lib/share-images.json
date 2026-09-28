@@ -18,6 +18,22 @@
       "square": "/media/share/store-hat-square.bae37999de.jpg"
     }
   },
+  "merch": {
+    "rainbow/black": "/media/share/merch-rainbow-black.d30b6fdea2.jpg",
+    "red/white": "/media/share/merch-red-white.665abc3286.jpg",
+    "yellow/white": "/media/share/merch-yellow-white.8e53c17083.jpg",
+    "green/white": "/media/share/merch-green-white.812e8ddb56.jpg",
+    "blue/white": "/media/share/merch-blue-white.316a3fc2c7.jpg",
+    "purple/white": "/media/share/merch-purple-white.f84ae42760.jpg"
+  },
+  "merchCards": {
+    "rainbow": "/media/share/merch-rainbow.d30b6fdea2.jpg",
+    "red": "/media/share/merch-red.665abc3286.jpg",
+    "yellow": "/media/share/merch-yellow.8e53c17083.jpg",
+    "green": "/media/share/merch-green.812e8ddb56.jpg",
+    "blue": "/media/share/merch-blue.316a3fc2c7.jpg",
+    "purple": "/media/share/merch-purple.f84ae42760.jpg"
+  },
   "icons": {
     "32": "/media/share/icon-32.35f7f2a766.png",
     "180": "/media/share/icon-180.35f7f2a766.png",

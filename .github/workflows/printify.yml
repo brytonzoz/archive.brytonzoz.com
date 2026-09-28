@@ -1,0 +1,54 @@
+# Printify: runs scripts/printify.mjs with the PRINTIFY_ACCESS secret whenever the NonParallel merch
+# setup changes on a claude/* branch. "sync" commits lib/merch-catalog.json and the rendered mockups
+# back to the branch, so the site is built from what Printify actually has.
+name: Printify
+
+on:
+  push:
+    branches: ['claude/**']
+    paths:
+      - 'printify/**'
+      - 'scripts/printify*.mjs'
+      - '.github/workflows/printify.yml'
+
+permissions:
+  contents: write
+
+concurrency:
+  group: printify-${{ github.ref }}
+  cancel-in-progress: false
+
+jobs:
+  printify:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+      - name: Inspect the Printify account
+        env:
+          PRINTIFY_ACCESS: ${{ secrets.PRINTIFY_ACCESS }}
+        run: node scripts/printify.mjs inspect
+      - name: Create/update the products and fetch their mockups
+        env:
+          PRINTIFY_ACCESS: ${{ secrets.PRINTIFY_ACCESS }}
+        run: node scripts/printify.mjs sync
+      - name: Commit the catalog and mockups back to the branch
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add lib/merch-catalog.json assets-src/merch
+          if git diff --cached --quiet; then
+            echo "Nothing changed."
+            exit 0
+          fi
+          git commit -m "Sync NonParallel merch from Printify"
+          # The branch may have moved while Printify rendered: replay this commit on top of it.
+          for attempt in 1 2 3; do
+            git pull --rebase origin "${GITHUB_REF_NAME}" && git push origin "HEAD:${GITHUB_REF_NAME}" && exit 0
+            sleep 5
+          done
+          exit 1

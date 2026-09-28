@@ -51,6 +51,14 @@ push, and give the owner the staging link from the PR comment once the Staging w
   Stripe Checkout, 1-of-1 holds and sold state in `worker/store.ts` (D1 table `store_items`; mark a piece sold/available in
   `/admin`). The Stripe key is the `STRIPE_SECRET_KEY` repository secret (staging uses `STRIPE_TEST_SECRET_KEY`, a test
   key); both deploy workflows copy it to the Worker. Never put it in code or chat.
+- NonParallel tees (`/nonparallel/`, the homepage scene after Scrapwrk): printed to order by Printify (shop "NONPARALLEL").
+  Designs, colors and prices live in `printify/products.json`; pushing it runs the **Printify** workflow, which
+  creates/updates the products and commits their mockups (`assets-src/merch/`) and `lib/merch-catalog.json`. Then run
+  `npm run media`. They sell through the same bag and Stripe checkout as Scrapwrk (`components/store/Merch*.tsx`,
+  `Bag.tsx`); `worker/merch.ts` sends each paid order to Printify (on the thank-you page, plus a 10-minute cron
+  catch-up), tracked in D1 `merch_orders` and shown in `/admin`. Token: the `PRINTIFY_ACCESS` repository secret
+  (production only, so staging checkouts never print). Never put it in code or chat. The scene's background tees are
+  Bryton's own mockups from the "NP merch" Drive folder, cut out in `assets-src/scenes/nonparallel/` (kept faint: `alpha` in `nonparallelStickers`, app/page.tsx).
 - Metrics: `lib/analytics.ts` (anonymous, batched) -> `/api/e` in `worker/metrics.ts` -> D1 `brytonzoz-metrics`
   (`brytonzoz-metrics-staging` for staging; schema `worker/schema.sql`). The dashboard is `/admin`; its password is
   the `ADMIN_PASSWORD` repository secret, which both deploy workflows copy to the Worker. Never put it in code or chat.

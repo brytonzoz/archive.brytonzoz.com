@@ -6,6 +6,7 @@
 // Secrets: STRIPE_SECRET_KEY (and optionally STRIPE_WEBHOOK_SECRET), set by the deploy workflows.
 import catalog from '../lib/store-catalog.json';
 import shareImages from '../lib/share-images.json';
+import { encodeMerch, fulfillMerch, MERCH_PREFIX, merchLineItems, merchOrders, parseMerch, type MerchEnv } from './merch';
 
 export interface StoreEnv {
   DB?: D1Database;
@@ -17,16 +18,21 @@ export interface StoreEnv {
 
 type Status = 'available' | 'held' | 'sold';
 type Row = { product_id: string; status: Status; session_id: string | null; held_until: number | null };
-type StripeSession = {
+export type ShippingDetails = {
+  name?: string | null;
+  address?: { line1?: string | null; line2?: string | null; city?: string | null; state?: string | null; postal_code?: string | null; country?: string | null } | null;
+};
+export type StripeSession = {
   id: string;
   url?: string | null;
   status?: 'open' | 'complete' | 'expired';
   payment_status?: 'paid' | 'unpaid' | 'no_payment_required';
   amount_total?: number | null;
   currency?: string | null;
-  customer_details?: { email?: string | null; name?: string | null } | null;
-  shipping_details?: { name?: string | null; address?: { city?: string | null; state?: string | null } | null } | null;
-  collected_information?: { shipping_details?: { name?: string | null; address?: { city?: string | null; state?: string | null } | null } | null } | null;
+  created?: number;
+  customer_details?: { email?: string | null; name?: string | null; phone?: string | null } | null;
+  shipping_details?: ShippingDetails | null;
+  collected_information?: { shipping_details?: ShippingDetails | null } | null;
   metadata?: Record<string, string> | null;
 };
 
@@ -53,7 +59,7 @@ function form(data: Record<string, unknown>, prefix = '', out = new URLSearchPar
   return out;
 }
 
-async function stripe<T>(env: StoreEnv, method: 'GET' | 'POST', path: string, body?: Record<string, unknown>): Promise<T> {
+export async function stripe<T>(env: StoreEnv, method: 'GET' | 'POST', path: string, body?: Record<string, unknown>): Promise<T> {
   const response = await fetch(`${env.STRIPE_API_BASE ?? 'https://api.stripe.com'}/v1/${path}`, {
     method,
     headers: {
@@ -67,7 +73,7 @@ async function stripe<T>(env: StoreEnv, method: 'GET' | 'POST', path: string, bo
   return data;
 }
 
-const isPaid = (session: StripeSession) =>
+export const isPaid = (session: StripeSession) =>
   session.status === 'complete' && (session.payment_status === 'paid' || session.payment_status === 'no_payment_required');
 
 async function ensureRows(db: D1Database) {
@@ -133,8 +139,13 @@ async function checkout(request: Request, env: StoreEnv & { DB: D1Database }): P
   } catch {
     return json({ error: 'bad-request' }, 400);
   }
-  const ids = [...new Set(Array.isArray(body.items) ? body.items.filter((id): id is string => typeof id === 'string') : [])];
-  if (!ids.length || ids.length > PRODUCTS.size || ids.some((id) => !PRODUCTS.has(id))) return json({ error: 'bad-request' }, 400);
+  const keys = Array.isArray(body.items) ? body.items.filter((id): id is string => typeof id === 'string') : [];
+  // Scrapwrk pieces (each 1 of 1) and NonParallel tees ("np:<design>:<variantId>", repeated per unit).
+  const ids = [...new Set(keys.filter((key) => !key.startsWith(MERCH_PREFIX)))];
+  const merchCounts = parseMerch(keys.filter((key) => key.startsWith(MERCH_PREFIX)));
+  if ((!ids.length && !merchCounts?.size) || !merchCounts || ids.length > PRODUCTS.size || ids.some((id) => !PRODUCTS.has(id))) {
+    return json({ error: 'bad-request' }, 400);
+  }
 
   // Coming back to checkout (e.g. after pressing back on Stripe's page) replaces the earlier session.
   if (typeof body.previous === 'string') await cancelSession(env, body.previous);
@@ -148,9 +159,11 @@ async function checkout(request: Request, env: StoreEnv & { DB: D1Database }): P
   const expiresAt = Math.floor(now / 1000) + SESSION_SECONDS;
   const holdUntil = expiresAt * 1000 + HOLD_GRACE_MS;
   const token = `pending_${crypto.randomUUID()}`;
-  const held = await env.DB.batch(ids.map((id) =>
-    env.DB.prepare("UPDATE store_items SET status = 'held', session_id = ?, held_until = ?, updated_at = ? WHERE product_id = ? AND status = 'available'")
-      .bind(token, holdUntil, now, id)));
+  const held = ids.length
+    ? await env.DB.batch(ids.map((id) =>
+      env.DB.prepare("UPDATE store_items SET status = 'held', session_id = ?, held_until = ?, updated_at = ? WHERE product_id = ? AND status = 'available'")
+        .bind(token, holdUntil, now, id)))
+    : [];
   const lost = ids.filter((_, i) => !held[i].meta.changes);
   if (lost.length) {
     await release(env.DB, token);
@@ -162,7 +175,7 @@ async function checkout(request: Request, env: StoreEnv & { DB: D1Database }): P
     const session = await stripe<StripeSession>(env, 'POST', 'checkout/sessions', {
       mode: 'payment',
       success_url: `${origin}/scrapwrk/order/?session_id={CHECKOUT_SESSION_ID}`,
-      cancel_url: `${origin}/scrapwrk/?checkout=cancelled`,
+      cancel_url: `${origin}/${ids.length ? 'scrapwrk' : 'nonparallel'}/?checkout=cancelled`,
       expires_at: expiresAt,
       billing_address_collection: 'auto',
       phone_number_collection: { enabled: true },
@@ -175,9 +188,9 @@ async function checkout(request: Request, env: StoreEnv & { DB: D1Database }): P
         },
       }],
       submit_type: 'pay',
-      metadata: { source: 'brytonzoz.com', product_ids: ids.join(',') },
-      payment_intent_data: { metadata: { product_ids: ids.join(',') } },
-      line_items: ids.map((id) => {
+      metadata: { source: 'brytonzoz.com', product_ids: ids.join(','), merch: merchCounts.size ? encodeMerch(merchCounts) : undefined },
+      payment_intent_data: { metadata: { product_ids: ids.join(','), merch: merchCounts.size ? encodeMerch(merchCounts) : undefined } },
+      line_items: [...ids.map((id) => {
         const product = PRODUCTS.get(id)!;
         const image = SQUARE_IMAGES[product.slug]?.square;
         return {
@@ -193,7 +206,7 @@ async function checkout(request: Request, env: StoreEnv & { DB: D1Database }): P
             },
           },
         };
-      }),
+      }), ...merchLineItems(merchCounts, origin)],
     });
     await env.DB.prepare('UPDATE store_items SET session_id = ? WHERE session_id = ?').bind(session.id, token).run();
     return json({ url: session.url, id: session.id });
@@ -205,7 +218,7 @@ async function checkout(request: Request, env: StoreEnv & { DB: D1Database }): P
 }
 
 // The order confirmation page: only what the buyer needs to see, looked up by session id.
-async function order(url: URL, env: StoreEnv & { DB: D1Database }): Promise<Response> {
+async function order(url: URL, env: MerchEnv & { DB: D1Database }): Promise<Response> {
   if (!env.STRIPE_SECRET_KEY) return json({ error: 'not-configured' }, 503);
   const sessionId = url.searchParams.get('session_id') ?? '';
   if (!SESSION_ID.test(sessionId)) return json({ error: 'bad-request' }, 400);
@@ -217,11 +230,14 @@ async function order(url: URL, env: StoreEnv & { DB: D1Database }): Promise<Resp
   }
   const paid = isPaid(session);
   if (paid) await markSold(env.DB, sessionId);
+  const merchStatus = paid ? await fulfillMerch(env, session) : null;
   const shipping = session.collected_information?.shipping_details ?? session.shipping_details;
   return json({
     paid,
     status: session.status,
     items: (session.metadata?.product_ids ?? '').split(',').filter((id) => PRODUCTS.has(id)),
+    merch: session.metadata?.merch ?? null,
+    merchStatus,
     amountTotal: session.amount_total ?? null,
     email: session.customer_details?.email ?? null,
     name: shipping?.name ?? session.customer_details?.name ?? null,
@@ -243,7 +259,7 @@ async function verifySignature(payload: string, header: string, secret: string):
   return diff === 0;
 }
 
-async function webhook(request: Request, env: StoreEnv & { DB: D1Database }): Promise<Response> {
+async function webhook(request: Request, env: MerchEnv & { DB: D1Database }): Promise<Response> {
   if (!env.STRIPE_WEBHOOK_SECRET) return json({ error: 'not-configured' }, 503);
   const payload = await request.text();
   if (!(await verifySignature(payload, request.headers.get('stripe-signature') ?? '', env.STRIPE_WEBHOOK_SECRET))) {
@@ -252,7 +268,10 @@ async function webhook(request: Request, env: StoreEnv & { DB: D1Database }): Pr
   const event = JSON.parse(payload) as { type: string; data: { object: StripeSession } };
   const session = event.data.object;
   if (event.type === 'checkout.session.completed' || event.type === 'checkout.session.async_payment_succeeded') {
-    if (isPaid(session)) await markSold(env.DB, session.id);
+    if (isPaid(session)) {
+      await markSold(env.DB, session.id);
+      await fulfillMerch(env, session);
+    }
   } else if (event.type === 'checkout.session.expired' || event.type === 'checkout.session.async_payment_failed') {
     await release(env.DB, session.id);
   }
@@ -261,7 +280,7 @@ async function webhook(request: Request, env: StoreEnv & { DB: D1Database }): Pr
 
 // /api/admin/store (password checked by the caller): list, or mark a piece available/sold
 // (e.g. after a refund, or when it sold somewhere else).
-export async function adminStore(request: Request, env: StoreEnv & { DB: D1Database }): Promise<Response> {
+export async function adminStore(request: Request, env: MerchEnv & { DB: D1Database }): Promise<Response> {
   if (request.method === 'POST') {
     const body = await request.json().catch(() => ({})) as { productId?: string; status?: string };
     if (!body.productId || !PRODUCTS.has(body.productId) || (body.status !== 'available' && body.status !== 'sold')) {
@@ -271,10 +290,15 @@ export async function adminStore(request: Request, env: StoreEnv & { DB: D1Datab
     await env.DB.prepare('UPDATE store_items SET status = ?, session_id = NULL, held_until = NULL, sold_at = ?, updated_at = ? WHERE product_id = ?')
       .bind(body.status, body.status === 'sold' ? Date.now() : null, Date.now(), body.productId).run();
   }
-  return json({ items: await inventory(env), checkout: Boolean(env.STRIPE_SECRET_KEY), mode: env.STRIPE_SECRET_KEY?.startsWith('sk_live_') ? 'live' : env.STRIPE_SECRET_KEY ? 'test' : null });
+  return json({
+    items: await inventory(env),
+    checkout: Boolean(env.STRIPE_SECRET_KEY),
+    mode: env.STRIPE_SECRET_KEY?.startsWith('sk_live_') ? 'live' : env.STRIPE_SECRET_KEY ? 'test' : null,
+    merch: { printify: Boolean(env.PRINTIFY_ACCESS), orders: await merchOrders(env.DB) },
+  });
 }
 
-export async function handleStore(request: Request, env: StoreEnv): Promise<Response | null> {
+export async function handleStore(request: Request, env: MerchEnv): Promise<Response | null> {
   const url = new URL(request.url);
   const routes: Record<string, string> = {
     '/api/store': 'GET',
@@ -287,7 +311,7 @@ export async function handleStore(request: Request, env: StoreEnv): Promise<Resp
   if (!method) return null;
   if (request.method !== method) return new Response('Method not allowed', { status: 405, headers: { allow: method } });
   if (!env.DB) return json({ error: 'no-database' }, 503);
-  const storeEnv = env as StoreEnv & { DB: D1Database };
+  const storeEnv = env as MerchEnv & { DB: D1Database };
 
   switch (url.pathname) {
     case '/api/store':

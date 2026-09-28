@@ -1,9 +1,10 @@
 // Listening metrics: /api/e takes anonymous events from the site, /api/admin/* serves the
 // dashboard at /admin. Data lives in D1 (schema: worker/schema.sql).
 import catalog from '../lib/tracks.json';
-import { adminStore, type StoreEnv } from './store';
+import type { MerchEnv } from './merch';
+import { adminStore } from './store';
 
-export interface MetricsEnv extends StoreEnv {
+export interface MetricsEnv extends MerchEnv {
   DB?: D1Database;
   ADMIN_PASSWORD?: string;
 }

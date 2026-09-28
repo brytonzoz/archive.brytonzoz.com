@@ -37,3 +37,10 @@ fashion:
     description: "Curated fashion pieces and experimental designs"
     highlight: "Limited Collection"
     image: "covers/scrapwrk"
+
+  - name: "NonParallel"
+    url: "/nonparallel/"
+    type: "merch"
+    description: "the label and company behind all of this"
+    highlight: "Shop"
+    image: "merch/rainbow/black-1"

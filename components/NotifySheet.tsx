@@ -8,11 +8,12 @@ import { useSheet } from './useSheet';
 
 export const NOTIFY_KEY = 'bz.notify';
 
-type NotifySource = 'teaser' | 'scrapwrk';
+type NotifySource = 'teaser' | 'scrapwrk' | 'nonparallel';
 const storageKey = (source: NotifySource) => (source === 'teaser' ? NOTIFY_KEY : `${NOTIFY_KEY}.${source}`);
 const COPY: Record<NotifySource, { title: string; note: string; done: string }> = {
   teaser: { title: 'Be first to hear it', note: 'One email when it’s out. Nothing else.', done: 'One email when it’s out.' },
   scrapwrk: { title: 'Be first to the next drop', note: 'One email when new pieces go up. Nothing else.', done: 'One email when new pieces go up.' },
+  nonparallel: { title: 'New NonParallel designs', note: 'One email when new tees go up. Nothing else.', done: 'One email when new tees go up.' },
 };
 
 export function hasSignedUp(source: NotifySource = 'teaser'): boolean {

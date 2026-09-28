@@ -51,3 +51,15 @@ CREATE TABLE IF NOT EXISTS store_items (
   updated_at INTEGER
 );
 CREATE INDEX IF NOT EXISTS store_items_session ON store_items (session_id);
+
+-- NonParallel tees: one row per paid checkout that contains them, once its Printify order is placed
+-- (or failed, retried up to 5 times by the scheduled check). Managed by worker/merch.ts.
+CREATE TABLE IF NOT EXISTS merch_orders (
+  session_id TEXT PRIMARY KEY,
+  status TEXT NOT NULL,
+  printify_order_id TEXT,
+  error TEXT,
+  attempts INTEGER NOT NULL DEFAULT 0,
+  created_at INTEGER,
+  updated_at INTEGER
+);

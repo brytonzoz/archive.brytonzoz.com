@@ -1,499 +1,256 @@
 'use client';
 
-import React, { useState } from 'react';
-import Link from 'next/link';
+import React, { useEffect, useState } from 'react';
 import { Project, isProjectReleased } from '../lib/utils';
 import { streamingIconAssets } from '../lib/assets';
-import { ResponsiveImage } from './ResponsiveImage';
+import { ResponsiveImage, placeholderBackground } from './ResponsiveImage';
+
+const STREAMING_SERVICES = [
+  { key: 'applemusic', name: 'Apple Music', icon: streamingIconAssets.applemusic },
+  { key: 'spotify', name: 'Spotify', icon: streamingIconAssets.spotify },
+  { key: 'youtubemusic', name: 'YouTube Music', icon: streamingIconAssets.youtubemusic },
+] as const;
+
+const TYPE_LABELS: Record<string, string> = {
+  album: 'Album',
+  'streaming-ep': 'EP',
+  mixtape: 'Mixtape',
+  'multi-purpose-stream': 'Platform',
+  'video-series': 'Video series',
+  ecommerce: 'Store',
+};
+
+function getStreamingLinks(project: Project) {
+  return isProjectReleased(project)
+    ? (project.postReleaseStreamingLinks || project.streamingLinks)
+    : project.streamingLinks;
+}
+
+function getDescription(project: Project) {
+  return isProjectReleased(project)
+    ? (project.postReleaseDescription || project.description)
+    : (project.preReleaseDescription || project.description);
+}
+
+function ArrowIcon({ className = '' }: { className?: string }) {
+  return (
+    <svg className={className} width="14" height="14" viewBox="0 0 24 24" fill="none" aria-hidden="true">
+      <path d="M7 17 17 7M9 7h8v8" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round" />
+    </svg>
+  );
+}
+
+export const StreamingModal = ({
+  project,
+  isOpen,
+  onClose,
+}: {
+  project: Project;
+  isOpen: boolean;
+  onClose: () => void;
+}) => {
+  useEffect(() => {
+    if (!isOpen) return;
+    const handleKey = (event: KeyboardEvent) => {
+      if (event.key === 'Escape') onClose();
+    };
+    window.addEventListener('keydown', handleKey);
+    return () => window.removeEventListener('keydown', handleKey);
+  }, [isOpen, onClose]);
+
+  const links = getStreamingLinks(project);
+  if (!isOpen || !links) return null;
+
+  const isReleased = isProjectReleased(project);
+  // Before release every service is listed, but only Apple Music (the pre-save) is live.
+  const services = STREAMING_SERVICES
+    .map((service) => ({
+      ...service,
+      url: isReleased || service.key === 'applemusic' ? links[service.key] : undefined,
+    }))
+    .filter((service) => service.url || !isReleased);
+
+  return (
+    <div
+      role="dialog"
+      aria-modal="true"
+      aria-label={`Listen to ${project.name}`}
+      className="fixed inset-0 z-[100] flex items-end justify-center font-body sm:items-center"
+    >
+      <button
+        type="button"
+        aria-label="Close"
+        onClick={onClose}
+        className="modal-backdrop absolute inset-0 cursor-default bg-black/60 backdrop-blur-xl"
+      />
+
+      <div
+        className="modal-sheet relative w-full max-w-[380px] rounded-t-[28px] bg-[#161618] p-5 shadow-[0_30px_80px_rgba(0,0,0,0.5)] ring-1 ring-white/10 sm:rounded-[28px]"
+        style={{ paddingBottom: 'max(1.25rem, env(safe-area-inset-bottom))' }}
+      >
+        <div className="flex items-center gap-4">
+          {project.image ? (
+            <div
+              className="relative h-14 w-14 shrink-0 overflow-hidden rounded-xl"
+              style={placeholderBackground(project.image)}
+            >
+              <ResponsiveImage
+                asset={project.image}
+                alt=""
+                sizes="56px"
+                className="absolute inset-0 h-full w-full object-cover"
+              />
+            </div>
+          ) : null}
+          <div className="min-w-0 flex-1">
+            <p className="text-[11px] font-medium uppercase tracking-[0.14em] text-white/40">
+              {isReleased ? 'Listen on' : 'Pre-save on'}
+            </p>
+            <h2 className="mt-0.5 truncate text-lg font-semibold tracking-[-0.01em] text-white">{project.name}</h2>
+          </div>
+          <button
+            type="button"
+            onClick={onClose}
+            aria-label="Close"
+            className="-mr-1 flex h-9 w-9 shrink-0 items-center justify-center rounded-full text-white/50 transition-colors hover:bg-white/10 hover:text-white focus-visible:outline focus-visible:outline-2 focus-visible:outline-white/60"
+          >
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" aria-hidden="true">
+              <path d="M6 6l12 12M18 6 6 18" stroke="currentColor" strokeWidth="2.4" strokeLinecap="round" />
+            </svg>
+          </button>
+        </div>
+
+        <ul className="mt-5 space-y-2">
+          {services.map((service) => {
+            const row = (
+              <>
+                <span className="relative h-8 w-8 shrink-0 overflow-hidden rounded-full bg-white/10">
+                  <ResponsiveImage
+                    asset={service.icon}
+                    alt=""
+                    sizes="32px"
+                    className="absolute inset-0 h-full w-full object-cover"
+                  />
+                </span>
+                <span className="flex-1 text-[15px] font-medium">{service.name}</span>
+              </>
+            );
+
+            return (
+              <li key={service.key}>
+                {service.url ? (
+                  <a
+                    href={service.url}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="group flex items-center gap-3 rounded-2xl bg-white/[0.06] px-4 py-3 text-white transition-colors hover:bg-white/[0.11] focus-visible:outline focus-visible:outline-2 focus-visible:outline-white/60"
+                  >
+                    {row}
+                    <ArrowIcon className="text-white/40 transition-transform group-hover:-translate-y-px group-hover:translate-x-px group-hover:text-white" />
+                  </a>
+                ) : (
+                  <div className="flex items-center gap-3 rounded-2xl bg-white/[0.03] px-4 py-3 text-white/40">
+                    {row}
+                    <span className="text-[12px]">At release</span>
+                  </div>
+                )}
+              </li>
+            );
+          })}
+        </ul>
+      </div>
+    </div>
+  );
+};
 
 interface ProjectCardProps {
   project: Project;
   className?: string;
   style?: React.CSSProperties;
   onModalStateChange?: (isOpen: boolean) => void;
-  imageAspectRatio?: number;
 }
 
-// Streaming service configuration with local images
-const streamingServices = {
-  applemusic: {
-    name: 'Apple Music',
-    image: streamingIconAssets.applemusic
-  },
-  spotify: {
-    name: 'Spotify',
-    image: streamingIconAssets.spotify
-  },
-  youtubemusic: {
-    name: 'YouTube Music',
-    image: streamingIconAssets.youtubemusic
-  }
-};
-
-// Enhanced color schemes with sophisticated depth and precedence
-const getProjectColors = (projectName: string, type: string) => {
-  if (type === "album") {
-    return {
-      gradient: "from-amber-500/10 via-yellow-500/8 to-orange-500/10",
-      hoverGradient: "group-hover:from-amber-500/25 group-hover:via-yellow-500/20 group-hover:to-orange-500/25",
-      accent: "text-amber-300",
-      badge: "bg-amber-500/12 border-amber-400/20 text-amber-200",
-      glow: "group-hover:shadow-amber-500/15",
-      shadowColor: "shadow-amber-500/10"
-    };
-  } else if (type === "streaming-ep") {
-    return {
-      gradient: "from-pink-500/10 via-purple-500/8 to-blue-500/10",
-      hoverGradient: "group-hover:from-pink-500/25 group-hover:via-purple-500/20 group-hover:to-blue-500/25",
-      accent: "text-pink-300",
-      badge: "bg-pink-500/12 border-pink-400/20 text-pink-200",
-      glow: "group-hover:shadow-pink-500/15",
-      shadowColor: "shadow-pink-500/10"
-    };
-  } else if (type === "mixtape") {
-    return {
-      gradient: "from-purple-500/10 via-violet-500/8 to-fuchsia-500/10",
-      hoverGradient: "group-hover:from-purple-500/25 group-hover:via-violet-500/20 group-hover:to-fuchsia-500/25",
-      accent: "text-purple-300",
-      badge: "bg-purple-500/12 border-purple-400/20 text-purple-200",
-      glow: "group-hover:shadow-purple-500/15",
-      shadowColor: "shadow-purple-500/10"
-    };
-  } else if (type === "multi-purpose-stream") {
-    return {
-      gradient: "from-blue-500/10 via-cyan-500/8 to-teal-500/10",
-      hoverGradient: "group-hover:from-blue-500/25 group-hover:via-cyan-500/20 group-hover:to-teal-500/25",
-      accent: "text-blue-300",
-      badge: "bg-blue-500/12 border-blue-400/20 text-blue-200",
-      glow: "group-hover:shadow-blue-500/15",
-      shadowColor: "shadow-blue-500/10"
-    };
-  } else if (type === "video-series") {
-    return {
-      gradient: "from-orange-500/10 via-red-500/8 to-pink-500/10",
-      hoverGradient: "group-hover:from-orange-500/25 group-hover:via-red-500/20 group-hover:to-pink-500/25",
-      accent: "text-orange-300",
-      badge: "bg-orange-500/12 border-orange-400/20 text-orange-200",
-      glow: "group-hover:shadow-orange-500/15",
-      shadowColor: "shadow-orange-500/10"
-    };
-  } else {
-    return {
-      gradient: "from-green-500/10 via-emerald-500/8 to-teal-500/10",
-      hoverGradient: "group-hover:from-green-500/25 group-hover:via-emerald-500/20 group-hover:to-teal-500/25",
-      accent: "text-green-300",
-      badge: "bg-green-500/12 border-green-400/20 text-green-200",
-      glow: "group-hover:shadow-green-500/15",
-      shadowColor: "shadow-green-500/10"
-    };
-  }
-};
-
-// Streaming Modal Component
-export const StreamingModal = ({
-  project,
-  isOpen,
-  onClose
-}: {
-  project: Project;
-  isOpen: boolean;
-  onClose: () => void;
-}) => {
-  if (!isOpen) return null;
-
+export function ProjectCard({ project, className = '', style, onModalStateChange }: ProjectCardProps) {
+  const [isStreamingModalOpen, setIsStreamingModalOpen] = useState(false);
+  const links = getStreamingLinks(project);
   const isReleased = isProjectReleased(project);
-  const currentStreamingLinks = isReleased ?
-    (project.postReleaseStreamingLinks || project.streamingLinks) :
-    project.streamingLinks;
+  const action = links
+    ? (isReleased ? 'Listen' : 'Pre-save')
+    : project.type === 'video-series'
+      ? 'Watch'
+      : project.type === 'ecommerce'
+        ? 'Shop'
+        : 'Visit';
 
-  if (!currentStreamingLinks) return null;
-
-  // For pre-release, show all potential services but only enable Apple Music
-  const allServices = ['applemusic', 'spotify', 'youtubemusic'];
-  const services = allServices.map(key => {
-    const url = currentStreamingLinks[key as keyof typeof currentStreamingLinks];
-    const serviceInfo = streamingServices[key as keyof typeof streamingServices];
-    const isEnabled = isReleased || key === 'applemusic'; // Only Apple Music enabled pre-release
-
-    return {
-      key,
-      url: isEnabled ? url : undefined,
-      isEnabled,
-      ...serviceInfo
-    };
-  }).filter(service => service.url || !isReleased); // Show all services pre-release, only available ones post-release
-
-  return (
-    <div className="fixed inset-0 z-[100] flex items-center justify-center">
-      {/* Ultra-Enhanced Full-Screen Backdrop with Maximum Blur */}
-      <div
-        className="absolute inset-0 bg-black/90 backdrop-blur-3xl"
-        onClick={onClose}
-        style={{
-          backdropFilter: 'blur(60px) saturate(200%)',
-          WebkitBackdropFilter: 'blur(60px) saturate(200%)'
-        }}
-      />
-
-      {/* Modal Content - Simplified */}
-      <div className="relative z-10 w-full max-w-sm px-6">
-        {/* Close Button */}
-        <button
-          onClick={onClose}
-          className="absolute -top-16 right-4 text-white/90 hover:text-white transition-colors p-2 rounded-full hover:bg-white/10"
-        >
-          <svg className="w-8 h-8" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M6 18L18 6M6 6l12 12" />
-          </svg>
-        </button>
-
-        {/* Slimmer Flying Containers - Closer Together */}
-        <div className="space-y-4">
-          {services.map((service, index) => (
-            <div
-              key={service.key}
-              className={`
-                animate-in slide-in-from-bottom-8 fade-in-0 duration-500
-                ${index === 0 ? 'delay-100' : index === 1 ? 'delay-200' : 'delay-300'}
-              `}
-            >
-              {service.isEnabled && service.url ? (
-                <Link
-                  href={service.url}
-                  target="_blank"
-                  rel="noopener noreferrer"
-                  className="
-                    group flex items-center justify-between py-5 px-6
-                    bg-white/15 hover:bg-white/25
-                    backdrop-blur-xl border border-white/30
-                    rounded-2xl transition-all duration-300
-                    hover:scale-105 hover:shadow-2xl hover:shadow-white/20
-                    transform-gpu focus:outline-none focus:ring-0
-                  "
-                  style={{
-                    backdropFilter: 'blur(30px) saturate(180%)',
-                    WebkitBackdropFilter: 'blur(30px) saturate(180%)'
-                  }}
-                >
-                  {/* Service Name */}
-                  <span className="text-white font-semibold text-lg">
-                    {service.name}
-                  </span>
-
-                  {/* Right Side Content */}
-                  <div className="flex items-center space-x-4">
-                    {/* Circular Logo */}
-                    <div className="w-12 h-12 rounded-full overflow-hidden bg-white/30 p-1 ring-1 ring-white/20">
-                      <ResponsiveImage
-                        asset={service.image}
-                        alt={service.name}
-                        sizes="40px"
-                        className="w-full h-full object-cover rounded-full"
-                      />
-                    </div>
-
-                    {/* Arrow */}
-                    <svg
-                      className="w-6 h-6 text-white/80 group-hover:text-white group-hover:translate-x-2 transition-all duration-300"
-                      fill="none"
-                      stroke="currentColor"
-                      viewBox="0 0 24 24"
-                    >
-                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M10 6L8 4l6 8-6 8 2-2 4-6-4-6z" />
-                    </svg>
-                  </div>
-                </Link>
-              ) : (
-                <div className="
-                  flex items-center justify-between py-5 px-6
-                  bg-white/5 backdrop-blur-xl border border-white/10
-                  rounded-2xl transition-all duration-300
-                  opacity-50 cursor-not-allowed
-                "
-                style={{
-                  backdropFilter: 'blur(30px) saturate(180%)',
-                  WebkitBackdropFilter: 'blur(30px) saturate(180%)'
-                }}
-                >
-                  {/* Service Name */}
-                  <span className="text-white/70 font-semibold text-lg">
-                    {service.name}
-                  </span>
-
-                  {/* Right Side Content */}
-                  <div className="flex items-center space-x-4">
-                    {/* Circular Logo */}
-                    <div className="w-12 h-12 rounded-full overflow-hidden bg-white/20 p-1 ring-1 ring-white/10">
-                      <ResponsiveImage
-                        asset={service.image}
-                        alt={service.name}
-                        sizes="40px"
-                        className="w-full h-full object-cover rounded-full opacity-60"
-                      />
-                    </div>
-
-                    {/* Lock Icon Instead of Arrow for disabled services */}
-                    <svg
-                      className="w-6 h-6 text-white/40"
-                      fill="none"
-                      stroke="currentColor"
-                      viewBox="0 0 24 24"
-                    >
-                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 15v2m0 0v2m0-2h2m-2 0H8m13 0a9 9 0 11-18 0 9 9 0 0118 0z" />
-                    </svg>
-                  </div>
-                </div>
-              )}
-            </div>
-          ))}
-        </div>
-      </div>
-    </div>
-  );
-};
-
-const SolenyaCard = ({
-  project,
-  className = '',
-  style,
-}: {
-  project: Project;
-  className?: string;
-  style?: React.CSSProperties;
-}) => {
-  const isReleased = isProjectReleased(project);
-  const currentDescription = isReleased ?
-    (project.postReleaseDescription || project.description) :
-    (project.preReleaseDescription || project.description);
-  const currentStreamingLinks = isReleased ?
-    (project.postReleaseStreamingLinks || project.streamingLinks) :
-    project.streamingLinks;
-  const primaryActionUrl =
-    currentStreamingLinks?.applemusic ||
-    currentStreamingLinks?.spotify ||
-    currentStreamingLinks?.youtubemusic ||
-    project.url;
-
-  return (
-    <div
-      className={`
-        relative mx-auto overflow-hidden rounded-[56px]
-        bg-[#2A130D]
-        px-3 pb-3 pt-3 sm:px-3.5 sm:pb-4 sm:pt-3.5
-        shadow-[0_36px_110px_rgba(22,8,8,0.45)]
-        ${className}
-      `}
-      style={style}
-    >
-      <div className="absolute inset-0 bg-[radial-gradient(circle_at_top_left,rgba(255,255,255,0.08),transparent_32%),radial-gradient(circle_at_bottom_right,rgba(0,0,0,0.22),transparent_40%)]" />
-
-      <div className="relative z-10 flex flex-col gap-3">
-        <div className="relative overflow-hidden rounded-[28px] aspect-square shadow-[0_20px_60px_rgba(0,0,0,0.24)]">
-          {project.image ? (
-            <ResponsiveImage
-              asset={project.image}
-              alt={project.name}
-              sizes="(max-width: 640px) calc(100vw - 190px), 260px"
-              className="absolute inset-0 h-full w-full object-cover object-center"
-            />
-          ) : null}
-        </div>
-
-        <div className="space-y-1 px-2 text-white">
-          <h3 className="text-[1.65rem] font-black uppercase tracking-[-0.05em] leading-none sm:text-[1.9rem]">
-            {project.name}
-          </h3>
-          <p className="max-w-none whitespace-nowrap text-[0.76rem] leading-none text-white/84 sm:text-[0.86rem]">
-            {currentDescription}
-          </p>
-        </div>
-
-        {primaryActionUrl ? (
-          <Link
-            href={primaryActionUrl}
-            target="_blank"
-            rel="noopener noreferrer"
-            className="
-              group/listen mt-1 flex items-center justify-between rounded-[28px]
-              bg-[#C7937F] px-4 py-3 text-white
-              transition-transform duration-500 hover:-translate-y-0.5
-              sm:px-5 sm:py-3.5
-            "
-          >
-            <span className="text-[0.9rem] font-semibold tracking-[-0.04em] sm:text-[1rem]">
-              Listen Now
-            </span>
-            <svg
-              className="h-7 w-7 transition-transform duration-500 group-hover/listen:translate-x-1 sm:h-8 sm:w-8"
-              fill="none"
-              stroke="currentColor"
-              viewBox="0 0 24 24"
-            >
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.25} d="M5 12h14m-5-5 5 5-5 5" />
-            </svg>
-          </Link>
-        ) : null}
-      </div>
-    </div>
-  );
-};
-
-// Card Content Component
-const CardContent = ({ project, colors, imageAspectRatio = 16/9 }: { project: Project; colors: any; imageAspectRatio?: number }) => {
-  const isReleased = isProjectReleased(project);
-  const currentDescription = isReleased ?
-    (project.postReleaseDescription || project.description) :
-    (project.preReleaseDescription || project.description);
-  const currentStreamingLinks = isReleased ?
-    (project.postReleaseStreamingLinks || project.streamingLinks) :
-    project.streamingLinks;
-
-  return (
+  const content = (
     <>
-      {/* Image Container */}
       <div
-        className="relative rounded-xl overflow-hidden mb-4"
-        style={{
-          aspectRatio: `${imageAspectRatio}`,
-          minHeight: '200px'
-        }}
+        className="relative aspect-square overflow-hidden rounded-[22px] bg-white/[0.04] ring-1 ring-inset ring-white/[0.06]"
+        style={project.image ? placeholderBackground(project.image) : undefined}
       >
         {project.image ? (
           <ResponsiveImage
             asset={project.image}
             alt={project.name}
-            sizes="(min-width: 640px) 360px, calc(100vw - 80px)"
-            className="absolute inset-0 h-full w-full object-cover object-top group-hover:scale-105 transition-transform duration-700"
+            sizes="(min-width: 640px) 420px, calc(100vw - 40px)"
+            className="absolute inset-0 h-full w-full object-cover transition-transform duration-700 ease-out group-hover:scale-[1.03]"
           />
         ) : null}
-        <div className={`absolute inset-0 bg-gradient-to-t from-black/50 to-transparent opacity-60 group-hover:opacity-40 transition-opacity duration-500`} />
       </div>
 
-      {/* Content */}
-      <div className="space-y-3">
-        <h3 className="text-lg font-semibold text-white/90 group-hover:text-white transition-colors duration-300">
-          {project.name}
-        </h3>
-
-        <p className="text-sm text-white/60 group-hover:text-white/80 transition-colors duration-300 leading-relaxed">
-          {currentDescription}
-        </p>
-
-      {/* Refined Tags */}
-      <div className="flex flex-wrap gap-1.5">
-        {project.type && !project.type.includes('streaming-ep') && !project.type.includes('album') && (
-          <span className={`px-2 py-1 text-xs rounded-full border backdrop-blur-sm ${colors.badge}`}>
-            {project.type.replace(/-/g, ' ')}
-          </span>
-        )}
-        {project.highlight && (
-          <span className={`px-2 py-1 text-xs rounded-full border backdrop-blur-sm ${colors.badge}`}>
-            {project.highlight}
-          </span>
-        )}
-        {/* Streaming Platform Tags */}
-        {currentStreamingLinks && (
-          <>
-            {currentStreamingLinks.applemusic && (
-              <span className="px-2 py-1 text-xs rounded-full border backdrop-blur-sm bg-pink-500/12 border-pink-400/20 text-pink-200">
-                Apple Music
-              </span>
-            )}
-            {currentStreamingLinks.spotify && (
-              <span className="px-2 py-1 text-xs rounded-full border backdrop-blur-sm bg-green-500/12 border-green-400/20 text-green-200">
-                Spotify
-              </span>
-            )}
-            {currentStreamingLinks.youtubemusic && (
-              <span className="px-2 py-1 text-xs rounded-full border backdrop-blur-sm bg-red-500/12 border-red-400/20 text-red-200">
-                YouTube Music
-              </span>
-            )}
-          </>
-        )}
+      <div className="mt-4 flex items-end justify-between gap-4 px-0.5">
+        <div className="min-w-0">
+          <p className="text-[11px] font-medium uppercase tracking-[0.14em] text-white/40">
+            {TYPE_LABELS[project.type] ?? project.type.replace(/-/g, ' ')}
+          </p>
+          <h2 className="mt-1 truncate text-[17px] font-semibold tracking-[-0.01em] text-white">{project.name}</h2>
+          <p className="mt-0.5 line-clamp-2 text-[14px] leading-snug text-white/55">{getDescription(project)}</p>
         </div>
+        <span className="flex shrink-0 items-center gap-1 rounded-full bg-white px-3.5 py-1.5 text-[13px] font-semibold text-black transition-transform duration-200 group-hover:translate-x-0.5">
+          {action}
+          {links ? null : <ArrowIcon />}
+        </span>
       </div>
     </>
   );
-};
 
-export function ProjectCard({ project, className = '', style, onModalStateChange, imageAspectRatio = 16/9 }: ProjectCardProps) {
-  const [isStreamingModalOpen, setIsStreamingModalOpen] = useState(false);
-  const isSolenya = project.name === 'SOLENYA';
-  const colors = getProjectColors(project.name, project.type);
-  const isReleased = isProjectReleased(project);
-  const currentStreamingLinks = isReleased ?
-    (project.postReleaseStreamingLinks || project.streamingLinks) :
-    project.streamingLinks;
+  const cardClassName = `group block w-full rounded-[26px] text-left focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-4 focus-visible:outline-white/60 ${className}`;
 
-  if (isSolenya) {
-    return <SolenyaCard project={project} className={className} style={style} />;
+  if (links) {
+    return (
+      <>
+        <button
+          type="button"
+          className={cardClassName}
+          style={style}
+          onClick={() => {
+            setIsStreamingModalOpen(true);
+            onModalStateChange?.(true);
+          }}
+        >
+          {content}
+        </button>
+        <StreamingModal
+          project={project}
+          isOpen={isStreamingModalOpen}
+          onClose={() => {
+            setIsStreamingModalOpen(false);
+            onModalStateChange?.(false);
+          }}
+        />
+      </>
+    );
   }
 
-  const handleCardClick = () => {
-    if (currentStreamingLinks) {
-      setIsStreamingModalOpen(true);
-      onModalStateChange?.(true);
-    } else if (project.url) {
-      window.open(project.url, '_blank');
-    }
-  };
-
-  const handleModalClose = () => {
-    setIsStreamingModalOpen(false);
-    onModalStateChange?.(false);
-  };
-
   return (
-    <>
-      <div
-        className={`
-          group relative overflow-hidden rounded-2xl p-6 cursor-pointer
-          bg-gradient-to-br ${colors.gradient} ${colors.hoverGradient}
-          border border-white/10 backdrop-blur-xl
-          hover:border-white/20 transition-all duration-500
-          hover:shadow-2xl ${colors.glow} hover:-translate-y-1
-          ${className}
-        `}
-        style={style}
-        onClick={handleCardClick}
-      >
-        {/* Glass overlay */}
-        <div className="absolute inset-0 bg-gradient-to-br from-white/5 to-transparent opacity-0 group-hover:opacity-100 transition-opacity duration-500" />
-
-        <CardContent project={project} colors={colors} imageAspectRatio={imageAspectRatio} />
-
-        {/* Large Call-to-Action Button */}
-        <div className="mt-6">
-          <div className="
-            flex items-center justify-center space-x-2
-            py-3 px-4 rounded-xl
-            bg-white/10 group-hover:bg-white/20
-            border border-white/20 group-hover:border-white/30
-            transition-all duration-300
-            text-white/80 group-hover:text-white
-          ">
-            <span className="font-medium">
-              {currentStreamingLinks ? (isReleased ? 'Listen' : 'Presave') : 'Visit'}
-            </span>
-            <svg
-              className="w-4 h-4 group-hover:translate-x-1 transition-transform duration-300"
-              fill="none"
-              stroke="currentColor"
-              viewBox="0 0 24 24"
-            >
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
-            </svg>
-          </div>
-        </div>
-      </div>
-
-      {/* Streaming Modal */}
-      <StreamingModal
-        project={project}
-        isOpen={isStreamingModalOpen}
-        onClose={handleModalClose}
-      />
-    </>
+    <a
+      href={project.url}
+      target="_blank"
+      rel="noopener noreferrer"
+      className={cardClassName}
+      style={style}
+    >
+      {content}
+    </a>
   );
 }

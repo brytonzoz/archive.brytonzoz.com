@@ -1,9 +1,5 @@
 import type { MediaAsset } from './media';
 
-export function cn(...inputs: string[]) {
-  return inputs.filter(Boolean).join(' ');
-}
-
 // Utility function to check if a project has been released
 export function isProjectReleased(project: Project): boolean {
   if (!project.releaseDate) return true; // No release date means it's already released

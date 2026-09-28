@@ -10,7 +10,10 @@ const inter = Inter({
 
 export const metadata: Metadata = {
   metadataBase: new URL('https://brytonzoz.com'),
-  title: 'Bryton Zoz - Creative Projects',
+  title: {
+    default: 'Bryton Zoz - Creative Projects',
+    template: '%s - Bryton Zoz',
+  },
   description: 'Find music and fashion creative projects by Bryton',
   keywords: 'Bryton Zoz, music, fashion, creative, archive',
   authors: [{ name: 'Bryton' }],
@@ -20,11 +23,13 @@ export const metadata: Metadata = {
     url: 'https://brytonzoz.com',
     siteName: 'Bryton Zoz',
     type: 'website',
+    images: [{ url: '/og.jpg', width: 1200, height: 630, alt: 'SOLENYA by Bryton Zoz' }],
   },
   twitter: {
     card: 'summary_large_image',
     title: 'Bryton Zoz - Creative Projects',
     description: 'Find music and fashion creative projects by Bryton',
+    images: ['/og.jpg'],
   },
   robots: {
     index: true,

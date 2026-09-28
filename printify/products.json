@@ -466,7 +466,7 @@
       "key": "trucker",
       "name": "Trucker Hat",
       "category": "Hats & Bags",
-      "blueprintId": 1128,
+      "blueprintId": 1446,
       "designs": [
         "rainbow",
         "purple"
@@ -476,8 +476,10 @@
           "Black"
         ],
         "purple": [
-          "Black",
-          "Dark Navy"
+          "Black / White",
+          "Heather Grey / White",
+          "Charcoal / White",
+          "Black"
         ]
       },
       "placements": {
@@ -489,7 +491,12 @@
       },
       "margin": 700,
       "lead": "front",
-      "shots": 3
+      "shots": 3,
+      "find": [
+        "Snapback Trucker",
+        "Trucker Cap",
+        "Trucker Hat"
+      ]
     },
     {
       "key": "tote",
@@ -588,7 +595,6 @@
       "key": "keychain",
       "name": "Keychain",
       "category": "Stickers & Pins",
-      "blueprintId": 2675,
       "designs": [
         "rainbow",
         "purple"
@@ -602,7 +608,12 @@
       },
       "margin": 350,
       "lead": "front",
-      "shots": 3
+      "shots": 3,
+      "find": [
+        "Acrylic Keychain",
+        "Keychain"
+      ],
+      "exclude": "AOP|Plush|Heart"
     },
     {
       "key": "mug",
@@ -840,22 +851,16 @@
       "key": "framed-poster",
       "name": "Framed Poster",
       "category": "Home",
-      "blueprintId": 492,
       "designs": [
         "rainbow",
         "purple"
       ],
-      "designColors": {
-        "rainbow": [
-          "Black"
-        ],
-        "purple": [
-          "White"
-        ]
-      },
       "sizes": [
         "11″ x 14″",
-        "18″ x 24″"
+        "12″ x 16″",
+        "16″ x 20″",
+        "18″ x 24″",
+        "24″ x 36″"
       ],
       "placements": {
         "front": {
@@ -866,7 +871,14 @@
       },
       "margin": 1200,
       "lead": "front",
-      "shots": 3
+      "shots": 3,
+      "find": [
+        "Framed Vertical Poster",
+        "Framed Poster",
+        "Framed Paper Poster"
+      ],
+      "exclude": "AOP|EU|UK|Horizontal|Canvas",
+      "maxColors": 2
     },
     {
       "key": "flag",

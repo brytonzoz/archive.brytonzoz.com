@@ -69,37 +69,44 @@ export async function sync(printify, root) {
     }
   }
 
+  // US printers for a blueprint. The blueprint's provider list doesn't say where each one prints;
+  // the provider itself does. A UK printer charges $25-45 to ship here, so only US ones.
+  async function usProviders(blueprintId) {
+    const providers = await printify('GET', `/catalog/blueprints/${blueprintId}/print_providers.json`).catch(() => []);
+    const ids = [];
+    for (const entry of providers) {
+      if (!providerCountry.has(entry.id)) {
+        const detail = await printify('GET', `/catalog/print_providers/${entry.id}.json`).catch(() => null);
+        providerCountry.set(entry.id, detail?.location?.country ?? null);
+      }
+      if (providerCountry.get(entry.id) === 'US') ids.push(entry.id);
+    }
+    return ids;
+  }
+
   async function syncLine(line) {
-    if (!line.blueprintId) {
+    let providerIds = line.printProviders;
+    if (line.blueprintId && !providerIds) providerIds = await usProviders(line.blueprintId);
+    // By name: the first matching blank that a US printer makes (also the fallback when the
+    // blueprint given has none).
+    if ((!line.blueprintId || !providerIds?.length) && line.find) {
       blueprints ??= await printify('GET', '/catalog/blueprints.json');
       const label = (b) => `${b.brand} ${b.model} ${b.title}`;
       const skip = line.exclude ? new RegExp(line.exclude, 'i') : /\(AOP\)|\bEU\b|\(EU\)|UK/;
-      for (const pattern of [].concat(line.find)) {
-        const match = blueprints.find((b) => new RegExp(pattern, 'i').test(label(b)) && !skip.test(label(b)));
-        if (match) { line.blueprintId = match.id; break; }
+      search: for (const pattern of [].concat(line.find)) {
+        for (const b of blueprints.filter((entry) => new RegExp(pattern, 'i').test(label(entry)) && !skip.test(label(entry))).slice(0, 8)) {
+          const ids = await usProviders(b.id);
+          if (ids.length) { line.blueprintId = b.id; providerIds = ids; break search; }
+        }
       }
-      if (!line.blueprintId) {
-        console.log(`! ${line.name}: no blank matches ${[].concat(line.find).join(' | ')}; skipped`);
-        return;
-      }
+    }
+    if (!line.blueprintId || !providerIds?.length) {
+      console.log(`! ${line.name}: no blank with a US printer${line.find ? ` for ${[].concat(line.find).join(' | ')}` : ''}; skipped`);
+      return;
     }
     const blueprint = await printify('GET', `/catalog/blueprints/${line.blueprintId}.json`);
     console.log(`\n# ${line.name}: blueprint ${line.blueprintId} · ${blueprint.brand} ${blueprint.model} · ${blueprint.title}`);
-    let providerIds = line.printProviders;
-    if (!providerIds) {
-      // The blueprint's provider list doesn't say where each one prints; the provider itself does.
-      // Only US printers, so shipping stays a few dollars (a UK printer charges $25-45 to ship here).
-      const providers = await printify('GET', `/catalog/blueprints/${line.blueprintId}/print_providers.json`);
-      providerIds = [];
-      for (const entry of providers) {
-        if (!providerCountry.has(entry.id)) {
-          const detail = await printify('GET', `/catalog/print_providers/${entry.id}.json`).catch(() => null);
-          providerCountry.set(entry.id, detail?.location?.country ?? null);
-        }
-        if (providerCountry.get(entry.id) === 'US') providerIds.push(entry.id);
-      }
-      console.log(`  US printers: ${providerIds.join(', ') || 'none'}`);
-    }
+    console.log(`  US printers: ${providerIds.join(', ')}`);
     const details = line.details ?? stripHtml(blueprint.description).split('.:').slice(1).map((part) => part.replace(/\s+/g, ' ').trim().replace(/\.$/, '')).filter(Boolean).slice(0, 5);
     const shippingCache = new Map();
     const variantCache = new Map();
@@ -130,7 +137,7 @@ export async function sync(printify, root) {
         }
         variantCache.set(candidate, data);
         const list = (data.variants ?? []).filter((variant) =>
-          (!wantedColors || wantedColors.includes(colorOf(variant, line))) && (!sizes || sizes.includes(loose(sizeOf(variant)))));
+          (!wantedColors || wantedColors.includes(colorOf(variant, line))) && (!sizes || sizes.some((wanted) => loose(sizeOf(variant)).startsWith(wanted))));
         const found = new Set(list.map((variant) => colorOf(variant, line))).size;
         if (list.length && found > best) {
           providerId = candidate;

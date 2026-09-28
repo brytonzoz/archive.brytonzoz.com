@@ -3,7 +3,7 @@
   "version": "0.1.0",
   "private": true,
   "scripts": {
-    "media": "node scripts/build-media.mjs",
+    "media": "node scripts/build-media.mjs && node scripts/build-share-images.mjs",
     "predev": "npm run media",
     "dev": "next dev",
     "prebuild": "npm run media",
@@ -13,7 +13,8 @@
     "preview": "npm run build && wrangler dev",
     "deploy:staging": "npm run build && wrangler deploy --env staging",
     "deploy": "npm run build && wrangler deploy --env=\"\"",
-    "deploy:redirects": "wrangler deploy --config workers/redirects/wrangler.jsonc"
+    "deploy:redirects": "wrangler deploy --config workers/redirects/wrangler.jsonc",
+    "check:tracks": "node scripts/check-tracks.mjs"
   },
   "dependencies": {
     "autoprefixer": "^10.4.21",
@@ -23,6 +24,7 @@
     "react-dom": "^18.3.1"
   },
   "devDependencies": {
+    "@cloudflare/workers-types": "^5.20260928.1",
     "@types/node": "^20",
     "@types/react": "^18",
     "@types/react-dom": "^18",

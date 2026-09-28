@@ -1,14 +1,25 @@
 {
   "$schema": "node_modules/wrangler/config-schema.json",
-  // Static-only Worker: every request is served straight from Cloudflare's edge asset store,
-  // with no Worker script invocation.
+  // Static assets are served straight from Cloudflare's edge; the script in worker/ only runs for
+  // /audio/* (songs streamed from R2) and /api/* (listening metrics). See run_worker_first.
   "name": "archive",
+  "account_id": "480a4eebfef4c5ba2d0e225fde891ae8",
   "compatibility_date": "2026-09-01",
+  "main": "worker/index.ts",
   "assets": {
     "directory": "./out",
+    "binding": "ASSETS",
     "html_handling": "auto-trailing-slash",
-    "not_found_handling": "404-page"
+    "not_found_handling": "404-page",
+    "run_worker_first": ["/audio/*", "/api/*"]
   },
+  "r2_buckets": [
+    { "binding": "MUSIC", "bucket_name": "brytonzoz-media" }
+  ],
+  // Listening metrics (schema: worker/schema.sql). ADMIN_PASSWORD is a Worker secret.
+  "d1_databases": [
+    { "binding": "DB", "database_name": "brytonzoz-metrics", "database_id": "be9007bc-0a13-4a48-8b21-5dd731620cb8" }
+  ],
   // `npm run deploy` -> production on brytonzoz.com (www/archive redirect via workers/redirects).
   "routes": [
     { "pattern": "brytonzoz.com", "custom_domain": true }
@@ -18,7 +29,14 @@
     // `npm run deploy:staging` -> Worker "archive-staging" on workers.dev, separate from production.
     "staging": {
       "routes": [],
-      "workers_dev": true
+      "workers_dev": true,
+      "r2_buckets": [
+        { "binding": "MUSIC", "bucket_name": "brytonzoz-media" }
+      ],
+      // Separate database so tests on staging never touch real listening numbers.
+      "d1_databases": [
+        { "binding": "DB", "database_name": "brytonzoz-metrics-staging", "database_id": "9f5fb652-b770-45c6-90a4-74c27ff947eb" }
+      ]
     }
   }
 }

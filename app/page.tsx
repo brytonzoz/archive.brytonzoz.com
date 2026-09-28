@@ -1,11 +1,17 @@
 'use client';
 
 import React, { useCallback, useEffect, useState } from 'react';
-import { ProjectCard, StreamingModal } from '../components/ProjectCard';
+import { ProjectCard } from '../components/ProjectCard';
+import { ReleaseSheet } from '../components/release/ReleaseSheet';
+import { usePlayer } from '../components/player/context';
+import { ArrowUpRightIcon, EqualizerBars } from '../components/player/icons';
 import { ResponsiveImage, placeholderBackground } from '../components/ResponsiveImage';
 import { getProjects } from '../lib/projects';
 import { cautionSceneAssets, reminderSceneAssets, scrapwrkSceneAssets, solenyaSceneAssets } from '../lib/assets';
-import { Project, isProjectReleased } from '../lib/utils';
+import type { MediaAsset } from '../lib/media';
+import { getStreamingServices, getVisitLabel } from '../lib/streaming';
+import { getReleaseForProject, warmTrack } from '../lib/tracks';
+import { Project, getProjectTypeLabel, isProjectReleased } from '../lib/utils';
 
 const clamp = (value: number, min: number, max: number) => Math.min(Math.max(value, min), max);
 const easeOutCubic = (value: number) => 1 - Math.pow(1 - value, 3);
@@ -65,14 +71,6 @@ function getSceneStickerState(sticker: SceneStickerConfig, distance: number) {
     rotate: baseRotate + (sticker.movement.rotate * departure),
   };
 }
-
-const FOOTER_BACKGROUND: SlideBackground = {
-  base: 'linear-gradient(135deg, #020202 0%, #0A0A0D 38%, #141722 100%)',
-  overlay: 'radial-gradient(circle at 22% 18%, rgba(118, 134, 170, 0.22), transparent 34%), radial-gradient(circle at 78% 82%, rgba(161, 66, 66, 0.18), transparent 32%)',
-  topGlow: 'rgba(132, 156, 204, 0.18)',
-  bottomGlow: 'rgba(141, 54, 54, 0.18)',
-  edgeGlow: 'rgba(210, 210, 210, 0.06)',
-};
 
 const HOMEPAGE_PROJECT_ORDER = [
   'SOLENYA',
@@ -165,14 +163,6 @@ function getProjectBackground(project: Project): SlideBackground {
   }
 }
 
-function getSlideBackground(index: number, projects: Project[]): SlideBackground {
-  if (index >= projects.length) {
-    return FOOTER_BACKGROUND;
-  }
-
-  return getProjectBackground(projects[index]);
-}
-
 function BackgroundLayer({
   background,
   opacity,
@@ -221,52 +211,72 @@ function FooterSocialLink({
       target="_blank"
       rel="noopener noreferrer"
       aria-label={label}
-      className="flex h-11 w-11 items-center justify-center rounded-full bg-white/10 text-white/72 transition-colors duration-300 hover:bg-white/16 hover:text-white"
+      className="rounded-sm text-white/70 transition-colors duration-200 hover:text-white focus-visible:text-white focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-4 focus-visible:outline-white/60"
     >
       {children}
     </a>
   );
 }
 
-function FacebookIcon() {
-  return (
-    <svg width="15" height="15" viewBox="0 0 24 24" fill="none" aria-hidden="true">
-      <path
-        d="M13.25 21V12.75H16L16.4 9.5H13.25V7.43C13.25 6.49 13.51 5.85 14.86 5.85H16.5V2.94C15.7 2.86 14.9 2.82 14.1 2.82C11.72 2.82 10.08 4.27 10.08 6.95V9.5H7.5V12.75H10.08V21H13.25Z"
-        fill="currentColor"
-      />
-    </svg>
-  );
-}
-
 function InstagramIcon() {
   return (
     <svg width="16" height="16" viewBox="0 0 24 24" fill="none" aria-hidden="true">
-      <rect x="3.25" y="3.25" width="17.5" height="17.5" rx="5.25" stroke="currentColor" strokeWidth="1.8" />
-      <circle cx="12" cy="12" r="4.1" stroke="currentColor" strokeWidth="1.8" />
-      <circle cx="17.35" cy="6.7" r="1.15" fill="currentColor" />
+      <rect x="3" y="3" width="18" height="18" rx="5" stroke="currentColor" strokeWidth="1.8" />
+      <circle cx="12" cy="12" r="4" stroke="currentColor" strokeWidth="1.8" />
+      <circle cx="17.3" cy="6.7" r="1.1" fill="currentColor" />
     </svg>
   );
 }
 
 function TikTokIcon() {
   return (
-    <svg width="15" height="15" viewBox="0 0 24 24" fill="none" aria-hidden="true">
-      <path
-        d="M14.2 4.5C14.86 6.3 16.15 7.55 18 8.15V10.85C16.63 10.81 15.31 10.39 14.2 9.64V14.75C14.2 18.09 11.95 20.25 8.86 20.25C5.8 20.25 3.5 17.96 3.5 14.98C3.5 11.82 5.93 9.7 8.97 9.7C9.28 9.7 9.57 9.73 9.9 9.82V12.63C9.59 12.49 9.25 12.42 8.88 12.42C7.39 12.42 6.25 13.57 6.25 14.99C6.25 16.47 7.4 17.52 8.79 17.52C10.34 17.52 11.46 16.31 11.46 14.54V3.75H14.2V4.5Z"
-        fill="currentColor"
-      />
+    <svg width="15" height="16" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true">
+      <path d="M16.6 2h-3.5v13.4a3.1 3.1 0 1 1-2.2-3V8.8a6.6 6.6 0 1 0 5.7 6.6V8.6a8.2 8.2 0 0 0 4.4 1.3V6.4a4.6 4.6 0 0 1-4.4-4.4Z" />
     </svg>
   );
 }
 
 function XIcon() {
   return (
-    <svg width="15" height="15" viewBox="0 0 24 24" fill="none" aria-hidden="true">
-      <path d="M5 4.5L18.6 19.5H15.45L11.2 14.86L7.1 19.5H5.5L10.47 13.88L4 6.75V4.5H5Z" fill="currentColor" />
-      <path d="M8.74 4.5L18.95 19.5" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" />
-      <path d="M18.2 4.5L5.8 19.5" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" />
+    <svg width="14" height="14" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true">
+      <path d="M17.8 2.5h3.3l-7.2 8.2 8.5 10.8h-6.6l-5.2-6.6-6 6.6H1.3l7.7-8.8L.9 2.5h6.8l4.7 6 5.4-6Zm-1.2 17h1.8L7.5 4.4H5.5l11.1 15.1Z" />
     </svg>
+  );
+}
+
+function FacebookIcon() {
+  return (
+    <svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true">
+      <path d="M13.4 21.9v-7.4h2.5l.4-2.9h-2.9V9.8c0-.8.2-1.4 1.4-1.4h1.5V5.8c-.3 0-1.2-.1-2.2-.1-2.2 0-3.7 1.3-3.7 3.8v2.1H7.9v2.9h2.5v7.4a10 10 0 1 1 3 0Z" />
+    </svg>
+  );
+}
+
+function SiteFooter() {
+  return (
+    <footer
+      className="pointer-events-none absolute inset-x-0 bottom-0 z-30 flex items-center justify-between gap-6 bg-gradient-to-t from-black/75 via-black/50 via-45% to-transparent px-6 pt-24 text-[13px] [text-shadow:0_1px_10px_rgba(0,0,0,0.55)] sm:px-10"
+      style={{ paddingBottom: 'calc(max(1.25rem, env(safe-area-inset-bottom)) + var(--player-offset, 0px))' }}
+    >
+      <p className="text-white/60">
+        <span className="font-medium text-white/85">Bryton Zoz</span>
+        <span className="ml-2">&copy; 2026</span>
+      </p>
+      <nav aria-label="Social" className="pointer-events-auto flex items-center gap-5">
+        <FooterSocialLink href="https://instagram.com/brytonzoz" label="Instagram">
+          <InstagramIcon />
+        </FooterSocialLink>
+        <FooterSocialLink href="https://tiktok.com/@brytonzoz" label="TikTok">
+          <TikTokIcon />
+        </FooterSocialLink>
+        <FooterSocialLink href="https://x.com/brytonzoz" label="X">
+          <XIcon />
+        </FooterSocialLink>
+        <FooterSocialLink href="https://facebook.com/brytonzoz" label="Facebook">
+          <FacebookIcon />
+        </FooterSocialLink>
+      </nav>
+    </footer>
   );
 }
 
@@ -283,17 +293,214 @@ const sceneTop = (value: number) => `calc(50% + var(--scene-unit) * ${value - (S
 const SCENE_FRAME_WIDTH = scaleValue(SOLENYA_FRAME.width);
 const SCENE_FRAME_HEIGHT = scaleValue(SOLENYA_FRAME.height);
 
+const SCENE_FONT = 'var(--font-inter), Inter, system-ui, sans-serif';
+
 const sceneImageSizes = (designWidth: number) => {
   const byHeight = ((designWidth / SOLENYA_FRAME.height) * 100).toFixed(2);
   const byWidth = ((designWidth / SOLENYA_FRAME.width) * 100).toFixed(2);
   return `(min-aspect-ratio: ${SOLENYA_FRAME.width}/${SOLENYA_FRAME.height}) ${byHeight}vh, ${byWidth}vw`;
 };
 
+const PILL_STYLE: React.CSSProperties = {
+  flex: '1 1 0',
+  minWidth: 0,
+  height: scaleValue(118),
+  borderRadius: 999,
+  display: 'flex',
+  alignItems: 'center',
+  justifyContent: 'center',
+  gap: scaleValue(14),
+  fontFamily: SCENE_FONT,
+  fontSize: scaleValue(38),
+  fontWeight: 600,
+  letterSpacing: '-0.01em',
+  textDecoration: 'none',
+  border: 'none',
+  cursor: 'pointer',
+};
+const DARK_INK = '#1E1712';
+// Scenes are light or dark; text and buttons flip so they always read clearly.
+const SCENE_TONES = {
+  light: {
+    ink: '#FFFFFF',
+    muted: 'rgba(255, 255, 255, 0.72)',
+    primary: { ...PILL_STYLE, background: '#FFFFFF', color: '#0B0B0C' },
+  },
+  dark: {
+    ink: DARK_INK,
+    muted: 'rgba(30, 23, 18, 0.62)',
+    primary: { ...PILL_STYLE, background: DARK_INK, color: '#FFFFFF' },
+  },
+} satisfies Record<string, { ink: string; muted: string; primary: React.CSSProperties }>;
+
+// The release itself, and nothing else: artwork, title, and at most two actions.
+// Play starts it right here; the app icons open the other places to listen.
+function SceneCard({
+  project,
+  cover,
+  distance,
+  loadImages,
+  priority = false,
+  coverPosition = 'center',
+  tone = 'light',
+  onModalStateChange,
+}: {
+  project: Project;
+  cover: MediaAsset;
+  coverPosition?: string;
+  tone?: keyof typeof SCENE_TONES;
+  distance: number;
+  loadImages: boolean;
+  priority?: boolean;
+  onModalStateChange?: (isOpen: boolean) => void;
+}) {
+  const [isSheetOpen, setIsSheetOpen] = useState(false);
+  const player = usePlayer();
+  const colors = SCENE_TONES[tone];
+  const PRIMARY_PILL = colors.primary;
+  const isReleased = isProjectReleased(project);
+  const release = isReleased ? getReleaseForProject(project.name) : undefined;
+  const services = getStreamingServices(project);
+  const isPlayingThis = Boolean(release) && player.current?.release.id === release?.id && player.isPlaying;
+
+  const openSheet = () => {
+    setIsSheetOpen(true);
+    onModalStateChange?.(true);
+  };
+
+  // Once this scene has been on screen for a moment, fetch the start of its first song so Play
+  // answers instantly (a finger or cursor reaching the button does the same, sooner).
+  const isOnScreen = Math.abs(distance) < 0.5;
+  const firstTrack = release?.tracks[0];
+  useEffect(() => {
+    if (!isOnScreen || !loadImages || !firstTrack) return;
+    const timer = window.setTimeout(() => warmTrack(firstTrack), 1200);
+    return () => window.clearTimeout(timer);
+  }, [isOnScreen, loadImages, firstTrack]);
+
+  const distanceMagnitude = clamp(Math.abs(distance), 0, 1);
+  const outgoing = easeOutCubic(clamp((distance - 0.08) / 0.78, 0, 1));
+  const incoming = easeOutCubic(clamp(Math.abs(Math.min(distance, 0)) / 0.9, 0, 1));
+  const scale = distance >= 0 ? 1 - (outgoing * 0.26) : 1 - (incoming * 0.18);
+
+  // One action. Releases open the full sheet (play right here, streaming apps at the bottom);
+  // everything else opens its site.
+  let primary: React.ReactNode = null;
+  if (release || services.length) {
+    primary = (
+      <button
+        type="button"
+        className="scene-button"
+        onClick={openSheet}
+        onPointerEnter={() => warmTrack(firstTrack)}
+        onPointerDown={() => warmTrack(firstTrack)}
+        aria-haspopup="dialog"
+        style={PRIMARY_PILL}
+      >
+        {isPlayingThis ? <EqualizerBars playing className="scene-eq" /> : null}
+        {isReleased ? 'Listen Now' : 'Pre-save'}
+      </button>
+    );
+  } else if (project.url) {
+    primary = (
+      <a href={project.url} target="_blank" rel="noopener noreferrer" className="scene-button" style={PRIMARY_PILL}>
+        {getVisitLabel(project)}
+        <ArrowUpRightIcon size={scaleValue(34)} className="shrink-0" />
+      </a>
+    );
+  }
+
+  return (
+    <>
+      <div
+        className="absolute solenya-card-enter"
+        style={{ left: scaleValue(120), top: scaleValue(214), width: scaleValue(722), zIndex: 10, animationDelay: '0.14s' }}
+      >
+        <div
+          className="scene-card"
+          style={{
+            opacity: 1 - (distanceMagnitude * 0.18),
+            transform: `translate3d(0, ${scaleValue(outgoing * 58)}, 0) scale(${scale})`,
+            transformOrigin: 'center center',
+            // Only transform: will-change on opacity would make this a backdrop root for blur effects.
+            willChange: 'transform',
+            transition: 'transform 760ms cubic-bezier(0.22, 1, 0.36, 1), opacity 420ms ease-out',
+          }}
+        >
+          <div
+            className="scene-cover relative w-full overflow-hidden"
+            style={{ aspectRatio: '1 / 1', borderRadius: scaleValue(34), ...placeholderBackground(cover, coverPosition) }}
+          >
+            {loadImages ? (
+              <ResponsiveImage
+                asset={cover}
+                alt={`${project.name} cover`}
+                sizes={sceneImageSizes(722)}
+                priority={priority}
+                draggable={false}
+                className="absolute inset-0 h-full w-full select-none object-cover"
+                style={{ objectPosition: coverPosition }}
+              />
+            ) : null}
+          </div>
+
+          <h2
+            className={`text-balance ${tone === 'light' ? 'scene-title' : ''}`}
+            style={{
+              margin: `${scaleValue(52)} 0 0`,
+              fontFamily: SCENE_FONT,
+              fontSize: scaleValue(62),
+              lineHeight: 1.08,
+              fontWeight: 650,
+              letterSpacing: '-0.035em',
+              color: colors.ink,
+            }}
+          >
+            {project.name}
+          </h2>
+          <p
+            className={tone === 'light' ? 'scene-title' : undefined}
+            style={{
+              margin: `${scaleValue(10)} 0 0`,
+              fontFamily: SCENE_FONT,
+              fontSize: scaleValue(34),
+              lineHeight: 1.2,
+              fontWeight: 500,
+              color: colors.muted,
+            }}
+          >
+            {getProjectTypeLabel(project)}
+          </p>
+
+          {primary ? (
+            <div className="flex" style={{ gap: scaleValue(20), marginTop: scaleValue(44) }}>
+              {primary}
+            </div>
+          ) : null}
+        </div>
+      </div>
+
+      {release || services.length ? (
+        <ReleaseSheet
+          project={project}
+          isOpen={isSheetOpen}
+          onClose={() => {
+            setIsSheetOpen(false);
+            onModalStateChange?.(false);
+          }}
+        />
+      ) : null}
+    </>
+  );
+}
+
 const solenyaStickers = [
   {
     key: 'light-cloud',
     src: solenyaSceneAssets.lightCloud,
     alt: 'Light cloud',
+    fadeX: 'linear-gradient(to right, transparent 0%, #000 26%)',
+    fadeY: 'linear-gradient(to bottom, #000 58%, transparent 84%)',
     frame: { left: -215, top: -284, size: 696 },
     zIndex: 2,
     movement: { x: -18, y: -70, rotate: -4, scale: 0.05, fadeRate: 0.7 },
@@ -304,6 +511,7 @@ const solenyaStickers = [
     key: 'dark-cloud',
     src: solenyaSceneAssets.darkCloud,
     alt: 'Dark cloud',
+    fadeX: 'linear-gradient(to left, transparent 0%, #000 26%)',
     frame: { left: 575, top: -268, size: 696 },
     zIndex: 2,
     movement: { x: 26, y: -96, rotate: 6, scale: 0.06, fadeRate: 0.8 },
@@ -457,7 +665,7 @@ const reminderStickers = [
     key: 'microphone',
     src: reminderSceneAssets.microphone,
     alt: 'Microphone',
-    frame: { left: 426, top: 1188, size: 696 },
+    frame: { left: 450, top: 1300, size: 696 },
     zIndex: 5,
     baseRotate: -22.25,
     movement: { x: 78, y: 132, rotate: -4, scale: 0.08, fadeRate: 1.08 },
@@ -493,6 +701,7 @@ const scrapwrkStickers = [
     key: 'hoodie-bottom',
     src: scrapwrkSceneAssets.hoodieBottom,
     alt: 'Patchwork hoodie',
+    fadeY: 'linear-gradient(to bottom, #000 74%, transparent 99%)',
     frame: { left: -43, top: 1250, size: 524.54 },
     zIndex: 5,
     baseRotate: 1.82,
@@ -517,40 +726,13 @@ const SolenyaScene = React.memo(function SolenyaScene({
   project,
   distance,
   loadImages,
-  showScrollPrompt,
-  onScrollPromptClick,
   onModalStateChange,
 }: {
   project: Project;
   distance: number;
   loadImages: boolean;
-  showScrollPrompt: boolean;
-  onScrollPromptClick: () => void;
   onModalStateChange?: (isOpen: boolean) => void;
 }) {
-  const [isStreamingModalOpen, setIsStreamingModalOpen] = useState(false);
-  const isReleased = isProjectReleased(project);
-  const currentDescription = isReleased
-    ? (project.postReleaseDescription || project.description)
-    : (project.preReleaseDescription || project.description);
-  const currentStreamingLinks = isReleased
-    ? (project.postReleaseStreamingLinks || project.streamingLinks)
-    : project.streamingLinks;
-  const primaryActionUrl =
-    currentStreamingLinks?.applemusic ||
-    currentStreamingLinks?.spotify ||
-    currentStreamingLinks?.youtubemusic ||
-    project.url;
-
-  const distanceMagnitude = clamp(Math.abs(distance), 0, 1);
-  const outgoingCardProgress = easeOutCubic(clamp((distance - 0.08) / 0.78, 0, 1));
-  const incomingCardProgress = easeOutCubic(clamp(Math.abs(Math.min(distance, 0)) / 0.9, 0, 1));
-  const cardScale = distance >= 0
-    ? 1 - (outgoingCardProgress * 0.26)
-    : 1 - (incomingCardProgress * 0.18);
-  const cardOpacity = 1 - (distanceMagnitude * 0.18);
-  const cardTranslateY = outgoingCardProgress * 58;
-
   return (
     <div className="relative h-full w-full overflow-hidden">
       {solenyaStickers.map((sticker) => {
@@ -589,6 +771,8 @@ const SolenyaScene = React.memo(function SolenyaScene({
                     '--float-rotate': `${sticker.float.rotate}deg`,
                     '--float-duration': sticker.float.duration,
                     animationDelay: sticker.float.delay,
+                    maskImage: sticker.fadeX,
+                    WebkitMaskImage: sticker.fadeX,
                   } as React.CSSProperties
                 }
               >
@@ -599,6 +783,7 @@ const SolenyaScene = React.memo(function SolenyaScene({
                     sizes={sceneImageSizes(sticker.frame.size)}
                     draggable={false}
                     className="h-full w-full object-contain select-none"
+                    style={sticker.fadeY ? { maskImage: sticker.fadeY, WebkitMaskImage: sticker.fadeY } : undefined}
                   />
                 ) : null}
               </div>
@@ -608,201 +793,17 @@ const SolenyaScene = React.memo(function SolenyaScene({
       })}
 
       <div className="absolute inset-0 flex items-center justify-center">
-        <div
-          className="relative"
-          style={{
-            width: SCENE_FRAME_WIDTH,
-            height: SCENE_FRAME_HEIGHT,
-          }}
-        >
-          <div
-            className="absolute solenya-card-enter"
-            style={{
-              left: scaleValue(120),
-              top: scaleValue(208),
-              width: scaleValue(722),
-              height: scaleValue(1086),
-              zIndex: 10,
-              animationDelay: '0.14s',
-            }}
-          >
-            <div
-              style={{
-                position: 'relative',
-                width: '100%',
-                height: '100%',
-                background: '#1F0E08',
-                borderRadius: scaleValue(100),
-                boxShadow: '0px 4px 4px rgba(0, 0, 0, 0.25)',
-                opacity: cardOpacity,
-                transform: `translate3d(0, ${scaleValue(cardTranslateY)}, 0) scale(${cardScale})`,
-                transformOrigin: 'center center',
-                willChange: 'transform, opacity',
-                transition: 'transform 760ms cubic-bezier(0.22, 1, 0.36, 1), opacity 420ms ease-out',
-              }}
-            >
-            <div
-              style={{
-                position: 'absolute',
-                left: scaleValue(45),
-                top: scaleValue(51),
-                width: scaleValue(632),
-                height: scaleValue(632),
-                overflow: 'hidden',
-                borderRadius: scaleValue(53),
-                ...placeholderBackground(solenyaSceneAssets.cover, 'center'),
-              }}
-            >
-              {loadImages ? (
-                <ResponsiveImage
-                  asset={solenyaSceneAssets.cover}
-                  alt={project.name}
-                  sizes={sceneImageSizes(632)}
-                  priority
-                  className="absolute inset-0 h-full w-full object-cover object-center"
-                />
-              ) : null}
-            </div>
-
-            <h2
-              style={{
-                position: 'absolute',
-                left: scaleValue(45),
-                top: scaleValue(718),
-                margin: 0,
-                fontFamily: 'Inter, sans-serif',
-                fontSize: scaleValue(64),
-                lineHeight: scaleValue(77),
-                fontWeight: 700,
-                letterSpacing: '-0.04em',
-                color: '#FFFFFF',
-              }}
-            >
-              {project.name}
-            </h2>
-
-            <p
-              style={{
-                position: 'absolute',
-                left: scaleValue(45),
-                top: scaleValue(807),
-                width: scaleValue(632),
-                margin: 0,
-                fontFamily: 'Inter, sans-serif',
-                fontSize: scaleValue(36),
-                lineHeight: scaleValue(44),
-                fontWeight: 300,
-                color: '#FFFFFF',
-              }}
-            >
-              {currentDescription}
-            </p>
-
-            {primaryActionUrl ? (
-              <button
-                type="button"
-                onClick={() => {
-                  setIsStreamingModalOpen(true);
-                  onModalStateChange?.(true);
-                }}
-                style={{
-                  position: 'absolute',
-                  left: scaleValue(45),
-                  top: scaleValue(902),
-                  width: scaleValue(632),
-                  height: scaleValue(146),
-                  background: '#AF7D6B',
-                  borderRadius: scaleValue(51),
-                  display: 'flex',
-                  alignItems: 'center',
-                  justifyContent: 'space-between',
-                  paddingLeft: scaleValue(49),
-                  paddingRight: scaleValue(37),
-                  textDecoration: 'none',
-                  color: '#FFFFFF',
-                  border: 'none',
-                  cursor: 'pointer',
-                }}
-              >
-                <span
-                  style={{
-                    fontFamily: 'Inter, sans-serif',
-                    fontSize: scaleValue(40),
-                    lineHeight: scaleValue(48),
-                    fontWeight: 700,
-                }}
-              >
-                Listen Now
-              </span>
-                <svg
-                  style={{ width: scaleValue(81), height: scaleValue(40) }}
-                  viewBox="0 0 81 40"
-                  fill="none"
-                >
-                  <path d="M0 20H63" stroke="white" strokeWidth={6} strokeLinecap="round" />
-                  <path d="M58 6L75 20L58 34" stroke="white" strokeWidth={6} strokeLinecap="round" strokeLinejoin="round" />
-                </svg>
-              </button>
-            ) : null}
-            </div>
-          </div>
-
-          {showScrollPrompt ? (
-            <button
-              onClick={onScrollPromptClick}
-              className="absolute transition-transform duration-300 hover:-translate-y-0.5"
-              style={{
-                left: scaleValue(277),
-                top: scaleValue(1552),
-                width: scaleValue(407),
-                height: scaleValue(121),
-                background: 'rgba(47, 47, 47, 0.68)',
-                borderRadius: scaleValue(100),
-                display: 'flex',
-                alignItems: 'center',
-                justifyContent: 'space-between',
-                paddingLeft: scaleValue(38),
-                paddingRight: scaleValue(34),
-                backdropFilter: 'blur(18px)',
-                WebkitBackdropFilter: 'blur(18px)',
-                color: '#FFFFFF',
-                zIndex: 14,
-                opacity: 1 - clamp(distance / 0.16, 0, 1),
-                transform: `translate3d(0, ${scaleValue(clamp(distance, 0, 1) * 38)}, 0)`,
-                transition: 'transform 300ms ease-out, opacity 220ms ease-out',
-              }}
-            >
-              <span
-                style={{
-                  fontFamily: 'Inter, sans-serif',
-                  fontSize: scaleValue(32),
-                  lineHeight: scaleValue(39),
-                  fontWeight: 700,
-                }}
-              >
-                Scroll for more
-              </span>
-              <svg
-                style={{ width: scaleValue(55), height: scaleValue(55) }}
-                viewBox="0 0 55 55"
-                fill="none"
-              >
-                <path d="M27.5 4V43" stroke="white" strokeWidth={6} strokeLinecap="round" />
-                <path d="M10 27.5L27.5 45L45 27.5" stroke="white" strokeWidth={6} strokeLinecap="round" strokeLinejoin="round" />
-              </svg>
-            </button>
-          ) : null}
+        <div className="relative" style={{ width: SCENE_FRAME_WIDTH, height: SCENE_FRAME_HEIGHT }}>
+          <SceneCard
+            project={project}
+            cover={solenyaSceneAssets.cover}
+            distance={distance}
+            loadImages={loadImages}
+            priority
+            onModalStateChange={onModalStateChange}
+          />
         </div>
       </div>
-
-      <StreamingModal
-        project={project}
-        isOpen={isStreamingModalOpen}
-        onClose={() => {
-          setIsStreamingModalOpen(false);
-          onModalStateChange?.(false);
-        }}
-      />
     </div>
   );
 });
@@ -818,24 +819,6 @@ const CautionScene = React.memo(function CautionScene({
   loadImages: boolean;
   onModalStateChange?: (isOpen: boolean) => void;
 }) {
-  const [isStreamingModalOpen, setIsStreamingModalOpen] = useState(false);
-  const currentDescription = project.description;
-  const currentStreamingLinks = project.streamingLinks;
-  const primaryActionUrl =
-    currentStreamingLinks?.applemusic ||
-    currentStreamingLinks?.spotify ||
-    currentStreamingLinks?.youtubemusic ||
-    project.url;
-
-  const distanceMagnitude = clamp(Math.abs(distance), 0, 1);
-  const outgoingCardProgress = easeOutCubic(clamp((distance - 0.08) / 0.78, 0, 1));
-  const incomingCardProgress = easeOutCubic(clamp(Math.abs(Math.min(distance, 0)) / 0.9, 0, 1));
-  const cardScale = distance >= 0
-    ? 1 - (outgoingCardProgress * 0.26)
-    : 1 - (incomingCardProgress * 0.18);
-  const cardOpacity = 1 - (distanceMagnitude * 0.18);
-  const cardTranslateY = outgoingCardProgress * 58;
-
   return (
     <div className="relative h-full w-full overflow-hidden">
       {cautionStickers.map((sticker) => {
@@ -894,154 +877,17 @@ const CautionScene = React.memo(function CautionScene({
       })}
 
       <div className="absolute inset-0 flex items-center justify-center">
-        <div
-          className="relative"
-          style={{
-            width: SCENE_FRAME_WIDTH,
-            height: SCENE_FRAME_HEIGHT,
-          }}
-        >
-          <div
-            className="absolute solenya-card-enter"
-            style={{
-              left: scaleValue(120),
-              top: scaleValue(208),
-              width: scaleValue(722),
-              height: scaleValue(1086),
-              zIndex: 10,
-              animationDelay: '0.14s',
-            }}
-          >
-            <div
-              style={{
-                position: 'relative',
-                width: '100%',
-                height: '100%',
-                background: '#241804',
-                borderRadius: scaleValue(100),
-                boxShadow: '0px 4px 4px rgba(0, 0, 0, 0.25)',
-                opacity: cardOpacity,
-                transform: `translate3d(0, ${scaleValue(cardTranslateY)}, 0) scale(${cardScale})`,
-                transformOrigin: 'center center',
-                willChange: 'transform, opacity',
-                transition: 'transform 760ms cubic-bezier(0.22, 1, 0.36, 1), opacity 420ms ease-out',
-              }}
-            >
-              <div
-                style={{
-                  position: 'absolute',
-                  left: scaleValue(47),
-                  top: scaleValue(52),
-                  width: scaleValue(630),
-                  height: scaleValue(630),
-                  overflow: 'hidden',
-                  borderRadius: scaleValue(48),
-                  ...placeholderBackground(cautionSceneAssets.cover, 'center top'),
-                }}
-              >
-                {loadImages ? (
-                  <ResponsiveImage
-                    asset={cautionSceneAssets.cover}
-                    alt={project.name}
-                    sizes={sceneImageSizes(630)}
-                    className="absolute inset-0 h-full w-full object-cover"
-                    style={{ objectPosition: 'center top' }}
-                  />
-                ) : null}
-              </div>
-
-              <h2
-                style={{
-                  position: 'absolute',
-                  left: scaleValue(45),
-                  top: scaleValue(718),
-                  margin: 0,
-                  fontFamily: 'Inter, sans-serif',
-                  fontSize: scaleValue(64),
-                  lineHeight: scaleValue(77),
-                  fontWeight: 700,
-                  letterSpacing: '-0.04em',
-                  color: '#FFFFFF',
-                }}
-              >
-                {project.name}
-              </h2>
-
-              <p
-                style={{
-                  position: 'absolute',
-                  left: scaleValue(45),
-                  top: scaleValue(807),
-                  width: scaleValue(632),
-                  margin: 0,
-                  fontFamily: 'Inter, sans-serif',
-                  fontSize: scaleValue(36),
-                  lineHeight: scaleValue(44),
-                  fontWeight: 300,
-                  color: '#FFFFFF',
-                }}
-              >
-                {currentDescription}
-              </p>
-
-              {primaryActionUrl ? (
-                <button
-                  type="button"
-                  onClick={() => {
-                    setIsStreamingModalOpen(true);
-                    onModalStateChange?.(true);
-                  }}
-                  style={{
-                    position: 'absolute',
-                    left: scaleValue(45),
-                    top: scaleValue(902),
-                    width: scaleValue(632),
-                    height: scaleValue(146),
-                    background: '#B4907B',
-                    borderRadius: scaleValue(51),
-                    display: 'flex',
-                    alignItems: 'center',
-                    justifyContent: 'space-between',
-                    paddingLeft: scaleValue(49),
-                    paddingRight: scaleValue(37),
-                    color: '#FFFFFF',
-                    border: 'none',
-                    cursor: 'pointer',
-                  }}
-                >
-                  <span
-                    style={{
-                      fontFamily: 'Inter, sans-serif',
-                      fontSize: scaleValue(40),
-                      lineHeight: scaleValue(48),
-                      fontWeight: 700,
-                    }}
-                  >
-                    Listen Now
-                  </span>
-                  <svg
-                    style={{ width: scaleValue(81), height: scaleValue(40) }}
-                    viewBox="0 0 81 40"
-                    fill="none"
-                  >
-                    <path d="M0 20H63" stroke="white" strokeWidth={6} strokeLinecap="round" />
-                    <path d="M58 6L75 20L58 34" stroke="white" strokeWidth={6} strokeLinecap="round" strokeLinejoin="round" />
-                  </svg>
-                </button>
-              ) : null}
-            </div>
-          </div>
+        <div className="relative" style={{ width: SCENE_FRAME_WIDTH, height: SCENE_FRAME_HEIGHT }}>
+          <SceneCard
+            project={project}
+            cover={cautionSceneAssets.cover}
+            distance={distance}
+            loadImages={loadImages}
+            coverPosition="center top"
+            onModalStateChange={onModalStateChange}
+          />
         </div>
       </div>
-
-      <StreamingModal
-        project={project}
-        isOpen={isStreamingModalOpen}
-        onClose={() => {
-          setIsStreamingModalOpen(false);
-          onModalStateChange?.(false);
-        }}
-      />
     </div>
   );
 });
@@ -1055,19 +901,6 @@ const ReminderScene = React.memo(function ReminderScene({
   distance: number;
   loadImages: boolean;
 }) {
-  const displayTitle = 'Just a reminder to live life';
-  const displayDescription = 'thoughts, moments, and in-between';
-  const primaryActionUrl = project.url;
-
-  const distanceMagnitude = clamp(Math.abs(distance), 0, 1);
-  const outgoingCardProgress = easeOutCubic(clamp((distance - 0.08) / 0.78, 0, 1));
-  const incomingCardProgress = easeOutCubic(clamp(Math.abs(Math.min(distance, 0)) / 0.9, 0, 1));
-  const cardScale = distance >= 0
-    ? 1 - (outgoingCardProgress * 0.26)
-    : 1 - (incomingCardProgress * 0.18);
-  const cardOpacity = 1 - (distanceMagnitude * 0.18);
-  const cardTranslateY = outgoingCardProgress * 58;
-
   return (
     <div className="relative h-full w-full overflow-hidden">
       {reminderStickers.map((sticker) => {
@@ -1125,140 +958,14 @@ const ReminderScene = React.memo(function ReminderScene({
       })}
 
       <div className="absolute inset-0 flex items-center justify-center">
-        <div
-          className="relative"
-          style={{
-            width: SCENE_FRAME_WIDTH,
-            height: SCENE_FRAME_HEIGHT,
-          }}
-        >
-          <div
-            className="absolute solenya-card-enter"
-            style={{
-              left: scaleValue(120),
-              top: scaleValue(208),
-              width: scaleValue(722),
-              height: scaleValue(1176),
-              zIndex: 10,
-              animationDelay: '0.14s',
-            }}
-          >
-            <div
-              style={{
-                position: 'relative',
-                width: '100%',
-                height: '100%',
-                background: '#1F1F1F',
-                borderRadius: scaleValue(100),
-                boxShadow: '0px 4px 4px rgba(0, 0, 0, 0.25)',
-                opacity: cardOpacity,
-                transform: `translate3d(0, ${scaleValue(cardTranslateY)}, 0) scale(${cardScale})`,
-                transformOrigin: 'center center',
-                willChange: 'transform, opacity',
-                transition: 'transform 760ms cubic-bezier(0.22, 1, 0.36, 1), opacity 420ms ease-out',
-              }}
-            >
-              <div
-                style={{
-                  position: 'absolute',
-                  left: scaleValue(46),
-                  top: scaleValue(51),
-                  width: scaleValue(631),
-                  height: scaleValue(631),
-                  overflow: 'hidden',
-                  borderRadius: scaleValue(49),
-                  ...placeholderBackground(reminderSceneAssets.cover, 'center'),
-                }}
-              >
-                {loadImages ? (
-                  <ResponsiveImage
-                    asset={reminderSceneAssets.cover}
-                    alt={displayTitle}
-                    sizes={sceneImageSizes(631)}
-                    className="absolute inset-0 h-full w-full object-cover object-center"
-                  />
-                ) : null}
-              </div>
-
-              <h2
-                style={{
-                  position: 'absolute',
-                  left: scaleValue(45),
-                  top: scaleValue(718),
-                  width: scaleValue(632),
-                  margin: 0,
-                  fontFamily: 'Inter, sans-serif',
-                  fontSize: scaleValue(64),
-                  lineHeight: scaleValue(77),
-                  fontWeight: 700,
-                  letterSpacing: '-0.04em',
-                  color: '#FFFFFF',
-                }}
-              >
-                {displayTitle}
-              </h2>
-
-              <p
-                style={{
-                  position: 'absolute',
-                  left: scaleValue(45),
-                  top: scaleValue(885),
-                  width: scaleValue(632),
-                  margin: 0,
-                  fontFamily: 'Inter, sans-serif',
-                  fontSize: scaleValue(36),
-                  lineHeight: scaleValue(44),
-                  fontWeight: 300,
-                  color: '#FFFFFF',
-                }}
-              >
-                {displayDescription}
-              </p>
-
-              {primaryActionUrl ? (
-                <button
-                  type="button"
-                  onClick={() => window.open(primaryActionUrl, '_blank', 'noopener,noreferrer')}
-                  style={{
-                    position: 'absolute',
-                    left: scaleValue(45),
-                    top: scaleValue(980),
-                    width: scaleValue(632),
-                    height: scaleValue(146),
-                    background: '#525252',
-                    borderRadius: scaleValue(51),
-                    display: 'flex',
-                    alignItems: 'center',
-                    justifyContent: 'space-between',
-                    paddingLeft: scaleValue(49),
-                    paddingRight: scaleValue(37),
-                    color: '#FFFFFF',
-                    border: 'none',
-                    cursor: 'pointer',
-                  }}
-                >
-                  <span
-                    style={{
-                      fontFamily: 'Inter, sans-serif',
-                      fontSize: scaleValue(40),
-                      lineHeight: scaleValue(48),
-                      fontWeight: 700,
-                    }}
-                  >
-                    Listen Now
-                  </span>
-                  <svg
-                    style={{ width: scaleValue(81), height: scaleValue(40) }}
-                    viewBox="0 0 81 40"
-                    fill="none"
-                  >
-                    <path d="M0 20H63" stroke="white" strokeWidth={6} strokeLinecap="round" />
-                    <path d="M58 6L75 20L58 34" stroke="white" strokeWidth={6} strokeLinecap="round" strokeLinejoin="round" />
-                  </svg>
-                </button>
-              ) : null}
-            </div>
-          </div>
+        <div className="relative" style={{ width: SCENE_FRAME_WIDTH, height: SCENE_FRAME_HEIGHT }}>
+          <SceneCard
+            project={project}
+            cover={reminderSceneAssets.cover}
+            tone="dark"
+            distance={distance}
+            loadImages={loadImages}
+          />
         </div>
       </div>
     </div>
@@ -1274,19 +981,6 @@ const ScrapwrkScene = React.memo(function ScrapwrkScene({
   distance: number;
   loadImages: boolean;
 }) {
-  const displayTitle = 'SCRAPWRK';
-  const displayDescription = 'reconstructed pieces and identity';
-  const primaryActionUrl = project.url;
-
-  const distanceMagnitude = clamp(Math.abs(distance), 0, 1);
-  const outgoingCardProgress = easeOutCubic(clamp((distance - 0.08) / 0.78, 0, 1));
-  const incomingCardProgress = easeOutCubic(clamp(Math.abs(Math.min(distance, 0)) / 0.9, 0, 1));
-  const cardScale = distance >= 0
-    ? 1 - (outgoingCardProgress * 0.26)
-    : 1 - (incomingCardProgress * 0.18);
-  const cardOpacity = 1 - (distanceMagnitude * 0.18);
-  const cardTranslateY = outgoingCardProgress * 58;
-
   return (
     <div className="relative h-full w-full overflow-hidden">
       {scrapwrkStickers.map((sticker) => {
@@ -1335,6 +1029,7 @@ const ScrapwrkScene = React.memo(function ScrapwrkScene({
                     sizes={sceneImageSizes(sticker.frame.size)}
                     draggable={false}
                     className="h-full w-full object-contain select-none"
+                    style={sticker.fadeY ? { maskImage: sticker.fadeY, WebkitMaskImage: sticker.fadeY } : undefined}
                   />
                 ) : null}
               </div>
@@ -1344,145 +1039,44 @@ const ScrapwrkScene = React.memo(function ScrapwrkScene({
       })}
 
       <div className="absolute inset-0 flex items-center justify-center">
-        <div
-          className="relative"
-          style={{
-            width: SCENE_FRAME_WIDTH,
-            height: SCENE_FRAME_HEIGHT,
-          }}
-        >
-          <div
-            className="absolute solenya-card-enter"
-            style={{
-              left: scaleValue(120),
-              top: scaleValue(208),
-              width: scaleValue(722),
-              height: scaleValue(1094),
-              zIndex: 10,
-              animationDelay: '0.14s',
-            }}
-          >
-            <div
-              style={{
-                position: 'relative',
-                width: '100%',
-                height: '100%',
-                background: '#1F1F1F',
-                borderRadius: scaleValue(100),
-                boxShadow: '0px 4px 4px rgba(0, 0, 0, 0.25)',
-                opacity: cardOpacity,
-                transform: `translate3d(0, ${scaleValue(cardTranslateY)}, 0) scale(${cardScale})`,
-                transformOrigin: 'center center',
-                willChange: 'transform, opacity',
-                transition: 'transform 760ms cubic-bezier(0.22, 1, 0.36, 1), opacity 420ms ease-out',
-              }}
-            >
-              <div
-                style={{
-                  position: 'absolute',
-                  left: scaleValue(46),
-                  top: scaleValue(51),
-                  width: scaleValue(631),
-                  height: scaleValue(632),
-                  overflow: 'hidden',
-                  borderRadius: scaleValue(50),
-                  ...placeholderBackground(scrapwrkSceneAssets.cover, 'center'),
-                }}
-              >
-                {loadImages ? (
-                  <ResponsiveImage
-                    asset={scrapwrkSceneAssets.cover}
-                    alt={displayTitle}
-                    sizes={sceneImageSizes(631)}
-                    className="absolute inset-0 h-full w-full object-cover object-center"
-                  />
-                ) : null}
-              </div>
-
-              <h2
-                style={{
-                  position: 'absolute',
-                  left: scaleValue(45),
-                  top: scaleValue(718),
-                  width: scaleValue(632),
-                  margin: 0,
-                  fontFamily: 'Inter, sans-serif',
-                  fontSize: scaleValue(64),
-                  lineHeight: scaleValue(77),
-                  fontWeight: 700,
-                  letterSpacing: '-0.04em',
-                  color: '#FFFFFF',
-                }}
-              >
-                {displayTitle}
-              </h2>
-
-              <p
-                style={{
-                  position: 'absolute',
-                  left: scaleValue(45),
-                  top: scaleValue(807),
-                  width: scaleValue(632),
-                  margin: 0,
-                  fontFamily: 'Inter, sans-serif',
-                  fontSize: scaleValue(36),
-                  lineHeight: scaleValue(44),
-                  fontWeight: 300,
-                  color: '#FFFFFF',
-                }}
-              >
-                {displayDescription}
-              </p>
-
-              {primaryActionUrl ? (
-                <button
-                  type="button"
-                  onClick={() => window.open(primaryActionUrl, '_blank', 'noopener,noreferrer')}
-                  style={{
-                    position: 'absolute',
-                    left: scaleValue(45),
-                    top: scaleValue(896),
-                    width: scaleValue(632),
-                    height: scaleValue(146),
-                    background: '#525252',
-                    borderRadius: scaleValue(51),
-                    display: 'flex',
-                    alignItems: 'center',
-                    justifyContent: 'space-between',
-                    paddingLeft: scaleValue(49),
-                    paddingRight: scaleValue(37),
-                    color: '#FFFFFF',
-                    border: 'none',
-                    cursor: 'pointer',
-                  }}
-                >
-                  <span
-                    style={{
-                      fontFamily: 'Inter, sans-serif',
-                      fontSize: scaleValue(40),
-                      lineHeight: scaleValue(48),
-                      fontWeight: 700,
-                    }}
-                  >
-                    Visit
-                  </span>
-                  <svg
-                    style={{ width: scaleValue(81), height: scaleValue(40) }}
-                    viewBox="0 0 81 40"
-                    fill="none"
-                  >
-                    <path d="M0 20H63" stroke="white" strokeWidth={6} strokeLinecap="round" />
-                    <path d="M58 6L75 20L58 34" stroke="white" strokeWidth={6} strokeLinecap="round" strokeLinejoin="round" />
-                  </svg>
-                </button>
-              ) : null}
-            </div>
-          </div>
+        <div className="relative" style={{ width: SCENE_FRAME_WIDTH, height: SCENE_FRAME_HEIGHT }}>
+          <SceneCard
+            project={project}
+            cover={scrapwrkSceneAssets.cover}
+            distance={distance}
+            loadImages={loadImages}
+          />
         </div>
       </div>
     </div>
   );
 });
+
+// Page dots, as on iOS: they show there's more below, where you are, and jump anywhere.
+function SceneDots({ names, activeIndex, onSelect }: { names: string[]; activeIndex: number; onSelect: (index: number) => void }) {
+  return (
+    <nav
+      aria-label="Projects"
+      className="scene-dots fixed right-2 top-1/2 z-40 flex -translate-y-1/2 flex-col items-center sm:right-5"
+    >
+      {names.map((name, index) => (
+        <button
+          key={name}
+          type="button"
+          onClick={() => onSelect(index)}
+          aria-label={name}
+          aria-current={index === activeIndex ? 'true' : undefined}
+          className="group flex h-6 w-6 items-center justify-center rounded-full focus-visible:outline focus-visible:outline-2 focus-visible:outline-white/70"
+        >
+          <span
+            aria-hidden="true"
+            className={`block w-[6px] rounded-full bg-white shadow-[0_0_0_0.5px_rgba(0,0,0,0.12),0_1px_4px_rgba(0,0,0,0.3)] transition-[height,opacity] duration-300 ease-out group-hover:opacity-90 ${index === activeIndex ? 'h-[18px] opacity-95' : 'h-[6px] opacity-40'}`}
+          />
+        </button>
+      ))}
+    </nav>
+  );
+}
 
 export default function HomePage() {
   const { music, fashion } = getProjects();
@@ -1500,15 +1094,14 @@ export default function HomePage() {
   const [scrollProgress, setScrollProgress] = useState(0);
   const [isTransitioning, setIsTransitioning] = useState(false);
   const [isModalOpen, setIsModalOpen] = useState(false);
-  const [showScrollPrompt, setShowScrollPrompt] = useState(true);
   const [loadDeferredScenes, setLoadDeferredScenes] = useState(false);
   const [containerSize, setContainerSize] = useState({ width: 0, height: 0, imageAspectRatio: 16 / 9 });
-  const clampedBackgroundProgress = clamp(scrollProgress, 0, allProjects.length);
+  const clampedBackgroundProgress = clamp(scrollProgress, 0, allProjects.length - 1);
   const currentBackgroundIndex = Math.floor(clampedBackgroundProgress);
-  const nextBackgroundIndex = Math.min(currentBackgroundIndex + 1, allProjects.length);
+  const nextBackgroundIndex = Math.min(currentBackgroundIndex + 1, allProjects.length - 1);
   const backgroundBlend = clampedBackgroundProgress - currentBackgroundIndex;
-  const currentBackground = getSlideBackground(currentBackgroundIndex, allProjects);
-  const nextBackground = getSlideBackground(nextBackgroundIndex, allProjects);
+  const currentBackground = getProjectBackground(allProjects[currentBackgroundIndex]);
+  const nextBackground = getProjectBackground(allProjects[nextBackgroundIndex]);
 
   const handleModalStateChange = useCallback((isOpen: boolean) => {
     setIsModalOpen(isOpen);
@@ -1539,15 +1132,9 @@ export default function HomePage() {
     };
   };
 
-  const handleScrollToNext = useCallback(() => {
+  const scrollToScene = useCallback((index: number) => {
     const container = document.querySelector('.scroll-container');
-    if (container) {
-      container.scrollTo({
-        top: container.clientHeight,
-        behavior: 'smooth',
-      });
-    }
-    setShowScrollPrompt(false);
+    container?.scrollTo({ top: container.clientHeight * index, behavior: 'smooth' });
   }, []);
 
   useEffect(() => {
@@ -1560,12 +1147,6 @@ export default function HomePage() {
 
     return () => window.removeEventListener('resize', updateLayout);
   }, [isModalOpen]);
-
-  useEffect(() => {
-    if (activeIndex > 0) {
-      setShowScrollPrompt(false);
-    }
-  }, [activeIndex]);
 
   // Only the first scene's art is in the initial HTML; the rest starts downloading once that
   // has finished (window load) or as soon as the visitor starts scrolling.
@@ -1634,6 +1215,12 @@ export default function HomePage() {
       ) : null}
       <div className="solenya-gradient-reveal pointer-events-none fixed inset-0 z-[1] bg-black" />
 
+      <SceneDots
+        names={allProjects.map((project) => project.name)}
+        activeIndex={activeIndex}
+        onSelect={scrollToScene}
+      />
+
       <div className="scroll-container relative z-10 h-screen overflow-y-auto snap-y snap-mandatory scroll-smooth">
         <div className="w-full max-w-none">
           {allProjects.map((project, index) => {
@@ -1647,7 +1234,9 @@ export default function HomePage() {
             const distanceFromCenter = Math.abs(scrollProgress - index);
             const continuousDistance = clamp(distanceFromCenter, 0, 1.2);
             // Scene motion saturates at one screen away; clamping lets memoized far-off scenes skip re-rendering.
-            const sceneDistance = clamp(scrollProgress - index, -1, 1);
+            const isLast = index === allProjects.length - 1;
+            const sceneDistance = clamp(scrollProgress - index, -1, isLast ? 0 : 1);
+            const footer = isLast ? <SiteFooter /> : null;
 
             if (isSolenya) {
               return (
@@ -1656,10 +1245,9 @@ export default function HomePage() {
                     project={project}
                     distance={sceneDistance}
                     loadImages={index === 0 || loadDeferredScenes}
-                    showScrollPrompt={showScrollPrompt && activeIndex === 0 && !isModalOpen}
-                    onScrollPromptClick={handleScrollToNext}
                     onModalStateChange={handleModalStateChange}
                   />
+                  {footer}
                 </div>
               );
             }
@@ -1673,6 +1261,7 @@ export default function HomePage() {
                     loadImages={index === 0 || loadDeferredScenes}
                     onModalStateChange={handleModalStateChange}
                   />
+                  {footer}
                 </div>
               );
             }
@@ -1685,6 +1274,7 @@ export default function HomePage() {
                     distance={sceneDistance}
                     loadImages={index === 0 || loadDeferredScenes}
                   />
+                  {footer}
                 </div>
               );
             }
@@ -1697,6 +1287,7 @@ export default function HomePage() {
                     distance={sceneDistance}
                     loadImages={index === 0 || loadDeferredScenes}
                   />
+                  {footer}
                 </div>
               );
             }
@@ -1728,7 +1319,6 @@ export default function HomePage() {
                 <ProjectCard
                   project={project}
                   onModalStateChange={handleModalStateChange}
-                  imageAspectRatio={containerSize.imageAspectRatio || 16 / 9}
                 />
               </div>
             );
@@ -1738,58 +1328,11 @@ export default function HomePage() {
                 <div className="flex h-full w-full items-start justify-center px-6 pt-20 sm:px-8 md:px-12 lg:px-16 xl:px-20 2xl:px-24">
                   {projectCard}
                 </div>
+                {footer}
               </div>
             );
           })}
 
-          <div className="h-[calc(100vh-80px)] snap-center flex items-start justify-center px-6 sm:px-8 md:px-12 lg:px-16 xl:px-20 2xl:px-24 pt-4">
-            <div
-              className={`
-                w-full max-w-4xl relative z-0 h-full transform-gpu origin-center
-                ${activeIndex === allProjects.length ?
-                  'scale-100 opacity-100' :
-                  'scale-90 opacity-60'
-                }
-              `}
-              style={{
-                filter: activeIndex === allProjects.length ? 'blur(0px)' : 'blur(0.5px)',
-                transition: 'all 0.4s cubic-bezier(0.23, 1, 0.32, 1), filter 0.3s ease-out',
-              }}
-            >
-              <div className="h-full overflow-y-auto rounded-[2rem] bg-black/18 px-8 py-10 shadow-[0_24px_80px_rgba(0,0,0,0.24)] backdrop-blur-2xl sm:px-12 sm:py-12">
-                <div className="mx-auto flex max-w-3xl flex-col items-start text-left">
-                  <p className="text-[0.68rem] font-medium uppercase tracking-[0.38em] text-white/42">
-                    NONPARALLEL
-                  </p>
-                  <h2 className="mt-4 text-3xl font-semibold tracking-tight text-white sm:text-4xl">
-                    Archive for music, fashion, and software experiments.
-                  </h2>
-                  <p className="mt-4 max-w-2xl text-sm leading-relaxed text-white/62 sm:text-base">
-                    A living body of work documenting releases, garments, and the systems built around them.
-                  </p>
-
-                  <div className="mt-8 flex items-center gap-4">
-                    <FooterSocialLink href="https://facebook.com/brytonzoz" label="Facebook">
-                      <FacebookIcon />
-                    </FooterSocialLink>
-                    <FooterSocialLink href="https://instagram.com/brytonzoz" label="Instagram">
-                      <InstagramIcon />
-                    </FooterSocialLink>
-                    <FooterSocialLink href="https://tiktok.com/@brytonzoz" label="TikTok">
-                      <TikTokIcon />
-                    </FooterSocialLink>
-                    <FooterSocialLink href="https://x.com/zozbryton" label="X">
-                      <XIcon />
-                    </FooterSocialLink>
-                  </div>
-
-                  <p className="mt-7 text-[0.72rem] font-light tracking-[0.22em] text-white/34 sm:text-xs">
-                    © 2026 Bryton Zoz • NONPARALLEL™
-                  </p>
-                </div>
-              </div>
-            </div>
-          </div>
         </div>
       </div>
     </div>

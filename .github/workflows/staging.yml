@@ -1,0 +1,110 @@
+name: Staging
+
+# Every pull request into main is checked, built, and deployed to the staging Worker.
+# Only one pull request may be open at a time; a second one fails the "One open PR" check.
+on:
+  pull_request:
+    branches: [main]
+    types: [opened, synchronize, reopened, ready_for_review]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  pull-requests: write
+
+concurrency:
+  group: staging
+  cancel-in-progress: true
+
+jobs:
+  single-pr:
+    name: One open PR
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/github-script@v8
+        with:
+          script: |
+            const open = await github.paginate(github.rest.pulls.list, {
+              owner: context.repo.owner, repo: context.repo.repo, state: 'open', base: 'main',
+            });
+            if (open.length > 1) {
+              core.setFailed(
+                `Only one pull request may be open at a time. Open now: ${open.map((pr) => `#${pr.number}`).join(', ')}. ` +
+                'Consolidate them into one pull request and close the rest.'
+              );
+            }
+
+  staging:
+    name: Build and deploy to staging
+    needs: single-pr
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v5
+
+      - uses: actions/setup-node@v5
+        with:
+          node-version: 22
+          cache: npm
+
+      - run: npm ci
+
+      - run: npm run lint
+
+      - run: npm run build
+
+      - name: Deploy to staging
+        id: deploy
+        env:
+          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+        run: |
+          set -o pipefail
+          if [ -z "$CLOUDFLARE_API_TOKEN" ]; then
+            echo "::error::The CLOUDFLARE_API_TOKEN secret is not set, so staging cannot be deployed."
+            exit 1
+          fi
+          npx wrangler deploy --env staging | tee deploy.log
+          url=$(grep -oE 'https://[a-z0-9.-]+\.workers\.dev' deploy.log | head -1)
+          if [ -z "$url" ]; then
+            echo "::error::Deploy finished but no workers.dev URL was found in its output."
+            exit 1
+          fi
+          echo "url=$url" >> "$GITHUB_OUTPUT"
+          echo "### Staging: $url" >> "$GITHUB_STEP_SUMMARY"
+
+      # The /admin dashboard's password lives only in the ADMIN_PASSWORD repository secret.
+      - name: Sync admin password
+        env:
+          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          ADMIN_PASSWORD: ${{ secrets.ADMIN_PASSWORD }}
+        run: |
+          if [ -z "$ADMIN_PASSWORD" ]; then
+            echo "::notice::ADMIN_PASSWORD is not set, so /admin stays locked. Add it under Settings > Secrets and variables > Actions."
+            exit 0
+          fi
+          printf '%s' "$ADMIN_PASSWORD" | npx wrangler secret put ADMIN_PASSWORD --env staging
+
+      - name: Check every live song plays from staging
+        env:
+          CHECK_ORIGIN: ${{ steps.deploy.outputs.url }}
+        run: npm run check:tracks
+
+      - name: Comment staging link on the pull request
+        if: github.event_name == 'pull_request'
+        uses: actions/github-script@v8
+        env:
+          STAGING_URL: ${{ steps.deploy.outputs.url }}
+        with:
+          script: |
+            const marker = '<!-- staging-deploy -->';
+            const body = `${marker}\n**Staging is live:** ${process.env.STAGING_URL}\n\n` +
+              `Built from \`${context.payload.pull_request.head.sha.slice(0, 7)}\`. ` +
+              'Review it there; merging this pull request publishes it to https://brytonzoz.com.';
+            const { owner, repo } = context.repo;
+            const issue_number = context.payload.pull_request.number;
+            const comments = await github.paginate(github.rest.issues.listComments, { owner, repo, issue_number });
+            const existing = comments.find((c) => c.body?.includes(marker));
+            if (existing) {
+              await github.rest.issues.updateComment({ owner, repo, comment_id: existing.id, body });
+            } else {
+              await github.rest.issues.createComment({ owner, repo, issue_number, body });
+            }

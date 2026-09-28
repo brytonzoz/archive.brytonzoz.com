@@ -1,9 +1,5 @@
 import type { MediaAsset } from './media';
 
-export function cn(...inputs: string[]) {
-  return inputs.filter(Boolean).join(' ');
-}
-
 // Utility function to check if a project has been released
 export function isProjectReleased(project: Project): boolean {
   if (!project.releaseDate) return true; // No release date means it's already released
@@ -43,4 +39,28 @@ export type Project = {
 export type ProjectData = {
   music: Project[];
   fashion: Project[];
+}
+const PROJECT_TYPE_LABELS: Record<string, string> = {
+  album: 'Album',
+  'streaming-ep': 'EP',
+  mixtape: 'Mixtape',
+  'multi-purpose-stream': 'Platform',
+  'video-series': 'Video series',
+  ecommerce: 'Store',
+};
+
+export function getProjectTypeLabel(project: Project): string {
+  return PROJECT_TYPE_LABELS[project.type] ?? project.type.replace(/-/g, ' ');
+}
+
+export function getStreamingLinks(project: Project) {
+  return isProjectReleased(project)
+    ? (project.postReleaseStreamingLinks || project.streamingLinks)
+    : project.streamingLinks;
+}
+
+export function getProjectDescription(project: Project): string {
+  return isProjectReleased(project)
+    ? (project.postReleaseDescription || project.description)
+    : (project.preReleaseDescription || project.description);
 }

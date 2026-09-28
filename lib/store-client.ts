@@ -1,5 +1,5 @@
 import { useSyncExternalStore } from 'react';
-import { productById, type Availability } from './store';
+import { productById, type Availability, type Product } from './store';
 
 // Browser side of the store: which pieces are still available, the bag, and checkout.
 
@@ -24,6 +24,23 @@ export function refreshAvailability(): Promise<void> {
       availabilityRequest = null;
     });
   return availabilityRequest;
+}
+
+// Starts loading a piece's first photos as soon as a finger lands on its card, so the sheet opens
+// with them ready. AVIF first (what <picture> will choose), at the sheet's size.
+const warmed = new Set<string>();
+export function warmProduct(product: Product): void {
+  if (warmed.has(product.id)) return;
+  warmed.add(product.id);
+  for (const image of product.images.slice(0, 2)) {
+    const link = document.createElement('link');
+    link.rel = 'preload';
+    link.as = 'image';
+    link.type = 'image/avif';
+    link.setAttribute('imagesrcset', image.avif);
+    link.setAttribute('imagesizes', '(min-width: 640px) 480px, 100vw');
+    document.head.appendChild(link);
+  }
 }
 
 // --- Bag (kept on this device) --------------------------------------------------------------

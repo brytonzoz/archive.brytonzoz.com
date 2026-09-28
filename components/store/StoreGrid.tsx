@@ -2,7 +2,7 @@
 
 import React, { useEffect, useState } from 'react';
 import { formatPrice, products, type Product } from '../../lib/store';
-import { useAvailability } from '../../lib/store-client';
+import { useAvailability, warmProduct } from '../../lib/store-client';
 import { ResponsiveImage, placeholderBackground } from '../ResponsiveImage';
 
 // The Scrapwrk grid: four cards that fly in one after another (top left, top right, bottom left,
@@ -118,12 +118,13 @@ export function StoreGrid({
     };
   }, [active]);
 
-  const cards: { key: string; label: string; face: React.ReactNode; onClick: () => void }[] = [
+  const cards: { key: string; label: string; face: React.ReactNode; onClick: () => void; warm?: () => void }[] = [
     ...products.slice(0, 3).map((product) => ({
       key: product.id,
       label: `${product.name}, ${formatPrice(product.price)}`,
       face: <ProductFace product={product} sizes={sizes} />,
       onClick: () => onOpen(product),
+      warm: () => warmProduct(product),
     })),
     { key: 'next-drop', label: 'Next drop: notify me', face: <NextDropFace />, onClick: onNotify },
   ];
@@ -152,7 +153,7 @@ export function StoreGrid({
                 '--delay': `${i * STAGGER_MS + 1100}ms`,
               } as React.CSSProperties}
             >
-              <button type="button" className="store-card" onClick={card.onClick} aria-label={card.label}>
+              <button type="button" className="store-card" onClick={card.onClick} onPointerDown={card.warm} onPointerEnter={card.warm} aria-label={card.label}>
                 <span className="store-card-flip" style={{ '--delay': `${i * STAGGER_MS}ms` } as React.CSSProperties}>
                   <span className={`store-card-inner ${spinning === i ? 'is-spinning' : ''}`}>{card.face}</span>
                 </span>

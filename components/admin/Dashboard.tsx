@@ -62,7 +62,7 @@ function CampaignLinks({ rows }: { rows: NonNullable<Stats['campaigns']> }) {
           {copied ? 'Copied' : 'Copy link'}
         </button>
       </form>
-      <p className="mt-1.5 truncate text-[12px] text-white/40">{code ? link : `${SITE_URL}/go/…`}</p>
+      <p className="mt-1.5 truncate text-[12px] text-white/50">{code ? link : `${SITE_URL}/go/…`}</p>
       <div className="mt-4">
         <RankedList
           rows={rows.map((row) => ({ label: row.label, value: n(row.visitors), extra: `${fmt(n(row.streams))} streams` }))}
@@ -116,7 +116,7 @@ function Tile({ label, value, hint, live = false }: { label: string; value: stri
         {label}
       </p>
       <p className="mt-1 text-[28px] font-semibold leading-tight tracking-[-0.02em] tabular-nums">{value}</p>
-      {hint ? <p className="mt-0.5 text-[12px] text-white/40">{hint}</p> : null}
+      {hint ? <p className="mt-0.5 text-[12px] text-white/50">{hint}</p> : null}
     </div>
   );
 }
@@ -135,7 +135,7 @@ function Card({ title, subtitle, children, className = '' }: { title: string; su
 function Columns({ data, format, label }: { data: { key: string; label: string; value: number; detail?: string }[]; format: (v: number) => string; label: string }) {
   const [active, setActive] = useState<number | null>(null);
   const max = Math.max(1, ...data.map((d) => d.value));
-  if (!data.length) return <p className="py-8 text-center text-[14px] text-white/40">No data yet</p>;
+  if (!data.length) return <p className="py-8 text-center text-[14px] text-white/50">No data yet</p>;
   const shown = active ?? data.length - 1;
 
   return (
@@ -166,7 +166,7 @@ function Columns({ data, format, label }: { data: { key: string; label: string; 
           ))}
         </div>
       </div>
-      <div className="mt-2 flex justify-between text-[11px] text-white/40" aria-hidden="true">
+      <div className="mt-2 flex justify-between text-[11px] text-white/50" aria-hidden="true">
         <span>{data[0].label}</span>
         <span>{data[data.length - 1].label}</span>
       </div>
@@ -176,7 +176,7 @@ function Columns({ data, format, label }: { data: { key: string; label: string; 
 
 // Ranked list with a thin magnitude bar (text stays in text colors; the bar carries the value).
 function RankedList({ rows, format = fmt, empty = 'No data yet' }: { rows: { label: string; value: number; extra?: string }[]; format?: (v: number) => string; empty?: string }) {
-  if (!rows.length) return <p className="py-4 text-[14px] text-white/40">{empty}</p>;
+  if (!rows.length) return <p className="py-4 text-[14px] text-white/50">{empty}</p>;
   const max = Math.max(1, ...rows.map((row) => row.value));
   return (
     <ol className="space-y-2.5">
@@ -186,7 +186,7 @@ function RankedList({ rows, format = fmt, empty = 'No data yet' }: { rows: { lab
             <span className="min-w-0 truncate text-white/85">{row.label}</span>
             <span className="shrink-0 tabular-nums text-white/60">
               {format(row.value)}
-              {row.extra ? <span className="ml-2 text-white/35">{row.extra}</span> : null}
+              {row.extra ? <span className="ml-2 text-white/50">{row.extra}</span> : null}
             </span>
           </div>
           <div className="mt-1 h-[4px] rounded-full bg-white/[0.06]">
@@ -234,7 +234,7 @@ function StoreCard({ password, funnel, views }: { password: string; funnel: Reco
             <li key={product.id} className="flex items-center gap-3 text-[14px]">
               <span className="min-w-0 flex-1">
                 <span className="block truncate text-white/90">{product.number} {product.name} · {formatPrice(product.price)}</span>
-                <span className="block text-[12px] text-white/40">{fmt(viewsById.get(product.id) ?? 0)} opened</span>
+                <span className="block text-[12px] text-white/50">{fmt(viewsById.get(product.id) ?? 0)} opened</span>
               </span>
               <span className={`rounded-full px-2.5 py-1 text-[12px] font-semibold ${status === 'sold' ? 'bg-white/10 text-white/60' : status === 'held' ? 'bg-[#ff9f0a]/20 text-[#ffb340]' : 'bg-[#30d158]/15 text-[#30d158]'}`}>
                 {status === 'held' ? 'In checkout' : status.replace(/^./, (c) => c.toUpperCase())}
@@ -450,7 +450,7 @@ export function Dashboard() {
             {range.label}
           </button>
         ))}
-        {busy ? <span className="ml-2 text-[13px] text-white/40">Loading…</span> : null}
+        {busy ? <span className="ml-2 text-[13px] text-white/50">Loading…</span> : null}
       </div>
 
       <div className="mt-6 grid grid-cols-2 gap-3 sm:grid-cols-4">
@@ -492,7 +492,7 @@ export function Dashboard() {
                   <tr key={String(row.track)} className="border-t border-white/[0.06]">
                     <td className="px-2 py-2.5">
                       <span className="block text-white/90">{trackTitles.get(String(row.track)) ?? row.track}</span>
-                      <span className="block text-[12px] text-white/40">{releaseTitles.get(String(row.release)) ?? row.release}</span>
+                      <span className="block text-[12px] text-white/50">{releaseTitles.get(String(row.release)) ?? row.release}</span>
                     </td>
                     <td className="px-2 text-right text-white/90">{fmt(n(row.streams))}</td>
                     <td className="px-2 text-right text-white/70">{fmt(n(row.listeners))}</td>
@@ -504,7 +504,7 @@ export function Dashboard() {
               </tbody>
             </table>
           </div>
-        ) : <p className="text-[14px] text-white/40">No plays in this range yet.</p>}
+        ) : <p className="text-[14px] text-white/50">No plays in this range yet.</p>}
       </Card>
 
       <div className="mt-3 grid gap-3 md:grid-cols-2 lg:grid-cols-3">
@@ -557,7 +557,7 @@ export function Dashboard() {
         <StoryKit />
       </Card>
 
-      <footer className="mt-8 flex flex-wrap items-center justify-between gap-3 text-[13px] text-white/40">
+      <footer className="mt-8 flex flex-wrap items-center justify-between gap-3 text-[13px] text-white/50">
         <p>Listening is anonymous: a random id per browser, no names or IP addresses. Emails are only the ones people left with Notify me.</p>
         <label className="flex items-center gap-2">
           <input

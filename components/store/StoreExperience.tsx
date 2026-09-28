@@ -105,7 +105,8 @@ export function BagButton({ onOpen, className = '' }: { onOpen: () => void; clas
       className={`store-bag-button glass-capsule flex h-11 items-center gap-2 rounded-full pl-3.5 pr-4 text-[15px] font-semibold text-white transition-transform active:scale-95 focus-visible:outline focus-visible:outline-2 focus-visible:outline-white/70 ${className}`}
     >
       <BagIcon size={19} />
-      <span className="tabular-nums">{bag.length}</span>
+      {/* Keyed by the count, so each change replays the pop. */}
+      <span key={bag.length} className="store-bag-count tabular-nums">{bag.length}</span>
     </button>
   );
 }
@@ -161,6 +162,7 @@ export function StoreExperience({
   const buy = useCallback(async (ids: string[]) => {
     if (!ids.length || busy) return;
     setBusy(true);
+    navigator.vibrate?.(12);
     track({ type: 'checkout', detail: ids.join(',') });
     const result = await startCheckout(ids);
     if ('url' in result) {

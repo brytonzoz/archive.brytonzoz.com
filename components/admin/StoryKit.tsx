@@ -110,7 +110,7 @@ export function StoryKit() {
     if (canvasRef.current && release) draw(canvasRef.current, release, trackId).catch(() => {});
   }, [release, trackId]);
 
-  if (!release) return <p className="text-[14px] text-white/40">No releases in the player yet.</p>;
+  if (!release) return <p className="text-[14px] text-white/50">No releases in the player yet.</p>;
 
   const download = () => {
     canvasRef.current?.toBlob((blob) => {

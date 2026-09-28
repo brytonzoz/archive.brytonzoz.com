@@ -12,7 +12,7 @@ export const metadata: Metadata = {
 
 export default function WorkPage() {
   return (
-    <main className="min-h-screen bg-[#0b0b0c] text-white">
+    <div className="min-h-screen bg-[#0b0b0c] text-white">
       <div className="mx-auto max-w-4xl px-5 pb-24 pt-6 sm:px-8 sm:pt-10">
         <Link
           href="/"
@@ -36,6 +36,6 @@ export default function WorkPage() {
         </a>
       </div>
       <SiteFooter />
-    </main>
+    </div>
   );
 }

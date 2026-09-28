@@ -125,7 +125,7 @@ export function PlatformBar({ project, release, className = '', style }: { proje
                       <span className="shrink-0 rounded-full bg-white px-4 py-1.5 text-[14px] font-semibold text-black">{isReleased ? 'Open' : 'Pre-save'}</span>
                     </a>
                   ) : (
-                    <span className="flex h-[68px] items-center gap-4 rounded-[12px] bg-white/[0.04] pl-3 pr-4 text-white/40">
+                    <span className="flex h-[68px] items-center gap-4 rounded-[12px] bg-white/[0.04] pl-3 pr-4 text-white/50">
                       <span className="opacity-40 grayscale"><AppIcon service={service} size={46} /></span>
                       <span className="min-w-0 flex-1 truncate text-[17px] font-semibold">{service.name}</span>
                       <span className="shrink-0 text-[14px] font-semibold">Release day</span>

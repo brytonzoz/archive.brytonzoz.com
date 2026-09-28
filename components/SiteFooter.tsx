@@ -45,7 +45,7 @@ export function SiteFooter({ variant = 'page' }: { variant?: 'overlay' | 'page' 
       style={{ paddingBottom: `calc(max(1.25rem, env(safe-area-inset-bottom)) + var(--player-offset, 0px)${overlay ? '' : ' + 1rem'})` }}
     >
       <nav aria-label="Listen" className="flex flex-wrap items-center gap-x-4 gap-y-1.5">
-        <span className="text-white/40">Listen</span>
+        <span className="text-white/50">Listen</span>
         {LISTEN_LINKS.map((link) => (
           <a key={link.name} href={link.url} target="_blank" rel="noopener noreferrer" className={LINK}>
             {link.name}

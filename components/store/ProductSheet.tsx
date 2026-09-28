@@ -141,7 +141,7 @@ export function ProductSheet({
                 <p className="text-[13px] font-semibold tracking-[0.18em] text-white/45">SCRAPWRK {product.number}</p>
                 <h2 id={titleId} className="mt-1 text-[30px] font-bold leading-none tracking-[-0.03em]">{product.name}</h2>
               </div>
-              <p className={`shrink-0 text-[24px] font-semibold tabular-nums tracking-[-0.02em] ${status === 'sold' ? 'text-white/40 line-through' : ''}`}>
+              <p className={`shrink-0 text-[24px] font-semibold tabular-nums tracking-[-0.02em] ${status === 'sold' ? 'text-white/50 line-through' : ''}`}>
                 {formatPrice(product.price)}
               </p>
             </div>
@@ -159,7 +159,7 @@ export function ProductSheet({
                 </li>
               ))}
             </ul>
-            <p className="mt-5 text-[13px] text-white/40">{shippingLabel} in the US · Secure checkout by Stripe</p>
+            <p className="mt-5 text-[13px] text-white/50">{shippingLabel} in the US · Secure checkout by Stripe</p>
           </div>
         </div>
 
@@ -177,6 +177,7 @@ export function ProductSheet({
                     return;
                   }
                   addToBag(product.id);
+                  navigator.vibrate?.(10);
                   track({ type: 'bag', detail: product.id });
                   notify('Added to bag');
                 }}

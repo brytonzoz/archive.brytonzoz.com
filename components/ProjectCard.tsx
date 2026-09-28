@@ -41,7 +41,7 @@ export function ProjectCard({ project, className = '', style, onModalStateChange
       </div>
       <p className="mt-2.5 line-clamp-2 text-[15px] font-medium leading-snug tracking-[-0.01em] text-white">
         {project.name}
-        {isExternal ? <ArrowUpRightIcon size={13} className="ml-1 inline-block align-[-1px] text-white/40" /> : null}
+        {isExternal ? <ArrowUpRightIcon size={13} className="ml-1 inline-block align-[-1px] text-white/50" /> : null}
       </p>
       <p className="text-[13px] leading-snug text-white/45">{getProjectTypeLabel(project)}</p>
     </>

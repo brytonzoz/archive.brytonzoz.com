@@ -32,10 +32,16 @@ export function useProgress() {
   return progress;
 }
 
-// Same idea for a bar that only needs its width: writes to the DOM directly.
-export function useProgressBar<T extends HTMLElement>() {
+const scaleBar = (element: HTMLElement | SVGElement, fraction: number) => {
+  element.style.transform = `scaleX(${fraction})`;
+};
+
+// Same idea for an indicator that only needs the played fraction: writes to the DOM directly.
+export function useProgressBar<T extends HTMLElement | SVGElement>(apply: (element: T, fraction: number) => void = scaleBar) {
   const { audioRef, current } = usePlayer();
   const barRef = useRef<T>(null);
+  const applyRef = useRef(apply);
+  applyRef.current = apply;
   const fallback = current ? current.durationMs / 1000 : 0;
 
   const hasTrack = Boolean(current);
@@ -45,7 +51,7 @@ export function useProgressBar<T extends HTMLElement>() {
     let frame = 0;
     const tick = () => {
       const { time, duration } = readProgress(audioRef.current, fallback);
-      if (barRef.current) barRef.current.style.transform = `scaleX(${duration > 0 ? Math.min(1, time / duration) : 0})`;
+      if (barRef.current) applyRef.current(barRef.current, duration > 0 ? Math.min(1, time / duration) : 0);
       frame = requestAnimationFrame(tick);
     };
     frame = requestAnimationFrame(tick);

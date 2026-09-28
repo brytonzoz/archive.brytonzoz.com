@@ -117,8 +117,8 @@ The site can play Bryton's music itself, and keeps playing while visitors scroll
   exact file names. A release appears in the player only when `"available": true`.
 - `CHECK_ORIGIN=<site> npm run check:tracks` confirms every song of an available release plays; both deploy workflows run it and stop
   if anything is missing. `--all` also reports releases that aren't live yet.
-- UI: a "Play here" row in the Listen sheet, a mini player at the bottom, and a full Now Playing sheet with the
-  tracklists. It works with the phone's lock screen, headphones and car controls through the Media Session API.
+- UI: a Play button under each cover (and in the Listen sheet on the Music page), a glass mini player at the
+  bottom, and a full Now Playing sheet whose tracklist button swaps the artwork for every song. It works with the phone's lock screen, headphones and car controls through the Media Session API.
 
 ## Hosting
 

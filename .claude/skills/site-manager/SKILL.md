@@ -50,8 +50,10 @@ the same PR so the owner can judge it on staging; nothing reaches production unt
   converted to V0 MP3) and uploads to R2. Test locally first with `python3 scripts/sync-music.py --out <dir>`.
 - Only flip a release to `"available": true` after Music sync succeeds, then push; the staging check
   (`CHECK_ORIGIN=<staging url> npm run check:tracks`) blocks a broken release.
-- The player appears automatically once any release is available: "Play here" in the Listen sheet, a mini player
+- The player appears automatically once any release is available: a Play button under the cover, a mini player
   while browsing, and Now Playing with the full tracklist.
+- Design rules for this site: artwork first, one primary action per screen, no taglines or helper captions,
+  icons instead of words where an icon is unmistakable (the app icons open the listen sheet). Keep it that way.
 
 ## 3. Verify before pushing
 

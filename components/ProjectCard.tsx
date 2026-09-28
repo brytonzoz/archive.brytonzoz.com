@@ -1,17 +1,12 @@
 'use client';
 
 import React, { useState } from 'react';
-import { Project, getProjectDescription, getProjectTypeLabel, getStreamingLinks, isProjectReleased } from '../lib/utils';
+import { Project, getProjectTypeLabel, isProjectReleased } from '../lib/utils';
+import { getStreamingServices } from '../lib/streaming';
+import { getReleaseForProject } from '../lib/tracks';
 import { ListenSheet } from './ListenSheet';
+import { ArrowUpRightIcon } from './player/icons';
 import { ResponsiveImage, placeholderBackground } from './ResponsiveImage';
-
-function ArrowIcon({ className = '' }: { className?: string }) {
-  return (
-    <svg className={className} width="14" height="14" viewBox="0 0 24 24" fill="none" aria-hidden="true">
-      <path d="M7 17 17 7M9 7h8v8" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round" />
-    </svg>
-  );
-}
 
 interface ProjectCardProps {
   project: Project;
@@ -20,61 +15,47 @@ interface ProjectCardProps {
   onModalStateChange?: (isOpen: boolean) => void;
 }
 
+// A grid tile, as in a music library: artwork, title, and what it is. Releases open the listen
+// sheet; everything else opens its site.
 export function ProjectCard({ project, className = '', style, onModalStateChange }: ProjectCardProps) {
-  const [isStreamingModalOpen, setIsStreamingModalOpen] = useState(false);
-  const links = getStreamingLinks(project);
-  const isReleased = isProjectReleased(project);
-  const action = links
-    ? (isReleased ? 'Listen' : 'Pre-save')
-    : project.type === 'video-series'
-      ? 'Watch'
-      : project.type === 'ecommerce'
-        ? 'Shop'
-        : 'Visit';
+  const [isSheetOpen, setIsSheetOpen] = useState(false);
+  const hasSheet = getStreamingServices(project).length > 0 || (isProjectReleased(project) && Boolean(getReleaseForProject(project.name)));
+  const isExternal = !hasSheet && Boolean(project.url);
 
   const content = (
     <>
       <div
-        className="relative aspect-square overflow-hidden rounded-[22px] bg-white/[0.04] ring-1 ring-inset ring-white/[0.06]"
+        className="tile-cover relative aspect-square overflow-hidden rounded-[10px] bg-white/[0.04]"
         style={project.image ? placeholderBackground(project.image) : undefined}
       >
         {project.image ? (
           <ResponsiveImage
             asset={project.image}
-            alt={project.name}
-            sizes="(min-width: 640px) 420px, calc(100vw - 40px)"
-            className="absolute inset-0 h-full w-full object-cover transition-transform duration-700 ease-out group-hover:scale-[1.03]"
+            alt=""
+            sizes="(min-width: 640px) 260px, calc(50vw - 28px)"
+            className="absolute inset-0 h-full w-full object-cover"
           />
         ) : null}
       </div>
-
-      <div className="mt-4 flex items-end justify-between gap-4 px-0.5">
-        <div className="min-w-0">
-          <p className="text-[11px] font-medium uppercase tracking-[0.14em] text-white/40">
-            {getProjectTypeLabel(project)}
-          </p>
-          <h2 className="mt-1 truncate text-[17px] font-semibold tracking-[-0.01em] text-white">{project.name}</h2>
-          <p className="mt-0.5 line-clamp-2 text-[14px] leading-snug text-white/55">{getProjectDescription(project)}</p>
-        </div>
-        <span className="flex shrink-0 items-center gap-1 rounded-full bg-white px-3.5 py-1.5 text-[13px] font-semibold text-black transition-transform duration-200 group-hover:translate-x-0.5">
-          {action}
-          {links ? null : <ArrowIcon />}
-        </span>
-      </div>
+      <p className="mt-2.5 line-clamp-2 text-[15px] font-medium leading-snug tracking-[-0.01em] text-white">
+        {project.name}
+        {isExternal ? <ArrowUpRightIcon size={13} className="ml-1 inline-block align-[-1px] text-white/40" /> : null}
+      </p>
+      <p className="text-[13px] leading-snug text-white/45">{getProjectTypeLabel(project)}</p>
     </>
   );
 
-  const cardClassName = `group block w-full rounded-[26px] text-left focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-4 focus-visible:outline-white/60 ${className}`;
+  const tileClassName = `tile group block w-full min-w-0 rounded-[12px] text-left focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-4 focus-visible:outline-white/60 ${className}`;
 
-  if (links) {
+  if (hasSheet) {
     return (
       <>
         <button
           type="button"
-          className={cardClassName}
+          className={tileClassName}
           style={style}
           onClick={() => {
-            setIsStreamingModalOpen(true);
+            setIsSheetOpen(true);
             onModalStateChange?.(true);
           }}
         >
@@ -82,9 +63,9 @@ export function ProjectCard({ project, className = '', style, onModalStateChange
         </button>
         <ListenSheet
           project={project}
-          isOpen={isStreamingModalOpen}
+          isOpen={isSheetOpen}
           onClose={() => {
-            setIsStreamingModalOpen(false);
+            setIsSheetOpen(false);
             onModalStateChange?.(false);
           }}
         />
@@ -93,13 +74,7 @@ export function ProjectCard({ project, className = '', style, onModalStateChange
   }
 
   return (
-    <a
-      href={project.url}
-      target="_blank"
-      rel="noopener noreferrer"
-      className={cardClassName}
-      style={style}
-    >
+    <a href={project.url} target="_blank" rel="noopener noreferrer" className={tileClassName} style={style}>
       {content}
     </a>
   );

@@ -3,12 +3,22 @@
 import React from 'react';
 import { ResponsiveImage, placeholderBackground } from '../ResponsiveImage';
 import { usePlayer } from './context';
-import { EqualizerBars, NextIcon, PauseIcon, PlayIcon } from './icons';
+import { NextIcon, PauseIcon, PlayIcon } from './icons';
 import { useProgressBar } from './useProgress';
 
+const RING_RADIUS = 20;
+const RING_LENGTH = 2 * Math.PI * RING_RADIUS;
+
+// While a song is loading the ring becomes a short spinning arc instead.
+const drawRing = (element: SVGCircleElement, fraction: number) => {
+  element.style.strokeDashoffset = element.dataset.loading ? '0' : String(RING_LENGTH * (1 - fraction));
+};
+
+// A floating glass capsule: artwork and title (tap to open the player), play/pause wrapped in a
+// thin progress ring, and next.
 export function MiniPlayer() {
   const { current, isPlaying, isLoading, failedTrackIds, toggle, next, expand } = usePlayer();
-  const barRef = useProgressBar<HTMLSpanElement>();
+  const ringRef = useProgressBar<SVGCircleElement>(drawRing);
   if (!current) return null;
 
   const cover = current.release.cover;
@@ -19,24 +29,21 @@ export function MiniPlayer() {
       className="mini-player pointer-events-none fixed inset-x-0 z-[90] flex justify-center px-3 font-body"
       style={{ bottom: 'max(12px, env(safe-area-inset-bottom))' }}
     >
-      <div className="pointer-events-auto relative flex h-[64px] w-full max-w-[440px] items-center gap-2 overflow-hidden rounded-[22px] bg-[#1b1b1e]/85 pl-2 pr-2 text-white shadow-[0_18px_50px_rgba(0,0,0,0.45)] ring-1 ring-white/10 backdrop-blur-2xl backdrop-saturate-150">
+      <div className="glass-capsule pointer-events-auto flex h-[60px] w-full max-w-[400px] items-center gap-1 rounded-full pl-[9px] pr-2 text-white">
         <button
           type="button"
           onClick={expand}
           aria-label={`Open player: ${current.title}`}
-          className="flex h-full min-w-0 flex-1 items-center gap-3 rounded-[16px] text-left focus-visible:outline focus-visible:outline-2 focus-visible:outline-white/70"
+          className="flex h-full min-w-0 flex-1 items-center gap-3 rounded-full text-left focus-visible:outline focus-visible:outline-2 focus-visible:outline-white/70"
         >
-          <span className="relative h-11 w-11 shrink-0 overflow-hidden rounded-[11px]" style={placeholderBackground(cover)}>
-            <ResponsiveImage asset={cover} alt="" sizes="44px" className="absolute inset-0 h-full w-full object-cover" />
-            <span className="absolute inset-0 flex items-center justify-center bg-black/35">
-              <EqualizerBars playing={isPlaying && !isLoading} />
-            </span>
+          <span
+            className={`relative h-[42px] w-[42px] shrink-0 overflow-hidden rounded-full transition-transform duration-500 ease-out ${isPlaying ? 'scale-100' : 'scale-[0.92]'}`}
+            style={placeholderBackground(cover)}
+          >
+            <ResponsiveImage asset={cover} alt="" sizes="42px" className="absolute inset-0 h-full w-full object-cover" />
           </span>
-          <span className="min-w-0 flex-1">
-            <span className="block truncate text-[15px] font-semibold leading-tight">{current.title}</span>
-            <span className="mt-0.5 block truncate text-[13px] leading-tight text-white/50">
-              {failed ? 'Couldn’t load this song, skipping' : `${current.release.title} · Bryton Zoz`}
-            </span>
+          <span className={`min-w-0 flex-1 truncate text-[15px] font-semibold tracking-[-0.01em] ${failed ? 'text-white/45' : ''}`}>
+            {failed ? 'Couldn’t load, skipping…' : current.title}
           </span>
         </button>
 
@@ -44,23 +51,34 @@ export function MiniPlayer() {
           type="button"
           onClick={toggle}
           aria-label={isPlaying ? 'Pause' : 'Play'}
-          className="relative flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-white text-black transition-transform active:scale-90 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-white/70"
+          className="relative flex h-11 w-11 shrink-0 items-center justify-center rounded-full transition-transform active:scale-90 focus-visible:outline focus-visible:outline-2 focus-visible:outline-white/70"
         >
-          {isLoading ? <span className="player-spinner absolute inset-[-3px] rounded-full" aria-hidden="true" /> : null}
-          {isPlaying ? <PauseIcon size={17} /> : <PlayIcon size={17} className="translate-x-[1px]" />}
+          <svg aria-hidden="true" viewBox="0 0 44 44" className={`absolute inset-0 h-full w-full -rotate-90 ${isLoading ? 'animate-[playerSpin_900ms_linear_infinite]' : ''}`}>
+            <circle cx="22" cy="22" r={RING_RADIUS} fill="none" stroke="rgba(255,255,255,0.16)" strokeWidth="2" />
+            <circle
+              ref={ringRef}
+              data-loading={isLoading ? '1' : undefined}
+              cx="22"
+              cy="22"
+              r={RING_RADIUS}
+              fill="none"
+              stroke="#fff"
+              strokeWidth="2"
+              strokeLinecap="round"
+              strokeDasharray={isLoading ? `${RING_LENGTH * 0.25} ${RING_LENGTH}` : RING_LENGTH}
+              style={{ strokeDashoffset: RING_LENGTH }}
+            />
+          </svg>
+          {isPlaying ? <PauseIcon size={18} /> : <PlayIcon size={18} className="translate-x-[1px]" />}
         </button>
         <button
           type="button"
           onClick={next}
           aria-label="Next song"
-          className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full text-white/85 transition-transform hover:text-white active:scale-90 focus-visible:outline focus-visible:outline-2 focus-visible:outline-white/70"
+          className="flex h-11 w-11 shrink-0 items-center justify-center rounded-full text-white/90 transition-transform active:scale-90 focus-visible:outline focus-visible:outline-2 focus-visible:outline-white/70"
         >
-          <NextIcon size={19} />
+          <NextIcon size={21} />
         </button>
-
-        <span aria-hidden="true" className="absolute inset-x-4 bottom-[5px] h-[2px] overflow-hidden rounded-full bg-white/10">
-          <span ref={barRef} className="block h-full origin-left rounded-full bg-white/75" style={{ transform: 'scaleX(0)' }} />
-        </span>
       </div>
     </div>
   );

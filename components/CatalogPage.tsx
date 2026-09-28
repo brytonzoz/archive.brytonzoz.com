@@ -7,7 +7,7 @@ export function CatalogPage({ title, projects }: { title: string; projects: Proj
   return (
     <main className="min-h-screen bg-[#0b0b0c] text-white">
       <div
-        className="mx-auto max-w-4xl px-5 pt-8 sm:px-8 sm:pt-12"
+        className="mx-auto max-w-4xl px-5 pt-6 sm:px-8 sm:pt-10"
         style={{ paddingBottom: 'calc(6rem + var(--player-offset, 0px))' }}
       >
         <Link
@@ -20,11 +20,11 @@ export function CatalogPage({ title, projects }: { title: string; projects: Proj
           Bryton Zoz
         </Link>
 
-        <h1 className="mt-10 text-[40px] font-semibold leading-none tracking-[-0.035em] sm:mt-14 sm:text-[56px]">
+        <h1 className="mt-8 text-[34px] font-bold leading-none tracking-[-0.03em] sm:mt-12 sm:text-[44px]">
           {title}
         </h1>
 
-        <div className="mt-10 grid gap-x-6 gap-y-12 sm:grid-cols-2">
+        <div className="mt-7 grid grid-cols-2 gap-x-4 gap-y-7 sm:mt-10 sm:grid-cols-3 sm:gap-x-6 sm:gap-y-10">
           {projects.map((project, index) => (
             <ProjectCard
               key={project.name}

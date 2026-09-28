@@ -24,7 +24,13 @@ export async function sync(printify, root) {
   const catalog = {
     shopId,
     currency: 'usd',
-    blueprint: { id: blueprint.id, name: `${blueprint.brand} ${blueprint.model}`, title: blueprint.title, details: stripHtml(blueprint.description).slice(0, 900) },
+    blueprint: {
+      id: blueprint.id,
+      name: `${blueprint.brand} ${blueprint.model}`,
+      title: blueprint.title,
+      // Printify's description is ".:"-separated bullet points after an intro; keep the bullets.
+      details: stripHtml(blueprint.description).split('.:').slice(1).map((part) => part.replace(/\s+/g, ' ').trim().replace(/\.$/, '')).filter(Boolean).slice(0, 6),
+    },
     products: [],
   };
 
@@ -75,7 +81,16 @@ export async function sync(printify, root) {
         await printify('DELETE', `/shops/${shopId}/products/${found.id}.json`);
         product = await printify('POST', `/shops/${shopId}/products.json`, body);
       } else {
-        product = await printify('PUT', `/shops/${shopId}/products/${found.id}.json`, body);
+        // Printify keeps every variant of the blueprint on a product (the ones not asked for are
+        // disabled), and an update has to list all of them in the print area.
+        const current = await printify('GET', `/shops/${shopId}/products/${found.id}.json`);
+        const wanted = new Map(body.variants.map((variant) => [variant.id, variant]));
+        const all = current.variants ?? [];
+        product = await printify('PUT', `/shops/${shopId}/products/${found.id}.json`, {
+          ...body,
+          variants: all.map((variant) => wanted.get(variant.id) ?? { id: variant.id, price: variant.price, is_enabled: false }),
+          print_areas: [{ ...body.print_areas[0], variant_ids: all.map((variant) => variant.id) }],
+        });
       }
       console.log(`Updated ${title} (${product.id})`);
     } else {

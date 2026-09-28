@@ -68,6 +68,198 @@
     "avif": "/media/icons/youtube-music.d0321d2965-96.avif 96w, /media/icons/youtube-music.d0321d2965-144.avif 144w",
     "webp": "/media/icons/youtube-music.d0321d2965-96.webp 96w, /media/icons/youtube-music.d0321d2965-144.webp 144w"
   },
+  "merch-studio/blue/white-1": {
+    "width": 1440,
+    "height": 1440,
+    "src": "/media/merch-studio/blue/white-1.908b91d1fe-1440.webp",
+    "avif": "/media/merch-studio/blue/white-1.908b91d1fe-320.avif 320w, /media/merch-studio/blue/white-1.908b91d1fe-480.avif 480w, /media/merch-studio/blue/white-1.908b91d1fe-640.avif 640w, /media/merch-studio/blue/white-1.908b91d1fe-800.avif 800w, /media/merch-studio/blue/white-1.908b91d1fe-1080.avif 1080w, /media/merch-studio/blue/white-1.908b91d1fe-1440.avif 1440w",
+    "webp": "/media/merch-studio/blue/white-1.908b91d1fe-320.webp 320w, /media/merch-studio/blue/white-1.908b91d1fe-480.webp 480w, /media/merch-studio/blue/white-1.908b91d1fe-640.webp 640w, /media/merch-studio/blue/white-1.908b91d1fe-800.webp 800w, /media/merch-studio/blue/white-1.908b91d1fe-1080.webp 1080w, /media/merch-studio/blue/white-1.908b91d1fe-1440.webp 1440w",
+    "placeholder": "data:image/webp;base64,UklGRrgAAABXRUJQVlA4IKwAAABQBQCdASoYABgAPu1urlKppiQiqAgBMB2JZQAFEB7rhs1WiCCj3g6jSLo7eR8XDTQVmAAA/vDfphhnRgTXPyX7YWLx01pm496cYVrwQ+fYfICW7v0HImBQUtXfq6Whgp/bKPTzGxWGYbD9ZMUlpmb3P/JoCanXYc5u6fZtzsiPA1H7brLUGlpi/xCcohDsUpV58TrxrZ57QTWFDgZlLpgnk1pTxfNJeLwpAAAA"
+  },
+  "merch-studio/blue/white-2": {
+    "width": 1440,
+    "height": 1440,
+    "src": "/media/merch-studio/blue/white-2.14accae5d5-1440.webp",
+    "avif": "/media/merch-studio/blue/white-2.14accae5d5-320.avif 320w, /media/merch-studio/blue/white-2.14accae5d5-480.avif 480w, /media/merch-studio/blue/white-2.14accae5d5-640.avif 640w, /media/merch-studio/blue/white-2.14accae5d5-800.avif 800w, /media/merch-studio/blue/white-2.14accae5d5-1080.avif 1080w, /media/merch-studio/blue/white-2.14accae5d5-1440.avif 1440w",
+    "webp": "/media/merch-studio/blue/white-2.14accae5d5-320.webp 320w, /media/merch-studio/blue/white-2.14accae5d5-480.webp 480w, /media/merch-studio/blue/white-2.14accae5d5-640.webp 640w, /media/merch-studio/blue/white-2.14accae5d5-800.webp 800w, /media/merch-studio/blue/white-2.14accae5d5-1080.webp 1080w, /media/merch-studio/blue/white-2.14accae5d5-1440.webp 1440w",
+    "placeholder": "data:image/webp;base64,UklGRoYAAABXRUJQVlA4IHoAAAAwBACdASoYABgAPu1qrlCppaQiqAqpMB2JZwDKtARXkW/Lq1oNE3QSaAAA55JvmdDdpIfyRpHNSD6CIeq02bAjbZid5CLrVV3aEsUxpVmSgkoLQ44Sp216bVEs5EJecHW9PsFX/OMjZJy6Sj7aHh/AjAJS1J625RAAAA=="
+  },
+  "merch-studio/blue/white-3": {
+    "width": 1440,
+    "height": 1440,
+    "src": "/media/merch-studio/blue/white-3.8876727531-1440.webp",
+    "avif": "/media/merch-studio/blue/white-3.8876727531-320.avif 320w, /media/merch-studio/blue/white-3.8876727531-480.avif 480w, /media/merch-studio/blue/white-3.8876727531-640.avif 640w, /media/merch-studio/blue/white-3.8876727531-800.avif 800w, /media/merch-studio/blue/white-3.8876727531-1080.avif 1080w, /media/merch-studio/blue/white-3.8876727531-1440.avif 1440w",
+    "webp": "/media/merch-studio/blue/white-3.8876727531-320.webp 320w, /media/merch-studio/blue/white-3.8876727531-480.webp 480w, /media/merch-studio/blue/white-3.8876727531-640.webp 640w, /media/merch-studio/blue/white-3.8876727531-800.webp 800w, /media/merch-studio/blue/white-3.8876727531-1080.webp 1080w, /media/merch-studio/blue/white-3.8876727531-1440.webp 1440w",
+    "placeholder": "data:image/webp;base64,UklGRoYAAABXRUJQVlA4IHoAAACQBACdASoYABgAPu1ep04ppKMiMBgMATAdiWgAsswKCa1xa/c08Eb/bzNwi+AA/FOyxMVhfbV/az1p/NgLuYV3PurNGDNFfWGy8j0JnnWnhuH70QhoSovutjdLrlXrVx7JJl1H5Ir7i1pDZXRdnnDQMXYy+zzw+OAAAA=="
+  },
+  "merch-studio/blue/white-4": {
+    "width": 1440,
+    "height": 1440,
+    "src": "/media/merch-studio/blue/white-4.c4fa2060e3-1440.webp",
+    "avif": "/media/merch-studio/blue/white-4.c4fa2060e3-320.avif 320w, /media/merch-studio/blue/white-4.c4fa2060e3-480.avif 480w, /media/merch-studio/blue/white-4.c4fa2060e3-640.avif 640w, /media/merch-studio/blue/white-4.c4fa2060e3-800.avif 800w, /media/merch-studio/blue/white-4.c4fa2060e3-1080.avif 1080w, /media/merch-studio/blue/white-4.c4fa2060e3-1440.avif 1440w",
+    "webp": "/media/merch-studio/blue/white-4.c4fa2060e3-320.webp 320w, /media/merch-studio/blue/white-4.c4fa2060e3-480.webp 480w, /media/merch-studio/blue/white-4.c4fa2060e3-640.webp 640w, /media/merch-studio/blue/white-4.c4fa2060e3-800.webp 800w, /media/merch-studio/blue/white-4.c4fa2060e3-1080.webp 1080w, /media/merch-studio/blue/white-4.c4fa2060e3-1440.webp 1440w",
+    "placeholder": "data:image/webp;base64,UklGRtwAAABXRUJQVlA4INAAAACwBQCdASoYABgAPu1sq1EppaOiqAqpMB2JbAC/ZwFqAALLqPLN4tU8TxEwJbHQwwx3p/cgOAAA/u/O3/5IE9aTgN7IwzUIRhcF48iL3oQ8AWLTW9nDDyHibP9RFiIT1ZPS62j2upEZujJ2X8oja5mIW3Mwgs4qJ1/HeWLZVVCxqBiu3qQdQ8MZw9wQUuTFHouxvihYyKiwyBtaORtfHzamF3/bQkg/EfDYOjSIxNtbQsr24QV/J0hUtwP9llXxEptIaUv5na2F2S2frub2xwAA"
+  },
+  "merch-studio/green/white-1": {
+    "width": 1440,
+    "height": 1440,
+    "src": "/media/merch-studio/green/white-1.7c05d68482-1440.webp",
+    "avif": "/media/merch-studio/green/white-1.7c05d68482-320.avif 320w, /media/merch-studio/green/white-1.7c05d68482-480.avif 480w, /media/merch-studio/green/white-1.7c05d68482-640.avif 640w, /media/merch-studio/green/white-1.7c05d68482-800.avif 800w, /media/merch-studio/green/white-1.7c05d68482-1080.avif 1080w, /media/merch-studio/green/white-1.7c05d68482-1440.avif 1440w",
+    "webp": "/media/merch-studio/green/white-1.7c05d68482-320.webp 320w, /media/merch-studio/green/white-1.7c05d68482-480.webp 480w, /media/merch-studio/green/white-1.7c05d68482-640.webp 640w, /media/merch-studio/green/white-1.7c05d68482-800.webp 800w, /media/merch-studio/green/white-1.7c05d68482-1080.webp 1080w, /media/merch-studio/green/white-1.7c05d68482-1440.webp 1440w",
+    "placeholder": "data:image/webp;base64,UklGRrYAAABXRUJQVlA4IKoAAAAwBQCdASoYABgAPu1sqlEppaOiqAqpMB2JZQDM0BDfEizv5wcrr9lZ+TTxt1s+kFDU3AD+7pCzdR0+we6RtgtkbA6q3+IVuDjpRsJKxK9TP+A7a+ipwmsnQ2RvhUzWF+0XJPftptZoovjbJSDZ2X3sV2NDA/uvjo7EhTQdtmrhsgzyLMcLgh5EHFBLjvLluDV9PhZdxc2sRHGWTYIp2k4DX1zq8aQtngAAAA=="
+  },
+  "merch-studio/green/white-2": {
+    "width": 1440,
+    "height": 1440,
+    "src": "/media/merch-studio/green/white-2.db5e59a4d2-1440.webp",
+    "avif": "/media/merch-studio/green/white-2.db5e59a4d2-320.avif 320w, /media/merch-studio/green/white-2.db5e59a4d2-480.avif 480w, /media/merch-studio/green/white-2.db5e59a4d2-640.avif 640w, /media/merch-studio/green/white-2.db5e59a4d2-800.avif 800w, /media/merch-studio/green/white-2.db5e59a4d2-1080.avif 1080w, /media/merch-studio/green/white-2.db5e59a4d2-1440.avif 1440w",
+    "webp": "/media/merch-studio/green/white-2.db5e59a4d2-320.webp 320w, /media/merch-studio/green/white-2.db5e59a4d2-480.webp 480w, /media/merch-studio/green/white-2.db5e59a4d2-640.webp 640w, /media/merch-studio/green/white-2.db5e59a4d2-800.webp 800w, /media/merch-studio/green/white-2.db5e59a4d2-1080.webp 1080w, /media/merch-studio/green/white-2.db5e59a4d2-1440.webp 1440w",
+    "placeholder": "data:image/webp;base64,UklGRowAAABXRUJQVlA4IIAAAABQBACdASoYABgAPu1urlIppiQiqAgBMB2JaQAAJoStudmpVjQM9KFnqy0AANPYpMOhlZZg3z5WkDocG8l/vuVShN0w5GceXvrs9tSFDNFqQSfobzzv3GOC63eD1tZqV25nXARoEfZbvXywg1Ze2lRWisjbYMZdHtCItUpkXwAAAA=="
+  },
+  "merch-studio/green/white-3": {
+    "width": 1440,
+    "height": 1440,
+    "src": "/media/merch-studio/green/white-3.9206931b2d-1440.webp",
+    "avif": "/media/merch-studio/green/white-3.9206931b2d-320.avif 320w, /media/merch-studio/green/white-3.9206931b2d-480.avif 480w, /media/merch-studio/green/white-3.9206931b2d-640.avif 640w, /media/merch-studio/green/white-3.9206931b2d-800.avif 800w, /media/merch-studio/green/white-3.9206931b2d-1080.avif 1080w, /media/merch-studio/green/white-3.9206931b2d-1440.avif 1440w",
+    "webp": "/media/merch-studio/green/white-3.9206931b2d-320.webp 320w, /media/merch-studio/green/white-3.9206931b2d-480.webp 480w, /media/merch-studio/green/white-3.9206931b2d-640.webp 640w, /media/merch-studio/green/white-3.9206931b2d-800.webp 800w, /media/merch-studio/green/white-3.9206931b2d-1080.webp 1080w, /media/merch-studio/green/white-3.9206931b2d-1440.webp 1440w",
+    "placeholder": "data:image/webp;base64,UklGRoQAAABXRUJQVlA4IHgAAAAQBACdASoYABgAPu1qrVEppaQiqAqpMB2JQBbZAUbttG0e1f8eWa9kAADWd9xCDjwqsgZBs2Lw+yEbgvWLoydgZqDyV2zXC7NM2wTo1kLZGB2vUvc3pZKO7aalSOfVqfk8vA76HgPf91A6ioa29bXRPuGf2EWQAAA="
+  },
+  "merch-studio/green/white-4": {
+    "width": 1440,
+    "height": 1440,
+    "src": "/media/merch-studio/green/white-4.049e5ab6cb-1440.webp",
+    "avif": "/media/merch-studio/green/white-4.049e5ab6cb-320.avif 320w, /media/merch-studio/green/white-4.049e5ab6cb-480.avif 480w, /media/merch-studio/green/white-4.049e5ab6cb-640.avif 640w, /media/merch-studio/green/white-4.049e5ab6cb-800.avif 800w, /media/merch-studio/green/white-4.049e5ab6cb-1080.avif 1080w, /media/merch-studio/green/white-4.049e5ab6cb-1440.avif 1440w",
+    "webp": "/media/merch-studio/green/white-4.049e5ab6cb-320.webp 320w, /media/merch-studio/green/white-4.049e5ab6cb-480.webp 480w, /media/merch-studio/green/white-4.049e5ab6cb-640.webp 640w, /media/merch-studio/green/white-4.049e5ab6cb-800.webp 800w, /media/merch-studio/green/white-4.049e5ab6cb-1080.webp 1080w, /media/merch-studio/green/white-4.049e5ab6cb-1440.webp 1440w",
+    "placeholder": "data:image/webp;base64,UklGRr4AAABXRUJQVlA4ILIAAABwBQCdASoYABgAPu1wr1IppiQiqAgBMB2JZgC+aQSBg72dpZZ6O+/9AYo60D0ea82722nQAP7vu/fJj/X/1ZT1JrOai1dH7jrxGIFJ6J5uS74JqY8ZaAQhNjQTrJ7x+te2xXwMLyO20f7Nqw9pl3nx2YWkTq5PZJqaEyWHgAUcCt83ByE4DpqDQCJiShI+5LzM2cFi+5Ozd+FMarOakMtbQvhiOq/GAokbsdeCBOXnQAAA"
+  },
+  "merch-studio/purple/white-1": {
+    "width": 1440,
+    "height": 1440,
+    "src": "/media/merch-studio/purple/white-1.dc9fa4784e-1440.webp",
+    "avif": "/media/merch-studio/purple/white-1.dc9fa4784e-320.avif 320w, /media/merch-studio/purple/white-1.dc9fa4784e-480.avif 480w, /media/merch-studio/purple/white-1.dc9fa4784e-640.avif 640w, /media/merch-studio/purple/white-1.dc9fa4784e-800.avif 800w, /media/merch-studio/purple/white-1.dc9fa4784e-1080.avif 1080w, /media/merch-studio/purple/white-1.dc9fa4784e-1440.avif 1440w",
+    "webp": "/media/merch-studio/purple/white-1.dc9fa4784e-320.webp 320w, /media/merch-studio/purple/white-1.dc9fa4784e-480.webp 480w, /media/merch-studio/purple/white-1.dc9fa4784e-640.webp 640w, /media/merch-studio/purple/white-1.dc9fa4784e-800.webp 800w, /media/merch-studio/purple/white-1.dc9fa4784e-1080.webp 1080w, /media/merch-studio/purple/white-1.dc9fa4784e-1440.webp 1440w",
+    "placeholder": "data:image/webp;base64,UklGRrYAAABXRUJQVlA4IKoAAABQBQCdASoYABgAPu1ur1IppiQiqAgBMB2JZwDM0Yx2bylEqm/oEIwiGXeH7xuy0KcrSmAA/u6RDZSrQ7OtNi3wrWyYviqmXTbGBU9xqKOTy5OUam6dwAavEpWprAAN0KmYquTUjQ1g0qWBwuUmZEdwTtFIFX4iCflXXuuNcOCHGw9RfIyhZGrmM7eaBnwmlCeLFK6BU4af7uXvVx6zl+Y+W+j+BdOjR2QAAA=="
+  },
+  "merch-studio/purple/white-2": {
+    "width": 1440,
+    "height": 1440,
+    "src": "/media/merch-studio/purple/white-2.be3e70494e-1440.webp",
+    "avif": "/media/merch-studio/purple/white-2.be3e70494e-320.avif 320w, /media/merch-studio/purple/white-2.be3e70494e-480.avif 480w, /media/merch-studio/purple/white-2.be3e70494e-640.avif 640w, /media/merch-studio/purple/white-2.be3e70494e-800.avif 800w, /media/merch-studio/purple/white-2.be3e70494e-1080.avif 1080w, /media/merch-studio/purple/white-2.be3e70494e-1440.avif 1440w",
+    "webp": "/media/merch-studio/purple/white-2.be3e70494e-320.webp 320w, /media/merch-studio/purple/white-2.be3e70494e-480.webp 480w, /media/merch-studio/purple/white-2.be3e70494e-640.webp 640w, /media/merch-studio/purple/white-2.be3e70494e-800.webp 800w, /media/merch-studio/purple/white-2.be3e70494e-1080.webp 1080w, /media/merch-studio/purple/white-2.be3e70494e-1440.webp 1440w",
+    "placeholder": "data:image/webp;base64,UklGRoQAAABXRUJQVlA4IHgAAACQBACdASoYABgAPu1ep06ppKMiMBgMATAdiWkAx2wJlozmUx6v++qzMns9bAAA6Bih0nVr2v0vhvqRLWO39zQhscG2sWwbEtKSSZFGb639L2R62vwXUnbq9d4iOXHPy3hDkogJRo+jKI5+XVd8CNvmSh84PeBAAAA="
+  },
+  "merch-studio/purple/white-3": {
+    "width": 1440,
+    "height": 1440,
+    "src": "/media/merch-studio/purple/white-3.21b60ebd8c-1440.webp",
+    "avif": "/media/merch-studio/purple/white-3.21b60ebd8c-320.avif 320w, /media/merch-studio/purple/white-3.21b60ebd8c-480.avif 480w, /media/merch-studio/purple/white-3.21b60ebd8c-640.avif 640w, /media/merch-studio/purple/white-3.21b60ebd8c-800.avif 800w, /media/merch-studio/purple/white-3.21b60ebd8c-1080.avif 1080w, /media/merch-studio/purple/white-3.21b60ebd8c-1440.avif 1440w",
+    "webp": "/media/merch-studio/purple/white-3.21b60ebd8c-320.webp 320w, /media/merch-studio/purple/white-3.21b60ebd8c-480.webp 480w, /media/merch-studio/purple/white-3.21b60ebd8c-640.webp 640w, /media/merch-studio/purple/white-3.21b60ebd8c-800.webp 800w, /media/merch-studio/purple/white-3.21b60ebd8c-1080.webp 1080w, /media/merch-studio/purple/white-3.21b60ebd8c-1440.webp 1440w",
+    "placeholder": "data:image/webp;base64,UklGRogAAABXRUJQVlA4IHwAAAAQBACdASoYABgAPu1srVCppaQiqAqpMB2JQBjIAUVOzxBi8hAE+/igAAD8UdcG9Paxa+VZwxY9U5elP7YOvMAnP3U4FJ6bY3VSezpXe69U84EkWkz/3pa9cnmedGkjOvvh6c7QCf4YB7x60XlikzX9m4M6hj2CkW7mgAAA"
+  },
+  "merch-studio/purple/white-4": {
+    "width": 1440,
+    "height": 1440,
+    "src": "/media/merch-studio/purple/white-4.49f95bd406-1440.webp",
+    "avif": "/media/merch-studio/purple/white-4.49f95bd406-320.avif 320w, /media/merch-studio/purple/white-4.49f95bd406-480.avif 480w, /media/merch-studio/purple/white-4.49f95bd406-640.avif 640w, /media/merch-studio/purple/white-4.49f95bd406-800.avif 800w, /media/merch-studio/purple/white-4.49f95bd406-1080.avif 1080w, /media/merch-studio/purple/white-4.49f95bd406-1440.avif 1440w",
+    "webp": "/media/merch-studio/purple/white-4.49f95bd406-320.webp 320w, /media/merch-studio/purple/white-4.49f95bd406-480.webp 480w, /media/merch-studio/purple/white-4.49f95bd406-640.webp 640w, /media/merch-studio/purple/white-4.49f95bd406-800.webp 800w, /media/merch-studio/purple/white-4.49f95bd406-1080.webp 1080w, /media/merch-studio/purple/white-4.49f95bd406-1440.webp 1440w",
+    "placeholder": "data:image/webp;base64,UklGRs4AAABXRUJQVlA4IMIAAABwBQCdASoYABgAPu1qrFEppaQiqAqpMB2JYgBV0APQ3YwiP8cKfVvMQ6ycswzY46MA9TKAAP7tQH5pwJZX4TN77MX/WjedXMjY970qddPJBw/lUo2gExwjbLOvPSQJgVhYpU/ULWTuRUmpLM4oDzDwNwNEBUGhspyVVNKNDJZIysM6GwpGRNVAYlUHCVwwlhyrfcYA0cwFy8wbNqdfrXgVsjLDKYOQASlY4JdUlXWheyFwEs8S83/+2yiDeSaFHcAAAA=="
+  },
+  "merch-studio/rainbow/black-1": {
+    "width": 1440,
+    "height": 1440,
+    "src": "/media/merch-studio/rainbow/black-1.ff8a7cd3ab-1440.webp",
+    "avif": "/media/merch-studio/rainbow/black-1.ff8a7cd3ab-320.avif 320w, /media/merch-studio/rainbow/black-1.ff8a7cd3ab-480.avif 480w, /media/merch-studio/rainbow/black-1.ff8a7cd3ab-640.avif 640w, /media/merch-studio/rainbow/black-1.ff8a7cd3ab-800.avif 800w, /media/merch-studio/rainbow/black-1.ff8a7cd3ab-1080.avif 1080w, /media/merch-studio/rainbow/black-1.ff8a7cd3ab-1440.avif 1440w",
+    "webp": "/media/merch-studio/rainbow/black-1.ff8a7cd3ab-320.webp 320w, /media/merch-studio/rainbow/black-1.ff8a7cd3ab-480.webp 480w, /media/merch-studio/rainbow/black-1.ff8a7cd3ab-640.webp 640w, /media/merch-studio/rainbow/black-1.ff8a7cd3ab-800.webp 800w, /media/merch-studio/rainbow/black-1.ff8a7cd3ab-1080.webp 1080w, /media/merch-studio/rainbow/black-1.ff8a7cd3ab-1440.webp 1440w",
+    "placeholder": "data:image/webp;base64,UklGRnYAAABXRUJQVlA4IGoAAABQBQCdASoYABgAPu1qrlCppaQiqAqpMB2JZQDN/BEyBQqbWIeDvXtdD+/1uTUCMCQv8sAA/uyzQqG+Ge3lhJqpukpi72KoL1xM9GCrwV7oAIQ40FSJuMFt5f00JAitFSLHPVoaeXIt4AAA"
+  },
+  "merch-studio/rainbow/black-2": {
+    "width": 1440,
+    "height": 1440,
+    "src": "/media/merch-studio/rainbow/black-2.34f5c26880-1440.webp",
+    "avif": "/media/merch-studio/rainbow/black-2.34f5c26880-320.avif 320w, /media/merch-studio/rainbow/black-2.34f5c26880-480.avif 480w, /media/merch-studio/rainbow/black-2.34f5c26880-640.avif 640w, /media/merch-studio/rainbow/black-2.34f5c26880-800.avif 800w, /media/merch-studio/rainbow/black-2.34f5c26880-1080.avif 1080w, /media/merch-studio/rainbow/black-2.34f5c26880-1440.avif 1440w",
+    "webp": "/media/merch-studio/rainbow/black-2.34f5c26880-320.webp 320w, /media/merch-studio/rainbow/black-2.34f5c26880-480.webp 480w, /media/merch-studio/rainbow/black-2.34f5c26880-640.webp 640w, /media/merch-studio/rainbow/black-2.34f5c26880-800.webp 800w, /media/merch-studio/rainbow/black-2.34f5c26880-1080.webp 1080w, /media/merch-studio/rainbow/black-2.34f5c26880-1440.webp 1440w",
+    "placeholder": "data:image/webp;base64,UklGRpwAAABXRUJQVlA4IJAAAAAQBQCdASoYABgAPu1aqU2ppKOiN/VYATAdiWcA0FWMJm2v2EeOX7+m0lLv3VIIK1gAAP7xzmfmMFlPIOxThBO4s5EiLUcYH3W9MePSju+3Xg1tDUlrt6xqwrdViS14NqZamAkg0ehC5cqVCUwi/moeDh+m6kyg2PHCSwamcsbK7Aa3otCb/E4yyYB+GBt5QAA="
+  },
+  "merch-studio/rainbow/black-3": {
+    "width": 1440,
+    "height": 1440,
+    "src": "/media/merch-studio/rainbow/black-3.31f9dbf4bc-1440.webp",
+    "avif": "/media/merch-studio/rainbow/black-3.31f9dbf4bc-320.avif 320w, /media/merch-studio/rainbow/black-3.31f9dbf4bc-480.avif 480w, /media/merch-studio/rainbow/black-3.31f9dbf4bc-640.avif 640w, /media/merch-studio/rainbow/black-3.31f9dbf4bc-800.avif 800w, /media/merch-studio/rainbow/black-3.31f9dbf4bc-1080.avif 1080w, /media/merch-studio/rainbow/black-3.31f9dbf4bc-1440.avif 1440w",
+    "webp": "/media/merch-studio/rainbow/black-3.31f9dbf4bc-320.webp 320w, /media/merch-studio/rainbow/black-3.31f9dbf4bc-480.webp 480w, /media/merch-studio/rainbow/black-3.31f9dbf4bc-640.webp 640w, /media/merch-studio/rainbow/black-3.31f9dbf4bc-800.webp 800w, /media/merch-studio/rainbow/black-3.31f9dbf4bc-1080.webp 1080w, /media/merch-studio/rainbow/black-3.31f9dbf4bc-1440.webp 1440w",
+    "placeholder": "data:image/webp;base64,UklGRoYAAABXRUJQVlA4IHoAAACQBACdASoYABgAPu1wsFKppiSiqAgBMB2JQBgFAiOdYAiPeL6W6d4/beuZ1AAA/sOZM/8/pttQKdzvETIaMEMz3fLHBUwDYiTH8xbHMXIllTD+DALwp5ymRRu5mnDXnvsdYGW/+xx1EBhmAyXR+lPRQhHy2DnVAAAAAA=="
+  },
+  "merch-studio/rainbow/black-4": {
+    "width": 1440,
+    "height": 1440,
+    "src": "/media/merch-studio/rainbow/black-4.6c12e5f8aa-1440.webp",
+    "avif": "/media/merch-studio/rainbow/black-4.6c12e5f8aa-320.avif 320w, /media/merch-studio/rainbow/black-4.6c12e5f8aa-480.avif 480w, /media/merch-studio/rainbow/black-4.6c12e5f8aa-640.avif 640w, /media/merch-studio/rainbow/black-4.6c12e5f8aa-800.avif 800w, /media/merch-studio/rainbow/black-4.6c12e5f8aa-1080.avif 1080w, /media/merch-studio/rainbow/black-4.6c12e5f8aa-1440.avif 1440w",
+    "webp": "/media/merch-studio/rainbow/black-4.6c12e5f8aa-320.webp 320w, /media/merch-studio/rainbow/black-4.6c12e5f8aa-480.webp 480w, /media/merch-studio/rainbow/black-4.6c12e5f8aa-640.webp 640w, /media/merch-studio/rainbow/black-4.6c12e5f8aa-800.webp 800w, /media/merch-studio/rainbow/black-4.6c12e5f8aa-1080.webp 1080w, /media/merch-studio/rainbow/black-4.6c12e5f8aa-1440.webp 1440w",
+    "placeholder": "data:image/webp;base64,UklGRsAAAABXRUJQVlA4ILQAAABwBQCdASoYABgAPu1or1CppaQiqAqpMB2JbACxDPT2QwGM5Y1nrDggDOyJqeGSBtSVdVgAAP7wxEo58xTbFKcInE8wqMoHUxbN2s/xKl7yeaMX/XTBM76fiWKroKDOMwxh21+ZQacpjMLuZxcQPi3Do4P7IMhHQnho+S6cUsGkeuQaIqiYfw3BQHfEDmiHFtiIQJ4Ljgcv0a1PTMMhU4lhXzKzPZ/zwYi7E5AU7rF04OcbAAA="
+  },
+  "merch-studio/red/white-1": {
+    "width": 1440,
+    "height": 1440,
+    "src": "/media/merch-studio/red/white-1.b30b48042b-1440.webp",
+    "avif": "/media/merch-studio/red/white-1.b30b48042b-320.avif 320w, /media/merch-studio/red/white-1.b30b48042b-480.avif 480w, /media/merch-studio/red/white-1.b30b48042b-640.avif 640w, /media/merch-studio/red/white-1.b30b48042b-800.avif 800w, /media/merch-studio/red/white-1.b30b48042b-1080.avif 1080w, /media/merch-studio/red/white-1.b30b48042b-1440.avif 1440w",
+    "webp": "/media/merch-studio/red/white-1.b30b48042b-320.webp 320w, /media/merch-studio/red/white-1.b30b48042b-480.webp 480w, /media/merch-studio/red/white-1.b30b48042b-640.webp 640w, /media/merch-studio/red/white-1.b30b48042b-800.webp 800w, /media/merch-studio/red/white-1.b30b48042b-1080.webp 1080w, /media/merch-studio/red/white-1.b30b48042b-1440.webp 1440w",
+    "placeholder": "data:image/webp;base64,UklGRqoAAABXRUJQVlA4IJ4AAAAwBQCdASoYABgAPu1qrFEppaQiqAqpMB2JZQDKtYv+XDIqppXgkpyT6T3hyNEE/5sgAAD+7qGW4xgePsh5eMG2b0SmJVozrvH0+SRM22vpW7NGYKm8X7o228qryYwzU6fiyzTJ2Zscqu8tuC17U6cYmEoGqh6kgGnRov6f7cwr77H4tXor0N4t6ayoQMrNVGZMXMOMKIW1jocflR4AAA=="
+  },
+  "merch-studio/red/white-2": {
+    "width": 1440,
+    "height": 1440,
+    "src": "/media/merch-studio/red/white-2.aa86866f49-1440.webp",
+    "avif": "/media/merch-studio/red/white-2.aa86866f49-320.avif 320w, /media/merch-studio/red/white-2.aa86866f49-480.avif 480w, /media/merch-studio/red/white-2.aa86866f49-640.avif 640w, /media/merch-studio/red/white-2.aa86866f49-800.avif 800w, /media/merch-studio/red/white-2.aa86866f49-1080.avif 1080w, /media/merch-studio/red/white-2.aa86866f49-1440.avif 1440w",
+    "webp": "/media/merch-studio/red/white-2.aa86866f49-320.webp 320w, /media/merch-studio/red/white-2.aa86866f49-480.webp 480w, /media/merch-studio/red/white-2.aa86866f49-640.webp 640w, /media/merch-studio/red/white-2.aa86866f49-800.webp 800w, /media/merch-studio/red/white-2.aa86866f49-1080.webp 1080w, /media/merch-studio/red/white-2.aa86866f49-1440.webp 1440w",
+    "placeholder": "data:image/webp;base64,UklGRn4AAABXRUJQVlA4IHIAAABQBACdASoYABgAPu1mq08ppaOiKA1RMB2JZwAAH/d9lLlcQC2wNpi6nhAAAPmx6ADIha8I0zS/pQBuHyR2DfQz/LeSq7vqhI4qD83UJpC/mOQSnNmvKhmFK9g3ekKFVAmobuEvKGr28QATw0FU3jWIAAA="
+  },
+  "merch-studio/red/white-3": {
+    "width": 1440,
+    "height": 1440,
+    "src": "/media/merch-studio/red/white-3.61580bdedb-1440.webp",
+    "avif": "/media/merch-studio/red/white-3.61580bdedb-320.avif 320w, /media/merch-studio/red/white-3.61580bdedb-480.avif 480w, /media/merch-studio/red/white-3.61580bdedb-640.avif 640w, /media/merch-studio/red/white-3.61580bdedb-800.avif 800w, /media/merch-studio/red/white-3.61580bdedb-1080.avif 1080w, /media/merch-studio/red/white-3.61580bdedb-1440.avif 1440w",
+    "webp": "/media/merch-studio/red/white-3.61580bdedb-320.webp 320w, /media/merch-studio/red/white-3.61580bdedb-480.webp 480w, /media/merch-studio/red/white-3.61580bdedb-640.webp 640w, /media/merch-studio/red/white-3.61580bdedb-800.webp 800w, /media/merch-studio/red/white-3.61580bdedb-1080.webp 1080w, /media/merch-studio/red/white-3.61580bdedb-1440.webp 1440w",
+    "placeholder": "data:image/webp;base64,UklGRnoAAABXRUJQVlA4IG4AAAAwBACdASoYABgAPu1srVEppiQiqAqpMB2JQBdgAUU7TN5o6q3RANM8FAAA9wQcw4SVGV0PdQWXhlhsDxpfKstAi4z7GxT6jwaDbQzZz80g+W76s2lQWXroSzX3iaBz/S219ZlMxmvhh+WWJEAAAA=="
+  },
+  "merch-studio/red/white-4": {
+    "width": 1440,
+    "height": 1440,
+    "src": "/media/merch-studio/red/white-4.9b16f87d1e-1440.webp",
+    "avif": "/media/merch-studio/red/white-4.9b16f87d1e-320.avif 320w, /media/merch-studio/red/white-4.9b16f87d1e-480.avif 480w, /media/merch-studio/red/white-4.9b16f87d1e-640.avif 640w, /media/merch-studio/red/white-4.9b16f87d1e-800.avif 800w, /media/merch-studio/red/white-4.9b16f87d1e-1080.avif 1080w, /media/merch-studio/red/white-4.9b16f87d1e-1440.avif 1440w",
+    "webp": "/media/merch-studio/red/white-4.9b16f87d1e-320.webp 320w, /media/merch-studio/red/white-4.9b16f87d1e-480.webp 480w, /media/merch-studio/red/white-4.9b16f87d1e-640.webp 640w, /media/merch-studio/red/white-4.9b16f87d1e-800.webp 800w, /media/merch-studio/red/white-4.9b16f87d1e-1080.webp 1080w, /media/merch-studio/red/white-4.9b16f87d1e-1440.webp 1440w",
+    "placeholder": "data:image/webp;base64,UklGRrwAAABXRUJQVlA4ILAAAAAwBQCdASoYABgAPu1or1CppaQiqAqpMB2JbAAALneGy39kpB3brTpbyot6IPemUlFLeAD+7UQzaVSQGYzYnJ9Az279+9YKnAu+6uXFV87zzHWI7c70wDcbh9gb9RWiX/eVM5epbNm8MVSnV56uDIMfcYwFXrFzfbF7mYZB8r8s7wp00Trx+i/hSvZ75wcjzUVUcrL78xLYU42NnkhZZarZbyUFUnw+Cqtgr5He3HuIAA=="
+  },
+  "merch-studio/yellow/white-1": {
+    "width": 1440,
+    "height": 1440,
+    "src": "/media/merch-studio/yellow/white-1.72d51532aa-1440.webp",
+    "avif": "/media/merch-studio/yellow/white-1.72d51532aa-320.avif 320w, /media/merch-studio/yellow/white-1.72d51532aa-480.avif 480w, /media/merch-studio/yellow/white-1.72d51532aa-640.avif 640w, /media/merch-studio/yellow/white-1.72d51532aa-800.avif 800w, /media/merch-studio/yellow/white-1.72d51532aa-1080.avif 1080w, /media/merch-studio/yellow/white-1.72d51532aa-1440.avif 1440w",
+    "webp": "/media/merch-studio/yellow/white-1.72d51532aa-320.webp 320w, /media/merch-studio/yellow/white-1.72d51532aa-480.webp 480w, /media/merch-studio/yellow/white-1.72d51532aa-640.webp 640w, /media/merch-studio/yellow/white-1.72d51532aa-800.webp 800w, /media/merch-studio/yellow/white-1.72d51532aa-1080.webp 1080w, /media/merch-studio/yellow/white-1.72d51532aa-1440.webp 1440w",
+    "placeholder": "data:image/webp;base64,UklGRrIAAABXRUJQVlA4IKYAAAAwBQCdASoYABgAPu1qrVCppaQiqAqpMB2JZQDLLBDexz7xMhfQAu6kAxuMZ1BiLr5OYAD+7pD7sZFsoEuCAhCMm1FWlG+uFs0BPmCWHaEtwurswQ6JoBwb9gfAfR5y04833wbsgMFu9QM/cksYYDJ4KnIwNETAzoYN3Kkrg0MzYbRsy7S7P3tNH06I+sJcTlCCJR/tYNDsz0skExMCQlK+QkH/AAAA"
+  },
+  "merch-studio/yellow/white-2": {
+    "width": 1440,
+    "height": 1440,
+    "src": "/media/merch-studio/yellow/white-2.7a3fe86a2e-1440.webp",
+    "avif": "/media/merch-studio/yellow/white-2.7a3fe86a2e-320.avif 320w, /media/merch-studio/yellow/white-2.7a3fe86a2e-480.avif 480w, /media/merch-studio/yellow/white-2.7a3fe86a2e-640.avif 640w, /media/merch-studio/yellow/white-2.7a3fe86a2e-800.avif 800w, /media/merch-studio/yellow/white-2.7a3fe86a2e-1080.avif 1080w, /media/merch-studio/yellow/white-2.7a3fe86a2e-1440.avif 1440w",
+    "webp": "/media/merch-studio/yellow/white-2.7a3fe86a2e-320.webp 320w, /media/merch-studio/yellow/white-2.7a3fe86a2e-480.webp 480w, /media/merch-studio/yellow/white-2.7a3fe86a2e-640.webp 640w, /media/merch-studio/yellow/white-2.7a3fe86a2e-800.webp 800w, /media/merch-studio/yellow/white-2.7a3fe86a2e-1080.webp 1080w, /media/merch-studio/yellow/white-2.7a3fe86a2e-1440.webp 1440w",
+    "placeholder": "data:image/webp;base64,UklGRo4AAABXRUJQVlA4IIIAAACQBACdASoYABgAPu1qrVCppaQiqAqpMB2JZQDMWAvRhX/ki6weQVwXJDI+gAAA+aoqYsNaAxncN4N5VR+IFYNS3pcwfMpvezAvOCTIDDYipNeAtESkw3L6Jbq9dTpr3zFVn3igd163Dex8JAT4kXBlQuksJiEMoAqAJuOXhBDLeAAA"
+  },
+  "merch-studio/yellow/white-3": {
+    "width": 1440,
+    "height": 1440,
+    "src": "/media/merch-studio/yellow/white-3.294033459b-1440.webp",
+    "avif": "/media/merch-studio/yellow/white-3.294033459b-320.avif 320w, /media/merch-studio/yellow/white-3.294033459b-480.avif 480w, /media/merch-studio/yellow/white-3.294033459b-640.avif 640w, /media/merch-studio/yellow/white-3.294033459b-800.avif 800w, /media/merch-studio/yellow/white-3.294033459b-1080.avif 1080w, /media/merch-studio/yellow/white-3.294033459b-1440.avif 1440w",
+    "webp": "/media/merch-studio/yellow/white-3.294033459b-320.webp 320w, /media/merch-studio/yellow/white-3.294033459b-480.webp 480w, /media/merch-studio/yellow/white-3.294033459b-640.webp 640w, /media/merch-studio/yellow/white-3.294033459b-800.webp 800w, /media/merch-studio/yellow/white-3.294033459b-1080.webp 1080w, /media/merch-studio/yellow/white-3.294033459b-1440.webp 1440w",
+    "placeholder": "data:image/webp;base64,UklGRo4AAABXRUJQVlA4IIIAAAAQBACdASoYABgAPu1oqU+ppaOiKA1RMB2JYwDE2A9WTU8Tc/z3T9ci4AD9zkLLE0Ln3wcERA0fqh6QK291tvPPJMQkQL7/ahGi7CLPea3gAJ74aJ7HFsbP55kxnVfN0UC2MLOHBguAazVR/Ai/49Vy7p0gdk/3Nx+JXyxDAl90QAAA"
+  },
+  "merch-studio/yellow/white-4": {
+    "width": 1440,
+    "height": 1440,
+    "src": "/media/merch-studio/yellow/white-4.4147e0a031-1440.webp",
+    "avif": "/media/merch-studio/yellow/white-4.4147e0a031-320.avif 320w, /media/merch-studio/yellow/white-4.4147e0a031-480.avif 480w, /media/merch-studio/yellow/white-4.4147e0a031-640.avif 640w, /media/merch-studio/yellow/white-4.4147e0a031-800.avif 800w, /media/merch-studio/yellow/white-4.4147e0a031-1080.avif 1080w, /media/merch-studio/yellow/white-4.4147e0a031-1440.avif 1440w",
+    "webp": "/media/merch-studio/yellow/white-4.4147e0a031-320.webp 320w, /media/merch-studio/yellow/white-4.4147e0a031-480.webp 480w, /media/merch-studio/yellow/white-4.4147e0a031-640.webp 640w, /media/merch-studio/yellow/white-4.4147e0a031-800.webp 800w, /media/merch-studio/yellow/white-4.4147e0a031-1080.webp 1080w, /media/merch-studio/yellow/white-4.4147e0a031-1440.webp 1440w",
+    "placeholder": "data:image/webp;base64,UklGRs4AAABXRUJQVlA4IMIAAADQBACdASoYABgAPu1mqk8ppaOiKA1RMB2JbACw7BEcmYhf1QSQWp/NkJClw1XVgAD+7TcHPOU1SCFv6HpfTx6Mplfw9gOAcNeQQYOV5sAMvGTVpQ75c4LrK6NZWrAUioFyRs8gqzQtvAMabPLMGrdl+N2MiS496vjF9exCiu4bIdEH1t9sjgz9h7yveHl8WqRrCLawCIBpPuLY1gKCBRSVtjG8XGkkgu4j9Kcl4+qq6L6NOPn/nezt/XX7BlRNW1dAAA=="
+  },
   "merch/blue/white-1": {
     "width": 1080,
     "height": 1080,

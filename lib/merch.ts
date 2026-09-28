@@ -25,6 +25,9 @@ const SWATCHES: Record<string, string> = {
 };
 const slugify = (text: string) => text.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '');
 
+const studioKeys = (design: string, color: string) =>
+  Object.keys(media).filter((key) => key.startsWith(`merch-studio/${design}/${color}-`)).sort();
+
 type RawColor = { name: string; hex: string | null; images: string[]; sizes: MerchSize[] };
 type RawProduct = { slug: string; number: string; name: string; title: string; price: number; colors: RawColor[] };
 
@@ -41,7 +44,8 @@ export const merchProducts: MerchProduct[] = (catalog.products as RawProduct[])
         name: color.name,
         slug: slugify(color.name),
         swatch: color.hex ?? SWATCHES[color.name] ?? '#888888',
-        images: color.images.map((key) => media[key as MediaKey]).filter(Boolean),
+        // Printify's mockups first, then any studio shots in assets-src/merch-studio/<design>/<color>-N.
+        images: [...color.images, ...studioKeys(product.slug, slugify(color.name))].map((key) => media[key as MediaKey]).filter(Boolean),
         sizes: color.sizes,
       }))
       .filter((color) => color.images.length && color.sizes.length),

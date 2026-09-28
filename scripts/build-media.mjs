@@ -40,6 +40,13 @@ const PROFILES = {
     webp: { quality: 82, effort: 4 },
     placeholder: true,
   },
+  // Studio shots of the merch (floating, flat lay, dress form, detail), shown after Printify's mockups.
+  'merch-studio': {
+    widths: [320, 480, 640, 800, 1080, 1440],
+    avif: { quality: 55, effort: 2 },
+    webp: { quality: 80, effort: 4 },
+    placeholder: true,
+  },
   icons: {
     widths: [96, 144],
     avif: { quality: 60, effort: 2 },
@@ -73,7 +80,7 @@ async function buildAsset(file) {
   const rel = path.relative(SRC_DIR, file).split(path.sep).join('/');
   const key = rel.replace(/\.[^.]+$/, '');
   const profile = PROFILES[rel.split('/')[0]];
-  if (!profile) throw new Error(`No media profile for ${rel}; put it under covers/, scenes/, store/, merch/ or icons/`);
+  if (!profile) throw new Error(`No media profile for ${rel}; put it under covers/, scenes/, store/, merch/, merch-studio/ or icons/`);
 
   const input = await fs.readFile(file);
   const hash = crypto.createHash('sha256')

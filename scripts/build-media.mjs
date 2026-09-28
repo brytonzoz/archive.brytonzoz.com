@@ -33,6 +33,13 @@ const PROFILES = {
     webp: { quality: 80, effort: 4 },
     placeholder: true,
   },
+  // NonParallel tee mockups rendered by Printify (1200px squares on white).
+  merch: {
+    widths: [320, 480, 640, 800, 1080],
+    avif: { quality: 58, effort: 2 },
+    webp: { quality: 82, effort: 4 },
+    placeholder: true,
+  },
   icons: {
     widths: [96, 144],
     avif: { quality: 60, effort: 2 },
@@ -66,7 +73,7 @@ async function buildAsset(file) {
   const rel = path.relative(SRC_DIR, file).split(path.sep).join('/');
   const key = rel.replace(/\.[^.]+$/, '');
   const profile = PROFILES[rel.split('/')[0]];
-  if (!profile) throw new Error(`No media profile for ${rel}; put it under covers/, scenes/, store/ or icons/`);
+  if (!profile) throw new Error(`No media profile for ${rel}; put it under covers/, scenes/, store/, merch/ or icons/`);
 
   const input = await fs.readFile(file);
   const hash = crypto.createHash('sha256')

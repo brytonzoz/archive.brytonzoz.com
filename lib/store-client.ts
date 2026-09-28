@@ -1,4 +1,5 @@
 import { useSyncExternalStore } from 'react';
+import { merchVariant, MERCH_KEY_PREFIX } from './merch';
 import { productById, type Availability, type Product } from './store';
 
 // Browser side of the store: which pieces are still available, the bag, and checkout.
@@ -52,7 +53,7 @@ function readBag(): string[] {
   if (bag) return bag;
   try {
     const parsed = JSON.parse(window.localStorage.getItem(BAG_KEY) ?? '[]');
-    bag = Array.isArray(parsed) ? parsed.filter((id): id is string => typeof id === 'string' && Boolean(productById(id))) : [];
+    bag = Array.isArray(parsed) ? parsed.filter((id): id is string => typeof id === 'string' && Boolean(productById(id) || merchVariant(id))) : [];
   } catch {
     bag = [];
   }
@@ -69,10 +70,32 @@ function writeBag(next: string[]) {
   emit();
 }
 
+// Scrapwrk pieces are 1 of 1 (in the bag once); a tee ("np:<variantId>") appears once per unit.
+const MAX_TEE_UNITS = 10;
 export const addToBag = (id: string) => {
-  if (!readBag().includes(id)) writeBag([...readBag(), id]);
+  const current = readBag();
+  if (id.startsWith(MERCH_KEY_PREFIX)) {
+    if (current.filter((entry) => entry === id).length < MAX_TEE_UNITS) writeBag([...current, id]);
+    return;
+  }
+  if (!current.includes(id)) writeBag([...current, id]);
 };
 export const removeFromBag = (id: string) => writeBag(readBag().filter((entry) => entry !== id));
+export const removeOneFromBag = (id: string) => {
+  const current = readBag();
+  const index = current.lastIndexOf(id);
+  if (index >= 0) writeBag([...current.slice(0, index), ...current.slice(index + 1)]);
+};
+// The bag as lines: each key once, with how many.
+export function bagLines(keys: string[]): { key: string; quantity: number }[] {
+  const lines: { key: string; quantity: number }[] = [];
+  for (const key of keys) {
+    const line = lines.find((entry) => entry.key === key);
+    if (line) line.quantity += 1;
+    else lines.push({ key, quantity: 1 });
+  }
+  return lines;
+}
 export const clearBag = () => writeBag([]);
 
 const EMPTY: string[] = [];

@@ -25,11 +25,14 @@
     { "pattern": "brytonzoz.com", "custom_domain": true }
   ],
   "workers_dev": false,
+  // NonParallel tees: every 10 minutes, paid orders that haven't reached Printify yet are sent (worker/merch.ts).
+  "triggers": { "crons": ["*/10 * * * *"] },
   "env": {
     // `npm run deploy:staging` -> Worker "archive-staging" on workers.dev, separate from production.
     "staging": {
       "routes": [],
       "workers_dev": true,
+      "triggers": { "crons": [] },
       "r2_buckets": [
         { "binding": "MUSIC", "bucket_name": "brytonzoz-media" }
       ],

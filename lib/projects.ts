@@ -1,5 +1,6 @@
 import { ProjectData, Project } from './utils';
-import { cautionSceneAssets, reminderSceneAssets, scrapwrkSceneAssets, solenyaSceneAssets } from './assets';
+import { cautionSceneAssets, nonparallelAssets, reminderSceneAssets, scrapwrkSceneAssets, solenyaSceneAssets } from './assets';
+import { merchProducts } from './merch';
 
 // For now, we'll use hardcoded data that matches our YAML structure
 // In a production app, this would load from the YAML file
@@ -50,6 +51,14 @@ const projectData: ProjectData = {
       description: "reconstructed pieces and identity",
       highlight: "Shop",
       image: scrapwrkSceneAssets.cover
+    },
+    {
+      name: "NonParallel",
+      url: "/nonparallel/",
+      type: "merch",
+      description: "the label and company behind all of this",
+      highlight: "Shop",
+      image: merchProducts[0]?.colors[0]?.images[0] ?? nonparallelAssets.logo
     }
   ]
 };

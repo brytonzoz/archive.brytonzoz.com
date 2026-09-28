@@ -6,6 +6,12 @@
   "sizes": ["S", "M", "L", "XL", "2XL", "3XL"],
   "price": 3500,
   "bigSizePrice": 3800,
+  "details": [
+    "100% Airlume combed and ring-spun cotton (solid colors)",
+    "Lightweight 4.2 oz jersey: soft and breathable",
+    "Unisex retail fit with a ribbed crew neck",
+    "Tear-away label"
+  ],
   "products": [
     {
       "slug": "rainbow",

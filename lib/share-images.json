@@ -18,6 +18,13 @@
       "square": "/media/share/store-hat-square.bae37999de.jpg"
     }
   },
+  "merch": {
+    "rainbow/black": "/media/share/merch-rainbow-black.027adb928a.jpg",
+    "rainbow/white": "/media/share/merch-rainbow-white.ca3853e5c1.jpg"
+  },
+  "merchCards": {
+    "rainbow": "/media/share/merch-rainbow.027adb928a.jpg"
+  },
   "icons": {
     "32": "/media/share/icon-32.35f7f2a766.png",
     "180": "/media/share/icon-180.35f7f2a766.png",

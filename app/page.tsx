@@ -5,13 +5,15 @@ import Link from 'next/link';
 import { ProjectCard } from '../components/ProjectCard';
 import { NotifySheet, hasSignedUp } from '../components/NotifySheet';
 import { SiteFooter } from '../components/SiteFooter';
+import { MerchExperience } from '../components/store/MerchExperience';
 import { StoreExperience } from '../components/store/StoreExperience';
 import { ReleaseSheet } from '../components/release/ReleaseSheet';
 import { usePlayer } from '../components/player/context';
 import { ArrowUpRightIcon, ChevronDownIcon, EqualizerBars } from '../components/player/icons';
 import { ResponsiveImage, placeholderBackground } from '../components/ResponsiveImage';
 import { getProjects } from '../lib/projects';
-import { cautionSceneAssets, reminderSceneAssets, scrapwrkSceneAssets, solenyaSceneAssets } from '../lib/assets';
+import { cautionSceneAssets, nonparallelAssets, reminderSceneAssets, scrapwrkSceneAssets, solenyaSceneAssets } from '../lib/assets';
+import { merchGridRows } from '../lib/merch';
 import type { MediaAsset } from '../lib/media';
 import { nextRelease, nextReleaseProject } from '../lib/next-release';
 import { getStreamingServices, getVisitLabel } from '../lib/streaming';
@@ -82,6 +84,7 @@ const HOMEPAGE_PROJECT_ORDER = [
   'CAUTION',
   'Just A Reminder To Live Life',
   'Scrapwrk Store',
+  'NonParallel',
 ];
 
 const HIDDEN_HOMEPAGE_PROJECTS = new Set<string>([]);
@@ -124,6 +127,16 @@ function getProjectBackground(project: Project): SlideBackground {
       topGlow: 'rgba(255, 244, 236, 0.24)',
       bottomGlow: 'rgba(96, 67, 49, 0.2)',
       edgeGlow: 'rgba(242, 225, 213, 0.08)',
+    };
+  }
+
+  if (project.name === 'NonParallel') {
+    return {
+      base: 'linear-gradient(160deg, #1a1030 0%, #0d0a16 55%, #07060b 100%)',
+      overlay: 'radial-gradient(circle at 20% 14%, rgba(137, 71, 255, 0.28), transparent 32%), radial-gradient(circle at 82% 86%, rgba(98, 0, 238, 0.22), transparent 36%)',
+      topGlow: 'rgba(137, 71, 255, 0.18)',
+      bottomGlow: 'rgba(60, 20, 120, 0.22)',
+      edgeGlow: 'rgba(200, 180, 255, 0.05)',
     };
   }
 
@@ -1155,6 +1168,53 @@ const ScrapwrkScene = React.memo(function ScrapwrkScene({ distance, loadImages }
   );
 });
 
+// NonParallel: the label behind all of this. Its logo (a sticker) heads the scene, a short note
+// says what it is, and the tees follow in the same card system as Scrapwrk.
+const NonParallelScene = React.memo(function NonParallelScene({ distance }: { distance: number }) {
+  const distanceMagnitude = clamp(Math.abs(distance), 0, 1);
+  const active = distanceMagnitude < 0.45;
+  const incoming = easeOutCubic(clamp(Math.abs(Math.min(distance, 0)) / 0.9, 0, 1));
+
+  return (
+    <div className="relative flex h-full w-full items-center justify-center overflow-hidden pb-[132px] pt-10">
+      <div aria-hidden="true" className="np-bg-logo np-bg-logo-a">
+        <ResponsiveImage asset={nonparallelAssets.logo} alt="" sizes="60vw" loading="lazy" draggable={false} className="h-full w-full object-contain" />
+      </div>
+      <div aria-hidden="true" className="np-bg-logo np-bg-logo-b">
+        <ResponsiveImage asset={nonparallelAssets.logo} alt="" sizes="50vw" loading="lazy" draggable={false} className="h-full w-full object-contain" />
+      </div>
+      <div
+        className="np-scene relative z-10"
+        style={{
+          '--rows': merchGridRows,
+          opacity: 1 - (distanceMagnitude * 0.3),
+          transform: `translate3d(0, ${incoming * 32}px, 0)`,
+          transition: 'transform 700ms cubic-bezier(0.22, 1, 0.36, 1), opacity 400ms ease-out',
+        } as React.CSSProperties}
+      >
+        <MerchExperience
+          active={active}
+          sizes="(min-width: 640px) 270px, 44vw"
+          headerClassName="np-scene-header"
+          title={(
+            <h2 className="np-scene-logo">
+              <span className="sr-only">NonParallel</span>
+              <ResponsiveImage asset={nonparallelAssets.logo} alt="" sizes="(min-width: 640px) 260px, 50vw" draggable={false} className="h-full w-full object-contain" />
+            </h2>
+          )}
+          titleEnd={(
+            <Link href="/nonparallel/" className="store-scene-link scene-title">
+              All tees
+              <ChevronDownIcon size={16} className="-rotate-90" />
+            </Link>
+          )}
+          intro={<p className="np-scene-note">The label and company behind all of this. A tee is a way to support it: you get something to wear, and it keeps the work going.</p>}
+        />
+      </div>
+    </div>
+  );
+});
+
 // Page dots, as on iOS: they show there's more below, where you are, and jump anywhere.
 function SceneDots({ names, activeIndex, onSelect }: { names: string[]; activeIndex: number; onSelect: (index: number) => void }) {
   return (
@@ -1335,6 +1395,7 @@ export default function HomePage() {
             const isCaution = project.name === 'CAUTION';
             const isReminder = project.name === 'Just A Reminder To Live Life';
             const isScrapwrk = project.name === 'Scrapwrk Store';
+            const isNonParallel = project.name === 'NonParallel';
             const distanceFromCenter = Math.abs(scrollProgress - index);
             const continuousDistance = clamp(distanceFromCenter, 0, 1.2);
             // Scene motion saturates at one screen away; clamping lets memoized far-off scenes skip re-rendering.
@@ -1387,6 +1448,15 @@ export default function HomePage() {
                     distance={sceneDistance}
                     loadImages={index === 0 || loadDeferredScenes}
                   />
+                  {footer}
+                </div>
+              );
+            }
+
+            if (isNonParallel) {
+              return (
+                <div key={project.name} className="relative h-screen snap-center overflow-hidden">
+                  <NonParallelScene distance={sceneDistance} />
                   {footer}
                 </div>
               );

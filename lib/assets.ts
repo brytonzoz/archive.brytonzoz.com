@@ -40,3 +40,7 @@ export const streamingIconAssets = {
   spotify: media['icons/spotify'],
   youtubemusic: media['icons/youtube-music'],
 };
+
+export const nonparallelAssets = {
+  logo: media['scenes/nonparallel/logo'],
+};

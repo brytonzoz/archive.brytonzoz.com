@@ -4,6 +4,7 @@ import React, { useEffect, useId, useRef, useState } from 'react';
 import { createPortal } from 'react-dom';
 import { track } from '../../lib/analytics';
 import { shareLink } from '../../lib/share';
+import type { MediaAsset } from '../../lib/media';
 import { formatPrice, productPath, shippingLabel, type Product } from '../../lib/store';
 import { addToBag, useAvailability, useBag } from '../../lib/store-client';
 import { ResponsiveImage, placeholderBackground } from '../ResponsiveImage';
@@ -14,11 +15,17 @@ import { useSheet } from '../useSheet';
 const iconButton =
   'flex h-10 w-10 items-center justify-center rounded-full text-white/75 transition-colors hover:bg-white/10 hover:text-white focus-visible:outline focus-visible:outline-2 focus-visible:outline-white/70';
 
-// Swipe (or use the arrows / dots) through every photo of the piece.
-function Gallery({ product }: { product: Product }) {
+// Swipe (or use the arrows / dots) through every photo. `dots` darkens for light photos.
+export function Gallery({ images, label, alt, tone = 'light' }: { images: MediaAsset[]; label: string; alt: (i: number) => string; tone?: 'light' | 'dark' }) {
   const scroller = useRef<HTMLDivElement>(null);
   const [index, setIndex] = useState(0);
-  const count = product.images.length;
+  const count = images.length;
+
+  // A new set of photos (another tee color) starts from the first one.
+  useEffect(() => {
+    scroller.current?.scrollTo({ left: 0 });
+    setIndex(0);
+  }, [images]);
 
   const go = (i: number) => {
     const el = scroller.current;
@@ -35,18 +42,18 @@ function Gallery({ product }: { product: Product }) {
           const el = event.currentTarget;
           setIndex(Math.round(el.scrollLeft / Math.max(1, el.clientWidth)));
         }}
-        aria-label={`${product.name} photos`}
+        aria-label={label}
         tabIndex={0}
         onKeyDown={(event) => {
           if (event.key === 'ArrowRight') { event.preventDefault(); go(index + 1); }
           if (event.key === 'ArrowLeft') { event.preventDefault(); go(index - 1); }
         }}
       >
-        {product.images.map((image, i) => (
+        {images.map((image, i) => (
           <div key={image.src} className="relative aspect-square w-full shrink-0 snap-center" style={placeholderBackground(image)}>
             <ResponsiveImage
               asset={image}
-              alt={i === 0 ? `Scrapwrk ${product.number} ${product.name}` : `${product.name}, photo ${i + 1} of ${count}`}
+              alt={alt(i)}
               sizes="(min-width: 640px) 480px, 100vw"
               priority={i === 0}
               loading={i < 2 ? 'eager' : 'lazy'}
@@ -63,8 +70,8 @@ function Gallery({ product }: { product: Product }) {
         <ChevronDownIcon size={20} className="-rotate-90" />
       </button>
       <div className="pointer-events-none absolute inset-x-0 bottom-3 flex justify-center gap-1.5" aria-hidden="true">
-        {product.images.map((image, i) => (
-          <span key={image.src} className={`h-1.5 rounded-full bg-white transition-all duration-300 ${i === index ? 'w-4 opacity-95' : 'w-1.5 opacity-45'}`} />
+        {images.map((image, i) => (
+          <span key={image.src} className={`h-1.5 rounded-full transition-all duration-300 ${tone === 'dark' ? 'bg-black' : 'bg-white'} ${i === index ? 'w-4 opacity-80' : 'w-1.5 opacity-30'}`} />
         ))}
       </div>
     </div>
@@ -143,7 +150,11 @@ export function ProductSheet({
         </div>
 
         <div className="min-h-0 flex-1 overflow-y-auto overscroll-contain" style={{ paddingBottom: 'calc(7.5rem + var(--sheet-player-offset, 0px))' }}>
-          <Gallery product={product} />
+          <Gallery
+            images={product.images}
+            label={`${product.name} photos`}
+            alt={(i) => (i === 0 ? `Scrapwrk ${product.number} ${product.name}` : `${product.name}, photo ${i + 1} of ${product.images.length}`)}
+          />
           <div className="px-6 pt-6">
             <div className="flex items-start justify-between gap-4">
               <div className="min-w-0">

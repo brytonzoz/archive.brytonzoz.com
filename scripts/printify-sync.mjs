@@ -28,8 +28,8 @@ export async function sync(printify, root) {
       id: blueprint.id,
       name: `${blueprint.brand} ${blueprint.model}`,
       title: blueprint.title,
-      // Printify's description is ".:"-separated bullet points after an intro; keep the bullets.
-      details: stripHtml(blueprint.description).split('.:').slice(1).map((part) => part.replace(/\s+/g, ' ').trim().replace(/\.$/, '')).filter(Boolean).slice(0, 6),
+      // The site's short list from printify/products.json; Printify's own bullets otherwise.
+      details: config.details ?? stripHtml(blueprint.description).split('.:').slice(1).map((part) => part.replace(/\s+/g, ' ').trim().replace(/\.$/, '')).filter(Boolean).slice(0, 6),
     },
     products: [],
   };

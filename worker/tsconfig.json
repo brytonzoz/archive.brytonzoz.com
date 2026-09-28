@@ -10,5 +10,5 @@
     "skipLibCheck": true,
     "resolveJsonModule": true
   },
-  "include": ["index.ts", "metrics.ts", "store.ts"]
+  "include": ["index.ts", "metrics.ts", "store.ts", "merch.ts"]
 }

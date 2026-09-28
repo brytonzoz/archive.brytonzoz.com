@@ -68,6 +68,70 @@
     "avif": "/media/icons/youtube-music.d0321d2965-96.avif 96w, /media/icons/youtube-music.d0321d2965-144.avif 144w",
     "webp": "/media/icons/youtube-music.d0321d2965-96.webp 96w, /media/icons/youtube-music.d0321d2965-144.webp 144w"
   },
+  "merch/rainbow/black-1": {
+    "width": 1080,
+    "height": 1080,
+    "src": "/media/merch/rainbow/black-1.77976ade8b-1080.webp",
+    "avif": "/media/merch/rainbow/black-1.77976ade8b-320.avif 320w, /media/merch/rainbow/black-1.77976ade8b-480.avif 480w, /media/merch/rainbow/black-1.77976ade8b-640.avif 640w, /media/merch/rainbow/black-1.77976ade8b-800.avif 800w, /media/merch/rainbow/black-1.77976ade8b-1080.avif 1080w",
+    "webp": "/media/merch/rainbow/black-1.77976ade8b-320.webp 320w, /media/merch/rainbow/black-1.77976ade8b-480.webp 480w, /media/merch/rainbow/black-1.77976ade8b-640.webp 640w, /media/merch/rainbow/black-1.77976ade8b-800.webp 800w, /media/merch/rainbow/black-1.77976ade8b-1080.webp 1080w",
+    "placeholder": "data:image/webp;base64,UklGRp4AAABXRUJQVlA4IJIAAAAQBQCdASoYABgAPu1sq1EppiOiqAqpMB2JZwAALc82P97RxZZ/fLTP5wSdfyna9uEAAP7zdR7KgauZ3cGzpKPK8nvm+V9VPFnlzaGVi8xtt2zuXnd/c4GhWYMPwyQ/f8FHHtgB6N90xerjsMxqNW1SllUdbIOwrhh6cxTy1SCoyIbNAschmwB9YrTqWTHDMpIAAA=="
+  },
+  "merch/rainbow/black-2": {
+    "width": 1080,
+    "height": 1080,
+    "src": "/media/merch/rainbow/black-2.041a6074ab-1080.webp",
+    "avif": "/media/merch/rainbow/black-2.041a6074ab-320.avif 320w, /media/merch/rainbow/black-2.041a6074ab-480.avif 480w, /media/merch/rainbow/black-2.041a6074ab-640.avif 640w, /media/merch/rainbow/black-2.041a6074ab-800.avif 800w, /media/merch/rainbow/black-2.041a6074ab-1080.avif 1080w",
+    "webp": "/media/merch/rainbow/black-2.041a6074ab-320.webp 320w, /media/merch/rainbow/black-2.041a6074ab-480.webp 480w, /media/merch/rainbow/black-2.041a6074ab-640.webp 640w, /media/merch/rainbow/black-2.041a6074ab-800.webp 800w, /media/merch/rainbow/black-2.041a6074ab-1080.webp 1080w",
+    "placeholder": "data:image/webp;base64,UklGRrIAAABXRUJQVlA4IKYAAADwBACdASoYABgAPu1qrVCppaQiqAqpMB2JZwDNSdwAeGyi++i2IXzxPAVhHsFsj0IA/vN1Hs1jLdxCNejZ34gydVOtofhfhedVen+CxvDOgLPIWOG2KYw3gBfvh5RcP/J/uSC+9qseIABCPwCfr0U6nMZDKvY9YfF7bd8ITX0f+5oOTBStkrmq894KNaIBicrM50/sevFdYF77OmmhAnUikoVbAAAA"
+  },
+  "merch/rainbow/black-3": {
+    "width": 1080,
+    "height": 1080,
+    "src": "/media/merch/rainbow/black-3.5a2b7f6304-1080.webp",
+    "avif": "/media/merch/rainbow/black-3.5a2b7f6304-320.avif 320w, /media/merch/rainbow/black-3.5a2b7f6304-480.avif 480w, /media/merch/rainbow/black-3.5a2b7f6304-640.avif 640w, /media/merch/rainbow/black-3.5a2b7f6304-800.avif 800w, /media/merch/rainbow/black-3.5a2b7f6304-1080.avif 1080w",
+    "webp": "/media/merch/rainbow/black-3.5a2b7f6304-320.webp 320w, /media/merch/rainbow/black-3.5a2b7f6304-480.webp 480w, /media/merch/rainbow/black-3.5a2b7f6304-640.webp 640w, /media/merch/rainbow/black-3.5a2b7f6304-800.webp 800w, /media/merch/rainbow/black-3.5a2b7f6304-1080.webp 1080w",
+    "placeholder": "data:image/webp;base64,UklGRsAAAABXRUJQVlA4ILQAAACQBQCdASoYABgAPu1iqE2ppaOiMAgBMB2JYwDOAPAKjrcJZj9bU516fRypy6wDXKJS2x02cAD+838PI1NR0LIbZtercanZNzgyuIdDuB8+/7U3EwtNom6lNo4bp6JtbGwrWqM6ZDj5xEWsAuKGjlAIzMuN7txv0/2fEE+02xtEMKgeOW6noJS/kBo/0vkcXWNiJdYrjAc1AAOjsZJjAH6+wAF64QSYcnjo0czYltObUAAAAAA="
+  },
+  "merch/rainbow/black-4": {
+    "width": 1080,
+    "height": 1080,
+    "src": "/media/merch/rainbow/black-4.122e1fdf87-1080.webp",
+    "avif": "/media/merch/rainbow/black-4.122e1fdf87-320.avif 320w, /media/merch/rainbow/black-4.122e1fdf87-480.avif 480w, /media/merch/rainbow/black-4.122e1fdf87-640.avif 640w, /media/merch/rainbow/black-4.122e1fdf87-800.avif 800w, /media/merch/rainbow/black-4.122e1fdf87-1080.avif 1080w",
+    "webp": "/media/merch/rainbow/black-4.122e1fdf87-320.webp 320w, /media/merch/rainbow/black-4.122e1fdf87-480.webp 480w, /media/merch/rainbow/black-4.122e1fdf87-640.webp 640w, /media/merch/rainbow/black-4.122e1fdf87-800.webp 800w, /media/merch/rainbow/black-4.122e1fdf87-1080.webp 1080w",
+    "placeholder": "data:image/webp;base64,UklGRrwAAABXRUJQVlA4ILAAAABQBQCdASoYABgAPu1qq1EppaOiqAqpMB2JYwDO7YxEZiD1ZvCqmVBueivCYwtM+tIA1iAA/u1hFs5WAepjcbEWWbryi5A+ciYBMzCrxaBpcsRnSs/iyPmDvlY/rQwDY48Plu+7fwEFUxHu5xZg4D+lRUSuj0hMSULeaga5QIwhWV3agmocy0euhITHrtiPOmXPXx9rwUciHnarnxVyGaslN5npQE2JCbc9523wMkAAAA=="
+  },
+  "merch/rainbow/white-1": {
+    "width": 1080,
+    "height": 1080,
+    "src": "/media/merch/rainbow/white-1.3a494181df-1080.webp",
+    "avif": "/media/merch/rainbow/white-1.3a494181df-320.avif 320w, /media/merch/rainbow/white-1.3a494181df-480.avif 480w, /media/merch/rainbow/white-1.3a494181df-640.avif 640w, /media/merch/rainbow/white-1.3a494181df-800.avif 800w, /media/merch/rainbow/white-1.3a494181df-1080.avif 1080w",
+    "webp": "/media/merch/rainbow/white-1.3a494181df-320.webp 320w, /media/merch/rainbow/white-1.3a494181df-480.webp 480w, /media/merch/rainbow/white-1.3a494181df-640.webp 640w, /media/merch/rainbow/white-1.3a494181df-800.webp 800w, /media/merch/rainbow/white-1.3a494181df-1080.webp 1080w",
+    "placeholder": "data:image/webp;base64,UklGRlYAAABXRUJQVlA4IEoAAAAQBACdASoYABgAPu1wsFIppiSiqAgBMB2JZwAALnWbwct6yHXbXrl9AAD+82uV3hCABCe71dj/G2VTV9k3HbmwAtf+TLMyfAAAAA=="
+  },
+  "merch/rainbow/white-2": {
+    "width": 1080,
+    "height": 1080,
+    "src": "/media/merch/rainbow/white-2.10ad0f8f55-1080.webp",
+    "avif": "/media/merch/rainbow/white-2.10ad0f8f55-320.avif 320w, /media/merch/rainbow/white-2.10ad0f8f55-480.avif 480w, /media/merch/rainbow/white-2.10ad0f8f55-640.avif 640w, /media/merch/rainbow/white-2.10ad0f8f55-800.avif 800w, /media/merch/rainbow/white-2.10ad0f8f55-1080.avif 1080w",
+    "webp": "/media/merch/rainbow/white-2.10ad0f8f55-320.webp 320w, /media/merch/rainbow/white-2.10ad0f8f55-480.webp 480w, /media/merch/rainbow/white-2.10ad0f8f55-640.webp 640w, /media/merch/rainbow/white-2.10ad0f8f55-800.webp 800w, /media/merch/rainbow/white-2.10ad0f8f55-1080.webp 1080w",
+    "placeholder": "data:image/webp;base64,UklGRmAAAABXRUJQVlA4IFQAAABQBACdASoYABgAPu1qr1CppaQiqAqpMB2JZwDOdBEcmDBxY7B1gzvp9UrgAP7za7WHITeLsctBA+VVuxocT8COiAArWwBwV5N95ErRilRLZwR/QAA="
+  },
+  "merch/rainbow/white-3": {
+    "width": 1080,
+    "height": 1080,
+    "src": "/media/merch/rainbow/white-3.a1a061dbe1-1080.webp",
+    "avif": "/media/merch/rainbow/white-3.a1a061dbe1-320.avif 320w, /media/merch/rainbow/white-3.a1a061dbe1-480.avif 480w, /media/merch/rainbow/white-3.a1a061dbe1-640.avif 640w, /media/merch/rainbow/white-3.a1a061dbe1-800.avif 800w, /media/merch/rainbow/white-3.a1a061dbe1-1080.avif 1080w",
+    "webp": "/media/merch/rainbow/white-3.a1a061dbe1-320.webp 320w, /media/merch/rainbow/white-3.a1a061dbe1-480.webp 480w, /media/merch/rainbow/white-3.a1a061dbe1-640.webp 640w, /media/merch/rainbow/white-3.a1a061dbe1-800.webp 800w, /media/merch/rainbow/white-3.a1a061dbe1-1080.webp 1080w",
+    "placeholder": "data:image/webp;base64,UklGRnIAAABXRUJQVlA4IGYAAAAQBQCdASoYABgAPu1krU+ppSQiMBgIATAdiWMAAI92XDe5qgE23ssMY2gbLqdj01yAAP72B8buM/8Cgtaby2wlBSgAIJa5rjP/VEIglGKH2xDUJKFsp9YAekQUBXDYNgAAKasB4AA="
+  },
+  "merch/rainbow/white-4": {
+    "width": 1080,
+    "height": 1080,
+    "src": "/media/merch/rainbow/white-4.e87f79d7a3-1080.webp",
+    "avif": "/media/merch/rainbow/white-4.e87f79d7a3-320.avif 320w, /media/merch/rainbow/white-4.e87f79d7a3-480.avif 480w, /media/merch/rainbow/white-4.e87f79d7a3-640.avif 640w, /media/merch/rainbow/white-4.e87f79d7a3-800.avif 800w, /media/merch/rainbow/white-4.e87f79d7a3-1080.avif 1080w",
+    "webp": "/media/merch/rainbow/white-4.e87f79d7a3-320.webp 320w, /media/merch/rainbow/white-4.e87f79d7a3-480.webp 480w, /media/merch/rainbow/white-4.e87f79d7a3-640.webp 640w, /media/merch/rainbow/white-4.e87f79d7a3-800.webp 800w, /media/merch/rainbow/white-4.e87f79d7a3-1080.webp 1080w",
+    "placeholder": "data:image/webp;base64,UklGRmAAAABXRUJQVlA4IFQAAADwAwCdASoYABgAPu1oqk8pqqOpsBgIAVAdiWMAzUgQ72tBmss9g3xgAP7tOxWeCV72KCs9gCtRqStKHX4VbTaJ4liFCffz9/9cx+Z2K9qBDJr3AAA="
+  },
   "scenes/caution/christler": {
     "width": 696,
     "height": 696,
@@ -95,6 +159,13 @@
     "src": "/media/scenes/caution/pigeon.28de8f1b24-696.webp",
     "avif": "/media/scenes/caution/pigeon.28de8f1b24-320.avif 320w, /media/scenes/caution/pigeon.28de8f1b24-480.avif 480w, /media/scenes/caution/pigeon.28de8f1b24-696.avif 696w",
     "webp": "/media/scenes/caution/pigeon.28de8f1b24-320.webp 320w, /media/scenes/caution/pigeon.28de8f1b24-480.webp 480w, /media/scenes/caution/pigeon.28de8f1b24-696.webp 696w"
+  },
+  "scenes/nonparallel/logo": {
+    "width": 466,
+    "height": 216,
+    "src": "/media/scenes/nonparallel/logo.d290e81f00-466.webp",
+    "avif": "/media/scenes/nonparallel/logo.d290e81f00-320.avif 320w, /media/scenes/nonparallel/logo.d290e81f00-466.avif 466w",
+    "webp": "/media/scenes/nonparallel/logo.d290e81f00-320.webp 320w, /media/scenes/nonparallel/logo.d290e81f00-466.webp 466w"
   },
   "scenes/reminder/microphone": {
     "width": 696,

@@ -11,6 +11,7 @@ import { StoryKit } from './StoryKit';
 // (ADMIN_PASSWORD secret); this page only remembers it on this device if asked to.
 
 type Row = Record<string, number | string | null>;
+type MerchOrder = { session_id: string; status: string; printify_order_id: string | null; error: string | null; attempts: number; created_at: number };
 type Stats = {
   since: string;
   generatedAt: string;
@@ -204,6 +205,7 @@ function StoreCard({ password, funnel, views }: { password: string; funnel: Reco
   const [items, setItems] = useState<Record<string, string> | null>(null);
   const [mode, setMode] = useState<string | null>(null);
   const [checkout, setCheckout] = useState(true);
+  const [merch, setMerch] = useState<{ printify: boolean; orders: MerchOrder[] } | null>(null);
   const call = useCallback(async (body?: object) => {
     const response = await fetch('/api/admin/store', {
       method: body ? 'POST' : 'GET',
@@ -215,6 +217,7 @@ function StoreCard({ password, funnel, views }: { password: string; funnel: Reco
     setItems(data.items);
     setMode(data.mode);
     setCheckout(data.checkout);
+    setMerch(data.merch ?? null);
   }, [password]);
   useEffect(() => { call(); }, [call]);
   const viewsById = new Map(views.map((row) => [String(row.label), n(row.value)]));
@@ -226,43 +229,81 @@ function StoreCard({ password, funnel, views }: { password: string; funnel: Reco
   ] as const;
 
   return (
-    <Card title="Scrapwrk" subtitle={checkout ? `Stripe ${mode === 'live' ? 'live' : 'test'} mode` : 'Checkout is closed: add the STRIPE_SECRET_KEY secret on GitHub'}>
-      <ul className="space-y-2.5">
-        {products.map((product) => {
-          const status = items?.[product.id] ?? '…';
-          return (
-            <li key={product.id} className="flex items-center gap-3 text-[14px]">
+    <>
+      <Card title="Scrapwrk" subtitle={checkout ? `Stripe ${mode === 'live' ? 'live' : 'test'} mode` : 'Checkout is closed: add the STRIPE_SECRET_KEY secret on GitHub'}>
+        <ul className="space-y-2.5">
+          {products.map((product) => {
+            const status = items?.[product.id] ?? '…';
+            return (
+              <li key={product.id} className="flex items-center gap-3 text-[14px]">
+                <span className="min-w-0 flex-1">
+                  <span className="block truncate text-white/90">{product.number} {product.name} · {formatPrice(product.price)}</span>
+                  <span className="block text-[12px] text-white/50">{fmt(viewsById.get(product.id) ?? 0)} opened</span>
+                </span>
+                <span className={`rounded-full px-2.5 py-1 text-[12px] font-semibold ${status === 'sold' ? 'bg-white/10 text-white/60' : status === 'held' ? 'bg-[#ff9f0a]/20 text-[#ffb340]' : 'bg-[#30d158]/15 text-[#30d158]'}`}>
+                  {status === 'held' ? 'In checkout' : status.replace(/^./, (c) => c.toUpperCase())}
+                </span>
+                {status === 'sold' || status === 'available' ? (
+                  <button
+                    type="button"
+                    onClick={() => {
+                      const next = status === 'sold' ? 'available' : 'sold';
+                      if (window.confirm(`Mark ${product.name} as ${next}?`)) call({ productId: product.id, status: next });
+                    }}
+                    className="h-8 rounded-full bg-white/[0.08] px-3 text-[12px] font-semibold text-white/75 hover:bg-white/[0.12]"
+                  >
+                    {status === 'sold' ? 'Mark available' : 'Mark sold'}
+                  </button>
+                ) : null}
+              </li>
+            );
+          })}
+        </ul>
+        <div className="mt-5 grid grid-cols-4 gap-2 border-t border-white/[0.06] pt-4">
+          {steps.map(([key, label]) => (
+            <div key={key}>
+              <p className="text-[20px] font-semibold tabular-nums">{fmt(n(funnel[key]))}</p>
+              <p className="text-[11px] leading-tight text-white/45">{label}</p>
+            </div>
+          ))}
+        </div>
+      </Card>
+      <MerchOrders merch={merch} />
+    </>
+  );
+}
+
+// NonParallel tees: each paid order goes to Printify for printing. Failed sends retry every
+// 10 minutes (up to 5 tries); after that, the order needs placing by hand in Printify.
+function MerchOrders({ merch }: { merch: { printify: boolean; orders: MerchOrder[] } | null }) {
+  const label = (order: MerchOrder) =>
+    order.status === 'sent' ? 'Sent to Printify' : order.status === 'sending' ? 'Sending' : order.attempts >= 5 ? 'Needs you' : 'Retrying';
+  return (
+    <Card
+      title="NonParallel tees"
+      subtitle={merch && !merch.printify ? 'Orders can’t reach Printify: add the PRINTIFY_ACCESS secret on GitHub' : 'Paid orders go to Printify to print and ship'}
+      className="mt-3"
+    >
+      {merch?.orders.length ? (
+        <ul className="space-y-2.5">
+          {merch.orders.map((order) => (
+            <li key={order.session_id} className="flex items-center gap-3 text-[14px]">
               <span className="min-w-0 flex-1">
-                <span className="block truncate text-white/90">{product.number} {product.name} · {formatPrice(product.price)}</span>
-                <span className="block text-[12px] text-white/50">{fmt(viewsById.get(product.id) ?? 0)} opened</span>
+                <span className="block truncate text-white/90">
+                  {new Date(order.created_at).toLocaleString(undefined, { month: 'short', day: 'numeric', hour: 'numeric', minute: '2-digit' })}
+                  {order.printify_order_id ? <span className="text-white/45"> · Printify {order.printify_order_id}</span> : null}
+                </span>
+                <span className="block truncate text-[12px] text-white/50">{order.error ?? `Stripe ${order.session_id.slice(-10)}`}</span>
               </span>
-              <span className={`rounded-full px-2.5 py-1 text-[12px] font-semibold ${status === 'sold' ? 'bg-white/10 text-white/60' : status === 'held' ? 'bg-[#ff9f0a]/20 text-[#ffb340]' : 'bg-[#30d158]/15 text-[#30d158]'}`}>
-                {status === 'held' ? 'In checkout' : status.replace(/^./, (c) => c.toUpperCase())}
+              <span className={`shrink-0 rounded-full px-2.5 py-1 text-[12px] font-semibold ${order.status === 'sent' ? 'bg-[#30d158]/15 text-[#30d158]' : order.status === 'failed' && order.attempts >= 5 ? 'bg-[#ff453a]/15 text-[#ff6961]' : 'bg-[#ff9f0a]/20 text-[#ffb340]'}`}>
+                {label(order)}
               </span>
-              {status === 'sold' || status === 'available' ? (
-                <button
-                  type="button"
-                  onClick={() => {
-                    const next = status === 'sold' ? 'available' : 'sold';
-                    if (window.confirm(`Mark ${product.name} as ${next}?`)) call({ productId: product.id, status: next });
-                  }}
-                  className="h-8 rounded-full bg-white/[0.08] px-3 text-[12px] font-semibold text-white/75 hover:bg-white/[0.12]"
-                >
-                  {status === 'sold' ? 'Mark available' : 'Mark sold'}
-                </button>
-              ) : null}
             </li>
-          );
-        })}
-      </ul>
-      <div className="mt-5 grid grid-cols-4 gap-2 border-t border-white/[0.06] pt-4">
-        {steps.map(([key, label]) => (
-          <div key={key}>
-            <p className="text-[20px] font-semibold tabular-nums">{fmt(n(funnel[key]))}</p>
-            <p className="text-[11px] leading-tight text-white/45">{label}</p>
-          </div>
-        ))}
-      </div>
+          ))}
+        </ul>
+      ) : (
+        <p className="text-[14px] text-white/50">{merch ? 'No tee orders yet' : '…'}</p>
+      )}
     </Card>
   );
 }

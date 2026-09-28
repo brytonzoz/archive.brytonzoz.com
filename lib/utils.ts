@@ -47,6 +47,7 @@ const PROJECT_TYPE_LABELS: Record<string, string> = {
   'multi-purpose-stream': 'Platform',
   'video-series': 'Video series',
   ecommerce: 'Store',
+  merch: 'Merch',
 };
 
 export function getProjectTypeLabel(project: Project): string {

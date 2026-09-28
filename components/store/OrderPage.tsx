@@ -3,12 +3,31 @@
 import React, { useEffect, useState } from 'react';
 import Link from 'next/link';
 import { track } from '../../lib/analytics';
+import { MERCH_PATH, merchKey, merchVariant } from '../../lib/merch';
 import { formatPrice, productById, STORE_PATH } from '../../lib/store';
 import { finishCheckout } from '../../lib/store-client';
 import { ResponsiveImage, placeholderBackground } from '../ResponsiveImage';
 import { SiteFooter } from '../SiteFooter';
 
-type Order = { paid: boolean; status?: string; items: string[]; amountTotal: number | null; email: string | null; name: string | null; city: string | null };
+type Order = {
+  paid: boolean;
+  status?: string;
+  items: string[];
+  merch?: string | null;
+  amountTotal: number | null;
+  email: string | null;
+  name: string | null;
+  city: string | null;
+};
+
+// "variantId:qty,…" from the checkout, as bag keys with quantities.
+const teeLines = (value?: string | null) =>
+  (value ?? '').split(',').map((part) => {
+    const [id, quantity] = part.split(':').map(Number);
+    return { key: merchKey(id), quantity };
+  }).filter((line) => line.quantity > 0 && merchVariant(line.key));
+
+const rowClass = 'flex items-center gap-4 rounded-[20px] bg-white/[0.06] p-3 ring-1 ring-inset ring-white/[0.08]';
 
 // Where Stripe sends the buyer after paying: /scrapwrk/order/?session_id=…
 export function OrderPage() {
@@ -27,13 +46,13 @@ export function OrderPage() {
         setOrder(body);
         setState('ready');
         if (body.paid) {
-          finishCheckout(body.items);
+          finishCheckout([...body.items, ...teeLines(body.merch).map((line) => line.key)]);
           // Counted once per order, even if the page is reloaded.
           const key = `bz.order.${sessionId}`;
           try {
             if (!window.localStorage.getItem(key)) {
               window.localStorage.setItem(key, '1');
-              track({ type: 'purchase', detail: body.items.join(',') });
+              track({ type: 'purchase', detail: [...body.items, ...teeLines(body.merch).map((line) => `${line.key}x${line.quantity}`)].join(',') });
             }
           } catch {
             // Storage blocked: skip the metric rather than risk counting twice.
@@ -44,6 +63,8 @@ export function OrderPage() {
   }, []);
 
   const firstName = order?.name?.split(' ')[0];
+  const tees = teeLines(order?.merch);
+  const onlyTees = Boolean(order && tees.length && !order.items.length);
 
   return (
     <div className="store-page min-h-screen text-white">
@@ -69,7 +90,7 @@ export function OrderPage() {
                 const product = productById(id);
                 if (!product) return null;
                 return (
-                  <li key={id} className="flex items-center gap-4 rounded-[20px] bg-white/[0.06] p-3 ring-1 ring-inset ring-white/[0.08]">
+                  <li key={id} className={rowClass}>
                     <span className="relative h-20 w-20 shrink-0 overflow-hidden rounded-[14px]" style={placeholderBackground(product.images[0])}>
                       <ResponsiveImage asset={product.images[0]} alt="" sizes="80px" className="absolute inset-0 h-full w-full object-cover" />
                     </span>
@@ -79,6 +100,22 @@ export function OrderPage() {
                       <span className="block text-[13px] text-white/45">1 of 1 · Size {product.size}</span>
                     </span>
                     <span className="shrink-0 text-[16px] font-semibold tabular-nums">{formatPrice(product.price)}</span>
+                  </li>
+                );
+              })}
+              {tees.map(({ key, quantity }) => {
+                const { product, color, size } = merchVariant(key)!;
+                return (
+                  <li key={key} className={rowClass}>
+                    <span className="relative h-20 w-20 shrink-0 overflow-hidden rounded-[14px] bg-white">
+                      <ResponsiveImage asset={color.images[0]} alt="" sizes="80px" className="absolute inset-0 h-full w-full object-cover" />
+                    </span>
+                    <span className="min-w-0 flex-1">
+                      <span className="block text-[12px] font-semibold tracking-[0.16em] text-white/45">NONPARALLEL {product.number}</span>
+                      <span className="block text-[18px] font-semibold">{product.name} Tee{quantity > 1 ? ` × ${quantity}` : ''}</span>
+                      <span className="block text-[13px] text-white/45">{color.name} · Size {size.size} · Printed to order</span>
+                    </span>
+                    <span className="shrink-0 text-[16px] font-semibold tabular-nums">{formatPrice(size.price * quantity)}</span>
                   </li>
                 );
               })}
@@ -97,10 +134,10 @@ export function OrderPage() {
           <div className="text-center">
             <h1 className="text-[28px] font-bold tracking-[-0.03em]">{state === 'ready' ? 'Payment not finished' : 'Order not found'}</h1>
             <p className="mt-2 text-[16px] text-white/55">
-              {state === 'ready' ? 'Nothing was charged. The piece is still in your bag.' : 'If you paid, your receipt email has the details.'}
+              {state === 'ready' ? 'Nothing was charged. Everything is still in your bag.' : 'If you paid, your receipt email has the details.'}
             </p>
-            <Link href={STORE_PATH} className="mt-8 inline-flex h-[52px] items-center rounded-full bg-white px-7 text-[16px] font-semibold text-black">
-              Back to Scrapwrk
+            <Link href={onlyTees ? MERCH_PATH : STORE_PATH} className="mt-8 inline-flex h-[52px] items-center rounded-full bg-white px-7 text-[16px] font-semibold text-black">
+              {onlyTees ? 'Back to NonParallel' : 'Back to Scrapwrk'}
             </Link>
           </div>
         )}

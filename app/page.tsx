@@ -481,7 +481,7 @@ const ComingSoonScene = React.memo(function ComingSoonScene({ distance, onNext }
   const outgoing = easeOutCubic(clamp((distance - 0.08) / 0.78, 0, 1));
   const incoming = easeOutCubic(clamp(Math.abs(Math.min(distance, 0)) / 0.9, 0, 1));
   const scale = distance >= 0 ? 1 - (outgoing * 0.26) : 1 - (incoming * 0.18);
-  const title = nextRelease.title ?? 'New music';
+  const title = nextRelease.title ?? 'New project';
   const [notifyOpen, setNotifyOpen] = useState(false);
   const [signedUp, setSignedUp] = useState(false);
   useEffect(() => setSignedUp(hasSignedUp()), []);

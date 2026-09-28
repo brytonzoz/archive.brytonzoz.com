@@ -32,7 +32,7 @@ export const metadata: Metadata = {
     url: 'https://brytonzoz.com',
     siteName: 'Bryton Zoz',
     type: 'website',
-    images: [{ url: '/og.jpg', width: 1200, height: 630, alt: 'Bryton Zoz: new music soon' }],
+    images: [{ url: '/og.jpg', width: 1200, height: 630, alt: 'Bryton Zoz: new project soon' }],
   },
   twitter: {
     card: 'summary_large_image',

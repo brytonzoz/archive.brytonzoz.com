@@ -1,7 +1,7 @@
 import type { Project } from './utils';
 
 // The teaser that leads the homepage while the next release is being made.
-// - `title`: leave null to keep it unnamed ("New music"); set it when you're ready to reveal.
+// - `title`: leave null to keep it unnamed ("New project"); set it when you're ready to reveal.
 // - `date`: an ISO date/time (e.g. '2026-11-14T00:00:00-05:00'); once set, "Coming soon" becomes a live
 //   countdown, and on the day it reads "Out now".
 // - `releaseId`: the release's id in lib/tracks.json. Once the date has passed and that release is

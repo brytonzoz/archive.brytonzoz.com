@@ -8,7 +8,8 @@ import { getRelease, releasePath, trackPath } from '../../lib/tracks';
 import { placeholderBackground } from '../ResponsiveImage';
 import { usePlayer } from '../player/context';
 import { ShareIcon } from '../player/icons';
-import { PlatformBar, ReleaseView } from './ReleaseView';
+import { PlatformBar } from './PlatformBar';
+import { ReleaseView } from './ReleaseView';
 
 // The page a shared link opens: brytonzoz.com/<release>/ or /<release>/<song>/.
 export function ReleasePage({ releaseId, songSlug }: { releaseId: string; songSlug?: string }) {

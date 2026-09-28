@@ -1,13 +1,11 @@
 'use client';
 
 import React from 'react';
-import { track as trackMetric } from '../../lib/analytics';
-import { getStreamingServices } from '../../lib/streaming';
 import { releaseMinutes, type Release, type Track } from '../../lib/tracks';
 import { Project, getProjectTypeLabel, isProjectReleased } from '../../lib/utils';
 import { ResponsiveImage, placeholderBackground } from '../ResponsiveImage';
 import { usePlayer } from '../player/context';
-import { ArrowUpRightIcon, EqualizerBars, PauseIcon, PlayIcon, ShuffleIcon } from '../player/icons';
+import { EqualizerBars, PauseIcon, PlayIcon, ShuffleIcon } from '../player/icons';
 import { TrackMenu } from '../player/TrackMenu';
 
 export const releaseKey = (project: Project, release?: Release) =>
@@ -114,61 +112,6 @@ export function ReleaseView({ project, release, focusTrack }: { project: Project
           </p>
         </>
       ) : null}
-    </div>
-  );
-}
-
-// Floats at the bottom: the apps people already pay for, one tap away.
-export function PlatformBar({ project, release, className = '', style }: { project: Project; release?: Release; className?: string; style?: React.CSSProperties }) {
-  const services = getStreamingServices(project);
-  const isReleased = isProjectReleased(project);
-  const key = releaseKey(project, release);
-
-  if (!services.length && !project.url) return null;
-
-  return (
-    <div className={`pointer-events-none flex justify-center px-4 ${className}`} style={style}>
-      <div className="platform-bar glass-capsule glass-solid pointer-events-auto flex items-center gap-3 rounded-full py-2 pl-5 pr-2">
-        {services.length ? (
-          <>
-            <span className="text-[13px] font-semibold leading-tight text-white/75">{isReleased ? 'Add to your library' : 'Pre-save on'}</span>
-            <span className="flex items-center gap-1.5">
-              {services.map((service) =>
-                service.url ? (
-                  <a
-                    key={service.key}
-                    href={service.url}
-                    target="_blank"
-                    rel="noopener noreferrer"
-                    aria-label={`${isReleased ? 'Open in' : 'Pre-save on'} ${service.name}`}
-                    title={service.name}
-                    onClick={() => trackMetric({ type: 'outbound', release: key, detail: service.key })}
-                    className="relative h-10 w-10 overflow-hidden rounded-[11px] shadow-[0_2px_8px_rgba(0,0,0,0.35)] transition-transform duration-150 hover:scale-105 active:scale-90 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-white/70"
-                    style={{ backgroundColor: service.tile }}
-                  >
-                    <ResponsiveImage asset={service.icon} alt="" sizes="40px" draggable={false} className="absolute inset-0 h-full w-full object-cover" />
-                  </a>
-                ) : (
-                  <span key={service.key} aria-label={`${service.name}, on release day`} className="relative h-10 w-10 overflow-hidden rounded-[11px] opacity-40 grayscale" style={{ backgroundColor: service.tile }}>
-                    <ResponsiveImage asset={service.icon} alt="" sizes="40px" draggable={false} className="absolute inset-0 h-full w-full object-cover" />
-                  </span>
-                ),
-              )}
-            </span>
-          </>
-        ) : (
-          <a
-            href={project.url}
-            target="_blank"
-            rel="noopener noreferrer"
-            onClick={() => trackMetric({ type: 'outbound', release: key, detail: 'website' })}
-            className="flex h-10 items-center gap-1.5 rounded-full bg-white px-4 text-[15px] font-semibold text-black transition-transform active:scale-95 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-white/70"
-          >
-            Website
-            <ArrowUpRightIcon size={14} />
-          </a>
-        )}
-      </div>
     </div>
   );
 }

@@ -10,7 +10,8 @@ import { placeholderBackground } from '../ResponsiveImage';
 import { usePlayer } from '../player/context';
 import { ChevronDownIcon, ShareIcon } from '../player/icons';
 import { useSheet } from '../useSheet';
-import { PlatformBar, ReleaseView, releaseKey } from './ReleaseView';
+import { PlatformBar } from './PlatformBar';
+import { ReleaseView, releaseKey } from './ReleaseView';
 
 const iconButton =
   'flex h-10 w-10 items-center justify-center rounded-full text-white/75 transition-colors hover:bg-white/10 hover:text-white focus-visible:outline focus-visible:outline-2 focus-visible:outline-white/70';

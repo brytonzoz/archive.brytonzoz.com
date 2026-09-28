@@ -32,6 +32,8 @@ push, and give the owner the staging link from the PR comment once the Staging w
 
 - Projects and links: `lib/projects.ts` (runtime) and `data/projects.yml` (mirror); homepage order and
   hidden projects: `HOMEPAGE_PROJECT_ORDER` / `HIDDEN_HOMEPAGE_PROJECTS` in `app/page.tsx`.
+- Next-release teaser (first homepage scene): `lib/next-release.ts`. Set `title` to reveal the name, `date` for a
+  live countdown, `enabled: false` to remove it. The link-preview image `public/og.jpg` is a render of that scene.
 - Artwork: originals in `assets-src/{covers,scenes/<scene>,icons}/`; `npm run media` builds
   `public/media/` and `lib/media-manifest.json` (commit the manifest). Never put large images in `public/`.
 - Music player: `lib/tracks.json` lists every release and its songs; each plays from `/audio/<file>`, which

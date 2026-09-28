@@ -14,24 +14,24 @@ const inter = Inter({
 export const metadata: Metadata = {
   metadataBase: new URL('https://brytonzoz.com'),
   title: {
-    default: 'Bryton Zoz - Creative Projects',
+    default: 'Bryton Zoz',
     template: '%s - Bryton Zoz',
   },
-  description: 'Find music and fashion creative projects by Bryton',
-  keywords: 'Bryton Zoz, music, fashion, creative, archive',
-  authors: [{ name: 'Bryton' }],
+  description: 'Music by Bryton Zoz. New music soon.',
+  keywords: 'Bryton Zoz, music, SOLENYA, CAUTION, new music',
+  authors: [{ name: 'Bryton Zoz' }],
   openGraph: {
-    title: 'Bryton Zoz - Creative Projects',
-    description: 'Find music and fashion creative projects by Bryton',
+    title: 'Bryton Zoz',
+    description: 'Music by Bryton Zoz. New music soon.',
     url: 'https://brytonzoz.com',
     siteName: 'Bryton Zoz',
     type: 'website',
-    images: [{ url: '/og.jpg', width: 1200, height: 630, alt: 'SOLENYA by Bryton Zoz' }],
+    images: [{ url: '/og.jpg', width: 1200, height: 630, alt: 'Bryton Zoz: new music soon' }],
   },
   twitter: {
     card: 'summary_large_image',
-    title: 'Bryton Zoz - Creative Projects',
-    description: 'Find music and fashion creative projects by Bryton',
+    title: 'Bryton Zoz',
+    description: 'Music by Bryton Zoz. New music soon.',
     images: ['/og.jpg'],
   },
   robots: {

@@ -4,11 +4,12 @@ import React, { useCallback, useEffect, useState } from 'react';
 import { ProjectCard } from '../components/ProjectCard';
 import { ReleaseSheet } from '../components/release/ReleaseSheet';
 import { usePlayer } from '../components/player/context';
-import { ArrowUpRightIcon, EqualizerBars } from '../components/player/icons';
+import { ArrowUpRightIcon, ChevronDownIcon, EqualizerBars } from '../components/player/icons';
 import { ResponsiveImage, placeholderBackground } from '../components/ResponsiveImage';
 import { getProjects } from '../lib/projects';
 import { cautionSceneAssets, reminderSceneAssets, scrapwrkSceneAssets, solenyaSceneAssets } from '../lib/assets';
 import type { MediaAsset } from '../lib/media';
+import { nextRelease, nextReleaseProject } from '../lib/next-release';
 import { getStreamingServices, getVisitLabel } from '../lib/streaming';
 import { getReleaseForProject, warmTrack } from '../lib/tracks';
 import { Project, getProjectTypeLabel, isProjectReleased } from '../lib/utils';
@@ -87,6 +88,16 @@ const HIDDEN_HOMEPAGE_PROJECTS = new Set([
 ]);
 
 function getProjectBackground(project: Project): SlideBackground {
+  if (project.type === 'coming-soon') {
+    return {
+      base: 'radial-gradient(120% 90% at 50% 34%, #1c1c1f 0%, #0a0a0b 52%, #000 100%)',
+      overlay: 'radial-gradient(circle at 50% 30%, rgba(255, 255, 255, 0.06), transparent 40%)',
+      topGlow: 'rgba(255, 255, 255, 0.04)',
+      bottomGlow: 'rgba(160, 160, 176, 0.05)',
+      edgeGlow: 'rgba(255, 255, 255, 0.03)',
+    };
+  }
+
   if (project.name === 'SOLENYA') {
     return {
       base: 'linear-gradient(139.07deg, #174E6C 2.05%, #720102 101.73%)',
@@ -493,6 +504,120 @@ function SceneCard({
     </>
   );
 }
+
+// Quiet on purpose: the only bright thing in this scene is the light inside the cover.
+const TEASER_PILL: React.CSSProperties = {
+  ...PILL_STYLE,
+  background: 'rgba(255, 255, 255, 0.1)',
+  color: 'rgba(255, 255, 255, 0.9)',
+  boxShadow: 'inset 0 0 0 1px rgba(255, 255, 255, 0.14)',
+};
+
+// "4d 12h 3m" until the date in lib/next-release.ts, "Out now" after it, "Coming soon" without one.
+// Starts on "Coming soon" so the static HTML and the first render agree.
+function useReleaseStatus(date: string | null): string {
+  const target = date ? Date.parse(date) : NaN;
+  const [now, setNow] = useState<number | null>(null);
+
+  useEffect(() => {
+    if (!Number.isFinite(target)) return;
+    setNow(Date.now());
+    const timer = window.setInterval(() => setNow(Date.now()), 1000);
+    return () => window.clearInterval(timer);
+  }, [target]);
+
+  if (!Number.isFinite(target) || now === null) return 'Coming soon';
+  const left = target - now;
+  if (left <= 0) return 'Out now';
+  const days = Math.floor(left / 86_400_000);
+  const hours = Math.floor((left % 86_400_000) / 3_600_000);
+  const minutes = Math.floor((left % 3_600_000) / 60_000);
+  const seconds = Math.floor((left % 60_000) / 1000);
+  return days > 0 ? `${days}d ${hours}h ${minutes}m` : `${hours}h ${minutes}m ${seconds}s`;
+}
+
+// Leads the homepage while the next release is being made: the same layout as every release,
+// but the cover is still developing, light moving behind frosted glass. Nothing given away.
+const ComingSoonScene = React.memo(function ComingSoonScene({ distance, onNext }: { distance: number; onNext: () => void }) {
+  const status = useReleaseStatus(nextRelease.date);
+  const distanceMagnitude = clamp(Math.abs(distance), 0, 1);
+  const outgoing = easeOutCubic(clamp((distance - 0.08) / 0.78, 0, 1));
+  const incoming = easeOutCubic(clamp(Math.abs(Math.min(distance, 0)) / 0.9, 0, 1));
+  const scale = distance >= 0 ? 1 - (outgoing * 0.26) : 1 - (incoming * 0.18);
+  const title = nextRelease.title ?? 'New music';
+
+  return (
+    <div className="relative h-full w-full overflow-hidden">
+      <div aria-hidden="true" className="teaser-grain pointer-events-none absolute inset-0" />
+      <div className="absolute inset-0 flex items-center justify-center">
+        <div className="relative" style={{ width: SCENE_FRAME_WIDTH, height: SCENE_FRAME_HEIGHT }}>
+          <div
+            className="absolute solenya-card-enter"
+            style={{ left: scaleValue(120), top: scaleValue(214), width: scaleValue(722), zIndex: 10, animationDelay: '0.1s' }}
+          >
+            <div
+              style={{
+                opacity: 1 - (distanceMagnitude * 0.18),
+                transform: `translate3d(0, ${scaleValue(outgoing * 58)}, 0) scale(${scale})`,
+                transformOrigin: 'center center',
+                willChange: 'transform',
+                transition: 'transform 760ms cubic-bezier(0.22, 1, 0.36, 1), opacity 420ms ease-out',
+              }}
+            >
+              <div
+                role="img"
+                aria-label="Cover art coming soon"
+                className="teaser-cover scene-cover relative w-full overflow-hidden"
+                style={{ aspectRatio: '1 / 1', borderRadius: scaleValue(34) }}
+              >
+                <span aria-hidden="true" className="teaser-light teaser-light-a" />
+                <span aria-hidden="true" className="teaser-light teaser-light-b" />
+                <span aria-hidden="true" className="teaser-light teaser-light-c" />
+                <span aria-hidden="true" className="teaser-frost" />
+                <span aria-hidden="true" className="teaser-pulse" style={{ width: scaleValue(22), height: scaleValue(22) }} />
+              </div>
+
+              <h2
+                className="scene-title text-balance"
+                style={{
+                  margin: `${scaleValue(52)} 0 0`,
+                  fontFamily: SCENE_FONT,
+                  fontSize: scaleValue(62),
+                  lineHeight: 1.08,
+                  fontWeight: 650,
+                  letterSpacing: '-0.035em',
+                  color: '#FFFFFF',
+                }}
+              >
+                {title}
+              </h2>
+              <p
+                className="scene-title tabular-nums"
+                style={{
+                  margin: `${scaleValue(10)} 0 0`,
+                  fontFamily: SCENE_FONT,
+                  fontSize: scaleValue(34),
+                  lineHeight: 1.2,
+                  fontWeight: 500,
+                  color: 'rgba(255, 255, 255, 0.6)',
+                }}
+              >
+                {status}
+              </p>
+
+              <div className="flex" style={{ marginTop: scaleValue(44) }}>
+                <button type="button" className="scene-button" onClick={onNext} style={TEASER_PILL}>
+                  Past releases
+                  <ChevronDownIcon size={scaleValue(34)} className="shrink-0" />
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+});
 
 const solenyaStickers = [
   {
@@ -1080,7 +1205,8 @@ function SceneDots({ names, activeIndex, onSelect }: { names: string[]; activeIn
 
 export default function HomePage() {
   const { music, fashion } = getProjects();
-  const allProjects = [...music, ...fashion]
+  const teaser = nextReleaseProject();
+  const allProjects = [...(teaser ? [teaser] : []), ...[...music, ...fashion]
     .filter((project) => !HIDDEN_HOMEPAGE_PROJECTS.has(project.name))
     .sort((leftProject, rightProject) => {
       const leftIndex = HOMEPAGE_PROJECT_ORDER.indexOf(leftProject.name);
@@ -1089,7 +1215,7 @@ export default function HomePage() {
       const safeRightIndex = rightIndex === -1 ? Number.MAX_SAFE_INTEGER : rightIndex;
 
       return safeLeftIndex - safeRightIndex;
-    });
+    })];
   const [activeIndex, setActiveIndex] = useState(0);
   const [scrollProgress, setScrollProgress] = useState(0);
   const [isTransitioning, setIsTransitioning] = useState(false);
@@ -1237,6 +1363,15 @@ export default function HomePage() {
             const isLast = index === allProjects.length - 1;
             const sceneDistance = clamp(scrollProgress - index, -1, isLast ? 0 : 1);
             const footer = isLast ? <SiteFooter /> : null;
+
+            if (project.type === 'coming-soon') {
+              return (
+                <div key={project.name} className="relative h-screen snap-center overflow-hidden">
+                  <ComingSoonScene distance={sceneDistance} onNext={() => scrollToScene(index + 1)} />
+                  {footer}
+                </div>
+              );
+            }
 
             if (isSolenya) {
               return (

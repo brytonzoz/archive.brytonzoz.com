@@ -2,7 +2,7 @@
 // listening metrics API at /api/* (worker/metrics.ts) and the Scrapwrk checkout (worker/store.ts). Every other path is handled by static
 // assets before this script runs (see run_worker_first).
 import { handleApi, type MetricsEnv } from './metrics';
-import { reconcileMerch, type MerchEnv } from './merch';
+import { placeManualOrders, reconcileMerch, type MerchEnv } from './merch';
 import { handleStore } from './store';
 
 interface Env extends MetricsEnv, MerchEnv {
@@ -118,8 +118,12 @@ export default {
     return env.ASSETS.fetch(request);
   },
   // Every 10 minutes (production): make sure every paid checkout with NonParallel tees has its
-  // Printify order, even when the buyer closed the tab before the thank-you page.
+  // Printify order, even when the buyer closed the tab before the thank-you page; and place any
+  // one-off sample orders added to D1 `manual_orders`.
   async scheduled(_controller: ScheduledController, env: Env, ctx: ExecutionContext): Promise<void> {
-    if (env.DB) ctx.waitUntil(reconcileMerch({ ...env, DB: env.DB }).catch((error) => console.error('reconcile failed', error)));
+    if (!env.DB) return;
+    const db = { ...env, DB: env.DB };
+    ctx.waitUntil(reconcileMerch(db).catch((error) => console.error('reconcile failed', error)));
+    ctx.waitUntil(placeManualOrders(db).catch((error) => console.error('manual orders failed', error)));
   },
 } satisfies ExportedHandler<Env>;

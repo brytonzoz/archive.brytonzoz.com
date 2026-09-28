@@ -33,7 +33,7 @@ export function MerchPage({ initialProduct }: { initialProduct?: string }) {
                 <ResponsiveImage asset={nonparallelAssets.logo} alt="" sizes="(min-width: 600px) 260px, 46vw" priority draggable={false} className="h-full w-full object-contain" />
               </h1>
             )}
-            intro={<p className="np-scene-note">The label and company behind all of this. A tee is a way to support it: you get something to wear, and it keeps the work going.</p>}
+            intro={<p className="store-caption">The label and company behind all of this. A tee is a way to support it: you get something to wear, and it keeps the work going.</p>}
           />
         </div>
       </div>

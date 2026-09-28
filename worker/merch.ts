@@ -168,3 +168,48 @@ export async function merchOrders(db: D1Database) {
   const { results } = await db.prepare('SELECT session_id, status, printify_order_id, error, attempts, created_at FROM merch_orders ORDER BY created_at DESC LIMIT 20').all();
   return results;
 }
+
+type ManualOrder = {
+  id: number; design: string; variant_id: number; name: string; address1: string; address2: string | null;
+  city: string; region: string; zip: string; country: string; max_cents: number;
+};
+
+// Scheduled: one-off orders at cost from D1 `manual_orders` (samples, added by hand). Each is quoted
+// first and only ordered when tee + standard shipping is within its max_cents.
+export async function placeManualOrders(env: MerchEnv & { DB: D1Database }): Promise<void> {
+  if (!env.PRINTIFY_ACCESS) return;
+  const { results } = await env.DB.prepare("SELECT * FROM manual_orders WHERE status = 'pending' ORDER BY id LIMIT 5").all<ManualOrder>();
+  for (const row of results) {
+    const claim = await env.DB.prepare("UPDATE manual_orders SET status = 'sending', updated_at = ? WHERE id = ? AND status = 'pending'").bind(Date.now(), row.id).run();
+    if (!claim.meta.changes) continue;
+    const done = (status: string, fields: { quote?: number; order?: string; error?: string } = {}) =>
+      env.DB.prepare('UPDATE manual_orders SET status = ?, quote_cents = COALESCE(?, quote_cents), printify_order_id = ?, error = ?, updated_at = ? WHERE id = ?')
+        .bind(status, fields.quote ?? null, fields.order ?? null, fields.error ?? null, Date.now(), row.id).run();
+    try {
+      const variant = VARIANTS.get(`${row.design}:${row.variant_id}`);
+      if (!variant) throw new Error(`Unknown tee ${row.design}:${row.variant_id}`);
+      const { first, last } = splitName(row.name);
+      const address_to = {
+        first_name: first, last_name: last, country: row.country || 'US', region: row.region,
+        address1: row.address1, address2: row.address2 ?? '', city: row.city, zip: row.zip,
+      };
+      const line_items = [{ product_id: variant.printifyId, variant_id: variant.variantId, quantity: 1 }];
+      const product = await printify<{ variants: { id: number; cost: number }[] }>(env, 'GET', `/shops/${merch.shopId}/products/${variant.printifyId}.json`);
+      const cost = product.variants.find((entry) => entry.id === variant.variantId)?.cost ?? Infinity;
+      const quote = await printify<{ standard: number }>(env, 'POST', `/shops/${merch.shopId}/orders/shipping.json`, { line_items, address_to });
+      const total = cost + quote.standard;
+      if (!(total <= row.max_cents)) {
+        await done('over-budget', { quote: Number.isFinite(total) ? total : undefined, error: `Quote ${total} is over ${row.max_cents}` });
+        continue;
+      }
+      const order = await printify<{ id: string }>(env, 'POST', `/shops/${merch.shopId}/orders.json`, {
+        external_id: `manual-${row.id}`, label: 'Sample for Bryton', line_items, shipping_method: 1, send_shipping_notification: false, address_to,
+      });
+      await printify(env, 'POST', `/shops/${merch.shopId}/orders/${order.id}/send_to_production.json`);
+      await done('sent', { quote: total, order: order.id });
+    } catch (error) {
+      console.error('manual order failed', row.id, error);
+      await done('failed', { error: String(error).slice(0, 500) });
+    }
+  }
+}

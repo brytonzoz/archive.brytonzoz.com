@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useEffect, useState } from 'react';
+import React from 'react';
 import { nonparallelAssets } from '../../lib/assets';
 import { merchCards, merchMoreCard, type MerchCard } from '../../lib/merch';
 import { formatPrice } from '../../lib/store';
@@ -11,8 +11,7 @@ import { ResponsiveImage } from '../ResponsiveImage';
 // the tee, then float. Photos are Printify's mockups on white. A "More soon" card invites a sign-up
 // for new designs: in the free spot of an odd grid, or across the bottom under two tees.
 
-const STAGGER_MS = 150;
-const SPIN_EVERY_MS = 4800;
+const STAGGER_MS = 60;
 
 function slotFor(index: number, count: number, columns: number, wide: boolean) {
   const column = index % columns;
@@ -123,7 +122,6 @@ export function MerchGrid({
   onNotify: () => void;
   sizes?: string;
 }) {
-  const [spinning, setSpinning] = useState<number | null>(null);
   const cards: { key: string; label: string; face: React.ReactNode; wide?: boolean; onClick: () => void }[] = merchCards.map((card) => ({
     key: `${card.product.slug}-${card.color.slug}`,
     label: `${card.product.name} tee${card.perColor ? `, ${card.color.name}` : ''}, ${formatPrice(card.product.price)}`,
@@ -139,26 +137,6 @@ export function MerchGrid({
   }
   const count = cards.length;
 
-  useEffect(() => {
-    if (!active || window.matchMedia('(prefers-reduced-motion: reduce)').matches) return;
-    let next = 0;
-    let clear: number | undefined;
-    let timer: number | undefined;
-    const settle = window.setTimeout(() => {
-      timer = window.setInterval(() => {
-        setSpinning(next);
-        clear = window.setTimeout(() => setSpinning(null), 1300);
-        next = (next + 1) % count;
-      }, SPIN_EVERY_MS);
-    }, count * STAGGER_MS + 1800);
-    return () => {
-      window.clearTimeout(settle);
-      window.clearInterval(timer);
-      window.clearTimeout(clear);
-      setSpinning(null);
-    };
-  }, [active, count]);
-
   return (
     <div className={`store-grid merch-grid ${columns === 3 ? 'is-3col' : ''} ${active ? 'is-active' : ''}`}>
       {cards.map((card, i) => {
@@ -171,11 +149,11 @@ export function MerchGrid({
           >
             <div
               className="store-float"
-              style={{ '--float-y': slot.floatY, '--float-rotate': slot.floatRotate, '--float-duration': slot.duration, '--delay': `${i * STAGGER_MS + 1100}ms` } as React.CSSProperties}
+              style={{ '--float-y': slot.floatY, '--float-rotate': slot.floatRotate, '--float-duration': slot.duration, '--delay': `${i * STAGGER_MS + 700}ms` } as React.CSSProperties}
             >
               <button type="button" className="store-card" onClick={card.onClick} aria-label={card.label}>
                 <span className="store-card-flip" style={{ '--delay': `${i * STAGGER_MS}ms` } as React.CSSProperties}>
-                  <span className={`store-card-inner ${spinning === i ? 'is-spinning' : ''}`}>{card.face}</span>
+                  <span className="store-card-inner">{card.face}</span>
                 </span>
               </button>
             </div>

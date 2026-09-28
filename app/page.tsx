@@ -862,7 +862,7 @@ const SolenyaScene = React.memo(function SolenyaScene({
                 opacity: stickerState.opacity,
                 transform: `translate3d(${scaleValue(stickerState.translateX)}, ${scaleValue(stickerState.translateY)}, 0) rotate(${stickerState.rotate}deg) scale(${stickerState.scale})`,
                 willChange: 'transform, opacity',
-                transition: 'transform 520ms cubic-bezier(0.22, 1, 0.36, 1), opacity 320ms ease-out',
+                transition: 'transform 400ms cubic-bezier(0.22, 1, 0.36, 1), opacity 260ms ease-out',
               }}
             >
               <div
@@ -948,7 +948,7 @@ const CautionScene = React.memo(function CautionScene({
                 opacity: stickerState.opacity,
                 transform: `translate3d(${scaleValue(stickerState.translateX)}, ${scaleValue(stickerState.translateY)}, 0) rotate(${stickerState.rotate}deg) scale(${stickerState.scale})`,
                 willChange: 'transform, opacity',
-                transition: 'transform 520ms cubic-bezier(0.22, 1, 0.36, 1), opacity 320ms ease-out',
+                transition: 'transform 400ms cubic-bezier(0.22, 1, 0.36, 1), opacity 260ms ease-out',
               }}
             >
               <div
@@ -1030,7 +1030,7 @@ const ReminderScene = React.memo(function ReminderScene({
                 opacity: stickerState.opacity,
                 transform: `translate3d(${scaleValue(stickerState.translateX)}, ${scaleValue(stickerState.translateY)}, 0) rotate(${stickerState.rotate}deg) scale(${stickerState.scale})`,
                 willChange: 'transform, opacity',
-                transition: 'transform 520ms cubic-bezier(0.22, 1, 0.36, 1), opacity 320ms ease-out',
+                transition: 'transform 400ms cubic-bezier(0.22, 1, 0.36, 1), opacity 260ms ease-out',
               }}
             >
               <div
@@ -1112,7 +1112,7 @@ const ScrapwrkScene = React.memo(function ScrapwrkScene({ distance, loadImages }
                   opacity: stickerState.opacity,
                   transform: `translate3d(${scaleValue(stickerState.translateX)}, ${scaleValue(stickerState.translateY)}, 0) rotate(${stickerState.rotate}deg) scale(${stickerState.scale})`,
                   willChange: 'transform, opacity',
-                  transition: 'transform 520ms cubic-bezier(0.22, 1, 0.36, 1), opacity 320ms ease-out',
+                  transition: 'transform 400ms cubic-bezier(0.22, 1, 0.36, 1), opacity 260ms ease-out',
                 }}
               >
                 <div
@@ -1148,7 +1148,7 @@ const ScrapwrkScene = React.memo(function ScrapwrkScene({ distance, loadImages }
         style={{
           opacity: 1 - (distanceMagnitude * 0.3),
           transform: `translate3d(0, ${incoming * 32}px, 0)`,
-          transition: 'transform 700ms cubic-bezier(0.22, 1, 0.36, 1), opacity 400ms ease-out',
+          transition: 'transform 480ms cubic-bezier(0.22, 1, 0.36, 1), opacity 280ms ease-out',
         }}
       >
         <StoreExperience
@@ -1156,6 +1156,7 @@ const ScrapwrkScene = React.memo(function ScrapwrkScene({ distance, loadImages }
           sizes="(min-width: 640px) 280px, 46vw"
           headerClassName="store-scene-header"
           title={<h2 className="store-scene-title scene-title">Scrapwrk</h2>}
+          intro={<p className="store-caption">One-of-one pieces, reworked by hand. Once one sells, it’s gone.</p>}
           titleEnd={(
             <Link href="/scrapwrk/" className="store-scene-link scene-title">
               All pieces
@@ -1220,7 +1221,7 @@ const NonParallelScene = React.memo(function NonParallelScene({ distance }: { di
                   opacity: stickerState.opacity * sticker.alpha,
                   transform: `translate3d(${scaleValue(stickerState.translateX)}, ${scaleValue(stickerState.translateY)}, 0) rotate(${stickerState.rotate}deg) scale(${stickerState.scale})`,
                   willChange: 'transform, opacity',
-                  transition: 'transform 520ms cubic-bezier(0.22, 1, 0.36, 1), opacity 320ms ease-out',
+                  transition: 'transform 400ms cubic-bezier(0.22, 1, 0.36, 1), opacity 260ms ease-out',
                 }}
               >
                 <div
@@ -1247,7 +1248,7 @@ const NonParallelScene = React.memo(function NonParallelScene({ distance }: { di
           '--row-h': merchScene.rowHeight,
           opacity: 1 - (distanceMagnitude * 0.3),
           transform: `translate3d(0, ${incoming * 32}px, 0)`,
-          transition: 'transform 700ms cubic-bezier(0.22, 1, 0.36, 1), opacity 400ms ease-out',
+          transition: 'transform 480ms cubic-bezier(0.22, 1, 0.36, 1), opacity 280ms ease-out',
         } as React.CSSProperties}
       >
         <MerchExperience
@@ -1267,7 +1268,7 @@ const NonParallelScene = React.memo(function NonParallelScene({ distance }: { di
               <ChevronDownIcon size={16} className="-rotate-90" />
             </Link>
           )}
-          intro={<p className="np-scene-note">The label and company behind all of this. A tee is a way to support it: you get something to wear, and it keeps the work going.</p>}
+          intro={<p className="store-caption">The label and company behind all of this. A tee is a way to support it: you get something to wear, and it keeps the work going.</p>}
         />
       </div>
     </div>

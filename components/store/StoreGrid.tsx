@@ -1,13 +1,13 @@
 'use client';
 
-import React, { useEffect, useState } from 'react';
+import React from 'react';
 import { formatPrice, products, type Product } from '../../lib/store';
 import { useAvailability, warmProduct } from '../../lib/store-client';
 import { ResponsiveImage, placeholderBackground } from '../ResponsiveImage';
 
 // The Scrapwrk grid: four cards that fly in one after another (top left, top right, bottom left,
-// bottom right), spin over to reveal the piece, then float. Every so often one card does a full
-// turn, one at a time. Three pieces and, in the fourth spot, the next drop.
+// bottom right), spin over to reveal the piece, then float. Three pieces and, in the fourth spot,
+// the next drop.
 
 const SLOTS = [
   { fromX: '-38%', fromY: '-70%', fromRotate: '-14deg', floatY: '-1.6cqw', floatRotate: '-0.8deg', duration: '6.4s' },
@@ -15,8 +15,7 @@ const SLOTS = [
   { fromX: '-38%', fromY: '75%', fromRotate: '12deg', floatY: '-1.5cqw', floatRotate: '0.7deg', duration: '6.8s' },
   { fromX: '38%', fromY: '75%', fromRotate: '-12deg', floatY: '-1.2cqw', floatRotate: '-0.9deg', duration: '7.4s' },
 ];
-const STAGGER_MS = 170;
-const SPIN_EVERY_MS = 4200;
+const STAGGER_MS = 70;
 
 function Wordmark() {
   return (
@@ -95,29 +94,6 @@ export function StoreGrid({
   onNotify: () => void;
   sizes?: string;
 }) {
-  const [spinning, setSpinning] = useState<number | null>(null);
-
-  // Once the cards have landed, one at a time does a slow full turn.
-  useEffect(() => {
-    if (!active || window.matchMedia('(prefers-reduced-motion: reduce)').matches) return;
-    let next = 0;
-    let clear: number | undefined;
-    let timer: number | undefined;
-    const settle = window.setTimeout(() => {
-      timer = window.setInterval(() => {
-        setSpinning(next);
-        clear = window.setTimeout(() => setSpinning(null), 1300);
-        next = (next + 1) % SLOTS.length;
-      }, SPIN_EVERY_MS);
-    }, SLOTS.length * STAGGER_MS + 1600);
-    return () => {
-      window.clearTimeout(settle);
-      window.clearInterval(timer);
-      window.clearTimeout(clear);
-      setSpinning(null);
-    };
-  }, [active]);
-
   const cards: { key: string; label: string; face: React.ReactNode; onClick: () => void; warm?: () => void }[] = [
     ...products.slice(0, 3).map((product) => ({
       key: product.id,
@@ -150,12 +126,12 @@ export function StoreGrid({
                 '--float-y': slot.floatY,
                 '--float-rotate': slot.floatRotate,
                 '--float-duration': slot.duration,
-                '--delay': `${i * STAGGER_MS + 1100}ms`,
+                '--delay': `${i * STAGGER_MS + 700}ms`,
               } as React.CSSProperties}
             >
               <button type="button" className="store-card" onClick={card.onClick} onPointerDown={card.warm} onPointerEnter={card.warm} aria-label={card.label}>
                 <span className="store-card-flip" style={{ '--delay': `${i * STAGGER_MS}ms` } as React.CSSProperties}>
-                  <span className={`store-card-inner ${spinning === i ? 'is-spinning' : ''}`}>{card.face}</span>
+                  <span className="store-card-inner">{card.face}</span>
                 </span>
               </button>
             </div>

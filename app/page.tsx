@@ -13,7 +13,7 @@ import { ArrowUpRightIcon, ChevronDownIcon, EqualizerBars } from '../components/
 import { ResponsiveImage, placeholderBackground } from '../components/ResponsiveImage';
 import { getProjects } from '../lib/projects';
 import { cautionSceneAssets, nonparallelAssets, reminderSceneAssets, scrapwrkSceneAssets, solenyaSceneAssets } from '../lib/assets';
-import { merchGridRows } from '../lib/merch';
+import { merchScene } from '../lib/merch';
 import type { MediaAsset } from '../lib/media';
 import { nextRelease, nextReleaseProject } from '../lib/next-release';
 import { getStreamingServices, getVisitLabel } from '../lib/streaming';
@@ -1186,7 +1186,8 @@ const NonParallelScene = React.memo(function NonParallelScene({ distance }: { di
       <div
         className="np-scene relative z-10"
         style={{
-          '--rows': merchGridRows,
+          '--rows': merchScene.rows,
+          '--row-h': merchScene.rowHeight,
           opacity: 1 - (distanceMagnitude * 0.3),
           transform: `translate3d(0, ${incoming * 32}px, 0)`,
           transition: 'transform 700ms cubic-bezier(0.22, 1, 0.36, 1), opacity 400ms ease-out',
@@ -1194,7 +1195,8 @@ const NonParallelScene = React.memo(function NonParallelScene({ distance }: { di
       >
         <MerchExperience
           active={active}
-          sizes="(min-width: 640px) 270px, 44vw"
+          columns={merchScene.columns}
+          sizes={merchScene.columns === 3 ? '(min-width: 640px) 180px, 30vw' : '(min-width: 640px) 270px, 44vw'}
           headerClassName="np-scene-header"
           title={(
             <h2 className="np-scene-logo">

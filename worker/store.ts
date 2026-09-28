@@ -140,7 +140,7 @@ async function checkout(request: Request, env: StoreEnv & { DB: D1Database }): P
     return json({ error: 'bad-request' }, 400);
   }
   const keys = Array.isArray(body.items) ? body.items.filter((id): id is string => typeof id === 'string') : [];
-  // Scrapwrk pieces (each 1 of 1) and NonParallel tees ("np:<variantId>", repeated per unit).
+  // Scrapwrk pieces (each 1 of 1) and NonParallel tees ("np:<design>:<variantId>", repeated per unit).
   const ids = [...new Set(keys.filter((key) => !key.startsWith(MERCH_PREFIX)))];
   const merchCounts = parseMerch(keys.filter((key) => key.startsWith(MERCH_PREFIX)));
   if ((!ids.length && !merchCounts?.size) || !merchCounts || ids.length > PRODUCTS.size || ids.some((id) => !PRODUCTS.has(id))) {

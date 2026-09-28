@@ -3,7 +3,7 @@
 import React, { useEffect, useState } from 'react';
 import Link from 'next/link';
 import { track } from '../../lib/analytics';
-import { MERCH_PATH, merchKey, merchVariant } from '../../lib/merch';
+import { MERCH_KEY_PREFIX, MERCH_PATH, merchVariant } from '../../lib/merch';
 import { formatPrice, productById, STORE_PATH } from '../../lib/store';
 import { finishCheckout } from '../../lib/store-client';
 import { ResponsiveImage, placeholderBackground } from '../ResponsiveImage';
@@ -20,11 +20,11 @@ type Order = {
   city: string | null;
 };
 
-// "variantId:qty,…" from the checkout, as bag keys with quantities.
+// "design:variantId:qty,…" from the checkout, as bag keys with quantities.
 const teeLines = (value?: string | null) =>
   (value ?? '').split(',').map((part) => {
-    const [id, quantity] = part.split(':').map(Number);
-    return { key: merchKey(id), quantity };
+    const [design, id, quantity] = part.split(':');
+    return { key: `${MERCH_KEY_PREFIX}${design}:${id}`, quantity: Number(quantity) };
   }).filter((line) => line.quantity > 0 && merchVariant(line.key));
 
 const rowClass = 'flex items-center gap-4 rounded-[20px] bg-white/[0.06] p-3 ring-1 ring-inset ring-white/[0.08]';

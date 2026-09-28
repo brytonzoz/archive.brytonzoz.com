@@ -14,6 +14,7 @@ export function MerchExperience({
   active,
   initialProduct,
   sizes,
+  columns,
   title,
   titleEnd,
   intro,
@@ -22,6 +23,7 @@ export function MerchExperience({
   active: boolean;
   initialProduct?: string;
   sizes?: string;
+  columns?: 2 | 3;
   title: React.ReactNode;
   titleEnd?: React.ReactNode;
   intro?: React.ReactNode;
@@ -63,6 +65,7 @@ export function MerchExperience({
       <MerchGrid
         active={active}
         sizes={sizes}
+        columns={columns}
         onOpen={openCard}
         onNotify={() => (signedUp ? notify('You’re on the list for new designs') : setNotifyOpen(true))}
       />

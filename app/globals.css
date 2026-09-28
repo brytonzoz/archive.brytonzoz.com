@@ -1287,6 +1287,37 @@ html {
   to { transform: translateY(-3%) rotate(2deg); }
 }
 
+/* The homepage's six tees, three across: smaller type and corners so the cards keep their proportions. */
+.merch-grid.is-3col {
+  grid-template-columns: repeat(3, 1fr);
+  gap: 3cqw;
+}
+
+.merch-grid.is-3col .store-slot {
+  --card-radius: 3.6cqw;
+}
+
+.merch-grid.is-3col .store-card-meta {
+  padding: 0 2.4cqw;
+}
+
+.merch-grid.is-3col .store-card-number {
+  font-size: 1.8cqw;
+  letter-spacing: 0.12em;
+}
+
+.merch-grid.is-3col .store-card-name {
+  font-size: 3.1cqw;
+}
+
+.merch-grid.is-3col .store-card-price {
+  font-size: 2.9cqw;
+}
+
+.merch-grid.is-3col .store-card-back-number {
+  font-size: 2.2cqw;
+}
+
 /* Under two tees: one card across the grid. */
 .store-slot.is-wide {
   grid-column: 1 / -1;
@@ -1352,7 +1383,7 @@ html {
 /* The homepage's NonParallel scene: sized so heading, note and grid fit above the footer. */
 .np-scene {
   container-type: inline-size;
-  width: min(88vw, 540px, calc((100dvh - 250px) / (0.5 + 0.66 * var(--rows, 1))));
+  width: min(88vw, 540px, calc((100dvh - 250px) / (0.5 + var(--row-h, 0.66) * var(--rows, 1))));
 }
 
 .np-scene-header {

@@ -64,7 +64,7 @@ export function MerchSheet({
       navigator.vibrate?.([8, 40, 8]);
       return;
     }
-    action(merchKey(chosen.variantId));
+    action(merchKey(product, chosen.variantId));
   };
 
   return createPortal(

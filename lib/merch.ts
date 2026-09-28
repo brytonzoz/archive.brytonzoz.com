@@ -56,16 +56,24 @@ export type MerchCard = { product: MerchProduct; color: MerchColor; perColor: bo
 export const merchCards: MerchCard[] = merchProducts.length < 3
   ? merchProducts.flatMap((product) => product.colors.map((color) => ({ product, color, perColor: true }))).slice(0, 4)
   : merchProducts.map((product) => ({ product, color: product.colors[0], perColor: false }));
-// An odd count ends with a "More soon" card in the free spot; two cards get a wide one under them.
+// In two columns, an odd count ends with a "More soon" card in the free spot; two cards get a wide one under them.
 export const merchMoreCard: 'none' | 'slot' | 'wide' = merchCards.length % 2 ? 'slot' : merchCards.length === 2 ? 'wide' : 'none';
-export const merchGridRows = Math.ceil(merchCards.length / 2) + (merchMoreCard === 'wide' ? 0.62 : 0);
+// The homepage scene has one screen to fit in: six (or nine) tees sit three across instead.
+const sceneColumns: 2 | 3 = merchCards.length >= 5 && merchCards.length % 3 === 0 ? 3 : 2;
+export const merchScene = {
+  columns: sceneColumns,
+  rows: sceneColumns === 3 ? merchCards.length / 3 : Math.ceil(merchCards.length / 2) + (merchMoreCard === 'wide' ? 0.62 : 0),
+  // A row's height relative to the grid's width (card + gap + room to float).
+  rowHeight: sceneColumns === 3 ? 0.44 : 0.66,
+};
 export const getMerch = (slug: string) => merchProducts.find((product) => product.slug === slug);
-export const merchKey = (variantId: number) => `${MERCH_KEY_PREFIX}${variantId}`;
+// A tee in the bag: "np:<design>:<Printify variant>". Printify's variant ids name a blank's color and
+// size (every white M is the same id), so the design has to be part of the key.
+export const merchKey = (product: MerchProduct, variantId: number) => `${MERCH_KEY_PREFIX}${product.slug}:${variantId}`;
 
 export type MerchVariant = { product: MerchProduct; color: MerchColor; size: MerchSize };
-const variants = new Map<number, MerchVariant>();
+const variants = new Map<string, MerchVariant>();
 for (const product of merchProducts) {
-  for (const color of product.colors) for (const size of color.sizes) variants.set(size.variantId, { product, color, size });
+  for (const color of product.colors) for (const size of color.sizes) variants.set(merchKey(product, size.variantId), { product, color, size });
 }
-export const merchVariant = (key: string): MerchVariant | undefined =>
-  key.startsWith(MERCH_KEY_PREFIX) ? variants.get(Number(key.slice(MERCH_KEY_PREFIX.length))) : undefined;
+export const merchVariant = (key: string): MerchVariant | undefined => variants.get(key);

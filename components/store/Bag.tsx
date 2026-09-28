@@ -54,22 +54,22 @@ function TeeRow({ id, quantity }: { id: string; quantity: number }) {
   const image = variant.color.images[0];
   const name = `${variant.product.name} tee`;
   return (
-    <li className="flex items-center gap-3 py-2.5">
+    <li className="flex items-start gap-3 py-2.5">
       <span className="relative h-14 w-14 shrink-0 overflow-hidden rounded-[12px] bg-white">
         <ResponsiveImage asset={image} alt="" sizes="56px" className="absolute inset-0 h-full w-full object-cover" />
       </span>
       <span className="min-w-0 flex-1">
         <span className="block truncate text-[16px] font-semibold">NonParallel {variant.product.name}</span>
         <span className="block truncate text-[13px] text-white/50">{variant.color.name} tee · {variant.size.size}</span>
+        <span className="mt-1.5 inline-flex items-center gap-1.5 rounded-full bg-white/[0.06] p-0.5">
+          <button type="button" className={stepButton} onClick={() => removeOneFromBag(id)} aria-label={quantity > 1 ? `One fewer ${name}` : `Remove ${name} from bag`}>
+            {quantity > 1 ? '−' : <RemoveIcon size={16} />}
+          </button>
+          <span className="w-4 text-center text-[14px] font-semibold tabular-nums" aria-label={`${quantity} in bag`}>{quantity}</span>
+          <button type="button" className={stepButton} onClick={() => addToBag(id)} disabled={quantity >= 10} aria-label={`One more ${name}`}>+</button>
+        </span>
       </span>
-      <span className="flex shrink-0 items-center gap-1.5 rounded-full bg-white/[0.06] p-1">
-        <button type="button" className={stepButton} onClick={() => removeOneFromBag(id)} aria-label={quantity > 1 ? `One fewer ${name}` : `Remove ${name} from bag`}>
-          {quantity > 1 ? '−' : <RemoveIcon size={16} />}
-        </button>
-        <span className="w-4 text-center text-[15px] font-semibold tabular-nums" aria-label={`${quantity} in bag`}>{quantity}</span>
-        <button type="button" className={stepButton} onClick={() => addToBag(id)} disabled={quantity >= 10} aria-label={`One more ${name}`}>+</button>
-      </span>
-      <span className="w-12 shrink-0 text-right text-[16px] font-semibold tabular-nums">{formatPrice(variant.size.price * quantity)}</span>
+      <span className="shrink-0 pt-0.5 text-right text-[16px] font-semibold tabular-nums">{formatPrice(variant.size.price * quantity)}</span>
     </li>
   );
 }

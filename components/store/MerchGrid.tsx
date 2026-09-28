@@ -14,15 +14,16 @@ import { ResponsiveImage } from '../ResponsiveImage';
 const STAGGER_MS = 150;
 const SPIN_EVERY_MS = 4800;
 
-function slotFor(index: number, count: number, wide: boolean) {
-  const column = index % 2;
-  const row = Math.floor(index / 2);
-  const rows = Math.ceil(count / 2);
+function slotFor(index: number, count: number, columns: number, wide: boolean) {
+  const column = index % columns;
+  const row = Math.floor(index / columns);
+  const rows = Math.ceil(count / columns);
   const fromTop = !wide && row < rows / 2;
+  const side = column === 0 ? -1 : column === columns - 1 ? 1 : 0;
   return {
-    fromX: wide ? '0%' : column === 0 ? '-38%' : '38%',
+    fromX: wide ? '0%' : `${side * 38}%`,
     fromY: fromTop ? '-70%' : '75%',
-    fromRotate: `${(column === 0 ? -1 : 1) * (fromTop ? 14 : -12)}deg`,
+    fromRotate: `${(side || (fromTop ? 1 : -1)) * (fromTop ? 14 : -12)}deg`,
     floatY: `${-1.2 - (index % 3) * 0.15}cqw`,
     floatRotate: `${(index % 2 ? 1 : -1) * (0.7 + (index % 3) * 0.1)}deg`,
     duration: `${6.4 + (index % 4) * 0.35}s`,
@@ -114,8 +115,10 @@ export function MerchGrid({
   onOpen,
   onNotify,
   sizes = '(min-width: 640px) 280px, 46vw',
+  columns = 2,
 }: {
   active: boolean;
+  columns?: 2 | 3;
   onOpen: (card: MerchCard) => void;
   onNotify: () => void;
   sizes?: string;
@@ -127,10 +130,11 @@ export function MerchGrid({
     face: <TeeCard card={card} sizes={sizes} />,
     onClick: () => onOpen(card),
   }));
-  if (merchMoreCard === 'slot') {
+  // Three across is only used when the tees fill the rows, so the "More soon" card is a two-column thing.
+  if (columns === 2 && merchMoreCard === 'slot') {
     const number = String(new Set(merchCards.map((card) => card.product.slug)).size + 1).padStart(3, '0');
     cards.push({ key: 'more', label: 'More designs soon: notify me', face: <MoreCard number={number} />, onClick: onNotify });
-  } else if (merchMoreCard === 'wide') {
+  } else if (columns === 2 && merchMoreCard === 'wide') {
     cards.push({ key: 'more', label: 'More designs soon: notify me', face: <WideMoreCard />, wide: true, onClick: onNotify });
   }
   const count = cards.length;
@@ -156,9 +160,9 @@ export function MerchGrid({
   }, [active, count]);
 
   return (
-    <div className={`store-grid merch-grid ${active ? 'is-active' : ''}`}>
+    <div className={`store-grid merch-grid ${columns === 3 ? 'is-3col' : ''} ${active ? 'is-active' : ''}`}>
       {cards.map((card, i) => {
-        const slot = slotFor(i, count, Boolean(card.wide));
+        const slot = slotFor(i, count, columns, Boolean(card.wide));
         return (
           <div
             key={card.key}

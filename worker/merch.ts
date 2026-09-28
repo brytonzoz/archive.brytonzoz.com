@@ -15,36 +15,39 @@ export interface MerchEnv extends StoreEnv {
   PRINTIFY_API_BASE?: string;
 }
 
-type Variant = { productSlug: string; printifyId: string; name: string; color: string; size: string; price: number };
+type Variant = { productSlug: string; printifyId: string; variantId: number; name: string; color: string; size: string; price: number };
 
-// Keys the browser sends for a tee: "np:<variantId>" (repeated for quantity).
+// Keys the browser sends for a tee: "np:<design>:<variantId>" (repeated for quantity). Printify's
+// variant ids only name the blank's color and size, shared by every design, hence the design slug.
 export const MERCH_PREFIX = 'np:';
-export const VARIANTS = new Map<number, Variant>();
+export const VARIANTS = new Map<string, Variant>();
 for (const product of merch.products as { slug: string; printifyId: string; name: string; colors: { name: string; sizes: { size: string; variantId: number; price: number }[] }[] }[]) {
   for (const color of product.colors) {
     for (const size of color.sizes) {
-      VARIANTS.set(size.variantId, { productSlug: product.slug, printifyId: product.printifyId, name: product.name, color: color.name, size: size.size, price: size.price });
+      VARIANTS.set(`${product.slug}:${size.variantId}`, {
+        productSlug: product.slug, printifyId: product.printifyId, variantId: size.variantId, name: product.name, color: color.name, size: size.size, price: size.price,
+      });
     }
   }
 }
 const MAX_MERCH_UNITS = 20;
 const MERCH_IMAGES = (shareImages as { merch?: Record<string, string> }).merch ?? {};
 
-// Counts tees in the cart: variant id -> quantity. Null when a key is unknown or the cart is too big.
-export function parseMerch(keys: string[]): Map<number, number> | null {
-  const counts = new Map<number, number>();
+// Counts tees in the cart: "design:variantId" -> quantity. Null when a key is unknown or the cart is too big.
+export function parseMerch(keys: string[]): Map<string, number> | null {
+  const counts = new Map<string, number>();
   for (const key of keys) {
-    const id = Number(key.slice(MERCH_PREFIX.length));
-    if (!VARIANTS.has(id)) return null;
-    counts.set(id, (counts.get(id) ?? 0) + 1);
+    const line = key.slice(MERCH_PREFIX.length);
+    if (!VARIANTS.has(line)) return null;
+    counts.set(line, (counts.get(line) ?? 0) + 1);
   }
   const units = [...counts.values()].reduce((sum, n) => sum + n, 0);
   return units <= MAX_MERCH_UNITS ? counts : null;
 }
 
-export function merchLineItems(counts: Map<number, number>, origin: string) {
-  return [...counts].map(([variantId, quantity]) => {
-    const variant = VARIANTS.get(variantId)!;
+export function merchLineItems(counts: Map<string, number>, origin: string) {
+  return [...counts].map(([line, quantity]) => {
+    const variant = VARIANTS.get(line)!;
     const image = MERCH_IMAGES[`${variant.productSlug}/${variant.color.toLowerCase().replace(/[^a-z0-9]+/g, '-')}`];
     return {
       quantity,
@@ -55,22 +58,24 @@ export function merchLineItems(counts: Map<number, number>, origin: string) {
           name: `NonParallel Tee — ${variant.name}`,
           description: `${variant.color} · Size ${variant.size} · Printed to order`,
           images: image ? [`${origin}${image}`] : undefined,
-          metadata: { variant_id: String(variantId) },
+          metadata: { tee: line },
         },
       },
     };
   });
 }
 
-// Stored on the Stripe session so fulfilment needs nothing else: "variantId:qty,variantId:qty".
-export const encodeMerch = (counts: Map<number, number>) => [...counts].map(([id, n]) => `${id}:${n}`).join(',');
+// Stored on the Stripe session so fulfilment needs nothing else: "design:variantId:qty,…".
+export const encodeMerch = (counts: Map<string, number>) => [...counts].map(([line, n]) => `${line}:${n}`).join(',');
 
-export function decodeMerch(value: string | undefined | null): { variantId: number; quantity: number }[] {
+export function decodeMerch(value: string | undefined | null): { variant: Variant; quantity: number }[] {
   if (!value) return [];
-  return value.split(',').map((part) => {
-    const [id, n] = part.split(':').map(Number);
-    return { variantId: id, quantity: n };
-  }).filter((line) => VARIANTS.has(line.variantId) && line.quantity > 0);
+  return value.split(',').flatMap((part) => {
+    const [design, id, n] = part.split(':');
+    const variant = VARIANTS.get(`${design}:${id}`);
+    const quantity = Number(n);
+    return variant && quantity > 0 ? [{ variant, quantity }] : [];
+  });
 }
 
 async function printify<T>(env: MerchEnv, method: 'GET' | 'POST', route: string, body?: unknown): Promise<T> {
@@ -116,7 +121,7 @@ export async function fulfillMerch(env: MerchEnv & { DB: D1Database }, session: 
     const order = await printify<{ id: string }>(env, 'POST', `/shops/${merch.shopId}/orders.json`, {
       external_id: session.id,
       label: 'brytonzoz.com',
-      line_items: lines.map((line) => ({ product_id: VARIANTS.get(line.variantId)!.printifyId, variant_id: line.variantId, quantity: line.quantity })),
+      line_items: lines.map(({ variant, quantity }) => ({ product_id: variant.printifyId, variant_id: variant.variantId, quantity })),
       shipping_method: 1,
       send_shipping_notification: true,
       address_to: {

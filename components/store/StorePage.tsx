@@ -8,7 +8,7 @@ import { StoreExperience } from './StoreExperience';
 // /scrapwrk/ (and /scrapwrk/<piece>/, which opens that piece's sheet).
 export function StorePage({ initialProduct }: { initialProduct?: string }) {
   return (
-    <main className="store-page min-h-screen text-white">
+    <div className="store-page min-h-screen text-white">
       <div className="mx-auto max-w-[560px] px-5 pt-6 sm:pt-10">
         <Link
           href="/"
@@ -30,6 +30,6 @@ export function StorePage({ initialProduct }: { initialProduct?: string }) {
         </div>
       </div>
       <SiteFooter />
-    </main>
+    </div>
   );
 }

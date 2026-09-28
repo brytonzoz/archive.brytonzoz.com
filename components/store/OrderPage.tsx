@@ -46,7 +46,7 @@ export function OrderPage() {
   const firstName = order?.name?.split(' ')[0];
 
   return (
-    <main className="store-page min-h-screen text-white">
+    <div className="store-page min-h-screen text-white">
       <div className="mx-auto max-w-[480px] px-5 pb-16 pt-16 sm:pt-24">
         {state === 'loading' ? (
           <div className="flex justify-center py-24" role="status" aria-label="Loading your order">
@@ -106,6 +106,6 @@ export function OrderPage() {
         )}
       </div>
       <SiteFooter />
-    </main>
+    </div>
   );
 }

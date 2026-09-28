@@ -27,10 +27,10 @@ function TrackRow({ track, focused }: { track: Track; focused: boolean }) {
         aria-current={isCurrent ? 'true' : undefined}
         className="flex min-w-0 flex-1 items-center gap-4 rounded-[12px] py-3 pl-3 text-left focus-visible:outline focus-visible:outline-2 focus-visible:outline-white/70 active:opacity-70"
       >
-        <span className="flex w-5 shrink-0 justify-center text-[15px] tabular-nums text-white/40">
+        <span className="flex w-5 shrink-0 justify-center text-[15px] tabular-nums text-white/50">
           {isCurrent ? <EqualizerBars playing={isPlaying} className="scale-90" /> : track.number}
         </span>
-        <span className={`min-w-0 flex-1 truncate text-[16px] ${isCurrent ? 'font-semibold text-white' : failed ? 'text-white/35' : 'text-white/90'}`}>
+        <span className={`min-w-0 flex-1 truncate text-[16px] ${isCurrent ? 'font-semibold text-white' : failed ? 'text-white/50' : 'text-white/90'}`}>
           {track.title}
         </span>
       </button>
@@ -77,7 +77,7 @@ export function ReleaseView({ project, release, focusTrack, inSheet = true }: { 
         <p className="mt-1 text-[17px] text-white/65">
           {focusTrack ? `${release?.title} · Bryton Zoz` : 'Bryton Zoz'}
         </p>
-        <p className="mt-1.5 text-[13px] text-white/40">{meta}</p>
+        <p className="mt-1.5 text-[13px] text-white/50">{meta}</p>
       </div>
 
       {release && isProjectReleased(project) ? (
@@ -106,7 +106,7 @@ export function ReleaseView({ project, release, focusTrack, inSheet = true }: { 
               <TrackRow key={track.id} track={track} focused={focusTrack?.id === track.id} />
             ))}
           </ol>
-          <p className="mt-4 px-3 text-[13px] text-white/40">
+          <p className="mt-4 px-3 text-[13px] text-white/50">
             {release.tracks.length} songs, {releaseMinutes(release)} minutes
             <br />© Bryton Zoz
           </p>

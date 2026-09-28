@@ -6,7 +6,7 @@ import type { Project } from '../lib/utils';
 
 export function CatalogPage({ title, projects }: { title: string; projects: Project[] }) {
   return (
-    <main className="min-h-screen bg-[#0b0b0c] text-white">
+    <div className="min-h-screen bg-[#0b0b0c] text-white">
       <div
         className="mx-auto max-w-4xl px-5 pt-6 sm:px-8 sm:pt-10"
         style={{ paddingBottom: '1rem' }}
@@ -37,6 +37,6 @@ export function CatalogPage({ title, projects }: { title: string; projects: Proj
         </div>
       </div>
       <SiteFooter />
-    </main>
+    </div>
   );
 }

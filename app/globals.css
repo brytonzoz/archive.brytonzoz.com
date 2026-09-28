@@ -1020,6 +1020,11 @@ html {
   animation: storeBagIn 420ms cubic-bezier(0.34, 1.56, 0.64, 1) both;
 }
 
+.store-bag-count {
+  display: inline-block;
+  animation: heartPop 380ms cubic-bezier(0.34, 1.56, 0.64, 1);
+}
+
 @keyframes storeFly {
   0% {
     opacity: 0;
@@ -1077,7 +1082,8 @@ html {
   .store-grid.is-active .store-float,
   .store-grid.is-active .store-card-flip,
   .store-card-inner.is-spinning,
-  .store-bag-button {
+  .store-bag-button,
+  .store-bag-count {
     animation: none;
   }
 }

@@ -30,3 +30,18 @@ jobs:
         env:
           PRINTIFY_ACCESS: ${{ secrets.PRINTIFY_ACCESS }}
         run: node scripts/printify.mjs inspect
+      - name: Create/update the products and fetch their mockups
+        env:
+          PRINTIFY_ACCESS: ${{ secrets.PRINTIFY_ACCESS }}
+        run: node scripts/printify.mjs sync
+      - name: Commit the catalog and mockups back to the branch
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add lib/merch-catalog.json assets-src/merch
+          if git diff --cached --quiet; then
+            echo "Nothing changed."
+            exit 0
+          fi
+          git commit -m "Sync NonParallel merch from Printify"
+          git push origin "HEAD:${GITHUB_REF_NAME}"

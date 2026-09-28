@@ -56,7 +56,7 @@ export function merchLineItems(counts: Map<string, number>, origin: string) {
         unit_amount: variant.price,
         product_data: {
           name: variant.title,
-          description: `${variant.color}${variant.size === 'One size' ? '' : ` · Size ${variant.size}`} · Printed to order`,
+          description: [variant.color === 'Standard' ? '' : variant.color, variant.size === 'One size' ? '' : `Size ${variant.size}`, 'Printed to order'].filter(Boolean).join(' · '),
           images: image ? [`${origin}${image}`] : undefined,
           metadata: { tee: line },
         },

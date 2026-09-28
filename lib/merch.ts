@@ -97,6 +97,12 @@ export const merchProducts: MerchProduct[] = (catalog.products as RawProduct[])
   .filter((product) => product.colors.length);
 
 export const merchPath = (product: MerchProduct) => `${MERCH_PATH}${product.slug}/`;
+// "Black tee", or just "Mug" for things that come one way (Printify calls that color "Standard").
+export const colorName = (color: MerchColor) => (color.name === 'Standard' ? '' : color.name);
+export const variantLabel = (product: MerchProduct, color: MerchColor) => {
+  const text = [colorName(color), product.lineName.toLowerCase()].filter(Boolean).join(' ');
+  return text.charAt(0).toUpperCase() + text.slice(1);
+};
 // Shop categories in catalog order (the order products.json lists its lines).
 export const merchCategories = merchProducts.map((product) => product.category).filter((category, index, all) => all.indexOf(category) === index);
 // The homepage scene's cards are the tees; everything else is in the shop below it.

@@ -377,7 +377,8 @@
           "scale": 0.9
         }
       },
-      "margin": 1200
+      "margin": 1200,
+      "lead": "front"
     },
     {
       "key": "sweatpants",
@@ -412,7 +413,8 @@
           "scale": 1
         }
       },
-      "margin": 1200
+      "margin": 1200,
+      "lead": "front"
     },
     {
       "key": "shorts",
@@ -457,30 +459,8 @@
           "scale": 0.8
         }
       },
-      "margin": 1000
-    },
-    {
-      "key": "socks",
-      "name": "Socks",
-      "category": "Bottoms",
-      "blueprintId": 365,
-      "designs": [
-        "rainbow",
-        "purple"
-      ],
-      "placements": {
-        "front_left_leg": {
-          "x": 0.5,
-          "y": 0.28,
-          "scale": 0.9
-        },
-        "front_right_leg": {
-          "x": 0.5,
-          "y": 0.28,
-          "scale": 0.9
-        }
-      },
-      "margin": 500
+      "margin": 1000,
+      "lead": "front"
     },
     {
       "key": "trucker",
@@ -597,7 +577,7 @@
         "front": {
           "x": 0.5,
           "y": 0.5,
-          "scale": 0.95
+          "scale": 0.78
         }
       },
       "margin": 250,
@@ -617,7 +597,7 @@
         "front": {
           "x": 0.5,
           "y": 0.5,
-          "scale": 1
+          "scale": 0.95
         }
       },
       "margin": 350,
@@ -638,7 +618,7 @@
         "front": {
           "x": 0.5,
           "y": 0.5,
-          "scale": 0.5
+          "scale": 0.32
         }
       },
       "margin": 500,
@@ -658,7 +638,7 @@
         "front": {
           "x": 0.5,
           "y": 0.5,
-          "scale": 0.45
+          "scale": 0.3
         }
       },
       "margin": 500,
@@ -678,7 +658,7 @@
         "front": {
           "x": 0.5,
           "y": 0.5,
-          "scale": 0.55
+          "scale": 0.36
         }
       },
       "margin": 600,
@@ -698,7 +678,7 @@
         "front": {
           "x": 0.5,
           "y": 0.5,
-          "scale": 0.55
+          "scale": 0.34
         }
       },
       "margin": 700,
@@ -717,7 +697,7 @@
         "front": {
           "x": 0.5,
           "y": 0.5,
-          "scale": 0.5
+          "scale": 0.42
         }
       },
       "margin": 800,
@@ -737,7 +717,7 @@
         "front": {
           "x": 0.5,
           "y": 0.5,
-          "scale": 0.9
+          "scale": 0.7
         }
       },
       "margin": 600,
@@ -758,7 +738,7 @@
         "front": {
           "x": 0.5,
           "y": 0.5,
-          "scale": 0.85
+          "scale": 1.1
         }
       },
       "margin": 600,
@@ -782,7 +762,7 @@
         "front": {
           "x": 0.5,
           "y": 0.5,
-          "scale": 0.95
+          "scale": 0.72
         }
       },
       "margin": 350,
@@ -968,7 +948,7 @@
         "front": {
           "x": 0.5,
           "y": 0.5,
-          "scale": 0.8
+          "scale": 0.42
         }
       },
       "margin": 600,

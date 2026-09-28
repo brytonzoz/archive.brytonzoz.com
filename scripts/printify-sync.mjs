@@ -60,6 +60,7 @@ export async function sync(printify, root) {
   const previous = JSON.parse(await fs.readFile(path.join(root, 'lib', 'merch-catalog.json'), 'utf8').catch(() => '{"products":[]}'));
 
   let blueprints = null;
+  const providerCountry = new Map();
   for (const line of config.lines) {
     try {
       await syncLine(line);
@@ -86,8 +87,18 @@ export async function sync(printify, root) {
     console.log(`\n# ${line.name}: blueprint ${line.blueprintId} · ${blueprint.brand} ${blueprint.model} · ${blueprint.title}`);
     let providerIds = line.printProviders;
     if (!providerIds) {
+      // The blueprint's provider list doesn't say where each one prints; the provider itself does.
+      // Only US printers, so shipping stays a few dollars (a UK printer charges $25-45 to ship here).
       const providers = await printify('GET', `/catalog/blueprints/${line.blueprintId}/print_providers.json`);
-      providerIds = providers.filter((entry) => (entry.location?.country ?? 'US') === 'US').map((entry) => entry.id);
+      providerIds = [];
+      for (const entry of providers) {
+        if (!providerCountry.has(entry.id)) {
+          const detail = await printify('GET', `/catalog/print_providers/${entry.id}.json`).catch(() => null);
+          providerCountry.set(entry.id, detail?.location?.country ?? null);
+        }
+        if (providerCountry.get(entry.id) === 'US') providerIds.push(entry.id);
+      }
+      console.log(`  US printers: ${providerIds.join(', ') || 'none'}`);
     }
     const details = line.details ?? stripHtml(blueprint.description).split('.:').slice(1).map((part) => part.replace(/\s+/g, ' ').trim().replace(/\.$/, '')).filter(Boolean).slice(0, 5);
     const shippingCache = new Map();
@@ -133,7 +144,10 @@ export async function sync(printify, root) {
         continue;
       }
       const positions = new Set(variants.flatMap((variant) => (variant.placeholders ?? []).map((placeholder) => placeholder.position)));
-      const placements = Object.entries(line.placements).filter(([position]) => positions.has(position));
+      // Some blanks name their print areas by method (front_dtg, back_dtf): take the first that exists.
+      const placements = Object.entries(line.placements)
+        .map(([position, spec]) => [[position, `${position}_dtg`, `${position}_dtf`].find((name) => positions.has(name)), spec])
+        .filter(([position]) => position);
       if (!placements.length) {
         console.log(`! ${title}: none of ${Object.keys(line.placements).join(', ')} in ${[...positions].join(', ')}; skipped`);
         continue;
@@ -226,7 +240,7 @@ export async function sync(printify, root) {
         const ids = new Set(colorVariants.map((variant) => variant.id));
         // The side with the full design first (the back on apparel), then the front, then the rest.
         const camera = (image) => new URL(image.src).searchParams.get('camera_label') ?? '';
-        const lead = line.lead ?? 'back';
+        const lead = line.lead ?? ('back' in line.placements ? 'back' : 'front');
         const rank = (image) => (camera(image) === lead ? 0 : camera(image) === 'front' ? 1 : 2 + Number(!image.is_default));
         const shots = images
           .filter((image) => image.variant_ids?.some((id) => ids.has(id)))

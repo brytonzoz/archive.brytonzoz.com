@@ -3,7 +3,7 @@
 import React, { useEffect, useId, useState } from 'react';
 import { createPortal } from 'react-dom';
 import { track } from '../../lib/analytics';
-import { merchKey, merchPath, type MerchProduct } from '../../lib/merch';
+import { merchKey, merchPath, variantLabel, type MerchProduct } from '../../lib/merch';
 import { shareLink } from '../../lib/share';
 import { formatPrice, shippingLabel } from '../../lib/store';
 import { addToBag } from '../../lib/store-client';
@@ -119,7 +119,7 @@ export function MerchSheet({
             <div className="flex items-start justify-between gap-4">
               <div className="min-w-0">
                 <p className="text-[13px] font-semibold tracking-[0.18em] text-black/55">
-                  NONPARALLEL {product.number} · {product.colors.length === 1 ? `${color.name} ${product.lineName}`.toUpperCase() : product.lineName.toUpperCase()}
+                  NONPARALLEL {product.number} · {(product.colors.length === 1 ? variantLabel(product, color) : product.lineName).toUpperCase()}
                 </p>
                 <h2 id={titleId} className="mt-1 text-[30px] font-bold leading-none tracking-[-0.03em]">{product.name}</h2>
               </div>

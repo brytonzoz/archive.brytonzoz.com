@@ -3,7 +3,7 @@
 import React, { useCallback, useEffect, useId, useState } from 'react';
 import { createPortal } from 'react-dom';
 import { track } from '../../lib/analytics';
-import { merchVariant } from '../../lib/merch';
+import { merchVariant, variantLabel } from '../../lib/merch';
 import { formatPrice, productById, shippingLabel } from '../../lib/store';
 import {
   addToBag, bagLines, cancelCheckout, hasPendingCheckout, removeFromBag, removeOneFromBag, startCheckout, useAvailability, useBag,
@@ -60,7 +60,7 @@ function TeeRow({ id, quantity }: { id: string; quantity: number }) {
       </span>
       <span className="min-w-0 flex-1">
         <span className="block truncate text-[16px] font-semibold">NonParallel {variant.product.displayName}</span>
-        <span className="block truncate text-[13px] text-white/50">{variant.color.name} {variant.product.lineName.toLowerCase()}{variant.product.colors[0].sizes.length > 1 ? ` · ${variant.size.size}` : ''}</span>
+        <span className="block truncate text-[13px] text-white/50">{variantLabel(variant.product, variant.color)}{variant.product.colors[0].sizes.length > 1 ? ` · ${variant.size.size}` : ''}</span>
         <span className="mt-1.5 inline-flex items-center gap-1.5 rounded-full bg-white/[0.06] p-0.5">
           <button type="button" className={stepButton} onClick={() => removeOneFromBag(id)} aria-label={quantity > 1 ? `One fewer ${name}` : `Remove ${name} from bag`}>
             {quantity > 1 ? '−' : <RemoveIcon size={16} />}

@@ -11,8 +11,6 @@ The homepage currently presents:
 3. **Just A Reminder To Live Life** — evolving mixtape
 4. **Scrapwrk Store** — fashion and e-commerce project
 
-The complete catalog also includes **Loopless Collection (Episodes)** and **The Archive (Music)** on the category pages.
-
 ## Routes
 
 | Route | Purpose |

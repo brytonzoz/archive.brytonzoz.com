@@ -30,21 +30,7 @@ music:
     highlight: "Always Something New"
     image: "covers/just-a-reminder"
 
-  - name: "The Archive (Music)"
-    url: "https://nonparallel.wixstudio.com/archive"
-    type: "multi-purpose-stream"
-    description: "Multi-purpose streaming platform for diverse audio content"
-    highlight: "Full Experience"
-    image: "covers/archive-music"
-
 fashion:
-  - name: "Loopless Collection (Episodes)"
-    url: "https://nonparallel.wixstudio.com/archive/thearchive-fashion-1"
-    type: "video-series"
-    description: "Video series showcasing design process and collections"
-    highlight: "untitled 14"
-    image: "covers/loopless"
-
   - name: "Scrapwrk Store"
     url: "https://scrapwrk.com"
     type: "ecommerce"

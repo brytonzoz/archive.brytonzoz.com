@@ -1,6 +1,5 @@
 import { ProjectData, Project } from './utils';
 import { cautionSceneAssets, reminderSceneAssets, scrapwrkSceneAssets, solenyaSceneAssets } from './assets';
-import { media } from './media';
 
 // For now, we'll use hardcoded data that matches our YAML structure
 // In a production app, this would load from the YAML file
@@ -41,25 +40,9 @@ const projectData: ProjectData = {
       description: "thoughts, moments, and in-between",
       highlight: "wednesday drops",
       image: reminderSceneAssets.cover
-    },
-    {
-      name: "The Archive (Music)",
-      url: "https://nonparallel.wixstudio.com/archive",
-      type: "multi-purpose-stream",
-      description: "Multi-purpose streaming platform for creative content",
-      highlight: "Beta Access",
-      image: media['covers/archive-music']
     }
   ],
   fashion: [
-    {
-      name: "Loopless Collection (Episodes)",
-      url: "https://nonparallel.wixstudio.com/archive/thearchive-fashion-1",
-      type: "video-series",
-      description: "Fashion video series showcasing creative collections",
-      highlight: "Latest Episodes",
-      image: media['covers/loopless']
-    },
     {
       name: "Scrapwrk Store",
       url: "https://scrapwrk.com",

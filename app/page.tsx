@@ -81,14 +81,9 @@ const HOMEPAGE_PROJECT_ORDER = [
   'CAUTION',
   'Just A Reminder To Live Life',
   'Scrapwrk Store',
-  'Loopless Collection (Episodes)',
-  'The Archive (Music)',
 ];
 
-const HIDDEN_HOMEPAGE_PROJECTS = new Set([
-  'Loopless Collection (Episodes)',
-  'The Archive (Music)',
-]);
+const HIDDEN_HOMEPAGE_PROJECTS = new Set<string>([]);
 
 function getProjectBackground(project: Project): SlideBackground {
   if (project.type === 'coming-soon') {

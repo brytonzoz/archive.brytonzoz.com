@@ -1,0 +1,107 @@
+{
+  "shopId": 18462993,
+  "currency": "usd",
+  "blueprint": {
+    "id": 12,
+    "name": "Bella+Canvas 3001",
+    "title": "Unisex Jersey Short Sleeve Tee",
+    "details": "The Bella Canvas 3001 is a classic unisex jersey short sleeve tee that fits like a well-loved favorite. Soft cotton and quality print make users fall in love with it over and over again. These t-shirts have ribbed knit collars to bolster shaping. The shoulders are tapered for a better fit over time, and dual side seams hold the garment's shape for longer. Disclaimer : - Sleeve prints and neck labels are produced using DTF (Direct-to-Film) printing technology. This applies only to products fulfilled by the print providers OPT OnDemand and Shirt Monkey among the providers offering this item. .:Made with 100% Airlume combed and ring-spun cotton, the Bella Canvas 3001 is a lightweight fabric (4.2 oz/yd² (142 g/m²)) that's breathable and easy to layer. Perfect for active and leisure wear. .:The retail fit that is perfect for casual and semi-formal settings. The crew neckline adds a classic, n"
+  },
+  "products": [
+    {
+      "slug": "rainbow",
+      "number": "001",
+      "name": "Rainbow",
+      "title": "NonParallel Tee — Rainbow",
+      "printifyId": "6abaa962e8d848fe71029ef0",
+      "printProviderId": 99,
+      "price": 3500,
+      "colors": [
+        {
+          "name": "Black",
+          "hex": null,
+          "images": [
+            "merch/rainbow/black-1",
+            "merch/rainbow/black-2",
+            "merch/rainbow/black-3",
+            "merch/rainbow/black-4"
+          ],
+          "sizes": [
+            {
+              "size": "S",
+              "variantId": 18100,
+              "price": 3500
+            },
+            {
+              "size": "M",
+              "variantId": 18101,
+              "price": 3500
+            },
+            {
+              "size": "L",
+              "variantId": 18102,
+              "price": 3500
+            },
+            {
+              "size": "XL",
+              "variantId": 18103,
+              "price": 3500
+            },
+            {
+              "size": "2XL",
+              "variantId": 18104,
+              "price": 3800
+            },
+            {
+              "size": "3XL",
+              "variantId": 18105,
+              "price": 3800
+            }
+          ]
+        },
+        {
+          "name": "White",
+          "hex": null,
+          "images": [
+            "merch/rainbow/white-1",
+            "merch/rainbow/white-2",
+            "merch/rainbow/white-3",
+            "merch/rainbow/white-4"
+          ],
+          "sizes": [
+            {
+              "size": "S",
+              "variantId": 18540,
+              "price": 3500
+            },
+            {
+              "size": "M",
+              "variantId": 18541,
+              "price": 3500
+            },
+            {
+              "size": "L",
+              "variantId": 18542,
+              "price": 3500
+            },
+            {
+              "size": "XL",
+              "variantId": 18543,
+              "price": 3500
+            },
+            {
+              "size": "2XL",
+              "variantId": 18544,
+              "price": 3800
+            },
+            {
+              "size": "3XL",
+              "variantId": 18545,
+              "price": 3800
+            }
+          ]
+        }
+      ]
+    }
+  ]
+}

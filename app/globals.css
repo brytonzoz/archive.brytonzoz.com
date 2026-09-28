@@ -756,3 +756,383 @@ html {
   outline: 2px solid rgba(255, 255, 255, 0.7);
   outline-offset: 3px;
 }
+
+/* ---------------------------------------------------------------------------------------------
+   Scrapwrk store (components/store/). Sizes are relative to the grid's width (cqw), so the same
+   cards work in the homepage scene and on /scrapwrk/.
+   --------------------------------------------------------------------------------------------- */
+.store-grid {
+  container-type: inline-size;
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 4cqw;
+  perspective: 1600px;
+}
+
+.store-slot {
+  opacity: 0;
+  --card-radius: 5cqw;
+}
+
+.store-grid.is-active .store-slot {
+  animation: storeFly 1050ms cubic-bezier(0.16, 1, 0.3, 1) var(--delay) both;
+}
+
+.store-grid.is-active .store-float {
+  animation: storeFloat var(--float-duration) ease-in-out var(--delay) infinite alternate;
+}
+
+.store-card {
+  display: block;
+  width: 100%;
+  border-radius: var(--card-radius);
+  text-align: left;
+  color: #fff;
+  transition: transform 260ms cubic-bezier(0.22, 1, 0.36, 1);
+  -webkit-tap-highlight-color: transparent;
+}
+
+@media (hover: hover) {
+  .store-card:hover {
+    transform: translateY(-1.2cqw) scale(1.02);
+  }
+}
+
+.store-card:active {
+  transform: scale(0.965);
+  transition-duration: 120ms;
+}
+
+.store-card:focus-visible {
+  outline: 2px solid rgba(255, 255, 255, 0.8);
+  outline-offset: 1cqw;
+}
+
+.store-card-flip,
+.store-card-inner {
+  display: block;
+  position: relative;
+  transform-style: preserve-3d;
+}
+
+.store-card-flip {
+  aspect-ratio: 4 / 5;
+}
+
+.store-grid.is-active .store-card-flip {
+  animation: storeFlip 1050ms cubic-bezier(0.3, 0.9, 0.3, 1.06) var(--delay) both;
+}
+
+.store-card-inner {
+  height: 100%;
+}
+
+.store-card-inner.is-spinning {
+  animation: storeSpin 1250ms cubic-bezier(0.45, 0, 0.2, 1) both;
+}
+
+.store-card-face {
+  position: absolute;
+  inset: 0;
+  display: block;
+  overflow: hidden;
+  border-radius: var(--card-radius);
+  /* clip-path as well: Safari otherwise draws layered children past the rounded corners. */
+  clip-path: inset(0 round var(--card-radius));
+  -webkit-backface-visibility: hidden;
+  backface-visibility: hidden;
+  background: #2f3547;
+  box-shadow: inset 0 0 0 1px rgba(255, 255, 255, 0.1);
+}
+
+.store-card-flip::before {
+  content: '';
+  position: absolute;
+  inset: 4% 3% -2%;
+  border-radius: var(--card-radius);
+  background: rgba(0, 0, 0, 0.55);
+  filter: blur(4cqw);
+  transform: translateZ(-1px);
+}
+
+.store-card-back {
+  transform: rotateY(180deg);
+}
+
+.store-card-photo {
+  position: relative;
+  display: block;
+  aspect-ratio: 1 / 1;
+  overflow: hidden;
+}
+
+.store-card-meta {
+  position: absolute;
+  inset: auto 0 0;
+  height: 20%;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 2cqw;
+  padding: 0 3.6cqw;
+  background: linear-gradient(to bottom, rgba(47, 53, 71, 0.9), #262b3a);
+}
+
+.store-card-number {
+  display: block;
+  font-size: 2.3cqw;
+  font-weight: 600;
+  letter-spacing: 0.16em;
+  color: rgba(255, 255, 255, 0.5);
+}
+
+.store-card-name {
+  display: block;
+  font-size: 3.9cqw;
+  font-weight: 650;
+  letter-spacing: -0.02em;
+  line-height: 1.15;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.store-card-price {
+  flex: none;
+  font-size: 3.7cqw;
+  font-weight: 600;
+  font-variant-numeric: tabular-nums;
+  letter-spacing: -0.01em;
+}
+
+.store-card-cta {
+  flex: none;
+  border-radius: 999px;
+  background: #fff;
+  color: #0b0b0c;
+  padding: 1.1cqw 2.4cqw;
+  font-size: 2.6cqw;
+  font-weight: 650;
+}
+
+.store-chip {
+  position: absolute;
+  left: 3cqw;
+  top: 3cqw;
+  border-radius: 999px;
+  background: rgba(0, 0, 0, 0.55);
+  -webkit-backdrop-filter: blur(12px);
+  backdrop-filter: blur(12px);
+  padding: 1cqw 2.4cqw;
+  font-size: 2.5cqw;
+  font-weight: 650;
+  color: #fff;
+}
+
+.store-card-back-shade {
+  position: absolute;
+  inset: 0;
+  background: linear-gradient(to bottom, rgba(20, 23, 32, 0.25), rgba(20, 23, 32, 0.72));
+}
+
+.store-wordmark {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 4.2cqw;
+  font-weight: 700;
+  letter-spacing: 0.34em;
+  padding-left: 0.34em;
+  color: rgba(255, 255, 255, 0.92);
+  text-shadow: 0 1px 12px rgba(0, 0, 0, 0.4);
+}
+
+.store-card-back-number {
+  position: absolute;
+  inset: auto 0 5cqw;
+  text-align: center;
+  font-size: 2.4cqw;
+  font-weight: 600;
+  letter-spacing: 0.2em;
+  color: rgba(255, 255, 255, 0.6);
+}
+
+.store-next .store-card-photo {
+  background: radial-gradient(120% 120% at 50% 40%, #202431 0%, #12141b 70%);
+}
+
+.store-next-lights {
+  position: absolute;
+  inset: 0;
+  overflow: hidden;
+}
+
+.store-next-back {
+  background: radial-gradient(120% 120% at 50% 30%, #2a2f3f 0%, #151821 75%);
+}
+
+.store-gallery {
+  scrollbar-width: none;
+}
+
+.store-gallery::-webkit-scrollbar {
+  display: none;
+}
+
+.store-gallery-arrow {
+  position: absolute;
+  top: 50%;
+  display: none;
+  height: 2.5rem;
+  width: 2.5rem;
+  transform: translateY(-50%);
+  align-items: center;
+  justify-content: center;
+  border-radius: 999px;
+  background: rgba(0, 0, 0, 0.35);
+  -webkit-backdrop-filter: blur(12px);
+  backdrop-filter: blur(12px);
+  color: #fff;
+  transition: opacity 200ms;
+}
+
+.store-gallery-arrow:disabled {
+  opacity: 0;
+  pointer-events: none;
+}
+
+@media (hover: hover) {
+  .store-gallery-arrow {
+    display: flex;
+  }
+}
+
+.store-spinner-dark {
+  border-color: rgba(0, 0, 0, 0.15);
+  border-top-color: rgba(0, 0, 0, 0.85);
+}
+
+.store-bag-button {
+  animation: storeBagIn 420ms cubic-bezier(0.34, 1.56, 0.64, 1) both;
+}
+
+@keyframes storeFly {
+  0% {
+    opacity: 0;
+    transform: translate3d(var(--from-x), var(--from-y), 0) rotate(var(--from-rotate)) scale(0.82);
+  }
+  22% {
+    opacity: 1;
+  }
+  100% {
+    opacity: 1;
+    transform: none;
+  }
+}
+
+@keyframes storeFlip {
+  0%,
+  28% {
+    transform: rotateY(-180deg);
+  }
+  100% {
+    transform: rotateY(0deg);
+  }
+}
+
+@keyframes storeSpin {
+  from {
+    transform: rotateY(0deg);
+  }
+  to {
+    transform: rotateY(360deg);
+  }
+}
+
+@keyframes storeFloat {
+  from {
+    transform: translate3d(0, 0, 0) rotate(0deg);
+  }
+  to {
+    transform: translate3d(0, var(--float-y), 0) rotate(var(--float-rotate));
+  }
+}
+
+@keyframes storeBagIn {
+  from {
+    opacity: 0;
+    transform: scale(0.6);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .store-grid.is-active .store-slot {
+    animation: storeFade 300ms ease-out both;
+  }
+
+  .store-grid.is-active .store-float,
+  .store-grid.is-active .store-card-flip,
+  .store-card-inner.is-spinning,
+  .store-bag-button {
+    animation: none;
+  }
+}
+
+@keyframes storeFade {
+  from {
+    opacity: 0;
+  }
+  to {
+    opacity: 1;
+  }
+}
+
+.store-page {
+  background:
+    radial-gradient(circle at 18% 0%, rgba(84, 92, 122, 0.28), transparent 45%),
+    radial-gradient(circle at 90% 100%, rgba(142, 83, 46, 0.2), transparent 45%),
+    linear-gradient(339deg, #2b1c15 0%, #1a1d27 100%);
+  background-attachment: fixed;
+}
+
+.order-enter {
+  animation: storeFade 500ms ease-out both;
+}
+
+/* The homepage's Scrapwrk scene: as wide as fits (grid ≈ 1.3 × its width tall, plus heading). */
+.store-scene {
+  container-type: inline-size;
+  width: min(88vw, 560px, calc((100dvh - 290px) / 1.32));
+}
+
+.store-scene-header {
+  margin-bottom: 5cqw;
+  min-height: 44px;
+}
+
+.store-scene-title {
+  margin: 0;
+  font-size: max(26px, 8cqw);
+  line-height: 1.05;
+  font-weight: 650;
+  letter-spacing: -0.035em;
+  color: #fff;
+}
+
+.store-scene-link {
+  display: flex;
+  align-items: center;
+  gap: 2px;
+  padding-bottom: 0.2em;
+  border-radius: 999px;
+  font-size: max(14px, 3.9cqw);
+  font-weight: 600;
+  color: rgba(255, 255, 255, 0.7);
+  transition: color 200ms;
+}
+
+.store-scene-link:hover {
+  color: #fff;
+}

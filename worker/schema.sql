@@ -39,3 +39,15 @@ CREATE TABLE IF NOT EXISTS subscribers (
   country TEXT,
   visitor TEXT
 );
+
+-- Scrapwrk: every piece is 1 of 1. 'held' while someone is in Stripe Checkout (until held_until),
+-- 'sold' once paid. Managed by worker/store.ts; rows are created on first use.
+CREATE TABLE IF NOT EXISTS store_items (
+  product_id TEXT PRIMARY KEY,
+  status TEXT NOT NULL DEFAULT 'available',
+  session_id TEXT,
+  held_until INTEGER,
+  sold_at INTEGER,
+  updated_at INTEGER
+);
+CREATE INDEX IF NOT EXISTS store_items_session ON store_items (session_id);

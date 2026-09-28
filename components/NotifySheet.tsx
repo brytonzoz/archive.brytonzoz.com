@@ -8,17 +8,25 @@ import { useSheet } from './useSheet';
 
 export const NOTIFY_KEY = 'bz.notify';
 
-export function hasSignedUp(): boolean {
+type NotifySource = 'teaser' | 'scrapwrk';
+const storageKey = (source: NotifySource) => (source === 'teaser' ? NOTIFY_KEY : `${NOTIFY_KEY}.${source}`);
+const COPY: Record<NotifySource, { title: string; note: string; done: string }> = {
+  teaser: { title: 'Be first to hear it', note: 'One email when it’s out. Nothing else.', done: 'One email when it’s out.' },
+  scrapwrk: { title: 'Be first to the next drop', note: 'One email when new pieces go up. Nothing else.', done: 'One email when new pieces go up.' },
+};
+
+export function hasSignedUp(source: NotifySource = 'teaser'): boolean {
   try {
-    return window.localStorage.getItem(NOTIFY_KEY) === '1';
+    return window.localStorage.getItem(storageKey(source)) === '1';
   } catch {
     return false;
   }
 }
 
-// "Notify me": one email field. The address goes only to the list in /admin, to write to
-// people when the next release is out.
-export function NotifySheet({ isOpen, onClose, onDone }: { isOpen: boolean; onClose: () => void; onDone: () => void }) {
+// "Notify me": one email field. The address goes only to the list in /admin (with where they
+// signed up), to write to people when the next release or Scrapwrk drop is out.
+export function NotifySheet({ isOpen, onClose, onDone, source = 'teaser' }: { isOpen: boolean; onClose: () => void; onDone: () => void; source?: NotifySource }) {
+  const copy = COPY[source];
   const titleId = useId();
   const { sheetRef, isClosing, requestClose, dragHandlers, sheetStyle } = useSheet(isOpen, onClose);
   const [email, setEmail] = useState('');
@@ -35,11 +43,11 @@ export function NotifySheet({ isOpen, onClose, onDone }: { isOpen: boolean; onCl
       const response = await fetch('/api/subscribe', {
         method: 'POST',
         headers: { 'content-type': 'application/json' },
-        body: JSON.stringify({ email, website: form.get('website'), source: 'teaser', campaign: campaign(), visitor: visitorId() }),
+        body: JSON.stringify({ email, website: form.get('website'), source, campaign: campaign(), visitor: visitorId() }),
       });
       if (!response.ok) throw new Error(String(response.status));
       try {
-        window.localStorage.setItem(NOTIFY_KEY, '1');
+        window.localStorage.setItem(storageKey(source), '1');
       } catch {
         // Storage blocked: they may see the button again, which is harmless.
       }
@@ -86,7 +94,7 @@ export function NotifySheet({ isOpen, onClose, onDone }: { isOpen: boolean; onCl
                 </svg>
               </span>
               <h2 id={titleId} className="mt-5 text-[22px] font-semibold tracking-[-0.02em]">You’re on the list</h2>
-              <p className="mt-1.5 text-[15px] text-white/55">One email when it’s out.</p>
+              <p className="mt-1.5 text-[15px] text-white/55">{copy.done}</p>
               <button
                 type="button"
                 onClick={requestClose}
@@ -97,8 +105,8 @@ export function NotifySheet({ isOpen, onClose, onDone }: { isOpen: boolean; onCl
             </div>
           ) : (
             <form onSubmit={submit}>
-              <h2 id={titleId} className="text-[24px] font-semibold leading-tight tracking-[-0.02em]">Be first to hear it</h2>
-              <p className="mt-1.5 text-[15px] text-white/55">One email when it’s out. Nothing else.</p>
+              <h2 id={titleId} className="text-[24px] font-semibold leading-tight tracking-[-0.02em]">{copy.title}</h2>
+              <p className="mt-1.5 text-[15px] text-white/55">{copy.note}</p>
               <label className="mt-6 block">
                 <span className="sr-only">Email</span>
                 <input

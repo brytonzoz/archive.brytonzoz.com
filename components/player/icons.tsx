@@ -152,6 +152,15 @@ export function HeartIcon({ size = 18, className, filled = false }: IconProps & 
   );
 }
 
+export function BagIcon({ size = 18, className }: IconProps) {
+  return (
+    <svg className={className} style={{ width: size, height: size }} viewBox="0 0 24 24" fill="none" aria-hidden="true">
+      <path d="M5.5 8h13l-1 12.2a1 1 0 0 1-1 .8h-9a1 1 0 0 1-1-.8L5.5 8Z" stroke="currentColor" strokeWidth="1.9" strokeLinejoin="round" />
+      <path d="M9 10V7a3 3 0 0 1 6 0v3" stroke="currentColor" strokeWidth="1.9" strokeLinecap="round" />
+    </svg>
+  );
+}
+
 export function ExplicitBadge() {
   return (
     <span

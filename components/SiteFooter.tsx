@@ -52,8 +52,8 @@ export function SiteFooter({ variant = 'page' }: { variant?: 'overlay' | 'page' 
           </a>
         ))}
       </nav>
-      <div className="mt-3 flex items-center justify-between gap-6">
-        <p className="flex flex-wrap items-center gap-x-2 gap-y-1 text-white/55">
+      <div className="mt-3 flex flex-wrap items-center justify-between gap-x-6 gap-y-3">
+        <p className="flex items-center gap-x-2 whitespace-nowrap text-white/55">
           <span className="whitespace-nowrap">
             <span className="font-medium text-white/85">Bryton Zoz</span>
             <span className="ml-2">&copy; 2026</span>

@@ -5,12 +5,13 @@ import Link from 'next/link';
 import { ProjectCard } from '../components/ProjectCard';
 import { NotifySheet, hasSignedUp } from '../components/NotifySheet';
 import { SiteFooter } from '../components/SiteFooter';
+import { StoreExperience } from '../components/store/StoreExperience';
 import { ReleaseSheet } from '../components/release/ReleaseSheet';
 import { usePlayer } from '../components/player/context';
 import { ArrowUpRightIcon, ChevronDownIcon, EqualizerBars } from '../components/player/icons';
 import { ResponsiveImage, placeholderBackground } from '../components/ResponsiveImage';
 import { getProjects } from '../lib/projects';
-import { cautionSceneAssets, reminderSceneAssets, scrapwrkSceneAssets, solenyaSceneAssets } from '../lib/assets';
+import { cautionSceneAssets, reminderSceneAssets, solenyaSceneAssets } from '../lib/assets';
 import type { MediaAsset } from '../lib/media';
 import { nextRelease, nextReleaseProject } from '../lib/next-release';
 import { getStreamingServices, getVisitLabel } from '../lib/streaming';
@@ -763,54 +764,6 @@ const reminderStickers = [
   },
 ];
 
-const scrapwrkStickers = [
-  {
-    key: 'hat',
-    src: scrapwrkSceneAssets.hat,
-    alt: 'Hat',
-    frame: { left: -385, top: -200, size: 754.83 },
-    zIndex: 18,
-    baseRotate: -33.34,
-    movement: { x: -76, y: -118, rotate: -7, scale: 0.07, fadeRate: 0.96 },
-    float: { x: -8, y: -8, rotate: -2.2, duration: '8.4s', delay: '0.12s' },
-    intro: { x: -184, y: -128, rotate: -10, delay: '0.12s' },
-  },
-  {
-    key: 'hoodie-top',
-    src: scrapwrkSceneAssets.hoodieTop,
-    alt: 'Folded hoodie',
-    frame: { left: 444, top: -340, size: 696 },
-    zIndex: 18,
-    baseRotate: -27.03,
-    movement: { x: 82, y: -124, rotate: 5, scale: 0.07, fadeRate: 0.96 },
-    float: { x: 8, y: -8, rotate: 2, duration: '8.9s', delay: '0.48s' },
-    intro: { x: 168, y: -140, rotate: 10, delay: '0.18s' },
-  },
-  {
-    key: 'hoodie-bottom',
-    src: scrapwrkSceneAssets.hoodieBottom,
-    alt: 'Patchwork hoodie',
-    fadeY: 'linear-gradient(to bottom, #000 74%, transparent 99%)',
-    frame: { left: -43, top: 1250, size: 524.54 },
-    zIndex: 5,
-    baseRotate: 1.82,
-    movement: { x: -64, y: 110, rotate: 4, scale: 0.08, fadeRate: 1.02 },
-    float: { x: -7, y: -8, rotate: -1.4, duration: '8.2s', delay: '0.28s' },
-    intro: { x: -152, y: 160, rotate: 8, delay: '0.34s' },
-  },
-  {
-    key: 'pants',
-    src: scrapwrkSceneAssets.pants,
-    alt: 'Patchwork pants',
-    frame: { left: 444, top: 1060, size: 696 },
-    zIndex: 5,
-    baseRotate: -25.85,
-    movement: { x: 78, y: 126, rotate: -5, scale: 0.08, fadeRate: 1.04 },
-    float: { x: 9, y: -10, rotate: 1.6, duration: '8.6s', delay: '0.56s' },
-    intro: { x: 170, y: 164, rotate: -8, delay: '0.42s' },
-  },
-];
-
 const SolenyaScene = React.memo(function SolenyaScene({
   project,
   distance,
@@ -1061,81 +1014,37 @@ const ReminderScene = React.memo(function ReminderScene({
   );
 });
 
-const ScrapwrkScene = React.memo(function ScrapwrkScene({
-  project,
-  distance,
-  loadImages,
-}: {
-  project: Project;
-  distance: number;
-  loadImages: boolean;
-}) {
+// Scrapwrk: the store itself, right here. Four cards fly in, turn over and float; tapping one opens
+// the piece (photos, details, Buy now). The full store also lives at /scrapwrk/.
+const ScrapwrkScene = React.memo(function ScrapwrkScene({ distance }: { distance: number }) {
+  const distanceMagnitude = clamp(Math.abs(distance), 0, 1);
+  const active = distanceMagnitude < 0.45;
+  const incoming = easeOutCubic(clamp(Math.abs(Math.min(distance, 0)) / 0.9, 0, 1));
+
+  // Sized to the screen rather than the portrait scene frame, so the pieces are as large as the
+  // screen allows (phone to desktop) while the grid and the footer both fit.
   return (
-    <div className="relative h-full w-full overflow-hidden">
-      {scrapwrkStickers.map((sticker) => {
-        const stickerState = getSceneStickerState(sticker, distance);
-
-        return (
-          <div
-            key={sticker.key}
-            className="pointer-events-none absolute solenya-sticker-enter"
-            style={{
-              left: sceneLeft(sticker.frame.left),
-              top: sceneTop(sticker.frame.top),
-              width: scaleValue(sticker.frame.size),
-              height: scaleValue(sticker.frame.size),
-              zIndex: sticker.zIndex,
-              '--intro-x': scaleValue(sticker.intro.x),
-              '--intro-y': scaleValue(sticker.intro.y),
-              '--intro-rotate': `${sticker.intro.rotate}deg`,
-              animationDelay: sticker.intro.delay,
-            } as React.CSSProperties}
-          >
-            <div
-              style={{
-                opacity: stickerState.opacity,
-                transform: `translate3d(${scaleValue(stickerState.translateX)}, ${scaleValue(stickerState.translateY)}, 0) rotate(${stickerState.rotate}deg) scale(${stickerState.scale})`,
-                willChange: 'transform, opacity',
-                transition: 'transform 520ms cubic-bezier(0.22, 1, 0.36, 1), opacity 320ms ease-out',
-              }}
-            >
-              <div
-                className="solenya-sticker-float h-full w-full"
-                style={
-                  {
-                    '--float-x': scaleValue(sticker.float.x),
-                    '--float-y': scaleValue(sticker.float.y),
-                    '--float-rotate': `${sticker.float.rotate}deg`,
-                    '--float-duration': sticker.float.duration,
-                    animationDelay: sticker.float.delay,
-                  } as React.CSSProperties
-                }
-              >
-                {loadImages ? (
-                  <ResponsiveImage
-                    asset={sticker.src}
-                    alt={sticker.alt}
-                    sizes={sceneImageSizes(sticker.frame.size)}
-                    draggable={false}
-                    className="h-full w-full object-contain select-none"
-                    style={sticker.fadeY ? { maskImage: sticker.fadeY, WebkitMaskImage: sticker.fadeY } : undefined}
-                  />
-                ) : null}
-              </div>
-            </div>
-          </div>
-        );
-      })}
-
-      <div className="absolute inset-0 flex items-center justify-center">
-        <div className="relative" style={{ width: SCENE_FRAME_WIDTH, height: SCENE_FRAME_HEIGHT }}>
-          <SceneCard
-            project={project}
-            cover={scrapwrkSceneAssets.cover}
-            distance={distance}
-            loadImages={loadImages}
-          />
-        </div>
+    <div className="relative flex h-full w-full items-center justify-center overflow-hidden pb-[132px] pt-10">
+      <div
+        className="store-scene"
+        style={{
+          opacity: 1 - (distanceMagnitude * 0.3),
+          transform: `translate3d(0, ${incoming * 32}px, 0)`,
+          transition: 'transform 700ms cubic-bezier(0.22, 1, 0.36, 1), opacity 400ms ease-out',
+        }}
+      >
+        <StoreExperience
+          active={active}
+          sizes="(min-width: 640px) 280px, 46vw"
+          headerClassName="store-scene-header"
+          title={<h2 className="store-scene-title scene-title">Scrapwrk</h2>}
+          titleEnd={(
+            <Link href="/scrapwrk/" className="store-scene-link scene-title">
+              All pieces
+              <ChevronDownIcon size={16} className="-rotate-90" />
+            </Link>
+          )}
+        />
       </div>
     </div>
   );
@@ -1381,11 +1290,7 @@ export default function HomePage() {
             if (isScrapwrk) {
               return (
                 <div key={project.name} className="relative h-screen snap-center overflow-hidden">
-                  <ScrapwrkScene
-                    project={project}
-                    distance={sceneDistance}
-                    loadImages={index === 0 || loadDeferredScenes}
-                  />
+                  <ScrapwrkScene distance={sceneDistance} />
                   {footer}
                 </div>
               );

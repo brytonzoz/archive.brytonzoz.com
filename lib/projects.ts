@@ -45,10 +45,10 @@ const projectData: ProjectData = {
   fashion: [
     {
       name: "Scrapwrk Store",
-      url: "https://scrapwrk.com",
+      url: "/scrapwrk/",
       type: "ecommerce",
       description: "reconstructed pieces and identity",
-      highlight: "Visit",
+      highlight: "Shop",
       image: scrapwrkSceneAssets.cover
     }
   ]

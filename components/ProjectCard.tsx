@@ -1,6 +1,7 @@
 'use client';
 
 import React, { useState } from 'react';
+import Link from 'next/link';
 import { Project, getProjectTypeLabel, isProjectReleased } from '../lib/utils';
 import { getStreamingServices } from '../lib/streaming';
 import { getReleaseForProject } from '../lib/tracks';
@@ -16,11 +17,12 @@ interface ProjectCardProps {
 }
 
 // A grid tile, as in a music library: artwork, title, and what it is. Releases open the listen
-// sheet; everything else opens its site.
+// sheet; pages on this site open in place; everything else opens its site.
 export function ProjectCard({ project, className = '', style, onModalStateChange }: ProjectCardProps) {
   const [isSheetOpen, setIsSheetOpen] = useState(false);
   const hasSheet = getStreamingServices(project).length > 0 || (isProjectReleased(project) && Boolean(getReleaseForProject(project.name)));
-  const isExternal = !hasSheet && Boolean(project.url);
+  const isInternal = Boolean(project.url?.startsWith('/'));
+  const isExternal = !hasSheet && !isInternal && Boolean(project.url);
 
   const content = (
     <>
@@ -70,6 +72,14 @@ export function ProjectCard({ project, className = '', style, onModalStateChange
           }}
         />
       </>
+    );
+  }
+
+  if (isInternal && project.url) {
+    return (
+      <Link href={project.url} className={tileClassName} style={style}>
+        {content}
+      </Link>
     );
   }
 

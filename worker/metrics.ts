@@ -1,13 +1,14 @@
 // Listening metrics: /api/e takes anonymous events from the site, /api/admin/* serves the
 // dashboard at /admin. Data lives in D1 (schema: worker/schema.sql).
 import catalog from '../lib/tracks.json';
+import { adminStore, type StoreEnv } from './store';
 
-export interface MetricsEnv {
+export interface MetricsEnv extends StoreEnv {
   DB?: D1Database;
   ADMIN_PASSWORD?: string;
 }
 
-const EVENT_TYPES = new Set(['view', 'play', 'listen', 'share', 'outbound', 'open', 'like', 'unlike']);
+const EVENT_TYPES = new Set(['view', 'play', 'listen', 'share', 'outbound', 'open', 'like', 'unlike', 'product', 'bag', 'checkout', 'purchase']);
 const MAX_EVENTS = 25;
 const LIVE_WINDOW_MS = 90_000;
 const STREAM_SECONDS = 30;
@@ -139,7 +140,7 @@ async function stats(url: URL, db: D1Database): Promise<Response> {
   const trackCounts = Object.fromEntries(catalog.releases.map((release) => [release.id, release.tracks.length]));
 
   const [totals, plays, daily, dailyPlays, tracks, releases, dropoff, countries, devices, referrers, outbound, shares, opens, returning, live, fullListens,
-    campaigns, campaignPlays, loved, subscribers] =
+    campaigns, campaignPlays, loved, storeFunnel, storeViews, subscribers] =
     await db.batch([
       q(`SELECT
           (SELECT COUNT(DISTINCT visitor) FROM events WHERE day >= ?1) AS visitors,
@@ -188,6 +189,10 @@ async function stats(url: URL, db: D1Database): Promise<Response> {
           SELECT visitor, track, type FROM events e WHERE type IN ('like', 'unlike') AND day >= ?1
             AND ts = (SELECT MAX(ts) FROM events WHERE visitor = e.visitor AND track = e.track AND type IN ('like', 'unlike'))
         ) WHERE type = 'like' GROUP BY track ORDER BY value DESC LIMIT 12`),
+      // Scrapwrk: people who opened a piece, bagged it, started checkout, and paid.
+      q(`SELECT type, COUNT(DISTINCT visitor) AS visitors FROM events
+          WHERE type IN ('product', 'bag', 'checkout', 'purchase') AND day >= ?1 GROUP BY type`),
+      q(`SELECT detail AS label, COUNT(DISTINCT visitor) AS value FROM events WHERE type = 'product' AND day >= ?1 GROUP BY detail ORDER BY value DESC`),
       q(`SELECT (SELECT COUNT(*) FROM subscribers) AS total,
           (SELECT COUNT(*) FROM subscribers WHERE ts >= CAST(strftime('%s', ?1) AS INTEGER) * 1000) AS recent`),
     ]);
@@ -220,6 +225,10 @@ async function stats(url: URL, db: D1Database): Promise<Response> {
     }),
     loved: loved.results,
     subscribers: subscribers.results[0],
+    store: {
+      funnel: Object.fromEntries((storeFunnel.results as { type: string; visitors: number }[]).map((row) => [row.type, row.visitors])),
+      views: storeViews.results,
+    },
   });
 }
 
@@ -285,6 +294,7 @@ export async function handleApi(request: Request, env: MetricsEnv): Promise<Resp
     if (url.pathname === '/api/admin/stats') return stats(url, env.DB);
     if (url.pathname === '/api/admin/export.csv') return exportCsv(url, env.DB);
     if (url.pathname === '/api/admin/subscribers.csv') return exportSubscribers(env.DB);
+    if (url.pathname === '/api/admin/store') return adminStore(request, { ...env, DB: env.DB });
   }
 
   return json({ error: 'not-found' }, 404);

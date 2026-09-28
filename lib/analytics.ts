@@ -1,7 +1,7 @@
 // Anonymous listening metrics for the /admin dashboard. A random id per browser (no cookies, no
 // personal data); events are batched and sent with sendBeacon so they never slow the site down.
 
-type EventType = 'view' | 'play' | 'listen' | 'share' | 'outbound' | 'open' | 'like' | 'unlike';
+type EventType = 'view' | 'play' | 'listen' | 'share' | 'outbound' | 'open' | 'like' | 'unlike' | 'product' | 'bag' | 'checkout' | 'purchase';
 
 export type MetricEvent = {
   type: EventType;

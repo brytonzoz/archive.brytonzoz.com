@@ -3,6 +3,7 @@
 import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import { isOptedOut, setOptedOut } from '../../lib/analytics';
 import { SITE_URL } from '../../lib/artist';
+import { formatPrice, products } from '../../lib/store';
 import { releases } from '../../lib/tracks';
 import { StoryKit } from './StoryKit';
 
@@ -29,6 +30,7 @@ type Stats = {
   campaigns?: { label: string; visitors: number; plays: number; streams: number }[];
   loved?: Row[];
   subscribers?: { total: number; recent: number };
+  store?: { funnel: Record<string, number>; views: Row[] };
 };
 
 // Links for posts and bios: brytonzoz.com/go/<name> lands on the homepage and credits that name.
@@ -193,6 +195,75 @@ function RankedList({ rows, format = fmt, empty = 'No data yet' }: { rows: { lab
         </li>
       ))}
     </ol>
+  );
+}
+
+// Scrapwrk: each piece's state (held = someone is in Stripe checkout), with a switch for when a
+// piece is refunded or sold elsewhere, and how far people got.
+function StoreCard({ password, funnel, views }: { password: string; funnel: Record<string, number>; views: Row[] }) {
+  const [items, setItems] = useState<Record<string, string> | null>(null);
+  const [mode, setMode] = useState<string | null>(null);
+  const [checkout, setCheckout] = useState(true);
+  const call = useCallback(async (body?: object) => {
+    const response = await fetch('/api/admin/store', {
+      method: body ? 'POST' : 'GET',
+      headers: { authorization: `Bearer ${password}`, ...(body ? { 'content-type': 'application/json' } : {}) },
+      body: body ? JSON.stringify(body) : undefined,
+    });
+    if (!response.ok) return;
+    const data = await response.json();
+    setItems(data.items);
+    setMode(data.mode);
+    setCheckout(data.checkout);
+  }, [password]);
+  useEffect(() => { call(); }, [call]);
+  const viewsById = new Map(views.map((row) => [String(row.label), n(row.value)]));
+  const steps = [
+    ['product', 'Opened a piece'],
+    ['bag', 'Added to bag'],
+    ['checkout', 'Started checkout'],
+    ['purchase', 'Bought'],
+  ] as const;
+
+  return (
+    <Card title="Scrapwrk" subtitle={checkout ? `Stripe ${mode === 'live' ? 'live' : 'test'} mode` : 'Checkout is closed: add the STRIPE_SECRET_KEY secret on GitHub'}>
+      <ul className="space-y-2.5">
+        {products.map((product) => {
+          const status = items?.[product.id] ?? '…';
+          return (
+            <li key={product.id} className="flex items-center gap-3 text-[14px]">
+              <span className="min-w-0 flex-1">
+                <span className="block truncate text-white/90">{product.number} {product.name} · {formatPrice(product.price)}</span>
+                <span className="block text-[12px] text-white/40">{fmt(viewsById.get(product.id) ?? 0)} opened</span>
+              </span>
+              <span className={`rounded-full px-2.5 py-1 text-[12px] font-semibold ${status === 'sold' ? 'bg-white/10 text-white/60' : status === 'held' ? 'bg-[#ff9f0a]/20 text-[#ffb340]' : 'bg-[#30d158]/15 text-[#30d158]'}`}>
+                {status === 'held' ? 'In checkout' : status.replace(/^./, (c) => c.toUpperCase())}
+              </span>
+              {status === 'sold' || status === 'available' ? (
+                <button
+                  type="button"
+                  onClick={() => {
+                    const next = status === 'sold' ? 'available' : 'sold';
+                    if (window.confirm(`Mark ${product.name} as ${next}?`)) call({ productId: product.id, status: next });
+                  }}
+                  className="h-8 rounded-full bg-white/[0.08] px-3 text-[12px] font-semibold text-white/75 hover:bg-white/[0.12]"
+                >
+                  {status === 'sold' ? 'Mark available' : 'Mark sold'}
+                </button>
+              ) : null}
+            </li>
+          );
+        })}
+      </ul>
+      <div className="mt-5 grid grid-cols-4 gap-2 border-t border-white/[0.06] pt-4">
+        {steps.map(([key, label]) => (
+          <div key={key}>
+            <p className="text-[20px] font-semibold tabular-nums">{fmt(n(funnel[key]))}</p>
+            <p className="text-[11px] leading-tight text-white/45">{label}</p>
+          </div>
+        ))}
+      </div>
+    </Card>
   );
 }
 
@@ -476,6 +547,10 @@ export function Dashboard() {
         <Card title="Links" subtitle="Visitors from each /go link and shared link">
           <CampaignLinks rows={stats.campaigns ?? []} />
         </Card>
+      </div>
+
+      <div className="mt-3">
+        <StoreCard password={password} funnel={stats.store?.funnel ?? {}} views={stats.store?.views ?? []} />
       </div>
 
       <Card title="Story kit" subtitle="A story image from the real cover, sized for Instagram and TikTok" className="mt-3">

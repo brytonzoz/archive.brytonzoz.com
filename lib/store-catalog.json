@@ -1,0 +1,42 @@
+{
+  "currency": "usd",
+  "shipping": { "countries": ["US"], "label": "Free shipping" },
+  "products": [
+    {
+      "id": "scrapwrk-001-hoodie",
+      "slug": "hoodie",
+      "number": "001",
+      "name": "Hoodie",
+      "price": 34900,
+      "description": "One-of-a-kind handcrafted hoodie made from premium recycled materials. Each piece represents the perfect fusion of sustainability and high fashion.",
+      "features": ["Handmade in limited quantities", "Sustainable materials", "Unique design - no two pieces are alike", "Water-resistant outer layer"],
+      "material": "Upcycled Textiles",
+      "size": "Large",
+      "images": ["store/hoodie/01", "store/hoodie/02", "store/hoodie/03", "store/hoodie/04", "store/hoodie/05", "store/hoodie/06", "store/hoodie/07", "store/hoodie/08"]
+    },
+    {
+      "id": "scrapwrk-002-pants",
+      "slug": "pants",
+      "number": "002",
+      "name": "Pants",
+      "price": 42900,
+      "description": "Artisanal pants crafted from reclaimed textiles. Featuring unique patterns and textures, these pants offer comfort with sustainable style.",
+      "features": ["Ethically produced", "Zero-waste manufacturing", "Adjustable waistband", "Reinforced stitching for durability"],
+      "material": "Upcycled Textiles",
+      "size": "Large",
+      "images": ["store/pants/01", "store/pants/02", "store/pants/03", "store/pants/04", "store/pants/05", "store/pants/06", "store/pants/07", "store/pants/08"]
+    },
+    {
+      "id": "scrapwrk-003-hat",
+      "slug": "hat",
+      "number": "003",
+      "name": "Hat",
+      "price": 9900,
+      "description": "Minimalist hat designed with purpose. Featuring a unique silhouette and crafted from recovered materials, each hat tells its own story.",
+      "features": ["Adjustable fit", "UV protection", "Breathable material", "Reversible design"],
+      "material": "Upcycled Textiles",
+      "size": "Adjustable",
+      "images": ["store/hat/01", "store/hat/02", "store/hat/03", "store/hat/04", "store/hat/05", "store/hat/06"]
+    }
+  ]
+}

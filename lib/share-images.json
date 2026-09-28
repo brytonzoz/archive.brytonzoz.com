@@ -4,6 +4,20 @@
     "caution": "/media/share/caution.3e738e3246.jpg",
     "just-a-reminder-to-live-life": "/media/share/just-a-reminder-to-live-life.2ec7b21745.jpg"
   },
+  "store": {
+    "hoodie": {
+      "card": "/media/share/store-hoodie.5d2216cdae.jpg",
+      "square": "/media/share/store-hoodie-square.5d2216cdae.jpg"
+    },
+    "pants": {
+      "card": "/media/share/store-pants.9a4ffd9995.jpg",
+      "square": "/media/share/store-pants-square.9a4ffd9995.jpg"
+    },
+    "hat": {
+      "card": "/media/share/store-hat.bae37999de.jpg",
+      "square": "/media/share/store-hat-square.bae37999de.jpg"
+    }
+  },
   "icons": {
     "32": "/media/share/icon-32.35f7f2a766.png",
     "180": "/media/share/icon-180.35f7f2a766.png",

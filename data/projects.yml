@@ -32,7 +32,7 @@ music:
 
 fashion:
   - name: "Scrapwrk Store"
-    url: "https://scrapwrk.com"
+    url: "/scrapwrk/"
     type: "ecommerce"
     description: "Curated fashion pieces and experimental designs"
     highlight: "Limited Collection"

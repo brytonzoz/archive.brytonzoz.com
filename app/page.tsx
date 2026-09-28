@@ -3,17 +3,18 @@
 import React, { useCallback, useEffect, useState } from 'react';
 import Link from 'next/link';
 import { ProjectCard } from '../components/ProjectCard';
+import { NotifySheet, hasSignedUp } from '../components/NotifySheet';
+import { SiteFooter } from '../components/SiteFooter';
 import { ReleaseSheet } from '../components/release/ReleaseSheet';
 import { usePlayer } from '../components/player/context';
 import { ArrowUpRightIcon, ChevronDownIcon, EqualizerBars } from '../components/player/icons';
 import { ResponsiveImage, placeholderBackground } from '../components/ResponsiveImage';
-import { LISTEN_LINKS } from '../lib/artist';
 import { getProjects } from '../lib/projects';
 import { cautionSceneAssets, reminderSceneAssets, scrapwrkSceneAssets, solenyaSceneAssets } from '../lib/assets';
 import type { MediaAsset } from '../lib/media';
 import { nextRelease, nextReleaseProject } from '../lib/next-release';
 import { getStreamingServices, getVisitLabel } from '../lib/streaming';
-import { getReleaseForProject, releasePath, warmTrack } from '../lib/tracks';
+import { getRelease, getReleaseForProject, releasePath, warmTrack } from '../lib/tracks';
 import { Project, getProjectTypeLabel, isProjectReleased } from '../lib/utils';
 
 const clamp = (value: number, min: number, max: number) => Math.min(Math.max(value, min), max);
@@ -206,106 +207,6 @@ function BackgroundLayer({
         style={{ background: background.edgeGlow }}
       />
     </div>
-  );
-}
-
-function FooterSocialLink({
-  href,
-  label,
-  children,
-}: {
-  href: string;
-  label: string;
-  children: React.ReactNode;
-}) {
-  return (
-    <a
-      href={href}
-      target="_blank"
-      rel="noopener noreferrer"
-      aria-label={label}
-      className="rounded-sm text-white/70 transition-colors duration-200 hover:text-white focus-visible:text-white focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-4 focus-visible:outline-white/60"
-    >
-      {children}
-    </a>
-  );
-}
-
-function InstagramIcon() {
-  return (
-    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" aria-hidden="true">
-      <rect x="3" y="3" width="18" height="18" rx="5" stroke="currentColor" strokeWidth="1.8" />
-      <circle cx="12" cy="12" r="4" stroke="currentColor" strokeWidth="1.8" />
-      <circle cx="17.3" cy="6.7" r="1.1" fill="currentColor" />
-    </svg>
-  );
-}
-
-function TikTokIcon() {
-  return (
-    <svg width="15" height="16" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true">
-      <path d="M16.6 2h-3.5v13.4a3.1 3.1 0 1 1-2.2-3V8.8a6.6 6.6 0 1 0 5.7 6.6V8.6a8.2 8.2 0 0 0 4.4 1.3V6.4a4.6 4.6 0 0 1-4.4-4.4Z" />
-    </svg>
-  );
-}
-
-function XIcon() {
-  return (
-    <svg width="14" height="14" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true">
-      <path d="M17.8 2.5h3.3l-7.2 8.2 8.5 10.8h-6.6l-5.2-6.6-6 6.6H1.3l7.7-8.8L.9 2.5h6.8l4.7 6 5.4-6Zm-1.2 17h1.8L7.5 4.4H5.5l11.1 15.1Z" />
-    </svg>
-  );
-}
-
-function FacebookIcon() {
-  return (
-    <svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true">
-      <path d="M13.4 21.9v-7.4h2.5l.4-2.9h-2.9V9.8c0-.8.2-1.4 1.4-1.4h1.5V5.8c-.3 0-1.2-.1-2.2-.1-2.2 0-3.7 1.3-3.7 3.8v2.1H7.9v2.9h2.5v7.4a10 10 0 1 1 3 0Z" />
-    </svg>
-  );
-}
-
-const FOOTER_LINK =
-  'pointer-events-auto rounded-sm text-white/70 transition-colors duration-200 hover:text-white focus-visible:text-white focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-4 focus-visible:outline-white/60';
-
-function SiteFooter() {
-  return (
-    <footer
-      className="pointer-events-none absolute inset-x-0 bottom-0 z-30 bg-gradient-to-t from-black/75 via-black/50 via-45% to-transparent px-6 pt-24 text-[13px] [text-shadow:0_1px_10px_rgba(0,0,0,0.55)] sm:px-10"
-      style={{ paddingBottom: 'calc(max(1.25rem, env(safe-area-inset-bottom)) + var(--player-offset, 0px))' }}
-    >
-      <nav aria-label="Listen" className="mb-3 flex flex-wrap items-center gap-x-4 gap-y-1.5">
-        <span className="text-white/45">Listen</span>
-        {LISTEN_LINKS.map((link) => (
-          <a key={link.name} href={link.url} target="_blank" rel="noopener noreferrer" className={FOOTER_LINK}>
-            {link.name}
-          </a>
-        ))}
-        <Link href="/work/" className={FOOTER_LINK}>
-          Work with me
-        </Link>
-      </nav>
-      <div className="flex items-center justify-between gap-6">
-        <p className="text-white/60">
-          <span className="font-medium text-white/85">Bryton Zoz</span>
-          <span className="ml-2">&copy; 2026</span>
-        </p>
-        <nav aria-label="Social" className="pointer-events-auto flex items-center gap-5">
-          <FooterSocialLink href="https://instagram.com/brytonzoz" label="Instagram">
-            <InstagramIcon />
-          </FooterSocialLink>
-          <FooterSocialLink href="https://tiktok.com/@brytonzoz" label="TikTok">
-            <TikTokIcon />
-          </FooterSocialLink>
-          <FooterSocialLink href="https://x.com/brytonzoz" label="X">
-            <XIcon />
-          </FooterSocialLink>
-          <FooterSocialLink href="https://www.facebook.com/bryton.zoz/" label="Facebook">
-            <FacebookIcon />
-          </FooterSocialLink>
-        </nav>
-      </div>
-    </footer>
   );
 }
 
@@ -581,6 +482,11 @@ const ComingSoonScene = React.memo(function ComingSoonScene({ distance, onNext }
   const incoming = easeOutCubic(clamp(Math.abs(Math.min(distance, 0)) / 0.9, 0, 1));
   const scale = distance >= 0 ? 1 - (outgoing * 0.26) : 1 - (incoming * 0.18);
   const title = nextRelease.title ?? 'New music';
+  const [notifyOpen, setNotifyOpen] = useState(false);
+  const [signedUp, setSignedUp] = useState(false);
+  useEffect(() => setSignedUp(hasSignedUp()), []);
+  // Release day: the teaser becomes the way in, once the songs are actually playable here.
+  const outRelease = status === 'Out now' && nextRelease.releaseId ? getRelease(nextRelease.releaseId) : undefined;
 
   return (
     <div className="relative h-full w-full overflow-hidden">
@@ -641,7 +547,29 @@ const ComingSoonScene = React.memo(function ComingSoonScene({ distance, onNext }
                 {status}
               </p>
 
-              <div className="flex" style={{ marginTop: scaleValue(44) }}>
+              <div className="flex" style={{ marginTop: scaleValue(44), gap: scaleValue(20) }}>
+                {outRelease ? (
+                  <Link href={releasePath(outRelease)} className="scene-button" style={{ ...PILL_STYLE, background: '#FFFFFF', color: '#0B0B0C' }}>
+                    Listen Now
+                  </Link>
+                ) : (
+                  <button
+                    type="button"
+                    className="scene-button"
+                    onClick={() => setNotifyOpen(true)}
+                    disabled={signedUp}
+                    style={signedUp ? TEASER_PILL : { ...PILL_STYLE, background: '#FFFFFF', color: '#0B0B0C' }}
+                  >
+                    {signedUp ? (
+                      <>
+                        <svg style={{ width: scaleValue(34), height: scaleValue(34) }} viewBox="0 0 24 24" fill="none" aria-hidden="true" className="shrink-0">
+                          <path d="m5 12.5 4.5 4.5L19 7.5" stroke="currentColor" strokeWidth="2.4" strokeLinecap="round" strokeLinejoin="round" />
+                        </svg>
+                        On the list
+                      </>
+                    ) : 'Notify me'}
+                  </button>
+                )}
                 <button type="button" className="scene-button" onClick={onNext} style={TEASER_PILL}>
                   Past releases
                   <ChevronDownIcon size={scaleValue(34)} className="shrink-0" />
@@ -651,6 +579,7 @@ const ComingSoonScene = React.memo(function ComingSoonScene({ distance, onNext }
           </div>
         </div>
       </div>
+      <NotifySheet isOpen={notifyOpen} onClose={() => setNotifyOpen(false)} onDone={() => setSignedUp(true)} />
     </div>
   );
 });
@@ -1398,7 +1327,7 @@ export default function HomePage() {
             // Scene motion saturates at one screen away; clamping lets memoized far-off scenes skip re-rendering.
             const isLast = index === allProjects.length - 1;
             const sceneDistance = clamp(scrollProgress - index, -1, isLast ? 0 : 1);
-            const footer = isLast ? <SiteFooter /> : null;
+            const footer = isLast ? <SiteFooter variant="overlay" /> : null;
 
             if (project.type === 'coming-soon') {
               return (

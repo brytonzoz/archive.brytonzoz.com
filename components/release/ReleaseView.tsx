@@ -41,7 +41,7 @@ function TrackRow({ track, focused }: { track: Track; focused: boolean }) {
 
 // Everything about one release: artwork, Play and Shuffle, and the tracklist. A song link
 // (focusTrack) leads with that song and highlights it in the list.
-export function ReleaseView({ project, release, focusTrack }: { project: Project; release?: Release; focusTrack?: Track }) {
+export function ReleaseView({ project, release, focusTrack, inSheet = true }: { project: Project; release?: Release; focusTrack?: Track; inSheet?: boolean }) {
   const player = usePlayer();
   const cover = release?.cover ?? project.image;
   const isThisRelease = Boolean(release) && player.current?.release.id === release?.id;
@@ -64,7 +64,7 @@ export function ReleaseView({ project, release, focusTrack }: { project: Project
     : getProjectTypeLabel(project);
 
   return (
-    <div className="px-5 pb-32">
+    <div className={`px-5 ${inSheet ? 'pb-32' : 'pb-2'}`}>
       <div className="flex flex-col items-center pt-4 text-center">
         {cover ? (
           <div className="release-art relative w-[min(62vw,260px)] overflow-hidden rounded-[12px]" style={{ aspectRatio: '1 / 1', ...placeholderBackground(cover) }}>

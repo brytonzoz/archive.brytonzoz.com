@@ -8,6 +8,7 @@ import { getRelease, releasePath, trackPath } from '../../lib/tracks';
 import { placeholderBackground } from '../ResponsiveImage';
 import { usePlayer } from '../player/context';
 import { ShareIcon } from '../player/icons';
+import { SiteFooter } from '../SiteFooter';
 import { PlatformBar } from './PlatformBar';
 import { ReleaseView } from './ReleaseView';
 
@@ -54,9 +55,17 @@ export function ReleasePage({ releaseId, songSlug }: { releaseId: string; songSl
       </header>
 
       <div className="mx-auto max-w-[520px]">
-        <ReleaseView project={project} release={release} focusTrack={focusTrack} />
+        <ReleaseView project={project} release={release} focusTrack={focusTrack} inSheet={false} />
+      </div>
+      <div className="pb-20">
+        <SiteFooter />
       </div>
 
+      <div
+        aria-hidden="true"
+        className="pointer-events-none fixed inset-x-0 bottom-0 z-[79] bg-gradient-to-t from-black/85 via-black/60 to-transparent"
+        style={{ height: 'calc(150px + var(--player-offset, 0px))' }}
+      />
       <PlatformBar
         project={project}
         release={release}

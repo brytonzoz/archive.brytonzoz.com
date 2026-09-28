@@ -2,26 +2,28 @@
 
 import React, { useEffect, useLayoutEffect, useRef, useState } from 'react';
 import { createPortal } from 'react-dom';
+import { toggleLoved, useLoved } from '../../lib/likes';
 import { shareLink } from '../../lib/share';
 import { trackPath, type Track } from '../../lib/tracks';
 import { usePlayer } from './context';
-import { AddToQueueIcon, MoreIcon, PlayNextIcon, ShareIcon } from './icons';
+import { AddToQueueIcon, HeartIcon, MoreIcon, PlayNextIcon, ShareIcon } from './icons';
 
 const MENU_WIDTH = 230;
 
-// The "…" on a song: Play Next, Add to Queue, Share Song. Laid out like an iOS context menu
+// The "…" on a song: Play Next, Add to Queue, Love, Share Song. Laid out like an iOS context menu
 // (label left, icon right) and kept inside the screen.
 export function TrackMenu({ track, className = '' }: { track: Track; className?: string }) {
   const { playNext, addToQueue, notify } = usePlayer();
   const buttonRef = useRef<HTMLButtonElement>(null);
   const menuRef = useRef<HTMLDivElement>(null);
   const [open, setOpen] = useState(false);
+  const loved = useLoved(track.id);
   const [position, setPosition] = useState<{ top: number; left: number; up: boolean } | null>(null);
 
   useLayoutEffect(() => {
     if (!open || !buttonRef.current) return;
     const rect = buttonRef.current.getBoundingClientRect();
-    const up = rect.bottom + 170 > window.innerHeight;
+    const up = rect.bottom + 215 > window.innerHeight;
     setPosition({
       top: up ? rect.top - 8 : rect.bottom + 8,
       left: Math.max(12, Math.min(rect.right - MENU_WIDTH, window.innerWidth - MENU_WIDTH - 12)),
@@ -60,6 +62,11 @@ export function TrackMenu({ track, className = '' }: { track: Track; className?:
   const items = [
     { label: 'Play Next', icon: <PlayNextIcon size={19} />, action: () => playNext(track) },
     { label: 'Add to Queue', icon: <AddToQueueIcon size={19} />, action: () => addToQueue(track) },
+    {
+      label: loved ? 'Unlove' : 'Love',
+      icon: <HeartIcon size={18} filled={loved} className={loved ? 'text-[#ff375f]' : ''} />,
+      action: () => notify(toggleLoved(track.id, track.release.id) ? 'Loved' : 'Removed from Loved'),
+    },
     {
       label: 'Share Song',
       icon: <ShareIcon size={18} />,

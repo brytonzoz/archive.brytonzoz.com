@@ -4,8 +4,9 @@ import { Inter } from 'next/font/google'
 import './globals.css'
 import { PlayerProvider } from '../components/player/PlayerProvider'
 import { PageViews } from '../components/PageViews'
+import { ServiceWorker } from '../components/ServiceWorker'
 import shareImages from '../lib/share-images.json'
-import { artistJsonLd } from '../lib/artist'
+import { artistJsonLd, jsonLdScript } from '../lib/artist'
 
 const inter = Inter({ 
   subsets: ['latin'],
@@ -13,7 +14,7 @@ const inter = Inter({
 })
 
 const TITLE = 'Bryton Zoz — Artist, Producer & Designer'
-const DESCRIPTION = 'Music by Bryton Zoz. Listen to SOLENYA, CAUTION and more on Spotify, Apple Music and YouTube Music.'
+const DESCRIPTION = 'Music by Bryton Zoz: the album SOLENYA, the EP CAUTION and the mixtape Just A Reminder To Live Life. Listen on Spotify, Apple Music and YouTube Music.'
 
 export const metadata: Metadata = {
   metadataBase: new URL('https://brytonzoz.com'),
@@ -70,9 +71,10 @@ export default function RootLayout({
       <body className={`${inter.variable} font-body antialiased`}>
         <script
           type="application/ld+json"
-          dangerouslySetInnerHTML={{ __html: JSON.stringify(artistJsonLd()).replace(/</g, '\\u003c') }}
+          dangerouslySetInnerHTML={{ __html: jsonLdScript(artistJsonLd()) }}
         />
         <PageViews />
+        <ServiceWorker />
         <PlayerProvider>
           <div className="min-h-screen bg-black overflow-x-hidden">
             <main className="relative">

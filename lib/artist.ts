@@ -1,5 +1,5 @@
 import shareImages from './share-images.json';
-import { getRelease, releasePath } from './tracks';
+import { getRelease, releasePath, trackPath, type Release, type Track } from './tracks';
 
 // One source of truth for who the artist is and where the music lives. Used by the site's
 // metadata, the JSON-LD search engines read (app/layout.tsx), the footer and the sitemap.
@@ -7,7 +7,7 @@ export const SITE_URL = 'https://brytonzoz.com';
 
 export const ARTIST = {
   name: 'Bryton Zoz',
-  jobTitle: 'Musician',
+  jobTitle: 'Artist, Producer & Designer',
   description: 'Bryton Zoz is a musician, producer and designer. Music includes the album SOLENYA, the EP CAUTION and the mixtape Just A Reminder To Live Life.',
   email: 'bryton.p.zoz@gmail.com',
 };
@@ -22,12 +22,19 @@ export const LISTEN_LINKS = [
 // Every verified profile, for schema.org sameAs.
 export const ARTIST_PROFILES = [
   ...LISTEN_LINKS.map((link) => link.url),
-  'https://www.instagram.com/brytonzoz/',
-  'https://www.instagram.com/bryton.archive/',
+  'https://www.instagram.com/brytonzoz',
+  'https://www.instagram.com/bryton.archive',
   'https://www.tiktok.com/@brytonzoz',
-  'https://x.com/brytonzoz',
-  'https://www.facebook.com/bryton.zoz/',
+  'https://x.com/BrytonZoz',
 ];
+
+// The social row in every footer.
+export const SOCIAL_LINKS = [
+  { name: 'Instagram', url: 'https://www.instagram.com/brytonzoz' },
+  { name: 'TikTok', url: 'https://www.tiktok.com/@brytonzoz' },
+  { name: 'X', url: 'https://x.com/BrytonZoz' },
+  { name: 'Facebook', url: 'https://www.facebook.com/bryton.zoz/' },
+] as const;
 
 type DiscographyEntry = {
   releaseId: string;
@@ -73,6 +80,48 @@ const DISCOGRAPHY: DiscographyEntry[] = [
 ];
 
 const ARTIST_ID = `${SITE_URL}/#artist`;
+
+function isoDuration(ms: number): string {
+  const seconds = Math.round(ms / 1000);
+  return `PT${Math.floor(seconds / 60)}M${seconds % 60}S`;
+}
+
+function recording(track: Track) {
+  return {
+    '@type': 'MusicRecording',
+    '@id': `${SITE_URL}${trackPath(track)}#recording`,
+    name: track.title,
+    url: `${SITE_URL}${trackPath(track)}`,
+    position: track.number,
+    ...(track.durationMs ? { duration: isoDuration(track.durationMs) } : {}),
+    byArtist: { '@id': ARTIST_ID },
+    inAlbum: { '@id': `${SITE_URL}/${track.release.id}/#album` },
+  };
+}
+
+// For a release page (the album with its songs) or a song page (that recording). Only for releases
+// that are out and playable here; the root layout's graph already names the artist.
+export function releaseJsonLd(release: Release, track?: Track) {
+  const entry = DISCOGRAPHY.find((candidate) => candidate.releaseId === release.id);
+  const image = (shareImages.releases as Record<string, string>)[release.id];
+  const album = {
+    '@type': 'MusicAlbum',
+    '@id': `${SITE_URL}/${release.id}/#album`,
+    name: entry?.name ?? release.title,
+    url: `${SITE_URL}${releasePath(release)}`,
+    byArtist: { '@type': 'Person', '@id': ARTIST_ID, name: ARTIST.name },
+    numTracks: release.tracks.length,
+    ...(entry?.datePublished ? { datePublished: entry.datePublished } : {}),
+    ...(image ? { image: `${SITE_URL}${image}` } : {}),
+    ...(entry ? { sameAs: entry.links } : {}),
+  };
+  if (track) return { '@context': 'https://schema.org', ...recording(track), inAlbum: album };
+  return { '@context': 'https://schema.org', ...album, track: release.tracks.map(recording) };
+}
+
+export function jsonLdScript(data: object): string {
+  return JSON.stringify(data).replace(/</g, '\\u003c');
+}
 
 // schema.org graph: the site, the artist, and each release with its streaming pages.
 export function artistJsonLd() {

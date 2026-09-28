@@ -90,7 +90,7 @@ export function PlatformBar({ project, release, className = '', style }: { proje
             id={panelId}
             role="group"
             aria-label={label}
-            className="platform-panel glass-capsule glass-solid pointer-events-auto w-full max-w-[440px] rounded-[30px] p-4 pb-3"
+            className="platform-panel glass-capsule glass-solid pointer-events-auto w-full max-w-[440px] rounded-[20px] p-4 pb-3"
             style={{ viewTransitionName: 'platform-bar', minHeight: 'min(34dvh, 320px)' } as React.CSSProperties}
           >
             <div className="flex items-start justify-between gap-3 px-1">
@@ -118,14 +118,14 @@ export function PlatformBar({ project, release, className = '', style }: { proje
                       rel="noopener noreferrer"
                       onClick={open(service)}
                       aria-label={`${isReleased ? 'Open in' : 'Pre-save on'} ${service.name}`}
-                      className="flex h-[68px] items-center gap-4 rounded-[20px] bg-white/[0.08] pl-3 pr-4 transition-[background-color,transform] duration-150 hover:bg-white/[0.12] active:scale-[0.98] active:bg-white/[0.14] focus-visible:outline focus-visible:outline-2 focus-visible:outline-white/70"
+                      className="flex h-[68px] items-center gap-4 rounded-[12px] bg-white/[0.08] pl-3 pr-4 transition-[background-color,transform] duration-150 hover:bg-white/[0.12] active:scale-[0.98] active:bg-white/[0.14] focus-visible:outline focus-visible:outline-2 focus-visible:outline-white/70"
                     >
                       <AppIcon service={service} size={46} />
                       <span className="min-w-0 flex-1 truncate text-[17px] font-semibold">{service.name}</span>
                       <span className="shrink-0 rounded-full bg-white px-4 py-1.5 text-[14px] font-semibold text-black">{isReleased ? 'Open' : 'Pre-save'}</span>
                     </a>
                   ) : (
-                    <span className="flex h-[68px] items-center gap-4 rounded-[20px] bg-white/[0.04] pl-3 pr-4 text-white/40">
+                    <span className="flex h-[68px] items-center gap-4 rounded-[12px] bg-white/[0.04] pl-3 pr-4 text-white/40">
                       <span className="opacity-40 grayscale"><AppIcon service={service} size={46} /></span>
                       <span className="min-w-0 flex-1 truncate text-[17px] font-semibold">{service.name}</span>
                       <span className="shrink-0 text-[14px] font-semibold">Release day</span>

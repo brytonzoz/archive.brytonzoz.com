@@ -106,6 +106,13 @@ export default {
     const url = new URL(request.url);
     if (url.pathname.startsWith(AUDIO_PREFIX)) return serveAudio(request, env, ctx);
     if (url.pathname.startsWith('/api/')) return handleApi(request, env);
+    // Campaign links for posts and bios: brytonzoz.com/go/ig -> the homepage, tagged "ig" in /admin.
+    if (url.pathname.startsWith('/go/')) {
+      const code = url.pathname.slice(4).replace(/\/+$/, '').toLowerCase();
+      const target = new URL('/', url);
+      if (/^[a-z0-9][a-z0-9_-]{0,39}$/.test(code)) target.searchParams.set('ref', code);
+      return Response.redirect(target.toString(), 302);
+    }
     return env.ASSETS.fetch(request);
   },
 } satisfies ExportedHandler<Env>;

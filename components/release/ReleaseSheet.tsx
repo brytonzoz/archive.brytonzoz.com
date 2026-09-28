@@ -45,7 +45,7 @@ export function ReleaseSheet({ project, isOpen, onClose }: { project: Project; i
       <div
         ref={sheetRef}
         tabIndex={-1}
-        className="sheet-panel relative isolate flex h-[calc(100dvh-8px)] w-full max-w-[480px] flex-col overflow-hidden rounded-t-[28px] text-white outline-none sm:h-[min(860px,calc(100dvh-48px))] sm:rounded-[28px]"
+        className="sheet-panel relative isolate flex h-[calc(100dvh-8px)] w-full max-w-[480px] flex-col overflow-hidden rounded-t-[32px] text-white outline-none sm:h-[min(860px,calc(100dvh-48px))] sm:rounded-[32px]"
         style={sheetStyle}
       >
         <div aria-hidden="true" className="absolute inset-0 -z-10 bg-[#111]" />
@@ -75,7 +75,7 @@ export function ReleaseSheet({ project, isOpen, onClose }: { project: Project; i
           </div>
         </div>
 
-        <div className="min-h-0 flex-1 overflow-y-auto overscroll-contain scroll-pb-32">
+        <div className="sheet-scroll min-h-0 flex-1 overflow-y-auto overscroll-contain scroll-pb-32">
           <ReleaseView project={project} release={release} />
         </div>
 

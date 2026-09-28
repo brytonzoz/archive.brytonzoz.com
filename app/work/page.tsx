@@ -1,6 +1,7 @@
 import React from 'react';
 import type { Metadata } from 'next';
 import Link from 'next/link';
+import { SiteFooter } from '../../components/SiteFooter';
 import { ARTIST } from '../../lib/artist';
 
 export const metadata: Metadata = {
@@ -34,6 +35,7 @@ export default function WorkPage() {
           {ARTIST.email}
         </a>
       </div>
+      <SiteFooter />
     </main>
   );
 }

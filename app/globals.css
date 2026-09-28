@@ -412,12 +412,38 @@
     animation: npSwap 220ms cubic-bezier(0.32, 0.72, 0, 1) both;
   }
 
+  .teaser-notify-glow {
+    background: radial-gradient(60% 100% at 50% 0%, rgba(255, 255, 255, 0.1), rgba(255, 255, 255, 0) 70%);
+  }
+
+  .notify-check {
+    animation: heartPop 420ms cubic-bezier(0.34, 1.56, 0.64, 1) both;
+  }
+
+  .heart-pop {
+    animation: heartPop 360ms cubic-bezier(0.34, 1.56, 0.64, 1);
+  }
+
+  @keyframes heartPop {
+    0% { transform: scale(0.6); }
+    60% { transform: scale(1.18); }
+    100% { transform: scale(1); }
+  }
+
+  /* Content scrolling under a sheet's header fades out instead of being cut off. */
+  .sheet-scroll {
+    -webkit-mask-image: linear-gradient(to bottom, transparent 0, #000 22px);
+    mask-image: linear-gradient(to bottom, transparent 0, #000 22px);
+  }
+
   .tracklist {
     -webkit-mask-image: linear-gradient(to bottom, transparent 0, #000 16px, #000 calc(100% - 24px), transparent 100%);
     mask-image: linear-gradient(to bottom, transparent 0, #000 16px, #000 calc(100% - 24px), transparent 100%);
   }
 
   @media (prefers-reduced-motion: reduce) {
+    .heart-pop,
+    .notify-check,
     .solenya-sticker-float,
     .catalog-enter,
     .mini-player,

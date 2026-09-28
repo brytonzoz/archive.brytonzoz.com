@@ -2,6 +2,7 @@ import React from 'react';
 import type { Metadata } from 'next';
 import { notFound } from 'next/navigation';
 import { ReleasePage } from '../../../components/release/ReleasePage';
+import { jsonLdScript, releaseJsonLd } from '../../../lib/artist';
 import { releaseMetadata } from '../../../lib/release-metadata';
 import { getRelease, releases } from '../../../lib/tracks';
 
@@ -23,7 +24,12 @@ export function generateMetadata({ params }: { params: { release: string; song: 
 }
 
 export default function Page({ params }: { params: { release: string; song: string } }) {
-  const { track } = find(params);
-  if (!track) notFound();
-  return <ReleasePage releaseId={params.release} songSlug={params.song} />;
+  const { release, track } = find(params);
+  if (!release || !track) notFound();
+  return (
+    <>
+      <script type="application/ld+json" dangerouslySetInnerHTML={{ __html: jsonLdScript(releaseJsonLd(release, track)) }} />
+      <ReleasePage releaseId={params.release} songSlug={params.song} />
+    </>
+  );
 }

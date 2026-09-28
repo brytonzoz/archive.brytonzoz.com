@@ -1,8 +1,10 @@
 import Link from 'next/link';
+import { SiteFooter } from '../components/SiteFooter';
 
 export default function NotFound() {
   return (
-    <main className="flex min-h-screen flex-col items-center justify-center bg-[#0b0b0c] px-6 text-center text-white">
+    <main className="flex min-h-screen flex-col bg-[#0b0b0c] text-white">
+      <div className="flex flex-1 flex-col items-center justify-center px-6 text-center">
       <p className="text-[12px] font-medium uppercase tracking-[0.16em] text-white/40">404</p>
       <h1 className="mt-3 text-balance text-3xl font-semibold tracking-[-0.03em] sm:text-4xl">This page doesn&rsquo;t exist.</h1>
       <Link
@@ -11,6 +13,8 @@ export default function NotFound() {
       >
         Back to Bryton Zoz
       </Link>
+      </div>
+      <SiteFooter />
     </main>
   );
 }

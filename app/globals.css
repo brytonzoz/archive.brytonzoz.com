@@ -285,41 +285,137 @@
     animation: catalogEnter 600ms cubic-bezier(0.16, 1, 0.3, 1) both;
   }
 
-  .listen-backdrop {
+  .sheet-backdrop {
     animation: listenFadeIn 240ms ease-out backwards;
   }
 
-  .listen-sheet {
+  .sheet-panel {
     animation: listenSheetIn 460ms cubic-bezier(0.32, 0.72, 0, 1) backwards;
   }
 
-  .is-closing .listen-backdrop {
+  .is-closing .sheet-backdrop {
     animation: listenFadeOut 220ms ease-in forwards;
   }
 
-  .is-closing .listen-sheet {
+  .is-closing .sheet-panel {
     animation: listenSheetOut 220ms cubic-bezier(0.32, 0.72, 0, 1) forwards;
   }
 
   @media (min-width: 640px) {
-    .listen-sheet {
+    .sheet-panel {
       animation-name: listenCardIn;
       animation-duration: 280ms;
     }
 
-    .is-closing .listen-sheet {
+    .is-closing .sheet-panel {
       animation-name: listenCardOut;
     }
   }
 
+  .mini-player {
+    animation: miniPlayerIn 520ms cubic-bezier(0.32, 0.72, 0, 1) backwards;
+  }
+
+  .equalizer {
+    display: inline-flex;
+    height: 14px;
+    align-items: flex-end;
+    gap: 2px;
+  }
+
+  .equalizer > span {
+    width: 3px;
+    height: 100%;
+    border-radius: 1px;
+    background: currentColor;
+    color: #fff;
+    transform-origin: bottom;
+    transform: scaleY(0.3);
+    animation: equalizer 900ms ease-in-out infinite alternate;
+    animation-play-state: paused;
+  }
+
+  .equalizer > span:nth-child(2) {
+    animation-delay: -300ms;
+    animation-duration: 700ms;
+  }
+
+  .equalizer > span:nth-child(3) {
+    animation-delay: -600ms;
+    animation-duration: 1100ms;
+  }
+
+  .equalizer.is-playing > span {
+    animation-play-state: running;
+  }
+
+  .player-spinner {
+    border: 2px solid rgba(255, 255, 255, 0.15);
+    border-top-color: rgba(255, 255, 255, 0.9);
+    animation: playerSpin 800ms linear infinite;
+  }
+
+  .scrubber {
+    -webkit-appearance: none;
+    appearance: none;
+    height: 20px;
+    background: transparent;
+    cursor: pointer;
+    touch-action: none;
+  }
+
+  .scrubber::-webkit-slider-runnable-track {
+    height: 5px;
+    border-radius: 999px;
+    background: linear-gradient(to right, rgba(255, 255, 255, 0.9) var(--pct), rgba(255, 255, 255, 0.18) var(--pct));
+  }
+
+  .scrubber::-moz-range-track {
+    height: 5px;
+    border-radius: 999px;
+    background: linear-gradient(to right, rgba(255, 255, 255, 0.9) var(--pct), rgba(255, 255, 255, 0.18) var(--pct));
+  }
+
+  .scrubber::-webkit-slider-thumb {
+    -webkit-appearance: none;
+    appearance: none;
+    width: 14px;
+    height: 14px;
+    margin-top: -4.5px;
+    border-radius: 999px;
+    background: #fff;
+    box-shadow: 0 2px 8px rgba(0, 0, 0, 0.35);
+    transition: transform 150ms ease;
+  }
+
+  .scrubber::-moz-range-thumb {
+    width: 14px;
+    height: 14px;
+    border: 0;
+    border-radius: 999px;
+    background: #fff;
+  }
+
+  .scrubber:active::-webkit-slider-thumb {
+    transform: scale(1.35);
+  }
+
+  .scrubber:focus-visible {
+    outline: 2px solid rgba(255, 255, 255, 0.7);
+    outline-offset: 4px;
+    border-radius: 4px;
+  }
+
   @media (prefers-reduced-motion: reduce) {
     .solenya-sticker-float,
-    .catalog-enter {
+    .catalog-enter,
+    .mini-player,
+    .equalizer > span {
       animation: none;
     }
 
-    .listen-backdrop,
-    .listen-sheet {
+    .sheet-backdrop,
+    .sheet-panel {
       animation-duration: 1ms !important;
     }
   }
@@ -347,6 +443,28 @@
   to {
     opacity: 1;
     transform: none;
+  }
+}
+
+@keyframes playerSpin {
+  to {
+    transform: rotate(360deg);
+  }
+}
+
+@keyframes miniPlayerIn {
+  from {
+    opacity: 0;
+    transform: translateY(24px) scale(0.96);
+  }
+}
+
+@keyframes equalizer {
+  0% {
+    transform: scaleY(0.25);
+  }
+  100% {
+    transform: scaleY(1);
   }
 }
 

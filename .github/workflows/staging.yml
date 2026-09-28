@@ -52,6 +52,9 @@ jobs:
 
       - run: npm run build
 
+      - name: Check every live song exists in R2
+        run: npm run check:tracks
+
       - name: Deploy to staging
         id: deploy
         env:

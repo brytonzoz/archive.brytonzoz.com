@@ -1,9 +1,13 @@
 'use client';
 
-import React, { useCallback, useEffect, useId, useRef, useState } from 'react';
+import React, { useId } from 'react';
 import { Project, getProjectTypeLabel, getStreamingLinks, isProjectReleased } from '../lib/utils';
 import { streamingIconAssets } from '../lib/assets';
+import { getReleaseForProject } from '../lib/tracks';
 import { ResponsiveImage, placeholderBackground } from './ResponsiveImage';
+import { usePlayer } from './player/context';
+import { PlayIcon } from './player/icons';
+import { useSheet } from './useSheet';
 
 const SERVICES = [
   { key: 'applemusic', name: 'Apple Music', icon: streamingIconAssets.applemusic, tile: '#FA2D48', button: '#FA2D48', buttonText: '#FFFFFF' },
@@ -16,9 +20,6 @@ const RELEASE_NOUNS: Record<string, string> = {
   'streaming-ep': 'EP',
   mixtape: 'mixtape',
 };
-
-const CLOSE_MS = 220;
-const DISMISS_DRAG_PX = 90;
 
 // Tell people exactly where a button lands, derived from the link itself.
 function describeDestination(url: string, releaseNoun: string): string {
@@ -46,48 +47,9 @@ export function ListenSheet({
   onClose: () => void;
 }) {
   const titleId = useId();
-  const sheetRef = useRef<HTMLDivElement>(null);
-  const onCloseRef = useRef(onClose);
-  onCloseRef.current = onClose;
-  const dragStartY = useRef<number | null>(null);
-  const [dragY, setDragY] = useState(0);
-  const [isDragging, setIsDragging] = useState(false);
-  const [isClosing, setIsClosing] = useState(false);
-
-  const requestClose = useCallback(() => setIsClosing(true), []);
-
-  useEffect(() => {
-    if (!isClosing) return;
-    const timer = window.setTimeout(() => {
-      setIsClosing(false);
-      setDragY(0);
-      onCloseRef.current();
-    }, CLOSE_MS);
-    return () => window.clearTimeout(timer);
-  }, [isClosing]);
-
-  useEffect(() => {
-    if (!isOpen) return;
-
-    const previouslyFocused = document.activeElement as HTMLElement | null;
-    const scroller = document.querySelector<HTMLElement>('.scroll-container');
-    const previousOverflow = [document.documentElement.style.overflow, scroller?.style.overflow ?? ''];
-    document.documentElement.style.overflow = 'hidden';
-    if (scroller) scroller.style.overflow = 'hidden';
-    sheetRef.current?.focus({ preventScroll: true });
-
-    const handleKey = (event: KeyboardEvent) => {
-      if (event.key === 'Escape') requestClose();
-    };
-    window.addEventListener('keydown', handleKey);
-
-    return () => {
-      window.removeEventListener('keydown', handleKey);
-      document.documentElement.style.overflow = previousOverflow[0];
-      if (scroller) scroller.style.overflow = previousOverflow[1];
-      previouslyFocused?.focus?.({ preventScroll: true });
-    };
-  }, [isOpen, requestClose]);
+  const { sheetRef, isClosing, requestClose, dragHandlers, sheetStyle } = useSheet(isOpen, onClose);
+  const player = usePlayer();
+  const siteRelease = getReleaseForProject(project.name);
 
   const links = getStreamingLinks(project);
   if (!isOpen || !links) return null;
@@ -102,17 +64,6 @@ export function ListenSheet({
     }))
     .filter((service) => service.url || !isReleased);
 
-  const endDrag = () => {
-    if (dragStartY.current === null) return;
-    dragStartY.current = null;
-    setIsDragging(false);
-    if (dragY > DISMISS_DRAG_PX) {
-      requestClose();
-    } else {
-      setDragY(0);
-    }
-  };
-
   return (
     <div
       role="dialog"
@@ -123,31 +74,18 @@ export function ListenSheet({
       <div
         aria-hidden="true"
         onClick={requestClose}
-        className="listen-backdrop absolute inset-0 touch-none bg-black/60 backdrop-blur-md"
+        className="sheet-backdrop absolute inset-0 touch-none bg-black/60 backdrop-blur-md"
       />
 
       <div
         ref={sheetRef}
         tabIndex={-1}
-        className="listen-sheet relative w-full max-w-[420px] rounded-t-[32px] bg-[#131315] text-white shadow-[0_-10px_60px_rgba(0,0,0,0.45)] outline-none ring-1 ring-white/[0.08] sm:rounded-[32px]"
-        style={{
-          '--drag-y': `${dragY}px`,
-          transform: dragY ? `translateY(${dragY}px)` : undefined,
-          transition: isDragging ? 'none' : 'transform 320ms cubic-bezier(0.32, 0.72, 0, 1)',
-        } as React.CSSProperties}
+        className="sheet-panel relative w-full max-w-[420px] rounded-t-[32px] bg-[#131315] text-white shadow-[0_-10px_60px_rgba(0,0,0,0.45)] outline-none ring-1 ring-white/[0.08] sm:rounded-[32px]"
+        style={sheetStyle}
       >
         <div
           className="touch-none select-none px-6 pb-5 pt-2.5 text-center"
-          onPointerDown={(event) => {
-            dragStartY.current = event.clientY;
-            setIsDragging(true);
-            event.currentTarget.setPointerCapture(event.pointerId);
-          }}
-          onPointerMove={(event) => {
-            if (dragStartY.current !== null) setDragY(Math.max(0, event.clientY - dragStartY.current));
-          }}
-          onPointerUp={endDrag}
-          onPointerCancel={endDrag}
+          {...dragHandlers}
         >
           <div aria-hidden="true" className="mx-auto h-[5px] w-10 rounded-full bg-white/20 sm:invisible" />
           {project.image ? (
@@ -177,6 +115,37 @@ export function ListenSheet({
         </p>
 
         <ul className="space-y-2 px-3">
+          {siteRelease && isReleased ? (
+            <li>
+              <button
+                type="button"
+                onClick={() => {
+                  if (player.current?.release.id === siteRelease.id) {
+                    player.expand();
+                  } else {
+                    player.playRelease(siteRelease);
+                  }
+                  requestClose();
+                }}
+                className="flex w-full items-center gap-3.5 rounded-[20px] bg-white/[0.1] p-3 pr-3.5 text-left ring-1 ring-inset ring-white/10 transition-[background-color,transform] duration-150 hover:bg-white/[0.14] active:scale-[0.98] focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-white/70"
+              >
+                <span className="flex h-11 w-11 shrink-0 items-center justify-center rounded-[12px] bg-white text-black">
+                  <PlayIcon size={20} className="translate-x-[1px]" />
+                </span>
+                <span className="min-w-0 flex-1">
+                  <span className="block text-[16px] font-semibold leading-tight">Play here</span>
+                  <span className="mt-0.5 block text-[13px] leading-tight text-white/55">
+                    {player.current?.release.id === siteRelease.id
+                      ? 'Playing now on this site'
+                      : `${siteRelease.tracks.length} songs · keeps playing as you browse`}
+                  </span>
+                </span>
+                <span className="shrink-0 rounded-full bg-white px-4 py-[7px] text-[14px] font-semibold text-black">
+                  {player.current?.release.id === siteRelease.id ? 'View' : 'Play'}
+                </span>
+              </button>
+            </li>
+          ) : null}
           {services.map((service) => {
             const tile = (
               <span

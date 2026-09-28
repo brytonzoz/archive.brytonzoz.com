@@ -31,6 +31,7 @@ Then run `npm ci`.
 | New cover art | Save the original to `assets-src/covers/<slug>.<ext>`, run `npm run media`, use `media['covers/<slug>']` |
 | New scene stickers | `assets-src/scenes/<scene>/`, then wire them up in `lib/assets.ts` and the scene in `app/page.tsx` |
 | Music / fashion grid pages | `app/music/page.tsx`, `app/fashion/page.tsx`, `components/ProjectCard.tsx` |
+| Songs for the on-site player | `lib/tracks.json` (see "Music player" below) |
 
 Images the owner sends in chat: save the original under `assets-src/` (never `public/`), run
 `npm run media`, and commit both the original and `lib/media-manifest.json`.
@@ -38,6 +39,17 @@ Images the owner sends in chat: save the original under `assets-src/` (never `pu
 A homepage project without its own scene renders as a `ProjectCard`. A full scene like SOLENYA's
 needs a scene component in `app/page.tsx`. For bigger "test a new structure" requests, build it in
 the same PR so the owner can judge it on staging; nothing reaches production until they merge.
+
+### Music player
+
+- Songs live in R2 under `https://media.brytonzoz.com/music/<release>/<NN>-<title-slug>.mp3` (MP3, 256–320 kbps;
+  Cloudflare caches .mp3 at the edge). `lib/tracks.json` maps each track to its file, with title, duration and
+  explicit flag. For releases on Apple Music, take titles and durations from
+  `https://itunes.apple.com/lookup?id=<albumId>&entity=song`.
+- After the owner uploads, run `NODE_USE_ENV_PROXY=1 node scripts/check-tracks.mjs --all`. Only flip a release to
+  `"available": true` once every file shows `ok`, then push. CI runs the same check and blocks a broken release.
+- The player appears automatically once any release is available: "Play here" in the Listen sheet, a mini player
+  while browsing, and Now Playing with the full tracklist.
 
 ## 3. Verify before pushing
 

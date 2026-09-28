@@ -3,6 +3,7 @@
 import React, { useCallback, useEffect, useState } from 'react';
 import { ProjectCard } from '../components/ProjectCard';
 import { ListenSheet } from '../components/ListenSheet';
+import { usePlayer } from '../components/player/context';
 import { ResponsiveImage, placeholderBackground } from '../components/ResponsiveImage';
 import { getProjects } from '../lib/projects';
 import { cautionSceneAssets, reminderSceneAssets, scrapwrkSceneAssets, solenyaSceneAssets } from '../lib/assets';
@@ -206,7 +207,7 @@ function FooterSocialLink({
       target="_blank"
       rel="noopener noreferrer"
       aria-label={label}
-      className="rounded-sm text-white/45 transition-colors duration-200 hover:text-white focus-visible:text-white focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-4 focus-visible:outline-white/60"
+      className="rounded-sm text-white/70 transition-colors duration-200 hover:text-white focus-visible:text-white focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-4 focus-visible:outline-white/60"
     >
       {children}
     </a>
@@ -250,11 +251,11 @@ function FacebookIcon() {
 function SiteFooter() {
   return (
     <footer
-      className="pointer-events-none absolute inset-x-0 bottom-0 z-30 flex items-center justify-between gap-6 px-6 text-[13px] sm:px-10"
-      style={{ paddingBottom: 'max(1.25rem, env(safe-area-inset-bottom))' }}
+      className="pointer-events-none absolute inset-x-0 bottom-0 z-30 flex items-center justify-between gap-6 bg-gradient-to-t from-black/75 via-black/50 via-45% to-transparent px-6 pt-24 text-[13px] [text-shadow:0_1px_10px_rgba(0,0,0,0.55)] sm:px-10"
+      style={{ paddingBottom: 'calc(max(1.25rem, env(safe-area-inset-bottom)) + var(--player-offset, 0px))' }}
     >
-      <p className="text-white/45">
-        <span className="font-medium text-white/75">Bryton Zoz</span>
+      <p className="text-white/60">
+        <span className="font-medium text-white/85">Bryton Zoz</span>
         <span className="ml-2">&copy; 2026</span>
       </p>
       <nav aria-label="Social" className="pointer-events-auto flex items-center gap-5">
@@ -1533,6 +1534,7 @@ export default function HomePage() {
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [showScrollPrompt, setShowScrollPrompt] = useState(true);
   const [loadDeferredScenes, setLoadDeferredScenes] = useState(false);
+  const { current: currentTrack } = usePlayer();
   const [containerSize, setContainerSize] = useState({ width: 0, height: 0, imageAspectRatio: 16 / 9 });
   const clampedBackgroundProgress = clamp(scrollProgress, 0, allProjects.length - 1);
   const currentBackgroundIndex = Math.floor(clampedBackgroundProgress);
@@ -1689,7 +1691,7 @@ export default function HomePage() {
                     project={project}
                     distance={sceneDistance}
                     loadImages={index === 0 || loadDeferredScenes}
-                    showScrollPrompt={showScrollPrompt && activeIndex === 0 && !isModalOpen}
+                    showScrollPrompt={showScrollPrompt && activeIndex === 0 && !isModalOpen && !currentTrack}
                     onScrollPromptClick={handleScrollToNext}
                     onModalStateChange={handleModalStateChange}
                   />

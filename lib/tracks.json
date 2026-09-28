@@ -1,0 +1,48 @@
+{
+  "baseUrl": "https://media.brytonzoz.com/music",
+  "releases": [
+    {
+      "id": "solenya",
+      "title": "SOLENYA",
+      "projectName": "SOLENYA",
+      "cover": "covers/solenya",
+      "available": false,
+      "tracks": [
+        { "title": "solenya", "file": "solenya/01-solenya.mp3", "durationMs": 218313, "explicit": true },
+        { "title": "no promises", "file": "solenya/02-no-promises.mp3", "durationMs": 121183, "explicit": true },
+        { "title": "serendipitous mistakes", "file": "solenya/03-serendipitous-mistakes.mp3", "durationMs": 154388, "explicit": true },
+        { "title": "lift me higher", "file": "solenya/04-lift-me-higher.mp3", "durationMs": 142987, "explicit": true },
+        { "title": "rediscover self", "file": "solenya/05-rediscover-self.mp3", "durationMs": 176470, "explicit": true },
+        { "title": "get out your head", "file": "solenya/06-get-out-your-head.mp3", "durationMs": 144914, "explicit": true },
+        { "title": "rolled up emotions", "file": "solenya/07-rolled-up-emotions.mp3", "durationMs": 224791, "explicit": true },
+        { "title": "reconnect", "file": "solenya/08-reconnect.mp3", "durationMs": 132933, "explicit": true },
+        { "title": "disappointing flaws", "file": "solenya/09-disappointing-flaws.mp3", "durationMs": 137112, "explicit": true },
+        { "title": "satisfied", "file": "solenya/10-satisfied.mp3", "durationMs": 141710, "explicit": true },
+        { "title": "not your friend", "file": "solenya/11-not-your-friend.mp3", "durationMs": 359258, "explicit": true },
+        { "title": "spend the night", "file": "solenya/12-spend-the-night.mp3", "durationMs": 225023, "explicit": true }
+      ]
+    },
+    {
+      "id": "caution",
+      "title": "CAUTION",
+      "projectName": "CAUTION",
+      "cover": "covers/caution",
+      "available": false,
+      "tracks": [
+        { "title": "star", "file": "caution/01-star.mp3", "durationMs": 218399, "explicit": true },
+        { "title": "butter fingers", "file": "caution/02-butter-fingers.mp3", "durationMs": 138375, "explicit": true },
+        { "title": "purpose", "file": "caution/03-purpose.mp3", "durationMs": 134000, "explicit": true },
+        { "title": "machine", "file": "caution/04-machine.mp3", "durationMs": 154498, "explicit": true },
+        { "title": "cars", "file": "caution/05-cars.mp3", "durationMs": 204975, "explicit": true }
+      ]
+    },
+    {
+      "id": "just-a-reminder-to-live-life",
+      "title": "Just A Reminder To Live Life",
+      "projectName": "Just A Reminder To Live Life",
+      "cover": "covers/just-a-reminder",
+      "available": false,
+      "tracks": []
+    }
+  ]
+}

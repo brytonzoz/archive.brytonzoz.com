@@ -2,6 +2,7 @@ import React from 'react'
 import type { Metadata } from 'next'
 import { Inter } from 'next/font/google'
 import './globals.css'
+import { PlayerProvider } from '../components/player/PlayerProvider'
 
 const inter = Inter({ 
   subsets: ['latin'],
@@ -45,11 +46,13 @@ export default function RootLayout({
   return (
     <html lang="en" className="dark">
       <body className={`${inter.variable} font-body antialiased`}>
-        <div className="min-h-screen bg-black overflow-x-hidden">
-          <main className="relative">
-            {children}
-          </main>
-        </div>
+        <PlayerProvider>
+          <div className="min-h-screen bg-black overflow-x-hidden">
+            <main className="relative">
+              {children}
+            </main>
+          </div>
+        </PlayerProvider>
       </body>
     </html>
   )

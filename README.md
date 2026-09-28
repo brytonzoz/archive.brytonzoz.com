@@ -106,6 +106,18 @@ Changes ship through GitHub, with no local machine required:
 
 Deploys need the `CLOUDFLARE_API_TOKEN` GitHub Actions secret. See `CLAUDE.md` and `.claude/skills/site-manager/` for how Claude sessions work on this repo.
 
+## Music player
+
+The site can play Bryton's music itself, and keeps playing while visitors scroll and move between pages.
+
+- Songs are MP3s in Cloudflare R2, served from `https://media.brytonzoz.com/music/…`.
+- `lib/tracks.json` lists each release (SOLENYA, CAUTION, Just A Reminder To Live Life) with its songs and their
+  exact file names. A release appears in the player only when `"available": true`.
+- `npm run check:tracks` confirms every song of an available release exists; both deploy workflows run it and stop
+  if anything is missing. `--all` also reports releases that aren't live yet.
+- UI: a "Play here" row in the Listen sheet, a mini player at the bottom, and a full Now Playing sheet with the
+  tracklists. It works with the phone's lock screen, headphones and car controls through the Media Session API.
+
 ## Hosting
 
 ### Cloudflare Workers (production)

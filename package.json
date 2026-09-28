@@ -13,7 +13,8 @@
     "preview": "npm run build && wrangler dev",
     "deploy:staging": "npm run build && wrangler deploy --env staging",
     "deploy": "npm run build && wrangler deploy --env=\"\"",
-    "deploy:redirects": "wrangler deploy --config workers/redirects/wrangler.jsonc"
+    "deploy:redirects": "wrangler deploy --config workers/redirects/wrangler.jsonc",
+    "check:tracks": "node scripts/check-tracks.mjs"
   },
   "dependencies": {
     "autoprefixer": "^10.4.21",

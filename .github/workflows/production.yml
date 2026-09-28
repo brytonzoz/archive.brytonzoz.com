@@ -29,6 +29,9 @@ jobs:
 
       - run: npm run build
 
+      - name: Check every live song exists in R2
+        run: npm run check:tracks
+
       - name: Check deploy credentials
         env:
           CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}

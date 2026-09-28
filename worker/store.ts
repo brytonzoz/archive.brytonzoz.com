@@ -230,7 +230,7 @@ async function order(url: URL, env: MerchEnv & { DB: D1Database }): Promise<Resp
   }
   const paid = isPaid(session);
   if (paid) await markSold(env.DB, sessionId);
-  const merchStatus = paid ? await fulfillMerch(env, session) : null;
+  const merchStatus = paid ? await fulfillMerch(env, session, { wait: false }) : null;
   const shipping = session.collected_information?.shipping_details ?? session.shipping_details;
   return json({
     paid,
@@ -270,7 +270,7 @@ async function webhook(request: Request, env: MerchEnv & { DB: D1Database }): Pr
   if (event.type === 'checkout.session.completed' || event.type === 'checkout.session.async_payment_succeeded') {
     if (isPaid(session)) {
       await markSold(env.DB, session.id);
-      await fulfillMerch(env, session);
+      await fulfillMerch(env, session, { wait: false });
     }
   } else if (event.type === 'checkout.session.expired' || event.type === 'checkout.session.async_payment_failed') {
     await release(env.DB, session.id);

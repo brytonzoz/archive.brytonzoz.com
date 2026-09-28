@@ -98,8 +98,38 @@ function splitName(name: string): { first: string; last: string } {
   return { first: parts[0] ?? '', last: parts.slice(1).join(' ') || parts[0] || '' };
 }
 
-// Sends a paid checkout's tees to Printify (once). Returns the stored status.
-export async function fulfillMerch(env: MerchEnv & { DB: D1Database }, session: StripeSession): Promise<string | null> {
+type PrintifyOrder = { id: string; status: string; external_id?: string; metadata?: { shop_order_id?: string | number } };
+// Printify states once an order has been sent to print (or beyond).
+const IN_PRODUCTION = new Set(['sending-to-production', 'in-production', 'partially-fulfilled', 'fulfilled', 'shipped', 'delivered']);
+const sleep = (ms: number) => new Promise((resolve) => setTimeout(resolve, ms));
+
+// An order already made for this external id (a Stripe session or a manual row), so a retry never
+// places a second one.
+async function findOrder(env: MerchEnv, externalId: string): Promise<PrintifyOrder | undefined> {
+  const list = await printify<{ data?: PrintifyOrder[] }>(env, 'GET', `/shops/${merch.shopId}/orders.json?limit=50`);
+  return list.data?.find((order) => order.external_id === externalId || String(order.metadata?.shop_order_id ?? '') === externalId);
+}
+
+// A new Printify order is "pending" for a few seconds while Printify prices it, and can only be sent
+// to print once it's "on-hold". Checks `tries` times, 2.5s apart; if it isn't ready yet, the
+// scheduled job finishes it.
+async function sendWhenReady(env: MerchEnv, orderId: string, tries = 6): Promise<boolean> {
+  for (let attempt = 0; attempt < tries; attempt++) {
+    const order = await printify<PrintifyOrder>(env, 'GET', `/shops/${merch.shopId}/orders/${orderId}.json`);
+    if (IN_PRODUCTION.has(order.status)) return true;
+    if (order.status === 'on-hold') {
+      await printify(env, 'POST', `/shops/${merch.shopId}/orders/${orderId}/send_to_production.json`);
+      return true;
+    }
+    if (attempt < tries - 1) await sleep(2500);
+  }
+  return false;
+}
+
+// Sends a paid checkout's tees to Printify (once). Returns the stored status: "created" means the
+// order exists and goes to print on the next scheduled run. The thank-you page doesn't wait
+// (`wait: false`); the scheduled job does.
+export async function fulfillMerch(env: MerchEnv & { DB: D1Database }, session: StripeSession, { wait = true } = {}): Promise<string | null> {
   const lines = decodeMerch(session.metadata?.merch);
   if (!lines.length || !isPaid(session)) return null;
   if (!env.PRINTIFY_ACCESS) return 'not-configured';
@@ -117,8 +147,11 @@ export async function fulfillMerch(env: MerchEnv & { DB: D1Database }, session: 
   const shipping = session.collected_information?.shipping_details ?? session.shipping_details;
   const address = shipping?.address;
   const { first, last } = splitName(shipping?.name ?? session.customer_details?.name ?? 'Customer');
+  const save = (status: string, orderId: string | null, error: string | null) =>
+    env.DB.prepare('UPDATE merch_orders SET status = ?, printify_order_id = COALESCE(?, printify_order_id), error = ?, updated_at = ? WHERE session_id = ?')
+      .bind(status, orderId, error, Date.now(), session.id).run();
   try {
-    const order = await printify<{ id: string }>(env, 'POST', `/shops/${merch.shopId}/orders.json`, {
+    const order = await findOrder(env, session.id) ?? await printify<PrintifyOrder>(env, 'POST', `/shops/${merch.shopId}/orders.json`, {
       external_id: session.id,
       label: 'brytonzoz.com',
       line_items: lines.map(({ variant, quantity }) => ({ product_id: variant.printifyId, variant_id: variant.variantId, quantity })),
@@ -137,28 +170,38 @@ export async function fulfillMerch(env: MerchEnv & { DB: D1Database }, session: 
         zip: address?.postal_code ?? '',
       },
     });
+    await save('created', order.id, null);
     // Straight into production: it's already paid for.
-    await printify(env, 'POST', `/shops/${merch.shopId}/orders/${order.id}/send_to_production.json`);
-    await env.DB.prepare("UPDATE merch_orders SET status = 'sent', printify_order_id = ?, error = NULL, updated_at = ? WHERE session_id = ?")
-      .bind(order.id, Date.now(), session.id).run();
-    return 'sent';
+    const sent = await sendWhenReady(env, order.id, wait ? 6 : 1);
+    if (sent) await save('sent', order.id, null);
+    return sent ? 'sent' : 'created';
   } catch (error) {
     console.error('printify order failed', session.id, error);
-    await env.DB.prepare("UPDATE merch_orders SET status = 'failed', error = ?, updated_at = ? WHERE session_id = ?")
-      .bind(String(error).slice(0, 500), Date.now(), session.id).run();
+    await save('failed', null, String(error).slice(0, 500));
     return 'failed';
   }
 }
 
-// Scheduled: every paid checkout with tees from the last three days has a Printify order.
+// Scheduled: every paid checkout with tees from the last three days has a Printify order, and
+// every order Printify was still pricing has been sent to print.
 export async function reconcileMerch(env: MerchEnv & { DB: D1Database }): Promise<void> {
   if (!env.STRIPE_SECRET_KEY || !env.PRINTIFY_ACCESS) return;
+  const { results: waiting } = await env.DB.prepare("SELECT session_id, printify_order_id FROM merch_orders WHERE status = 'created' AND printify_order_id IS NOT NULL").all<{ session_id: string; printify_order_id: string }>();
+  for (const row of waiting) {
+    try {
+      if (await sendWhenReady(env, row.printify_order_id)) {
+        await env.DB.prepare("UPDATE merch_orders SET status = 'sent', error = NULL, updated_at = ? WHERE session_id = ?").bind(Date.now(), row.session_id).run();
+      }
+    } catch (error) {
+      console.error('send to production failed', row.session_id, error);
+    }
+  }
   const since = Math.floor(Date.now() / 1000) - 3 * 86_400;
   const list = await stripe<{ data: StripeSession[] }>(env, 'GET', `checkout/sessions?limit=100&status=complete&created[gte]=${since}`);
   for (const session of list.data) {
     if (!session.metadata?.merch || !isPaid(session)) continue;
     const row = await env.DB.prepare('SELECT status, attempts FROM merch_orders WHERE session_id = ?').bind(session.id).first<{ status: string; attempts: number }>();
-    if (row && (row.status === 'sent' || row.status === 'sending' || row.attempts >= 5)) continue;
+    if (row && (row.status !== 'failed' || row.attempts >= 5)) continue;
     await fulfillMerch(env, session);
   }
 }
@@ -171,42 +214,48 @@ export async function merchOrders(db: D1Database) {
 
 type ManualOrder = {
   id: number; design: string; variant_id: number; name: string; address1: string; address2: string | null;
-  city: string; region: string; zip: string; country: string; max_cents: number;
+  city: string; region: string; zip: string; country: string; max_cents: number; status: string; printify_order_id: string | null;
 };
 
 // Scheduled: one-off orders at cost from D1 `manual_orders` (samples, added by hand). Each is quoted
-// first and only ordered when tee + standard shipping is within its max_cents.
+// first and only ordered when tee + standard shipping is within its max_cents; one Printify is still
+// pricing ("created") is sent to print on a later run.
 export async function placeManualOrders(env: MerchEnv & { DB: D1Database }): Promise<void> {
   if (!env.PRINTIFY_ACCESS) return;
-  const { results } = await env.DB.prepare("SELECT * FROM manual_orders WHERE status = 'pending' ORDER BY id LIMIT 5").all<ManualOrder>();
+  const { results } = await env.DB.prepare("SELECT * FROM manual_orders WHERE status IN ('pending', 'created') ORDER BY id LIMIT 5").all<ManualOrder>();
   for (const row of results) {
-    const claim = await env.DB.prepare("UPDATE manual_orders SET status = 'sending', updated_at = ? WHERE id = ? AND status = 'pending'").bind(Date.now(), row.id).run();
+    const claim = await env.DB.prepare("UPDATE manual_orders SET status = 'sending', updated_at = ? WHERE id = ? AND status = ?").bind(Date.now(), row.id, row.status).run();
     if (!claim.meta.changes) continue;
     const done = (status: string, fields: { quote?: number; order?: string; error?: string } = {}) =>
-      env.DB.prepare('UPDATE manual_orders SET status = ?, quote_cents = COALESCE(?, quote_cents), printify_order_id = ?, error = ?, updated_at = ? WHERE id = ?')
+      env.DB.prepare('UPDATE manual_orders SET status = ?, quote_cents = COALESCE(?, quote_cents), printify_order_id = COALESCE(?, printify_order_id), error = ?, updated_at = ? WHERE id = ?')
         .bind(status, fields.quote ?? null, fields.order ?? null, fields.error ?? null, Date.now(), row.id).run();
     try {
-      const variant = VARIANTS.get(`${row.design}:${row.variant_id}`);
-      if (!variant) throw new Error(`Unknown tee ${row.design}:${row.variant_id}`);
-      const { first, last } = splitName(row.name);
-      const address_to = {
-        first_name: first, last_name: last, country: row.country || 'US', region: row.region,
-        address1: row.address1, address2: row.address2 ?? '', city: row.city, zip: row.zip,
-      };
-      const line_items = [{ product_id: variant.printifyId, variant_id: variant.variantId, quantity: 1 }];
-      const product = await printify<{ variants: { id: number; cost: number }[] }>(env, 'GET', `/shops/${merch.shopId}/products/${variant.printifyId}.json`);
-      const cost = product.variants.find((entry) => entry.id === variant.variantId)?.cost ?? Infinity;
-      const quote = await printify<{ standard: number }>(env, 'POST', `/shops/${merch.shopId}/orders/shipping.json`, { line_items, address_to });
-      const total = cost + quote.standard;
-      if (!(total <= row.max_cents)) {
-        await done('over-budget', { quote: Number.isFinite(total) ? total : undefined, error: `Quote ${total} is over ${row.max_cents}` });
-        continue;
+      const externalId = `manual-${row.id}`;
+      let orderId = row.printify_order_id ?? (await findOrder(env, externalId))?.id;
+      if (!orderId) {
+        const variant = VARIANTS.get(`${row.design}:${row.variant_id}`);
+        if (!variant) throw new Error(`Unknown tee ${row.design}:${row.variant_id}`);
+        const { first, last } = splitName(row.name);
+        const address_to = {
+          first_name: first, last_name: last, country: row.country || 'US', region: row.region,
+          address1: row.address1, address2: row.address2 ?? '', city: row.city, zip: row.zip,
+        };
+        const line_items = [{ product_id: variant.printifyId, variant_id: variant.variantId, quantity: 1 }];
+        const product = await printify<{ variants: { id: number; cost: number }[] }>(env, 'GET', `/shops/${merch.shopId}/products/${variant.printifyId}.json`);
+        const cost = product.variants.find((entry) => entry.id === variant.variantId)?.cost ?? Infinity;
+        const quote = await printify<{ standard: number }>(env, 'POST', `/shops/${merch.shopId}/orders/shipping.json`, { line_items, address_to });
+        const total = cost + quote.standard;
+        if (!(total <= row.max_cents)) {
+          await done('over-budget', { quote: Number.isFinite(total) ? total : undefined, error: `Quote ${total} is over ${row.max_cents}` });
+          continue;
+        }
+        const order = await printify<PrintifyOrder>(env, 'POST', `/shops/${merch.shopId}/orders.json`, {
+          external_id: externalId, label: 'Sample for Bryton', line_items, shipping_method: 1, send_shipping_notification: false, address_to,
+        });
+        orderId = order.id;
+        await done('created', { quote: total, order: orderId });
       }
-      const order = await printify<{ id: string }>(env, 'POST', `/shops/${merch.shopId}/orders.json`, {
-        external_id: `manual-${row.id}`, label: 'Sample for Bryton', line_items, shipping_method: 1, send_shipping_notification: false, address_to,
-      });
-      await printify(env, 'POST', `/shops/${merch.shopId}/orders/${order.id}/send_to_production.json`);
-      await done('sent', { quote: total, order: order.id });
+      await done((await sendWhenReady(env, orderId)) ? 'sent' : 'created', { order: orderId });
     } catch (error) {
       console.error('manual order failed', row.id, error);
       await done('failed', { error: String(error).slice(0, 500) });

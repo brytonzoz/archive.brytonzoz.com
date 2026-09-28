@@ -60,6 +60,12 @@ async function inspect() {
     console.log(`- ${upload.id} · ${upload.file_name} · ${upload.width}x${upload.height} · ${upload.mime_type} · ${upload.upload_time ?? ''} · ${upload.preview_url}`);
   }
   for (const shop of shops) {
+    // Recent orders: ids, status and references only (no addresses in the public log).
+    const orders = await printify('GET', `/shops/${shop.id}/orders.json?limit=10`);
+    console.log(`\n## Recent orders in ${shop.title}`);
+    for (const order of orders.data ?? []) {
+      console.log(`- ${order.id} · ${order.status} · external_id ${order.external_id ?? '-'} · shop_order_id ${order.metadata?.shop_order_id ?? '-'} · label ${order.metadata?.shop_order_label ?? order.label ?? '-'} · total ${order.total_price}+${order.total_shipping} · ${order.created_at}`);
+    }
     const products = await printify('GET', `/shops/${shop.id}/products.json?limit=50`);
     console.log(`\n## Products in ${shop.title} (${products.total ?? products.data?.length ?? 0})`);
     for (const product of products.data ?? []) {

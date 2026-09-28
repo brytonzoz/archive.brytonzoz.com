@@ -2716,86 +2716,6 @@
       "number": "038"
     },
     {
-      "slug": "keychain-rainbow",
-      "line": "keychain",
-      "lineName": "Keychain",
-      "category": "Stickers & Pins",
-      "name": "Rainbow",
-      "title": "NonParallel Keychain — Rainbow",
-      "printifyId": "6abae2b22868f59b700b7b3e",
-      "printProviderId": 23,
-      "price": 2300,
-      "blank": "Generic brand",
-      "details": [
-        "Material: polycarbonate shell, TPU lining",
-        "Dimensions: 1.46” x 2.44” x 0.38” (3.7cm x 6.2cm x 0.97cm)",
-        "Available in a glossy or matte finish",
-        "Detachable split ring included"
-      ],
-      "colors": [
-        {
-          "name": "Standard",
-          "hex": null,
-          "images": [
-            "merch/keychain-rainbow/standard-1"
-          ],
-          "sizes": [
-            {
-              "size": "One size",
-              "variantId": 396775,
-              "price": 2300
-            },
-            {
-              "size": "One size",
-              "variantId": 396776,
-              "price": 2300
-            }
-          ]
-        }
-      ],
-      "number": "039"
-    },
-    {
-      "slug": "keychain-purple",
-      "line": "keychain",
-      "lineName": "Keychain",
-      "category": "Stickers & Pins",
-      "name": "Purple",
-      "title": "NonParallel Keychain — Purple",
-      "printifyId": "6abae2b580a6b91f7b06f834",
-      "printProviderId": 23,
-      "price": 2300,
-      "blank": "Generic brand",
-      "details": [
-        "Material: polycarbonate shell, TPU lining",
-        "Dimensions: 1.46” x 2.44” x 0.38” (3.7cm x 6.2cm x 0.97cm)",
-        "Available in a glossy or matte finish",
-        "Detachable split ring included"
-      ],
-      "colors": [
-        {
-          "name": "Standard",
-          "hex": null,
-          "images": [
-            "merch/keychain-purple/standard-1"
-          ],
-          "sizes": [
-            {
-              "size": "One size",
-              "variantId": 396775,
-              "price": 2300
-            },
-            {
-              "size": "One size",
-              "variantId": 396776,
-              "price": 2300
-            }
-          ]
-        }
-      ],
-      "number": "040"
-    },
-    {
       "slug": "mug-rainbow",
       "line": "mug",
       "lineName": "Mug",
@@ -2831,7 +2751,7 @@
           ]
         }
       ],
-      "number": "041"
+      "number": "039"
     },
     {
       "slug": "mug-purple",
@@ -2869,7 +2789,7 @@
           ]
         }
       ],
-      "number": "042"
+      "number": "040"
     },
     {
       "slug": "mug-blue",
@@ -2907,7 +2827,7 @@
           ]
         }
       ],
-      "number": "043"
+      "number": "041"
     },
     {
       "slug": "camp-mug-rainbow",
@@ -2945,7 +2865,7 @@
           ]
         }
       ],
-      "number": "044"
+      "number": "042"
     },
     {
       "slug": "camp-mug-purple",
@@ -2983,7 +2903,7 @@
           ]
         }
       ],
-      "number": "045"
+      "number": "043"
     },
     {
       "slug": "tumbler-rainbow",
@@ -3021,7 +2941,7 @@
           ]
         }
       ],
-      "number": "046"
+      "number": "044"
     },
     {
       "slug": "tumbler-purple",
@@ -3059,7 +2979,7 @@
           ]
         }
       ],
-      "number": "047"
+      "number": "045"
     },
     {
       "slug": "bottle-rainbow",
@@ -3097,7 +3017,7 @@
           ]
         }
       ],
-      "number": "048"
+      "number": "046"
     },
     {
       "slug": "bottle-purple",
@@ -3135,7 +3055,7 @@
           ]
         }
       ],
-      "number": "049"
+      "number": "047"
     },
     {
       "slug": "camelbak-rainbow",
@@ -3173,7 +3093,7 @@
           ]
         }
       ],
-      "number": "050"
+      "number": "048"
     },
     {
       "slug": "phone-case-rainbow",
@@ -3376,7 +3296,7 @@
           ]
         }
       ],
-      "number": "051"
+      "number": "049"
     },
     {
       "slug": "phone-case-purple",
@@ -3579,7 +3499,7 @@
           ]
         }
       ],
-      "number": "052"
+      "number": "050"
     },
     {
       "slug": "airpods-rainbow",
@@ -3781,79 +3701,7 @@
           ]
         }
       ],
-      "number": "053"
-    },
-    {
-      "slug": "phone-grip-rainbow",
-      "line": "phone-grip",
-      "lineName": "Phone Grip",
-      "category": "Tech",
-      "name": "Rainbow",
-      "title": "NonParallel Phone Grip — Rainbow",
-      "printifyId": "6abadd22970cf6d28208dfc2",
-      "printProviderId": 80,
-      "price": 2900,
-      "blank": "Generic brand",
-      "details": [
-        "Secure One-Handed Grip",
-        "Hands-Free Viewing Kickstand",
-        "Strong, Reliable Adhesive Backing",
-        "Slim Collapsible Profile",
-        "Pocket-Friendly Design"
-      ],
-      "colors": [
-        {
-          "name": "Standard",
-          "hex": null,
-          "images": [
-            "merch/phone-grip-rainbow/standard-1"
-          ],
-          "sizes": [
-            {
-              "size": "1.38\" x 2.56\"",
-              "variantId": 397009,
-              "price": 2900
-            }
-          ]
-        }
-      ],
-      "number": "054"
-    },
-    {
-      "slug": "phone-grip-purple",
-      "line": "phone-grip",
-      "lineName": "Phone Grip",
-      "category": "Tech",
-      "name": "Purple",
-      "title": "NonParallel Phone Grip — Purple",
-      "printifyId": "6abadd2697163e54500f1b85",
-      "printProviderId": 80,
-      "price": 2900,
-      "blank": "Generic brand",
-      "details": [
-        "Secure One-Handed Grip",
-        "Hands-Free Viewing Kickstand",
-        "Strong, Reliable Adhesive Backing",
-        "Slim Collapsible Profile",
-        "Pocket-Friendly Design"
-      ],
-      "colors": [
-        {
-          "name": "Standard",
-          "hex": null,
-          "images": [
-            "merch/phone-grip-purple/standard-1"
-          ],
-          "sizes": [
-            {
-              "size": "1.38\" x 2.56\"",
-              "variantId": 397009,
-              "price": 2900
-            }
-          ]
-        }
-      ],
-      "number": "055"
+      "number": "051"
     },
     {
       "slug": "desk-mat-rainbow",
@@ -3900,7 +3748,7 @@
           ]
         }
       ],
-      "number": "056"
+      "number": "052"
     },
     {
       "slug": "desk-mat-purple",
@@ -3947,7 +3795,7 @@
           ]
         }
       ],
-      "number": "057"
+      "number": "053"
     },
     {
       "slug": "notebook-rainbow",
@@ -3985,7 +3833,7 @@
           ]
         }
       ],
-      "number": "058"
+      "number": "054"
     },
     {
       "slug": "notebook-purple",
@@ -4023,7 +3871,7 @@
           ]
         }
       ],
-      "number": "059"
+      "number": "055"
     },
     {
       "slug": "poster-rainbow",
@@ -4076,7 +3924,7 @@
           ]
         }
       ],
-      "number": "060"
+      "number": "056"
     },
     {
       "slug": "poster-purple",
@@ -4129,7 +3977,7 @@
           ]
         }
       ],
-      "number": "061"
+      "number": "057"
     },
     {
       "slug": "poster-blue",
@@ -4182,7 +4030,7 @@
           ]
         }
       ],
-      "number": "062"
+      "number": "058"
     },
     {
       "slug": "framed-poster-rainbow",
@@ -4256,7 +4104,7 @@
           ]
         }
       ],
-      "number": "063"
+      "number": "059"
     },
     {
       "slug": "framed-poster-purple",
@@ -4330,7 +4178,7 @@
           ]
         }
       ],
-      "number": "064"
+      "number": "060"
     },
     {
       "slug": "flag-rainbow",
@@ -4378,7 +4226,7 @@
           ]
         }
       ],
-      "number": "065"
+      "number": "061"
     },
     {
       "slug": "tapestry-rainbow",
@@ -4419,7 +4267,7 @@
           ]
         }
       ],
-      "number": "066"
+      "number": "062"
     },
     {
       "slug": "blanket-purple",
@@ -4460,7 +4308,7 @@
           ]
         }
       ],
-      "number": "067"
+      "number": "063"
     },
     {
       "slug": "candle-purple",
@@ -4503,7 +4351,7 @@
           ]
         }
       ],
-      "number": "068"
+      "number": "064"
     },
     {
       "slug": "kids-tee-rainbow",
@@ -4550,7 +4398,7 @@
           ]
         }
       ],
-      "number": "069"
+      "number": "065"
     },
     {
       "slug": "onesie-purple",
@@ -4607,7 +4455,7 @@
           ]
         }
       ],
-      "number": "070"
+      "number": "066"
     },
     {
       "slug": "bandana-rainbow",
@@ -4650,7 +4498,7 @@
           ]
         }
       ],
-      "number": "071"
+      "number": "067"
     }
   ]
 }

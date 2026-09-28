@@ -1,17 +1,19 @@
 'use client';
 
 import React, { useCallback, useEffect, useState } from 'react';
+import Link from 'next/link';
 import { ProjectCard } from '../components/ProjectCard';
 import { ReleaseSheet } from '../components/release/ReleaseSheet';
 import { usePlayer } from '../components/player/context';
 import { ArrowUpRightIcon, ChevronDownIcon, EqualizerBars } from '../components/player/icons';
 import { ResponsiveImage, placeholderBackground } from '../components/ResponsiveImage';
+import { LISTEN_LINKS } from '../lib/artist';
 import { getProjects } from '../lib/projects';
 import { cautionSceneAssets, reminderSceneAssets, scrapwrkSceneAssets, solenyaSceneAssets } from '../lib/assets';
 import type { MediaAsset } from '../lib/media';
 import { nextRelease, nextReleaseProject } from '../lib/next-release';
 import { getStreamingServices, getVisitLabel } from '../lib/streaming';
-import { getReleaseForProject, warmTrack } from '../lib/tracks';
+import { getReleaseForProject, releasePath, warmTrack } from '../lib/tracks';
 import { Project, getProjectTypeLabel, isProjectReleased } from '../lib/utils';
 
 const clamp = (value: number, min: number, max: number) => Math.min(Math.max(value, min), max);
@@ -263,30 +265,46 @@ function FacebookIcon() {
   );
 }
 
+const FOOTER_LINK =
+  'pointer-events-auto rounded-sm text-white/70 transition-colors duration-200 hover:text-white focus-visible:text-white focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-4 focus-visible:outline-white/60';
+
 function SiteFooter() {
   return (
     <footer
-      className="pointer-events-none absolute inset-x-0 bottom-0 z-30 flex items-center justify-between gap-6 bg-gradient-to-t from-black/75 via-black/50 via-45% to-transparent px-6 pt-24 text-[13px] [text-shadow:0_1px_10px_rgba(0,0,0,0.55)] sm:px-10"
+      className="pointer-events-none absolute inset-x-0 bottom-0 z-30 bg-gradient-to-t from-black/75 via-black/50 via-45% to-transparent px-6 pt-24 text-[13px] [text-shadow:0_1px_10px_rgba(0,0,0,0.55)] sm:px-10"
       style={{ paddingBottom: 'calc(max(1.25rem, env(safe-area-inset-bottom)) + var(--player-offset, 0px))' }}
     >
-      <p className="text-white/60">
-        <span className="font-medium text-white/85">Bryton Zoz</span>
-        <span className="ml-2">&copy; 2026</span>
-      </p>
-      <nav aria-label="Social" className="pointer-events-auto flex items-center gap-5">
-        <FooterSocialLink href="https://instagram.com/brytonzoz" label="Instagram">
-          <InstagramIcon />
-        </FooterSocialLink>
-        <FooterSocialLink href="https://tiktok.com/@brytonzoz" label="TikTok">
-          <TikTokIcon />
-        </FooterSocialLink>
-        <FooterSocialLink href="https://x.com/brytonzoz" label="X">
-          <XIcon />
-        </FooterSocialLink>
-        <FooterSocialLink href="https://facebook.com/brytonzoz" label="Facebook">
-          <FacebookIcon />
-        </FooterSocialLink>
+      <nav aria-label="Listen" className="mb-3 flex flex-wrap items-center gap-x-4 gap-y-1.5">
+        <span className="text-white/45">Listen</span>
+        {LISTEN_LINKS.map((link) => (
+          <a key={link.name} href={link.url} target="_blank" rel="noopener noreferrer" className={FOOTER_LINK}>
+            {link.name}
+          </a>
+        ))}
+        <Link href="/work/" className={FOOTER_LINK}>
+          Work with me
+        </Link>
       </nav>
+      <div className="flex items-center justify-between gap-6">
+        <p className="text-white/60">
+          <span className="font-medium text-white/85">Bryton Zoz</span>
+          <span className="ml-2">&copy; 2026</span>
+        </p>
+        <nav aria-label="Social" className="pointer-events-auto flex items-center gap-5">
+          <FooterSocialLink href="https://instagram.com/brytonzoz" label="Instagram">
+            <InstagramIcon />
+          </FooterSocialLink>
+          <FooterSocialLink href="https://tiktok.com/@brytonzoz" label="TikTok">
+            <TikTokIcon />
+          </FooterSocialLink>
+          <FooterSocialLink href="https://x.com/brytonzoz" label="X">
+            <XIcon />
+          </FooterSocialLink>
+          <FooterSocialLink href="https://www.facebook.com/bryton.zoz/" label="Facebook">
+            <FacebookIcon />
+          </FooterSocialLink>
+        </nav>
+      </div>
     </footer>
   );
 }
@@ -397,18 +415,36 @@ function SceneCard({
   // One action. Releases open the full sheet (play right here, streaming apps at the bottom);
   // everything else opens its site.
   let primary: React.ReactNode = null;
-  if (release || services.length) {
+  if (release) {
+    // A real link to the release page (crawlable, works without JavaScript); a plain click opens
+    // the sheet right here instead.
     primary = (
-      <button
-        type="button"
+      <a
+        href={releasePath(release)}
         className="scene-button"
-        onClick={openSheet}
+        onClick={(event) => {
+          if (event.metaKey || event.ctrlKey || event.shiftKey || event.altKey || event.button !== 0) return;
+          event.preventDefault();
+          openSheet();
+        }}
         onPointerEnter={() => warmTrack(firstTrack)}
         onPointerDown={() => warmTrack(firstTrack)}
         aria-haspopup="dialog"
         style={PRIMARY_PILL}
       >
         {isPlayingThis ? <EqualizerBars playing className="scene-eq" /> : null}
+        Listen Now
+      </a>
+    );
+  } else if (services.length) {
+    primary = (
+      <button
+        type="button"
+        className="scene-button"
+        onClick={openSheet}
+        aria-haspopup="dialog"
+        style={PRIMARY_PILL}
+      >
         {isReleased ? 'Listen Now' : 'Pre-save'}
       </button>
     );

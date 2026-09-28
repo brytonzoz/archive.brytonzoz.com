@@ -19,8 +19,8 @@ const projectData: ProjectData = {
       },
       postReleaseStreamingLinks: {
         applemusic: "https://music.apple.com/us/album/solenya/1833829863",
-        spotify: "https://open.spotify.com/artist/2XP6WdGTizwwiIFjuAbGVc?si=xjSj6u56SQmhZ6B-2zPOpA",
-        youtubemusic: "https://music.youtube.com/channel/UCUj0eTHlcpfBcOLPg4PFBjQ?si=YUhf7W-MVG6Qk0-A"
+        spotify: "https://open.spotify.com/album/4IGIjZH0MbncPO4zxoZKmZ",
+        youtubemusic: "https://music.youtube.com/playlist?list=OLAK5uy_maQeci50syKnfqkO1YRqVtcHyRX2TkoLI"
       }
     },
     {
@@ -30,8 +30,8 @@ const projectData: ProjectData = {
       image: cautionSceneAssets.cover,
       streamingLinks: {
         applemusic: "https://music.apple.com/us/album/caution-ep/1824528138",
-        spotify: "https://open.spotify.com/album/0tdB9n4bTY3rYYv5AmZU9r?si=WyA-7u8hTsirIPzeTP6wJw",
-        youtubemusic: "https://music.youtube.com/playlist?list=OLAK5uy_n3mF8_7iuzdI5hN7B_Itc0XERH-F7e2Vg&si=IMOAIcungvz8DdCm"
+        spotify: "https://open.spotify.com/album/0tdB9n4bTY3rYYv5AmZU9r",
+        youtubemusic: "https://music.youtube.com/playlist?list=OLAK5uy_n3mF8_7iuzdI5hN7B_Itc0XERH-F7e2Vg"
       }
     },
     {

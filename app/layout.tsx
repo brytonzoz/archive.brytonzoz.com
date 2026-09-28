@@ -5,24 +5,29 @@ import './globals.css'
 import { PlayerProvider } from '../components/player/PlayerProvider'
 import { PageViews } from '../components/PageViews'
 import shareImages from '../lib/share-images.json'
+import { artistJsonLd } from '../lib/artist'
 
 const inter = Inter({ 
   subsets: ['latin'],
   variable: '--font-inter',
 })
 
+const TITLE = 'Bryton Zoz — Artist, Producer & Designer'
+const DESCRIPTION = 'Music by Bryton Zoz. Listen to SOLENYA, CAUTION and more on Spotify, Apple Music and YouTube Music.'
+
 export const metadata: Metadata = {
   metadataBase: new URL('https://brytonzoz.com'),
   title: {
-    default: 'Bryton Zoz',
+    default: TITLE,
     template: '%s - Bryton Zoz',
   },
-  description: 'Music by Bryton Zoz. New music soon.',
-  keywords: 'Bryton Zoz, music, SOLENYA, CAUTION, new music',
+  description: DESCRIPTION,
+  keywords: 'Bryton Zoz, music, artist, producer, SOLENYA, CAUTION, Just A Reminder To Live Life',
   authors: [{ name: 'Bryton Zoz' }],
+  alternates: { canonical: '/' },
   openGraph: {
-    title: 'Bryton Zoz',
-    description: 'Music by Bryton Zoz. New music soon.',
+    title: TITLE,
+    description: DESCRIPTION,
     url: 'https://brytonzoz.com',
     siteName: 'Bryton Zoz',
     type: 'website',
@@ -30,8 +35,8 @@ export const metadata: Metadata = {
   },
   twitter: {
     card: 'summary_large_image',
-    title: 'Bryton Zoz',
-    description: 'Music by Bryton Zoz. New music soon.',
+    title: TITLE,
+    description: DESCRIPTION,
     images: ['/og.jpg'],
   },
   robots: {
@@ -63,6 +68,10 @@ export default function RootLayout({
   return (
     <html lang="en" className="dark">
       <body className={`${inter.variable} font-body antialiased`}>
+        <script
+          type="application/ld+json"
+          dangerouslySetInnerHTML={{ __html: JSON.stringify(artistJsonLd()).replace(/</g, '\\u003c') }}
+        />
         <PageViews />
         <PlayerProvider>
           <div className="min-h-screen bg-black overflow-x-hidden">

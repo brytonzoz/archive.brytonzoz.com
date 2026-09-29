@@ -884,12 +884,13 @@
         "front": {
           "x": 0.5,
           "y": 0.5,
-          "scale": 0.42
+          "scale": 0.28
         }
       },
       "maxColors": 3,
       "lead": "front",
-      "shots": 3
+      "shots": 3,
+      "blueprintId": 727
     },
     {
       "key": "kids-tee",

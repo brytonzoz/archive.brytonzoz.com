@@ -1432,7 +1432,8 @@ export default function HomePage() {
       // re-snaps to the shop's top whenever the page bounces at the bottom or the grid grows.
       const shop = document.getElementById('shop');
       container.classList.toggle('is-free', Boolean(shop) && scrollTop >= (shop?.offsetTop ?? Infinity) - 2);
-      const newIndex = Math.round(scrollTop / containerHeight);
+      // Anywhere in the shop counts as the shop (it's taller than a screen).
+      const newIndex = Math.min(Math.round(scrollTop / containerHeight), allProjects.length);
 
       // Past the scenes (in the shop) nothing moves, so stop re-rendering on every scroll.
       setScrollProgress(Math.min(scrollTop / containerHeight, allProjects.length));

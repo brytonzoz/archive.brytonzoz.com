@@ -1455,10 +1455,20 @@ html {
   z-index: 20;
   margin: 16px -16px 0;
   padding: 10px 16px;
-  background: rgba(10, 10, 11, 0.82);
-  -webkit-backdrop-filter: blur(20px) saturate(160%);
-  backdrop-filter: blur(20px) saturate(160%);
-  border-bottom: 0.5px solid rgba(255, 255, 255, 0.08);
+  isolation: isolate;
+}
+
+/* The bar's backdrop reaches past it and fades out at the top and bottom (no hard band or line),
+   so the section's gradient carries on around it; stuck over the grid it still keeps the search
+   and chips readable. */
+.shop-controls::before {
+  content: '';
+  position: absolute;
+  inset: -18px 0 -28px;
+  z-index: -1;
+  pointer-events: none;
+  /* No backdrop blur: under the bar's entrance animation it can't see past the bar and only thins it. */
+  background: linear-gradient(180deg, rgba(10, 10, 11, 0) 0, #0a0a0b 18px, #0a0a0b calc(100% - 28px), rgba(10, 10, 11, 0) 100%);
 }
 
 @media (min-width: 640px) {

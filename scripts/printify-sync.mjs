@@ -80,7 +80,9 @@ export async function sync(printify, root) {
     try {
       await syncLine(line);
     } catch (error) {
-      console.log(`! ${line.name}: ${String(error).slice(0, 300)}; skipped`);
+      // A Printify hiccup (their API sometimes answers 500) must never take products off the site:
+      // the line keeps what the catalog already had.
+      console.log(`! ${line.name}: ${String(error).slice(0, 300)}; skipped, kept ${keepLine(line)} from the catalog`);
     }
   }
 
@@ -99,7 +101,20 @@ export async function sync(printify, root) {
     return ids;
   }
 
+  // What the catalog already has for a line, for lines this run leaves alone or can't reach.
+  function keepLine(line) {
+    const kept = previous.products.filter((product) => product.line === line.key && !catalog.products.some((done) => done.slug === product.slug));
+    catalog.products.push(...kept);
+    return kept.length;
+  }
+
   async function syncLine(line) {
+    // Lines not asked for this run (PRINTIFY_ONLY=hoodie,mug) keep what the catalog had, without
+    // touching Printify at all.
+    if (only && !only.has(line.key)) {
+      keepLine(line);
+      return;
+    }
     let providerIds = line.printProviders;
     if (line.blueprintId && !providerIds) providerIds = await usProviders(line.blueprintId);
     // By name: the first matching blank that a US printer makes (also the fallback when the
@@ -116,7 +131,7 @@ export async function sync(printify, root) {
       }
     }
     if (!line.blueprintId || !providerIds?.length) {
-      console.log(`! ${line.name}: no blank with a US printer${line.find ? ` for ${[].concat(line.find).join(' | ')}` : ''}; skipped`);
+      console.log(`! ${line.name}: no blank with a US printer${line.find ? ` for ${[].concat(line.find).join(' | ')}` : ''}; skipped, kept ${keepLine(line)} from the catalog`);
       return;
     }
     const blueprint = await printify('GET', `/catalog/blueprints/${line.blueprintId}.json`);
@@ -143,7 +158,11 @@ export async function sync(printify, root) {
       let variants = [];
       let best = 0;
       const sizes = line.sizes?.map(loose);
-      for (const candidate of providerIds.slice(0, 6)) {
+      // Stay with the printer the product already uses (so a re-sync updates it rather than making a
+      // new product elsewhere); the rest are fallbacks.
+      const current = previous.products.find((product) => product.slug === productSlug)?.printProviderId;
+      const candidates = current && providerIds.includes(current) ? [current, ...providerIds.filter((id) => id !== current)] : providerIds;
+      for (const candidate of candidates.slice(0, 6)) {
         let data;
         try {
           data = variantCache.get(candidate) ?? await printify('GET', `/catalog/blueprints/${line.blueprintId}/print_providers/${candidate}/variants.json?show-out-of-stock=0`);

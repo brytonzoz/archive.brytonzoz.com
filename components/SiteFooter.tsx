@@ -1,6 +1,6 @@
 import React from 'react';
 import Link from 'next/link';
-import { LISTEN_LINKS, SOCIAL_LINKS } from '../lib/artist';
+import { ARTIST, LISTEN_LINKS, SOCIAL_LINKS } from '../lib/artist';
 
 // The same quiet footer on every page: where to listen (plain links, so search engines can follow
 // them), socials, and the one understated way to the business page.
@@ -44,6 +44,9 @@ export function SiteFooter({ variant = 'page' }: { variant?: 'overlay' | 'page' 
       }
       style={{ paddingBottom: `calc(max(1.25rem, env(safe-area-inset-bottom)) + var(--player-offset, 0px)${overlay ? '' : ' + 1rem'})` }}
     >
+      {overlay ? null : (
+        <p className="mb-4 max-w-xl text-white/45">{ARTIST.name} is a {ARTIST.city} artist working across music, fashion and design.</p>
+      )}
       <nav aria-label="Listen" className="flex flex-wrap items-center gap-x-4 gap-y-1.5">
         <span className="text-white/50">Listen</span>
         {LISTEN_LINKS.map((link) => (
@@ -59,13 +62,18 @@ export function SiteFooter({ variant = 'page' }: { variant?: 'overlay' | 'page' 
             <span className="ml-2">&copy; 2026</span>
           </span>
           <span className="text-white/25" aria-hidden="true">·</span>
+          <Link href="/about/" className={`${LINK} whitespace-nowrap !text-white/55 hover:!text-white`}>
+            About
+          </Link>
+          <span className="text-white/25" aria-hidden="true">·</span>
           <Link href="/work/" className={`${LINK} whitespace-nowrap !text-white/55 hover:!text-white`}>
             Work with me
           </Link>
         </p>
         <nav aria-label="Social" className="pointer-events-auto flex items-center gap-5">
           {SOCIAL_LINKS.map((link) => (
-            <a key={link.name} href={link.url} target="_blank" rel="noopener noreferrer" aria-label={link.name} className={LINK}>
+            // rel="me": these profiles and this site are the same person (identity for search engines).
+            <a key={link.name} href={link.url} target="_blank" rel="me noopener noreferrer" aria-label={link.name} className={LINK}>
               {ICONS[link.name]}
             </a>
           ))}

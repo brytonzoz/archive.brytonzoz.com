@@ -6,15 +6,16 @@ import { PlayerProvider } from '../components/player/PlayerProvider'
 import { PageViews } from '../components/PageViews'
 import { ServiceWorker } from '../components/ServiceWorker'
 import shareImages from '../lib/share-images.json'
-import { artistJsonLd, jsonLdScript } from '../lib/artist'
+import { ARTIST, artistJsonLd, jsonLdScript } from '../lib/artist'
 
 const inter = Inter({ 
   subsets: ['latin'],
   variable: '--font-inter',
 })
 
-const TITLE = 'Bryton Zoz — Artist, Producer & Designer'
-const DESCRIPTION = 'Music by Bryton Zoz: the album SOLENYA, the EP CAUTION and the mixtape Just A Reminder To Live Life. Listen on Spotify, Apple Music and YouTube Music.'
+// How the site shows up in search and link previews: the story is in lib/artist.ts.
+const TITLE = `${ARTIST.name} — ${ARTIST.headline}`
+const DESCRIPTION = ARTIST.description
 
 export const metadata: Metadata = {
   metadataBase: new URL('https://brytonzoz.com'),
@@ -23,19 +24,29 @@ export const metadata: Metadata = {
     template: '%s - Bryton Zoz',
   },
   description: DESCRIPTION,
-  keywords: 'Bryton Zoz, music, artist, producer, SOLENYA, CAUTION, Just A Reminder To Live Life',
-  authors: [{ name: 'Bryton Zoz' }],
+  keywords: [
+    'Bryton Zoz', 'brytonzoz', 'New York artist', 'NYC artist', 'independent artist', 'musician', 'music producer',
+    'fashion designer', 'designer', 'creative', 'upcycled clothing', 'one of one clothing', 'Scrapwrk', 'NonParallel',
+    'SOLENYA', 'CAUTION', 'Just A Reminder To Live Life',
+  ],
+  authors: [{ name: 'Bryton Zoz', url: 'https://brytonzoz.com' }],
+  creator: 'Bryton Zoz',
+  publisher: 'Bryton Zoz',
+  category: 'music',
   alternates: { canonical: '/' },
   openGraph: {
     title: TITLE,
     description: DESCRIPTION,
     url: 'https://brytonzoz.com',
     siteName: 'Bryton Zoz',
-    type: 'website',
-    images: [{ url: '/og.jpg', width: 1200, height: 630, alt: 'Bryton Zoz: new project soon' }],
+    type: 'profile',
+    locale: 'en_US',
+    images: [{ url: '/og.jpg', width: 1200, height: 630, alt: 'Bryton Zoz, New York artist, musician and designer' }],
   },
   twitter: {
     card: 'summary_large_image',
+    creator: '@BrytonZoz',
+    site: '@BrytonZoz',
     title: TITLE,
     description: DESCRIPTION,
     images: ['/og.jpg'],
@@ -43,6 +54,8 @@ export const metadata: Metadata = {
   robots: {
     index: true,
     follow: true,
+    // Let search and AI results show full snippets and large image previews.
+    googleBot: { index: true, follow: true, 'max-snippet': -1, 'max-image-preview': 'large', 'max-video-preview': -1 },
   },
   icons: {
     icon: [{ url: shareImages.icons['32'], sizes: '32x32', type: 'image/png' }],

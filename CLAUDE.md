@@ -97,6 +97,12 @@ push, and give the owner the staging link from the PR comment once the Staging w
     `background-position` repaints every frame), and stop them when they're done (the shop shimmer stops per photo).
   - Photos load when needed: shop tiles lazily, the hover photo only with a mouse, gallery photos one ahead of the
     swipe. `public/sw.js` keeps shop photos in their own cache so they never push out the scenes' artwork.
+- Search and AI (SEO/GEO): how Bryton shows up is one story in `lib/artist.ts` (`ARTIST`: headline "New York Artist,
+  Musician & Designer", the meta description, the bio, `knowsAbout`, NonParallel and Scrapwrk). It feeds the root title
+  and description (app/layout.tsx), the JSON-LD graph (Person with New York, occupations and founder links, ProfilePage,
+  both organizations, the albums), `/about/` (the plain-text bio AI answers quote), `/llms.txt` (app/llms.txt/route.ts)
+  and the footer's one-line bio. Change the story there, never per page. `app/robots.ts` names the search and AI
+  crawlers explicitly. Only state facts the owner has confirmed (no invented bio details or genres).
 - Metrics: `lib/analytics.ts` (anonymous, batched) -> `/api/e` in `worker/metrics.ts` -> D1 `brytonzoz-metrics`
   (`brytonzoz-metrics-staging` for staging; schema `worker/schema.sql`). The dashboard is `/admin`; its password is
   the `ADMIN_PASSWORD` repository secret, which both deploy workflows copy to the Worker. Never put it in code or chat.

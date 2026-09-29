@@ -6,7 +6,7 @@ import { ARTIST } from '../../lib/artist';
 
 export const metadata: Metadata = {
   title: 'Work with me',
-  description: 'For collaborations, licensing and business inquiries with Bryton Zoz.',
+  description: 'Work with Bryton Zoz, a New York artist, musician and designer: collaborations, features, production, creative direction, licensing and business inquiries.',
   alternates: { canonical: '/work/' },
 };
 

@@ -5,12 +5,36 @@ import { getRelease, releasePath, trackPath, type Release, type Track } from './
 // metadata, the JSON-LD search engines read (app/layout.tsx), the footer and the sitemap.
 export const SITE_URL = 'https://brytonzoz.com';
 
+// Who Bryton Zoz is, in the words every search engine and AI answer should use. The page titles,
+// meta descriptions, JSON-LD, /about/ and public/llms.txt all come from (or repeat) this.
 export const ARTIST = {
   name: 'Bryton Zoz',
-  jobTitle: 'Artist, Producer & Designer',
-  description: 'Bryton Zoz is a musician, producer and designer. Music includes the album SOLENYA, the EP CAUTION and the mixtape Just A Reminder To Live Life.',
+  jobTitle: 'Artist, Musician & Designer',
+  /** Shown after the name in search results. */
+  headline: 'New York Artist, Musician & Designer',
+  city: 'New York',
+  region: 'NY',
+  country: 'US',
+  /** Meta description length (about 155 characters). */
+  description: 'Bryton Zoz is a New York artist working across music, fashion and design: the album SOLENYA, one-of-one Scrapwrk clothing and the NonParallel label.',
+  /** The longer story, for /about/ and AI summaries. No invented facts: only what the work shows. */
+  bio: [
+    'Bryton Zoz is an independent artist based in New York, working across music, fashion and design as one practice.',
+    'As a musician, Bryton Zoz writes, produces and releases original music: the album SOLENYA, the EP CAUTION and the mixtape Just A Reminder To Live Life, on Spotify, Apple Music and YouTube Music.',
+    'In fashion, Scrapwrk is Bryton Zoz\'s line of one-of-one clothing reconstructed from upcycled textile scraps: every piece is made once and never repeated.',
+    'NonParallel is the independent label and brand behind all of it, with apparel and objects carrying its artwork.',
+    'The site itself, brytonzoz.com, is part of the work: each release has its own designed scene, and the music plays right on the page.',
+  ],
+  knowsAbout: [
+    'Music', 'Music production', 'Songwriting', 'Fashion design', 'Upcycled fashion',
+    'Sustainable fashion', 'Streetwear', 'Graphic design', 'Creative direction', 'Visual art', 'Web design',
+  ],
   email: 'bryton.p.zoz@gmail.com',
 };
+
+// The label and the clothing line, as schema.org organizations the artist founded.
+export const LABEL = { name: 'NonParallel', url: `${SITE_URL}/nonparallel/`, description: 'The independent label and brand behind Bryton Zoz: music, apparel and objects.' };
+export const CLOTHING_LINE = { name: 'Scrapwrk', url: `${SITE_URL}/scrapwrk/`, description: 'One-of-one clothing by Bryton Zoz, reconstructed from upcycled textile scraps.' };
 
 // Artist profiles on the streaming services (the footer's "Listen" row).
 export const LISTEN_LINKS = [
@@ -144,6 +168,36 @@ export function artistJsonLd() {
     };
   });
 
+  const person = {
+    '@type': 'Person',
+    '@id': ARTIST_ID,
+    name: ARTIST.name,
+    alternateName: 'brytonzoz',
+    jobTitle: ARTIST.jobTitle,
+    description: ARTIST.description,
+    disambiguatingDescription: `${ARTIST.headline} (${ARTIST.bio[0]})`,
+    url: `${SITE_URL}/`,
+    image: `${SITE_URL}/og.jpg`,
+    homeLocation: { '@type': 'Place', name: 'New York, NY', address: { '@type': 'PostalAddress', addressLocality: ARTIST.city, addressRegion: ARTIST.region, addressCountry: ARTIST.country } },
+    hasOccupation: [
+      { '@type': 'Occupation', name: 'Musician' },
+      { '@type': 'Occupation', name: 'Music producer' },
+      { '@type': 'Occupation', name: 'Fashion designer' },
+      { '@type': 'Occupation', name: 'Designer' },
+    ],
+    knowsAbout: ARTIST.knowsAbout,
+    founder: [{ '@id': `${SITE_URL}/#nonparallel` }, { '@id': `${SITE_URL}/#scrapwrk` }],
+    sameAs: ARTIST_PROFILES,
+  };
+  const organization = (id: string, org: { name: string; url: string; description: string }) => ({
+    '@type': 'Organization',
+    '@id': `${SITE_URL}/#${id}`,
+    name: org.name,
+    url: org.url,
+    description: org.description,
+    founder: { '@id': ARTIST_ID },
+  });
+
   return {
     '@context': 'https://schema.org',
     '@graph': [
@@ -152,17 +206,23 @@ export function artistJsonLd() {
         '@id': `${SITE_URL}/#website`,
         url: `${SITE_URL}/`,
         name: ARTIST.name,
+        description: ARTIST.description,
+        inLanguage: 'en',
         about: { '@id': ARTIST_ID },
+        publisher: { '@id': ARTIST_ID },
       },
       {
-        '@type': 'Person',
-        '@id': ARTIST_ID,
-        name: ARTIST.name,
-        jobTitle: ARTIST.jobTitle,
-        description: ARTIST.description,
+        // The homepage is the artist's own profile page (Google's ProfilePage rich result).
+        '@type': 'ProfilePage',
+        '@id': `${SITE_URL}/#profile`,
         url: `${SITE_URL}/`,
-        sameAs: ARTIST_PROFILES,
+        name: `${ARTIST.name} — ${ARTIST.headline}`,
+        isPartOf: { '@id': `${SITE_URL}/#website` },
+        mainEntity: { '@id': ARTIST_ID },
       },
+      person,
+      organization('nonparallel', LABEL),
+      organization('scrapwrk', CLOTHING_LINE),
       ...albums,
     ],
   };

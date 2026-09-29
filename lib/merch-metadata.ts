@@ -3,10 +3,10 @@ import { SITE_URL } from './artist';
 import { MERCH_PATH, merchPath, merchProducts, type MerchProduct } from './merch';
 import { formatPrice } from './store';
 
-export const MERCH_DESCRIPTION = 'NonParallel is the label and company behind Bryton Zoz. A tee is a way to support it: printed to order, shipped free in the US.';
+export const MERCH_DESCRIPTION = 'NonParallel is the independent label and brand behind New York artist Bryton Zoz: tees, hoodies, hats, stickers and more, printed to order with free US shipping.';
 
 export function merchMetadata(product?: MerchProduct): Metadata {
-  const title = product ? product.title : 'NonParallel';
+  const title = product ? product.title : 'NonParallel — Label & Merch';
   const description = product
     ? `${product.title}, printed to order. ${product.colors.map((color) => color.name).join(', ')} · from ${formatPrice(product.price)}.`
     : MERCH_DESCRIPTION;

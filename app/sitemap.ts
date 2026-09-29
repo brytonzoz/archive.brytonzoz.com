@@ -4,12 +4,13 @@ import { MERCH_PATH, merchPath, merchProducts } from '../lib/merch';
 import { productPath, products, STORE_PATH } from '../lib/store';
 import { releasePath, releases, trackPath } from '../lib/tracks';
 
-// brytonzoz.com/sitemap.xml: the homepage, every release and song page, and the Scrapwrk store.
+// brytonzoz.com/sitemap.xml: the homepage, the about page, every release and song page, and the Scrapwrk store.
 export const dynamic = 'force-static';
 
 export default function sitemap(): MetadataRoute.Sitemap {
   return [
     { url: `${SITE_URL}/`, changeFrequency: 'weekly', priority: 1 },
+    { url: `${SITE_URL}/about/`, changeFrequency: 'monthly', priority: 0.9 },
     ...releases.map((release) => ({ url: `${SITE_URL}${releasePath(release)}`, changeFrequency: 'monthly' as const, priority: 0.9 })),
     ...releases.flatMap((release) =>
       release.tracks.map((track) => ({ url: `${SITE_URL}${trackPath(track)}`, changeFrequency: 'yearly' as const, priority: 0.6 })),

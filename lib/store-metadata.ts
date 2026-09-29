@@ -2,10 +2,10 @@ import type { Metadata } from 'next';
 import { SITE_URL } from './artist';
 import { formatPrice, productPath, products, STORE_PATH, type Product } from './store';
 
-export const STORE_DESCRIPTION = 'Scrapwrk by Bryton Zoz: one-of-a-kind clothing made from upcycled textile scraps. Every piece is 1 of 1.';
+export const STORE_DESCRIPTION = 'Scrapwrk by Bryton Zoz, New York artist and designer: one-of-one clothing reconstructed from upcycled textile scraps. Every piece is made once.';
 
 export function storeMetadata(product?: Product): Metadata {
-  const title = product ? `Scrapwrk ${product.number}: ${product.name}` : 'Scrapwrk';
+  const title = product ? `Scrapwrk ${product.number}: ${product.name}` : 'Scrapwrk — One-of-One Upcycled Clothing';
   const description = product
     ? `${product.description} 1 of 1 · Size ${product.size} · ${formatPrice(product.price)}.`
     : STORE_DESCRIPTION;

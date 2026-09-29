@@ -1465,6 +1465,8 @@ export default function HomePage() {
 
   return (
     <div className="min-h-screen bg-black relative overflow-hidden">
+      {/* The page's heading for search engines and screen readers; the scenes are the visual one. */}
+      <h1 className="sr-only">Bryton Zoz — New York artist, musician and designer</h1>
       <div className="fixed inset-0 bg-black" />
       <BackgroundLayer background={currentBackground} opacity={1} />
       {nextBackgroundIndex !== currentBackgroundIndex ? (

@@ -1169,8 +1169,7 @@ const ScrapwrkScene = React.memo(function ScrapwrkScene({ distance, loadImages }
   );
 });
 
-// NonParallel's background: four of the tees, faint and tucked into the corners, and one small logo
-// sticker. Placed by percentage of the screen (not the portrait scene frame) so they sit in the
+// NonParallel's background: four of the tees, faint and tucked into the corners. Placed by percentage of the screen (not the portrait scene frame) so they sit in the
 // corners on a phone and spread out on a wide screen; `size` is in units of --np-sticker
 // (globals.css) and `alpha` keeps them in the background. They move with the scroll like the
 // Scrapwrk stickers.
@@ -1183,8 +1182,6 @@ const nonparallelStickers = [
     movement: { x: -64, y: 112, rotate: 4, scale: 0.08, fadeRate: 1.02 }, float: { x: -7, y: -8, rotate: -1.4, duration: '8.2s', delay: '0.3s' }, intro: { x: -150, y: 160, rotate: 8, delay: '0.34s' } },
   { key: 'purple', src: nonparallelAssets.tees.purple, x: 97, y: 93, size: 0.95, alpha: 0.2, baseRotate: 17,
     movement: { x: 78, y: 124, rotate: -5, scale: 0.08, fadeRate: 1.04 }, float: { x: 9, y: -9, rotate: 1.6, duration: '8.6s', delay: '0.55s' }, intro: { x: 170, y: 164, rotate: -8, delay: '0.4s' } },
-  { key: 'logo', src: nonparallelAssets.logo, x: 74, y: 8, size: 0.38, alpha: 0.55, baseRotate: 9,
-    movement: { x: 40, y: -120, rotate: 6, scale: 0.06, fadeRate: 1 }, float: { x: 5, y: -6, rotate: 2.4, duration: '7.6s', delay: '0.2s' }, intro: { x: 90, y: -150, rotate: 12, delay: '0.46s' } },
 ];
 
 // NonParallel: the label behind all of this. Laid out like Scrapwrk's scene: its logo heads it, a

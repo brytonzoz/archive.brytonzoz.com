@@ -19,6 +19,7 @@ const SORTS: { value: Sort; label: string }[] = [
   { value: 'high', label: 'Highest price' },
 ];
 const PAGE = 24;
+const SUGGESTIONS = ['hoodie', 'tee', 'rainbow', 'mug', 'sticker', 'hat', 'poster'];
 
 // What people type for what the catalog calls something else.
 const SYNONYMS: Record<string, string> = {
@@ -59,6 +60,7 @@ export function MerchShop({
   const deferredQuery = useDeferredValue(query);
   const searchRef = useRef<HTMLInputElement>(null);
   const [showTop, setShowTop] = useState(false);
+  const [searching, setSearching] = useState(false);
 
   // Deep in the grid, a small "Top" button brings the search and filters back.
   useEffect(() => {
@@ -136,7 +138,8 @@ export function MerchShop({
       <div className="flex items-end justify-between gap-4">
         <div className="min-w-0">
           {title}
-          <p className="shop-eyebrow">NONPARALLEL</p>
+          {/* The /nonparallel/ page shows the logo instead; the homepage says the name. */}
+          {title ? null : <p className="shop-eyebrow">NONPARALLEL</p>}
           <Heading id="shop-title" className="shop-title">Shop</Heading>
         </div>
         <div className="flex items-center gap-3">
@@ -155,6 +158,8 @@ export function MerchShop({
               type="search"
               value={query}
               onChange={(event) => setQuery(event.target.value)}
+              onFocus={() => setSearching(true)}
+              onBlur={() => window.setTimeout(() => setSearching(false), 150)}
               placeholder="Search"
               enterKeyHint="search"
               autoComplete="off"
@@ -171,6 +176,16 @@ export function MerchShop({
             <svg aria-hidden="true" width="12" height="12" viewBox="0 0 24 24" fill="none"><path d="m6 9 6 6 6-6" stroke="currentColor" strokeWidth="2.6" strokeLinecap="round" strokeLinejoin="round" /></svg>
           </label>
         </div>
+        {searching && !query ? (
+          // Focused but empty: a few things people look for, one tap each.
+          <div className="shop-suggest" aria-label="Suggestions">
+            {SUGGESTIONS.map((word) => (
+              <button key={word} type="button" onMouseDown={(event) => event.preventDefault()} onClick={() => setQuery(word)} className="shop-suggest-item">
+                {word}
+              </button>
+            ))}
+          </div>
+        ) : null}
         <div className="shop-chips" role="group" aria-label="Category">
           <button type="button" aria-pressed={!category} onClick={() => chooseCategory(null)} className="shop-chip">All</button>
           {merchCategories.map((name) => (

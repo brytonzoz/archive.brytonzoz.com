@@ -2078,3 +2078,35 @@ html {
     animation: none;
   }
 }
+
+.shop-suggest {
+  display: flex;
+  gap: 6px;
+  margin: 10px -16px 0;
+  padding: 0 16px;
+  overflow-x: auto;
+  scrollbar-width: none;
+  animation: shopTileIn 240ms cubic-bezier(0.22, 1, 0.36, 1) both;
+}
+
+.shop-suggest::-webkit-scrollbar {
+  display: none;
+}
+
+.shop-suggest-item {
+  flex-shrink: 0;
+  height: 28px;
+  padding: 0 11px;
+  border-radius: 8px;
+  background: rgba(255, 255, 255, 0.06);
+  color: rgba(255, 255, 255, 0.7);
+  font-size: 13px;
+  transition: background-color 160ms ease, color 160ms ease;
+}
+
+.shop-suggest-item:hover,
+.shop-suggest-item:focus-visible {
+  background: rgba(255, 255, 255, 0.12);
+  color: #fff;
+  outline: none;
+}

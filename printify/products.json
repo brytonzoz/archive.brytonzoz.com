@@ -889,7 +889,8 @@
       },
       "maxColors": 3,
       "lead": "front",
-      "shots": 3
+      "shots": 3,
+      "blueprintId": 727
     },
     {
       "key": "kids-tee",

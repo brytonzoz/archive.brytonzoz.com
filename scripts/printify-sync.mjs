@@ -82,9 +82,7 @@ export async function sync(printify, root) {
     } catch (error) {
       // A Printify hiccup (their API sometimes answers 500) must never take products off the site:
       // the line keeps what the catalog already had.
-      const kept = previous.products.filter((product) => product.line === line.key && !catalog.products.some((done) => done.slug === product.slug));
-      catalog.products.push(...kept);
-      console.log(`! ${line.name}: ${String(error).slice(0, 300)}; skipped, kept ${kept.length} from the catalog`);
+      console.log(`! ${line.name}: ${String(error).slice(0, 300)}; skipped, kept ${keepLine(line)} from the catalog`);
     }
   }
 
@@ -103,7 +101,20 @@ export async function sync(printify, root) {
     return ids;
   }
 
+  // What the catalog already has for a line, for lines this run leaves alone or can't reach.
+  const keepLine = (line) => {
+    const kept = previous.products.filter((product) => product.line === line.key && !catalog.products.some((done) => done.slug === product.slug));
+    catalog.products.push(...kept);
+    return kept.length;
+  };
+
   async function syncLine(line) {
+    // Lines not asked for this run (PRINTIFY_ONLY=hoodie,mug) keep what the catalog had, without
+    // touching Printify at all.
+    if (only && !only.has(line.key)) {
+      keepLine(line);
+      return;
+    }
     let providerIds = line.printProviders;
     if (line.blueprintId && !providerIds) providerIds = await usProviders(line.blueprintId);
     // By name: the first matching blank that a US printer makes (also the fallback when the
@@ -120,7 +131,7 @@ export async function sync(printify, root) {
       }
     }
     if (!line.blueprintId || !providerIds?.length) {
-      console.log(`! ${line.name}: no blank with a US printer${line.find ? ` for ${[].concat(line.find).join(' | ')}` : ''}; skipped`);
+      console.log(`! ${line.name}: no blank with a US printer${line.find ? ` for ${[].concat(line.find).join(' | ')}` : ''}; skipped, kept ${keepLine(line)} from the catalog`);
       return;
     }
     const blueprint = await printify('GET', `/catalog/blueprints/${line.blueprintId}.json`);

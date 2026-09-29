@@ -623,6 +623,76 @@
       "number": "008"
     },
     {
+      "slug": "max-tee-rainbow",
+      "line": "max-tee",
+      "lineName": "Max Heavyweight Tee",
+      "category": "Tees",
+      "name": "Rainbow",
+      "title": "NonParallel Max Heavyweight Tee — Rainbow",
+      "printifyId": "6abadba0a43df71fd00b74bf",
+      "printProviderId": 74,
+      "price": 3900,
+      "blank": "Shaka Wear SHMHSS",
+      "details": [
+        "100% USA Cotton (7.5 oz / 245 - 255 GSM)",
+        "Yarn Count: 16 Singles",
+        "Available Sizes S - 7XL",
+        "Shoulder-to-shoulder neck tape and double-needle stitched neck",
+        "1\" double-needle stitched sleeve and bottom hems"
+      ],
+      "colors": [
+        {
+          "name": "Black",
+          "hex": null,
+          "images": [
+            "merch/max-tee-rainbow/black-1",
+            "merch/max-tee-rainbow/black-2",
+            "merch/max-tee-rainbow/black-3",
+            "merch/max-tee-rainbow/black-4"
+          ],
+          "views": [
+            "back",
+            "front",
+            null,
+            null
+          ],
+          "sizes": [
+            {
+              "size": "S",
+              "variantId": 117443,
+              "price": 3900
+            },
+            {
+              "size": "M",
+              "variantId": 117442,
+              "price": 3900
+            },
+            {
+              "size": "L",
+              "variantId": 117441,
+              "price": 3900
+            },
+            {
+              "size": "XL",
+              "variantId": 117444,
+              "price": 3900
+            },
+            {
+              "size": "2XL",
+              "variantId": 117437,
+              "price": 4500
+            },
+            {
+              "size": "3XL",
+              "variantId": 117438,
+              "price": 4900
+            }
+          ]
+        }
+      ],
+      "number": "009"
+    },
+    {
       "slug": "long-sleeve-rainbow",
       "line": "long-sleeve",
       "lineName": "Long Sleeve",
@@ -689,7 +759,7 @@
           ]
         }
       ],
-      "number": "009"
+      "number": "010"
     },
     {
       "slug": "long-sleeve-purple",
@@ -758,7 +828,7 @@
           ]
         }
       ],
-      "number": "010"
+      "number": "011"
     },
     {
       "slug": "tank-rainbow",
@@ -822,7 +892,7 @@
           ]
         }
       ],
-      "number": "011"
+      "number": "012"
     },
     {
       "slug": "hoodie-rainbow",
@@ -892,7 +962,7 @@
           ]
         }
       ],
-      "number": "012"
+      "number": "013"
     },
     {
       "slug": "hoodie-purple",
@@ -962,7 +1032,7 @@
           ]
         }
       ],
-      "number": "013"
+      "number": "014"
     },
     {
       "slug": "hoodie-blue",
@@ -1032,7 +1102,7 @@
           ]
         }
       ],
-      "number": "014"
+      "number": "015"
     },
     {
       "slug": "heavy-hoodie-rainbow",
@@ -1102,7 +1172,7 @@
           ]
         }
       ],
-      "number": "015"
+      "number": "016"
     },
     {
       "slug": "heavy-hoodie-purple",
@@ -1268,7 +1338,7 @@
           ]
         }
       ],
-      "number": "016"
+      "number": "017"
     },
     {
       "slug": "crewneck-rainbow",
@@ -1327,7 +1397,7 @@
           ]
         }
       ],
-      "number": "017"
+      "number": "018"
     },
     {
       "slug": "crewneck-purple",
@@ -1423,7 +1493,7 @@
           ]
         }
       ],
-      "number": "018"
+      "number": "019"
     },
     {
       "slug": "sweatpants-rainbow",
@@ -1485,7 +1555,7 @@
           ]
         }
       ],
-      "number": "019"
+      "number": "020"
     },
     {
       "slug": "sweatpants-purple",
@@ -1587,7 +1657,7 @@
           ]
         }
       ],
-      "number": "020"
+      "number": "021"
     },
     {
       "slug": "shorts-rainbow",
@@ -1649,7 +1719,7 @@
           ]
         }
       ],
-      "number": "021"
+      "number": "022"
     },
     {
       "slug": "shorts-purple",
@@ -1751,7 +1821,7 @@
           ]
         }
       ],
-      "number": "022"
+      "number": "023"
     },
     {
       "slug": "trucker-rainbow",
@@ -1789,7 +1859,7 @@
           ]
         }
       ],
-      "number": "023"
+      "number": "024"
     },
     {
       "slug": "trucker-purple",
@@ -1875,7 +1945,83 @@
           ]
         }
       ],
-      "number": "024"
+      "number": "025"
+    },
+    {
+      "slug": "tote-rainbow",
+      "line": "tote",
+      "lineName": "Tote",
+      "category": "Hats & Bags",
+      "name": "Rainbow",
+      "title": "NonParallel Tote — Rainbow",
+      "printifyId": "6abadc3e94b2a9796d07776a",
+      "printProviderId": 74,
+      "price": 3500,
+      "blank": "Econscious EC8040",
+      "details": [
+        "100% Certified Organic Cotton",
+        "Medium heavy fabric (9 oz/yd² (305 g/m²))",
+        "Econscious tag on handle base",
+        "Blank product sourced from Pakistan",
+        "Tear-away label"
+      ],
+      "colors": [
+        {
+          "name": "Black",
+          "hex": null,
+          "images": [
+            "merch/tote-rainbow/black-1",
+            "merch/tote-rainbow/black-2",
+            "merch/tote-rainbow/black-3"
+          ],
+          "sizes": [
+            {
+              "size": "One size",
+              "variantId": 71925,
+              "price": 3500
+            }
+          ]
+        }
+      ],
+      "number": "026"
+    },
+    {
+      "slug": "tote-purple",
+      "line": "tote",
+      "lineName": "Tote",
+      "category": "Hats & Bags",
+      "name": "Purple",
+      "title": "NonParallel Tote — Purple",
+      "printifyId": "6abadc44fa29275705030bcb",
+      "printProviderId": 74,
+      "price": 3500,
+      "blank": "Econscious EC8040",
+      "details": [
+        "100% Certified Organic Cotton",
+        "Medium heavy fabric (9 oz/yd² (305 g/m²))",
+        "Econscious tag on handle base",
+        "Blank product sourced from Pakistan",
+        "Tear-away label"
+      ],
+      "colors": [
+        {
+          "name": "Natural",
+          "hex": null,
+          "images": [
+            "merch/tote-purple/natural-1",
+            "merch/tote-purple/natural-2",
+            "merch/tote-purple/natural-3"
+          ],
+          "sizes": [
+            {
+              "size": "One size",
+              "variantId": 71926,
+              "price": 3500
+            }
+          ]
+        }
+      ],
+      "number": "027"
     },
     {
       "slug": "sticker-rainbow",
@@ -1947,7 +2093,7 @@
           ]
         }
       ],
-      "number": "025"
+      "number": "028"
     },
     {
       "slug": "sticker-red",
@@ -2019,7 +2165,7 @@
           ]
         }
       ],
-      "number": "026"
+      "number": "029"
     },
     {
       "slug": "sticker-yellow",
@@ -2091,7 +2237,7 @@
           ]
         }
       ],
-      "number": "027"
+      "number": "030"
     },
     {
       "slug": "sticker-green",
@@ -2163,7 +2309,7 @@
           ]
         }
       ],
-      "number": "028"
+      "number": "031"
     },
     {
       "slug": "sticker-blue",
@@ -2235,7 +2381,7 @@
           ]
         }
       ],
-      "number": "029"
+      "number": "032"
     },
     {
       "slug": "sticker-purple",
@@ -2307,7 +2453,7 @@
           ]
         }
       ],
-      "number": "030"
+      "number": "033"
     },
     {
       "slug": "holo-sticker-rainbow",
@@ -2365,7 +2511,7 @@
           ]
         }
       ],
-      "number": "031"
+      "number": "034"
     },
     {
       "slug": "holo-sticker-purple",
@@ -2423,7 +2569,7 @@
           ]
         }
       ],
-      "number": "032"
+      "number": "035"
     },
     {
       "slug": "button-rainbow",
@@ -2471,7 +2617,7 @@
           ]
         }
       ],
-      "number": "033"
+      "number": "036"
     },
     {
       "slug": "button-purple",
@@ -2519,7 +2665,7 @@
           ]
         }
       ],
-      "number": "034"
+      "number": "037"
     },
     {
       "slug": "button-blue",
@@ -2567,7 +2713,7 @@
           ]
         }
       ],
-      "number": "035"
+      "number": "038"
     },
     {
       "slug": "mug-rainbow",
@@ -2605,7 +2751,7 @@
           ]
         }
       ],
-      "number": "036"
+      "number": "039"
     },
     {
       "slug": "mug-purple",
@@ -2643,7 +2789,7 @@
           ]
         }
       ],
-      "number": "037"
+      "number": "040"
     },
     {
       "slug": "mug-blue",
@@ -2681,7 +2827,7 @@
           ]
         }
       ],
-      "number": "038"
+      "number": "041"
     },
     {
       "slug": "camp-mug-rainbow",
@@ -2719,7 +2865,7 @@
           ]
         }
       ],
-      "number": "039"
+      "number": "042"
     },
     {
       "slug": "camp-mug-purple",
@@ -2757,7 +2903,7 @@
           ]
         }
       ],
-      "number": "040"
+      "number": "043"
     },
     {
       "slug": "tumbler-rainbow",
@@ -2795,7 +2941,7 @@
           ]
         }
       ],
-      "number": "041"
+      "number": "044"
     },
     {
       "slug": "tumbler-purple",
@@ -2833,7 +2979,7 @@
           ]
         }
       ],
-      "number": "042"
+      "number": "045"
     },
     {
       "slug": "bottle-rainbow",
@@ -2871,7 +3017,7 @@
           ]
         }
       ],
-      "number": "043"
+      "number": "046"
     },
     {
       "slug": "bottle-purple",
@@ -2909,7 +3055,7 @@
           ]
         }
       ],
-      "number": "044"
+      "number": "047"
     },
     {
       "slug": "camelbak-rainbow",
@@ -2947,7 +3093,7 @@
           ]
         }
       ],
-      "number": "045"
+      "number": "048"
     },
     {
       "slug": "phone-case-rainbow",
@@ -3150,7 +3296,7 @@
           ]
         }
       ],
-      "number": "046"
+      "number": "049"
     },
     {
       "slug": "phone-case-purple",
@@ -3353,7 +3499,7 @@
           ]
         }
       ],
-      "number": "047"
+      "number": "050"
     },
     {
       "slug": "airpods-rainbow",
@@ -3555,7 +3701,7 @@
           ]
         }
       ],
-      "number": "048"
+      "number": "051"
     },
     {
       "slug": "desk-mat-rainbow",
@@ -3602,7 +3748,7 @@
           ]
         }
       ],
-      "number": "049"
+      "number": "052"
     },
     {
       "slug": "desk-mat-purple",
@@ -3649,7 +3795,7 @@
           ]
         }
       ],
-      "number": "050"
+      "number": "053"
     },
     {
       "slug": "notebook-rainbow",
@@ -3687,7 +3833,7 @@
           ]
         }
       ],
-      "number": "051"
+      "number": "054"
     },
     {
       "slug": "notebook-purple",
@@ -3725,7 +3871,7 @@
           ]
         }
       ],
-      "number": "052"
+      "number": "055"
     },
     {
       "slug": "poster-rainbow",
@@ -3778,7 +3924,7 @@
           ]
         }
       ],
-      "number": "053"
+      "number": "056"
     },
     {
       "slug": "poster-purple",
@@ -3831,7 +3977,7 @@
           ]
         }
       ],
-      "number": "054"
+      "number": "057"
     },
     {
       "slug": "poster-blue",
@@ -3884,7 +4030,7 @@
           ]
         }
       ],
-      "number": "055"
+      "number": "058"
     },
     {
       "slug": "framed-poster-rainbow",
@@ -3958,7 +4104,7 @@
           ]
         }
       ],
-      "number": "056"
+      "number": "059"
     },
     {
       "slug": "framed-poster-purple",
@@ -4032,7 +4178,7 @@
           ]
         }
       ],
-      "number": "057"
+      "number": "060"
     },
     {
       "slug": "flag-rainbow",
@@ -4080,7 +4226,7 @@
           ]
         }
       ],
-      "number": "058"
+      "number": "061"
     },
     {
       "slug": "tapestry-rainbow",
@@ -4121,7 +4267,7 @@
           ]
         }
       ],
-      "number": "059"
+      "number": "062"
     },
     {
       "slug": "blanket-purple",
@@ -4162,7 +4308,7 @@
           ]
         }
       ],
-      "number": "060"
+      "number": "063"
     },
     {
       "slug": "candle-purple",
@@ -4205,7 +4351,7 @@
           ]
         }
       ],
-      "number": "061"
+      "number": "064"
     },
     {
       "slug": "kids-tee-rainbow",
@@ -4252,7 +4398,7 @@
           ]
         }
       ],
-      "number": "062"
+      "number": "065"
     },
     {
       "slug": "onesie-purple",
@@ -4309,7 +4455,7 @@
           ]
         }
       ],
-      "number": "063"
+      "number": "066"
     },
     {
       "slug": "bandana-rainbow",
@@ -4352,7 +4498,7 @@
           ]
         }
       ],
-      "number": "064"
+      "number": "067"
     }
   ]
 }

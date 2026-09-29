@@ -3,7 +3,7 @@
 import React, { useEffect, useState } from 'react';
 import Link from 'next/link';
 import { track } from '../../lib/analytics';
-import { MERCH_KEY_PREFIX, MERCH_PATH, merchVariant } from '../../lib/merch';
+import { MERCH_KEY_PREFIX, MERCH_PATH, merchVariant, variantLabel } from '../../lib/merch';
 import { formatPrice, productById, STORE_PATH } from '../../lib/store';
 import { finishCheckout } from '../../lib/store-client';
 import { ResponsiveImage, placeholderBackground } from '../ResponsiveImage';
@@ -112,8 +112,8 @@ export function OrderPage() {
                     </span>
                     <span className="min-w-0 flex-1">
                       <span className="block text-[12px] font-semibold tracking-[0.16em] text-white/45">NONPARALLEL {product.number}</span>
-                      <span className="block text-[18px] font-semibold">{product.name}{quantity > 1 ? ` × ${quantity}` : ''}</span>
-                      <span className="block text-[13px] text-white/45">{color.name} tee · Size {size.size} · Printed to order</span>
+                      <span className="block text-[18px] font-semibold">{product.displayName}{quantity > 1 ? ` × ${quantity}` : ''}</span>
+                      <span className="block text-[13px] text-white/45">{variantLabel(product, color)}{color.sizes.length > 1 ? ` · Size ${size.size}` : ''} · Printed to order</span>
                     </span>
                     <span className="shrink-0 text-[16px] font-semibold tabular-nums">{formatPrice(size.price * quantity)}</span>
                   </li>

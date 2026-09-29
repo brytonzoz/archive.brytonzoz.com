@@ -1,0 +1,12 @@
+{
+  "_comment": "Which of Printify's mockups the site shows. Only real, photographic product shots: no flat 2D drawings, no models or faces, no blank or cropped frames. `studioOnly` lines show only their studio shots (assets-src/merch-studio/<slug>/, which need to exist for every color, or that color is left out). `hide` removes single mockups by key (regexes over merch/<slug>/<color>-N). Read by lib/merch.ts and scripts/build-share-images.mjs; the Printify sync still downloads everything.",
+  "studioOnly": ["heavy-hoodie", "sweatpants", "shorts", "desk-mat", "bandana"],
+  "hide": [
+    "^merch/max-tee-[^/]+/[a-z0-9-]+-[34]$",
+    "^merch/(long-sleeve|tank)-[^/]+/[a-z0-9-]+-[34]$",
+    "^merch/trucker-[^/]+/[a-z0-9-]+-3$",
+    "^merch/onesie-[^/]+/[a-z0-9-]+-3$",
+    "^merch/blanket-[^/]+/[a-z0-9-]+-3$",
+    "^merch/candle-[^/]+/[a-z0-9-]+-3$"
+  ]
+}

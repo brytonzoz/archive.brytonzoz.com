@@ -16,7 +16,7 @@ if (!TOKEN) {
 }
 
 export async function printify(method, route, body) {
-  for (let attempt = 0; attempt < 4; attempt++) {
+  for (let attempt = 0; attempt < 6; attempt++) {
     const response = await fetch(`${API}${route}`, {
       method,
       headers: {
@@ -28,8 +28,8 @@ export async function printify(method, route, body) {
     });
     // Rate limits, and Printify's occasional 5xx on requests that are safe to repeat: wait and retry.
     const retry = response.status === 429 || (response.status >= 500 && (method === 'GET' || method === 'PUT'));
-    if (retry && attempt < 3) {
-      await new Promise((resolve) => setTimeout(resolve, 3000 * (attempt + 1)));
+    if (retry && attempt < 5) {
+      await new Promise((resolve) => setTimeout(resolve, (response.status === 429 ? 20000 : 3000) * (attempt + 1)));
       continue;
     }
     const text = await response.text();
@@ -76,24 +76,72 @@ async function inspect() {
   }
 }
 
-// The classic tee blanks and who prints them in the US (to pick a blueprint + provider).
+// Blanks worth selling, by category, with who prints them in the US and what each offers (to plan
+// new products: blueprint + provider, colors, sizes, print areas).
+const CATEGORIES = {
+  stickers: /kiss-cut sticker|die-cut sticker|sticker sheet/i,
+  pins: /pin\b|pins\b|enamel|button/i,
+  patches: /patch/i,
+  keychains: /keychain|key ring/i,
+  mugs: /\bmug\b|ceramic mug/i,
+  bottles: /water bottle|tumbler|stainless steel bottle/i,
+  'phone cases': /phone case|tough case|iphone/i,
+  posters: /poster|matte vertical|art print/i,
+  canvas: /canvas gallery|framed poster/i,
+  'heavyweight tees': /comfort colors 1717|heavyweight.*tee|max heavyweight|garment-dyed heavyweight/i,
+  'long sleeves': /long sleeve tee|long sleeve t-shirt/i,
+  tanks: /tank top/i,
+  hoodies: /hoodie|hooded sweatshirt/i,
+  crewnecks: /crewneck sweatshirt/i,
+  jackets: /windbreaker|bomber|jacket/i,
+  shorts: /shorts/i,
+  pants: /sweatpants|joggers/i,
+  socks: /socks/i,
+  hats: /dad hat|snapback|trucker|bucket hat|corduroy cap/i,
+  beanies: /beanie/i,
+  totes: /tote bag/i,
+  backpacks: /backpack|drawstring bag|duffel/i,
+  blankets: /blanket|throw/i,
+  pillows: /pillow/i,
+  towels: /towel/i,
+  'mouse pads': /mouse pad|desk mat/i,
+  notebooks: /notebook|journal/i,
+  flags: /flag|tapestry/i,
+  puzzles: /puzzle/i,
+  slides: /slides|sneakers|flip flops/i,
+  kids: /toddler|baby|youth/i,
+  pets: /pet |dog |cat /i,
+};
 async function catalog() {
+  const pause = () => new Promise((resolve) => setTimeout(resolve, 900)); // Printify's catalog allows ~100 calls/min
   const blueprints = await printify('GET', '/catalog/blueprints.json');
-  const tees = blueprints.filter((b) => /3001|gildan 5000|comfort colors 1717|heavyweight|unisex jersey short sleeve/i.test(`${b.title} ${b.model} ${b.brand}`));
-  console.log('\n## Tee blueprints');
-  for (const b of tees.slice(0, 12)) console.log(`- ${b.id} · ${b.brand} ${b.model} · ${b.title}`);
-  for (const b of tees.filter((t) => /3001/.test(t.model)).slice(0, 1)) {
-    const providers = await printify('GET', `/catalog/blueprints/${b.id}/print_providers.json`);
-    console.log(`\n## Print providers for ${b.id} (${b.brand} ${b.model})`);
-    for (const p of providers) console.log(`- ${p.id} · ${p.title} · ${p.location?.country ?? ''} ${p.location?.region ?? ''}`);
+  const out = ['# Printify blanks by category', '', 'Written by `node scripts/printify.mjs catalog` (Printify workflow). One US provider per blank.', ''];
+  for (const [category, pattern] of Object.entries(CATEGORIES)) {
+    const matches = blueprints.filter((b) => pattern.test(`${b.title} ${b.model} ${b.brand}`)).slice(0, 5);
+    out.push(`## ${category}`);
+    for (const b of matches) {
+      await pause();
+      const providers = await printify('GET', `/catalog/blueprints/${b.id}/print_providers.json`);
+      const p = providers.find((entry) => (entry.location?.country ?? 'US') === 'US');
+      out.push(`- ${b.id} · ${b.brand} ${b.model} · ${b.title}`);
+      if (!p) continue;
+      await pause();
+      const data = await printify('GET', `/catalog/blueprints/${b.id}/print_providers/${p.id}/variants.json?show-out-of-stock=0`);
+      const variants = data.variants ?? [];
+      const colors = [...new Set(variants.map((v) => v.options.color).filter(Boolean))];
+      const sizes = [...new Set(variants.map((v) => v.options.size).filter(Boolean))];
+      const areas = [...new Set(variants.flatMap((v) => (v.placeholders ?? []).map((ph) => `${ph.position} ${ph.width}x${ph.height}`)))];
+      out.push(`  - provider ${p.id} ${p.title}: ${variants.length} variants · colors ${colors.slice(0, 10).join('/')}${colors.length > 10 ? ` (+${colors.length - 10})` : ''} · sizes ${sizes.join('/')} · areas ${areas.slice(0, 4).join(', ')}`);
+    }
+    out.push('');
   }
+  await fs.writeFile(path.join(ROOT, 'printify', 'catalog.md'), `${out.join('\n')}\n`);
+  console.log(`Wrote printify/catalog.md`);
 }
 
 const command = process.argv[2] ?? 'inspect';
-if (command === 'inspect') {
-  await inspect();
-  await catalog();
-}
+if (command === 'inspect') await inspect();
+else if (command === 'catalog') await catalog();
 else if (command === 'sync') await (await import('./printify-sync.mjs')).sync(printify, ROOT);
 else if (command === 'order') await (await import('./printify-order.mjs')).order(printify, ROOT);
 else {

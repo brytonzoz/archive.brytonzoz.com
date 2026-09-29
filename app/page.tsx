@@ -6,6 +6,7 @@ import { ProjectCard } from '../components/ProjectCard';
 import { NotifySheet, hasSignedUp } from '../components/NotifySheet';
 import { SiteFooter } from '../components/SiteFooter';
 import { MerchExperience } from '../components/store/MerchExperience';
+import { MerchShop } from '../components/store/MerchShop';
 import { StoreExperience } from '../components/store/StoreExperience';
 import { ReleaseSheet } from '../components/release/ReleaseSheet';
 import { usePlayer } from '../components/player/context';
@@ -13,7 +14,6 @@ import { ArrowUpRightIcon, ChevronDownIcon, EqualizerBars } from '../components/
 import { ResponsiveImage, placeholderBackground } from '../components/ResponsiveImage';
 import { getProjects } from '../lib/projects';
 import { cautionSceneAssets, nonparallelAssets, reminderSceneAssets, scrapwrkSceneAssets, solenyaSceneAssets } from '../lib/assets';
-import { merchScene } from '../lib/merch';
 import type { MediaAsset } from '../lib/media';
 import { nextRelease, nextReleaseProject } from '../lib/next-release';
 import { getStreamingServices, getVisitLabel } from '../lib/streaming';
@@ -1169,8 +1169,7 @@ const ScrapwrkScene = React.memo(function ScrapwrkScene({ distance, loadImages }
   );
 });
 
-// NonParallel's background: four of the tees, faint and tucked into the corners, and one small logo
-// sticker. Placed by percentage of the screen (not the portrait scene frame) so they sit in the
+// NonParallel's background: four of the tees, faint and tucked into the corners. Placed by percentage of the screen (not the portrait scene frame) so they sit in the
 // corners on a phone and spread out on a wide screen; `size` is in units of --np-sticker
 // (globals.css) and `alpha` keeps them in the background. They move with the scroll like the
 // Scrapwrk stickers.
@@ -1183,13 +1182,12 @@ const nonparallelStickers = [
     movement: { x: -64, y: 112, rotate: 4, scale: 0.08, fadeRate: 1.02 }, float: { x: -7, y: -8, rotate: -1.4, duration: '8.2s', delay: '0.3s' }, intro: { x: -150, y: 160, rotate: 8, delay: '0.34s' } },
   { key: 'purple', src: nonparallelAssets.tees.purple, x: 97, y: 93, size: 0.95, alpha: 0.2, baseRotate: 17,
     movement: { x: 78, y: 124, rotate: -5, scale: 0.08, fadeRate: 1.04 }, float: { x: 9, y: -9, rotate: 1.6, duration: '8.6s', delay: '0.55s' }, intro: { x: 170, y: 164, rotate: -8, delay: '0.4s' } },
-  { key: 'logo', src: nonparallelAssets.logo, x: 74, y: 8, size: 0.38, alpha: 0.55, baseRotate: 9,
-    movement: { x: 40, y: -120, rotate: 6, scale: 0.06, fadeRate: 1 }, float: { x: 5, y: -6, rotate: 2.4, duration: '7.6s', delay: '0.2s' }, intro: { x: 90, y: -150, rotate: 12, delay: '0.46s' } },
 ];
 
-// NonParallel: the label behind all of this. Its logo (a sticker) heads the scene, a short note
-// says what it is, and the tees follow in the same card system as Scrapwrk.
-const NonParallelScene = React.memo(function NonParallelScene({ distance }: { distance: number }) {
+// NonParallel: the label behind all of this. Laid out like Scrapwrk's scene: its logo heads it, a
+// line says what it is, four best sellers sit in the same 2x2 card grid, and a small "Scroll for
+// more" leads into the full shop below.
+const NonParallelScene = React.memo(function NonParallelScene({ distance, onShop }: { distance: number; onShop: () => void }) {
   const distanceMagnitude = clamp(Math.abs(distance), 0, 1);
   const active = distanceMagnitude < 0.45;
   const incoming = easeOutCubic(clamp(Math.abs(Math.min(distance, 0)) / 0.9, 0, 1));
@@ -1242,10 +1240,8 @@ const NonParallelScene = React.memo(function NonParallelScene({ distance }: { di
         })}
       </div>
       <div
-        className="np-scene relative z-10"
+        className="store-scene relative z-10"
         style={{
-          '--rows': merchScene.rows,
-          '--row-h': merchScene.rowHeight,
           opacity: 1 - (distanceMagnitude * 0.3),
           transform: `translate3d(0, ${incoming * 32}px, 0)`,
           transition: 'transform 480ms cubic-bezier(0.22, 1, 0.36, 1), opacity 280ms ease-out',
@@ -1253,9 +1249,8 @@ const NonParallelScene = React.memo(function NonParallelScene({ distance }: { di
       >
         <MerchExperience
           active={active}
-          columns={merchScene.columns}
-          sizes={merchScene.columns === 3 ? '(min-width: 640px) 180px, 30vw' : '(min-width: 640px) 270px, 44vw'}
-          headerClassName="np-scene-header"
+          sizes="(min-width: 640px) 280px, 46vw"
+          headerClassName="store-scene-header"
           title={(
             <h2 className="np-scene-logo">
               <span className="sr-only">NonParallel</span>
@@ -1263,12 +1258,18 @@ const NonParallelScene = React.memo(function NonParallelScene({ distance }: { di
             </h2>
           )}
           titleEnd={(
-            <Link href="/nonparallel/" className="store-scene-link scene-title">
-              All tees
-              <ChevronDownIcon size={16} className="-rotate-90" />
-            </Link>
+            <button type="button" onClick={onShop} className="store-scene-link scene-title">
+              Shop all
+              <ChevronDownIcon size={16} />
+            </button>
           )}
-          intro={<p className="store-caption">The label and company behind all of this. A tee is a way to support it: you get something to wear, and it keeps the work going.</p>}
+          intro={<p className="store-caption">Best sellers from the label behind all of this. Every piece supports the work.</p>}
+          footer={(
+            <button type="button" onClick={onShop} className="np-scroll-hint">
+              Scroll for more
+              <ChevronDownIcon size={14} />
+            </button>
+          )}
         />
       </div>
     </div>
@@ -1276,11 +1277,12 @@ const NonParallelScene = React.memo(function NonParallelScene({ distance }: { di
 });
 
 // Page dots, as on iOS: they show there's more below, where you are, and jump anywhere.
-function SceneDots({ names, activeIndex, onSelect }: { names: string[]; activeIndex: number; onSelect: (index: number) => void }) {
+function SceneDots({ names, activeIndex, onSelect, hidden }: { names: string[]; activeIndex: number; onSelect: (index: number) => void; hidden?: boolean }) {
   return (
     <nav
       aria-label="Projects"
-      className="scene-dots fixed right-2 top-1/2 z-40 flex -translate-y-1/2 flex-col items-center sm:right-5"
+      className={`scene-dots fixed right-2 top-1/2 z-40 flex -translate-y-1/2 flex-col items-center transition-opacity duration-300 sm:right-5 ${hidden ? 'pointer-events-none opacity-0' : ''}`}
+      aria-hidden={hidden || undefined}
     >
       {names.map((name, index) => (
         <button
@@ -1360,6 +1362,8 @@ export default function HomePage() {
     const container = document.querySelector('.scroll-container');
     container?.scrollTo({ top: container.clientHeight * index, behavior: 'smooth' });
   }, []);
+  // The shop sits after the last scene.
+  const scrollToShop = useCallback(() => scrollToScene(allProjects.length), [scrollToScene, allProjects.length]);
 
   useEffect(() => {
     const updateLayout = () => {
@@ -1406,9 +1410,14 @@ export default function HomePage() {
 
       const scrollTop = container.scrollTop;
       const containerHeight = container.clientHeight;
+      // Inside the shop the page scrolls freely. Snapping stays off there: with it on, iOS Safari
+      // re-snaps to the shop's top whenever the page bounces at the bottom or the grid grows.
+      const shop = document.getElementById('shop');
+      container.classList.toggle('is-free', Boolean(shop) && scrollTop >= (shop?.offsetTop ?? Infinity) - 2);
       const newIndex = Math.round(scrollTop / containerHeight);
 
-      setScrollProgress(scrollTop / containerHeight);
+      // Past the scenes (in the shop) nothing moves, so stop re-rendering on every scroll.
+      setScrollProgress(Math.min(scrollTop / containerHeight, allProjects.length));
       if (scrollTop > 0) {
         setLoadDeferredScenes(true);
       }
@@ -1440,9 +1449,10 @@ export default function HomePage() {
       <div className="solenya-gradient-reveal pointer-events-none fixed inset-0 z-[1] bg-black" />
 
       <SceneDots
-        names={allProjects.map((project) => project.name)}
+        names={[...allProjects.map((project) => project.name), 'Shop']}
         activeIndex={activeIndex}
         onSelect={scrollToScene}
+        hidden={activeIndex >= allProjects.length}
       />
 
       <div className="scroll-container relative z-10 h-screen overflow-y-auto snap-y snap-mandatory scroll-smooth">
@@ -1459,15 +1469,12 @@ export default function HomePage() {
             const distanceFromCenter = Math.abs(scrollProgress - index);
             const continuousDistance = clamp(distanceFromCenter, 0, 1.2);
             // Scene motion saturates at one screen away; clamping lets memoized far-off scenes skip re-rendering.
-            const isLast = index === allProjects.length - 1;
-            const sceneDistance = clamp(scrollProgress - index, -1, isLast ? 0 : 1);
-            const footer = isLast ? <SiteFooter variant="overlay" /> : null;
+            const sceneDistance = clamp(scrollProgress - index, -1, 1);
 
             if (project.type === 'coming-soon') {
               return (
                 <div key={project.name} className="relative h-screen snap-center overflow-hidden">
                   <ComingSoonScene distance={sceneDistance} onNext={() => scrollToScene(index + 1)} />
-                  {footer}
                 </div>
               );
             }
@@ -1481,7 +1488,6 @@ export default function HomePage() {
                     loadImages={index === 0 || loadDeferredScenes}
                     onModalStateChange={handleModalStateChange}
                   />
-                  {footer}
                 </div>
               );
             }
@@ -1495,7 +1501,6 @@ export default function HomePage() {
                     loadImages={index === 0 || loadDeferredScenes}
                     onModalStateChange={handleModalStateChange}
                   />
-                  {footer}
                 </div>
               );
             }
@@ -1508,7 +1513,6 @@ export default function HomePage() {
                     distance={sceneDistance}
                     loadImages={index === 0 || loadDeferredScenes}
                   />
-                  {footer}
                 </div>
               );
             }
@@ -1516,8 +1520,7 @@ export default function HomePage() {
             if (isNonParallel) {
               return (
                 <div key={project.name} className="relative h-screen snap-center overflow-hidden">
-                  <NonParallelScene distance={sceneDistance} />
-                  {footer}
+                  <NonParallelScene distance={sceneDistance} onShop={scrollToShop} />
                 </div>
               );
             }
@@ -1526,7 +1529,6 @@ export default function HomePage() {
               return (
                 <div key={project.name} className="relative h-screen snap-center overflow-hidden">
                   <ScrapwrkScene distance={sceneDistance} loadImages={index === 0 || loadDeferredScenes} />
-                  {footer}
                 </div>
               );
             }
@@ -1567,11 +1569,17 @@ export default function HomePage() {
                 <div className="flex h-full w-full items-start justify-center px-6 pt-20 sm:px-8 md:px-12 lg:px-16 xl:px-20 2xl:px-24">
                   {projectCard}
                 </div>
-                {footer}
               </div>
             );
           })}
 
+          {/* After the scenes, the page scrolls normally: the whole NonParallel shop, then the footer. */}
+          <section id="shop" aria-label="Shop" className="shop-section shop-section-home relative min-h-screen snap-start">
+            <div className="mx-auto max-w-[1120px] px-4 pt-14 sm:px-8 sm:pt-20">
+              <MerchShop />
+            </div>
+            <SiteFooter />
+          </section>
         </div>
       </div>
     </div>

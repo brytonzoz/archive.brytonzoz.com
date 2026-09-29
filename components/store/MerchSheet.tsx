@@ -3,7 +3,7 @@
 import React, { useEffect, useId, useState } from 'react';
 import { createPortal } from 'react-dom';
 import { track } from '../../lib/analytics';
-import { merchBlank, merchDetails, merchKey, merchPath, type MerchProduct } from '../../lib/merch';
+import { merchKey, merchPath, variantLabel, type MerchProduct } from '../../lib/merch';
 import { shareLink } from '../../lib/share';
 import { formatPrice, shippingLabel } from '../../lib/store';
 import { addToBag } from '../../lib/store-client';
@@ -15,7 +15,7 @@ import { Gallery } from './ProductSheet';
 const iconButton =
   'flex h-10 w-10 items-center justify-center rounded-full text-black/70 transition-colors hover:bg-black/5 hover:text-black focus-visible:outline focus-visible:outline-2 focus-visible:outline-black/50';
 
-// A NonParallel tee: photos on white (Printify's mockups), color, size, then Buy now or bag it.
+// A NonParallel piece: photos on white (Printify's mockups, then studio shots), color, size, then Buy now or bag it.
 export function MerchSheet({
   product,
   initialColor,
@@ -37,11 +37,14 @@ export function MerchSheet({
   const [colorIndex, setColorIndex] = useState(0);
   const [size, setSize] = useState<string | null>(null);
   const [nudge, setNudge] = useState(0);
+  // Briefly true after Add to bag: the button turns into a green check (a success state, not just a toast).
+  const [added, setAdded] = useState(0);
 
   useEffect(() => {
     if (!product) return;
     setColorIndex(Math.max(0, product.colors.findIndex((color) => color.slug === initialColor)));
     setSize(null);
+    setAdded(0);
     track({ type: 'product', detail: `np:${product.slug}` });
     if (!document.querySelector('link[data-stripe-preconnect]')) {
       const link = document.createElement('link');
@@ -54,7 +57,11 @@ export function MerchSheet({
 
   if (!product) return null;
   const color = product.colors[Math.min(colorIndex, product.colors.length - 1)];
-  const chosen = color.sizes.find((entry) => entry.size === size);
+  // One-size things (stickers, mugs…) skip the size row.
+  const oneSize = color.sizes.length === 1;
+  // "Size" for sizes; a candle's scents and the like are just options.
+  const sizeWord = color.sizes.some((option) => /\d|^(XS|S|M|L|XL)$/.test(option.size)) ? 'Size' : 'Option';
+  const chosen = oneSize ? color.sizes[0] : color.sizes.find((entry) => entry.size === size);
   const price = chosen?.price ?? color.sizes[0]?.price ?? product.price;
   // Bigger sizes cost more to make; say so under the sizes.
   const upcharges = color.sizes.filter((option) => option.price > product.price);
@@ -91,7 +98,7 @@ export function MerchSheet({
             </button>
             <button
               type="button"
-              aria-label={`Share the ${product.name} tee`}
+              aria-label={`Share the ${product.displayName}`}
               onClick={() =>
                 shareLink({ title: product.title, text: `${product.title} · NonParallel`, path: merchPath(product) })
                   .then((message) => message && notify(message))
@@ -107,6 +114,7 @@ export function MerchSheet({
           <div className="bg-white">
             <Gallery
               images={color.images}
+              views={color.views}
               tone="dark"
               label={`${product.title}, ${color.name}`}
               alt={(i) => `${product.title} in ${color.name}${i ? `, view ${i + 1}` : ''}`}
@@ -116,11 +124,14 @@ export function MerchSheet({
             <div className="flex items-start justify-between gap-4">
               <div className="min-w-0">
                 <p className="text-[13px] font-semibold tracking-[0.18em] text-black/55">
-                  NONPARALLEL {product.number}{product.colors.length === 1 ? ` · ${color.name.toUpperCase()} TEE` : ''}
+                  NONPARALLEL {product.number} · {(product.colors.length === 1 ? variantLabel(product, color) : product.lineName).toUpperCase()}
                 </p>
                 <h2 id={titleId} className="mt-1 text-[30px] font-bold leading-none tracking-[-0.03em]">{product.name}</h2>
               </div>
-              <p className="shrink-0 text-[24px] font-semibold tabular-nums tracking-[-0.02em]">{formatPrice(price)}</p>
+              <p className="shrink-0 overflow-hidden text-[24px] font-semibold tabular-nums tracking-[-0.02em]" aria-live="polite">
+                {/* Keyed by the price, so a size that costs more rolls the new price in. */}
+                <span key={price} className="merch-price-roll inline-block">{formatPrice(price)}</span>
+              </p>
             </div>
 
             {product.colors.length > 1 ? (
@@ -142,11 +153,15 @@ export function MerchSheet({
               </fieldset>
             ) : null}
 
-            <fieldset key={nudge} className={`mt-6 ${nudge ? 'merch-nudge' : ''}`}>
+            {oneSize ? null : <fieldset key={nudge} className={`mt-6 ${nudge ? 'merch-nudge' : ''}`}>
               <legend className="text-[13px] font-semibold text-black/60">
-                Size{chosen ? <> · <span className="text-black">{chosen.size}</span></> : nudge ? <span className="text-[#c4252a]"> · pick one</span> : null}
+                {sizeWord}{chosen ? <> · <span className="text-black">{chosen.size}</span></> : nudge ? <span className="text-[#c4252a]"> · pick one</span> : null}
               </legend>
-              <div className="mt-2.5 grid grid-cols-6 gap-2">
+              <div
+                className="mt-2.5 grid gap-2"
+                // Six apparel sizes fit one row on a phone; long names (phone models, poster sizes) get wider cells.
+                style={{ gridTemplateColumns: `repeat(auto-fill, minmax(${Math.max(2.75, Math.max(...color.sizes.map((option) => option.size.length)) * 0.5 + 1.25)}rem, 1fr))` }}
+              >
                 {color.sizes.map((option) => (
                   <button
                     key={option.variantId}
@@ -162,16 +177,16 @@ export function MerchSheet({
               {upcharges.length ? (
                 <p className="mt-2 text-[13px] text-black/60">{upcharges.map((option) => `${option.size} ${formatPrice(option.price)}`).join(' · ')}</p>
               ) : null}
-            </fieldset>
+            </fieldset>}
 
             <p className="mt-6 text-[15px] leading-relaxed text-black/70">
-              NonParallel is the label and company behind all of this. A tee is a way to support it: you get something to wear, and it keeps the work going.
+              NonParallel is the label and company behind all of this. Buying something here is a way to support it: you get something you’ll use, and it keeps the work going.
             </p>
-            {merchDetails.length ? (
+            {product.details.length ? (
               <details className="mt-5 border-t border-black/[0.08] pt-4 text-[14px] text-black/65">
-                <summary className="cursor-pointer font-semibold text-black/80">{merchBlank} · details</summary>
+                <summary className="cursor-pointer font-semibold text-black/80">{product.blank ? `${product.blank} · details` : 'Details'}</summary>
                 <ul className="mt-2 space-y-1.5 leading-relaxed">
-                  {merchDetails.map((line) => <li key={line} className="flex gap-2.5"><span aria-hidden="true" className="mt-[9px] h-1 w-1 shrink-0 rounded-full bg-black/40" />{line}</li>)}
+                  {product.details.map((line) => <li key={line} className="flex gap-2.5"><span aria-hidden="true" className="mt-[9px] h-1 w-1 shrink-0 rounded-full bg-black/40" />{line}</li>)}
                 </ul>
               </details>
             ) : null}
@@ -191,11 +206,17 @@ export function MerchSheet({
                 navigator.vibrate?.(10);
                 track({ type: 'bag', detail: key });
                 notify('Added to bag');
+                setAdded(Date.now());
+                window.setTimeout(() => setAdded(0), 1400);
               })}
-              aria-label="Add to bag"
-              className="flex h-[56px] shrink-0 items-center justify-center gap-2 rounded-full bg-black/[0.07] px-5 text-[16px] font-semibold text-black transition-[transform,background-color] hover:bg-black/[0.1] active:scale-[0.97] focus-visible:outline focus-visible:outline-2 focus-visible:outline-black/50"
+              aria-label={added ? 'Added to bag' : 'Add to bag'}
+              className={`merch-add ${added ? 'is-added' : ''} flex h-[56px] shrink-0 items-center justify-center gap-2 rounded-full px-5 text-[16px] font-semibold focus-visible:outline focus-visible:outline-2 focus-visible:outline-black/50`}
             >
-              <BagIcon size={20} />
+              {added ? (
+                <svg key={added} className="merch-add-check" width="20" height="20" viewBox="0 0 24 24" fill="none" aria-hidden="true">
+                  <path d="M5 12.5l4.5 4.5L19 7.5" stroke="currentColor" strokeWidth="2.6" strokeLinecap="round" strokeLinejoin="round" />
+                </svg>
+              ) : <BagIcon size={20} />}
             </button>
             <button
               type="button"

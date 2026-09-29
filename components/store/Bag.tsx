@@ -3,7 +3,7 @@
 import React, { useCallback, useEffect, useId, useState } from 'react';
 import { createPortal } from 'react-dom';
 import { track } from '../../lib/analytics';
-import { merchVariant } from '../../lib/merch';
+import { merchVariant, variantLabel } from '../../lib/merch';
 import { formatPrice, productById, shippingLabel } from '../../lib/store';
 import {
   addToBag, bagLines, cancelCheckout, hasPendingCheckout, removeFromBag, removeOneFromBag, startCheckout, useAvailability, useBag,
@@ -52,15 +52,15 @@ function TeeRow({ id, quantity }: { id: string; quantity: number }) {
   const variant = merchVariant(id);
   if (!variant) return null;
   const image = variant.color.images[0];
-  const name = `${variant.product.name} tee`;
+  const name = variant.product.displayName;
   return (
     <li className="flex items-start gap-3 py-2.5">
       <span className="relative h-14 w-14 shrink-0 overflow-hidden rounded-[12px] bg-white">
         <ResponsiveImage asset={image} alt="" sizes="56px" className="absolute inset-0 h-full w-full object-cover" />
       </span>
       <span className="min-w-0 flex-1">
-        <span className="block truncate text-[16px] font-semibold">NonParallel {variant.product.name}</span>
-        <span className="block truncate text-[13px] text-white/50">{variant.color.name} tee · {variant.size.size}</span>
+        <span className="block truncate text-[16px] font-semibold">NonParallel {variant.product.displayName}</span>
+        <span className="block truncate text-[13px] text-white/50">{variantLabel(variant.product, variant.color)}{variant.product.colors[0].sizes.length > 1 ? ` · ${variant.size.size}` : ''}</span>
         <span className="mt-1.5 inline-flex items-center gap-1.5 rounded-full bg-white/[0.06] p-0.5">
           <button type="button" className={stepButton} onClick={() => removeOneFromBag(id)} aria-label={quantity > 1 ? `One fewer ${name}` : `Remove ${name} from bag`}>
             {quantity > 1 ? '−' : <RemoveIcon size={16} />}

@@ -2,14 +2,13 @@
 
 import React from 'react';
 import { nonparallelAssets } from '../../lib/assets';
-import { merchCards, merchMoreCard, type MerchCard } from '../../lib/merch';
+import { merchCards, type MerchCard } from '../../lib/merch';
 import { formatPrice } from '../../lib/store';
 import { ResponsiveImage } from '../ResponsiveImage';
 
-// NonParallel tees in the same card system as Scrapwrk: the cards fly in (left column from the
-// left, right from the right; top rows from above, bottom from below), turn over from the logo to
-// the tee, then float. Photos are Printify's mockups on white. A "More soon" card invites a sign-up
-// for new designs: in the free spot of an odd grid, or across the bottom under two tees.
+// NonParallel's best sellers in the same 2x2 card system as Scrapwrk: the cards fly in (left column
+// from the left, right from the right; top row from above, bottom from below), turn over from the
+// logo to the piece, then float. Photos are Printify's mockups on white.
 
 const STAGGER_MS = 60;
 
@@ -46,6 +45,7 @@ function TeeCard({ card: { product, color, perColor }, sizes }: { card: MerchCar
       <span className="store-card-face store-card-front merch-card-front">
         <span className="store-card-photo merch-card-photo">
           <ResponsiveImage asset={color.images[0]} alt="" sizes={sizes} draggable={false} loading="lazy" className="h-full w-full object-cover" />
+          {color.views?.[0] ? <span className="shop-tile-side merch-card-side" aria-hidden="true">{color.views[0] === 'front' ? 'Front' : 'Back'}</span> : null}
           {!perColor && product.colors.length > 1 ? (
             <span className="merch-card-swatches" aria-hidden="true">
               {product.colors.slice(0, 5).map((option) => <span key={option.slug} style={{ background: option.swatch }} />)}
@@ -54,7 +54,7 @@ function TeeCard({ card: { product, color, perColor }, sizes }: { card: MerchCar
         </span>
         <span className="store-card-meta merch-card-meta">
           <span className="min-w-0">
-            <span className="store-card-number">{perColor ? `${product.number} · ${color.name.toUpperCase()}` : product.number}</span>
+            <span className="store-card-number">{perColor ? `${product.number} · ${color.name.toUpperCase()}` : product.lineName.toUpperCase()}</span>
             <span className="store-card-name">{product.name}</span>
           </span>
           <span className="store-card-price">{formatPrice(product.price)}</span>
@@ -65,80 +65,26 @@ function TeeCard({ card: { product, color, perColor }, sizes }: { card: MerchCar
   );
 }
 
-function WideMoreCard() {
-  return (
-    <>
-      <span className="store-card-face store-card-front merch-card-front merch-more merch-more-wide">
-        <span className="merch-more-wide-logo">
-          <ResponsiveImage asset={nonparallelAssets.logo} alt="" sizes="40vw" draggable={false} loading="lazy" className="h-full w-full object-contain" />
-        </span>
-        <span className="merch-more-wide-text">
-          <span className="store-card-name">More designs soon</span>
-          <span className="merch-more-wide-sub">One email when they drop</span>
-          <span className="store-card-cta merch-card-cta">Notify me</span>
-        </span>
-      </span>
-      <span className="store-card-face store-card-back merch-card-back" aria-hidden="true">
-        <span className="merch-card-logo merch-card-logo-wide">
-          <ResponsiveImage asset={nonparallelAssets.logo} alt="" sizes="40vw" draggable={false} loading="lazy" className="h-full w-full object-contain" />
-        </span>
-      </span>
-    </>
-  );
-}
-
-function MoreCard({ number }: { number: string }) {
-  return (
-    <>
-      <span className="store-card-face store-card-front merch-card-front">
-        <span className="store-card-photo merch-card-photo merch-more">
-          <span className="merch-more-logo">
-            <ResponsiveImage asset={nonparallelAssets.logo} alt="" sizes="30vw" draggable={false} loading="lazy" className="h-full w-full object-contain" />
-          </span>
-        </span>
-        <span className="store-card-meta merch-card-meta">
-          <span className="min-w-0">
-            <span className="store-card-number">{number}</span>
-            <span className="store-card-name">More soon</span>
-          </span>
-          <span className="store-card-cta merch-card-cta">Notify me</span>
-        </span>
-      </span>
-      <Back number={number} />
-    </>
-  );
-}
-
 export function MerchGrid({
   active,
   onOpen,
-  onNotify,
   sizes = '(min-width: 640px) 280px, 46vw',
-  columns = 2,
 }: {
   active: boolean;
-  columns?: 2 | 3;
   onOpen: (card: MerchCard) => void;
-  onNotify: () => void;
   sizes?: string;
 }) {
+  const columns = 2;
   const cards: { key: string; label: string; face: React.ReactNode; wide?: boolean; onClick: () => void }[] = merchCards.map((card) => ({
     key: `${card.product.slug}-${card.color.slug}`,
-    label: `${card.product.name} tee${card.perColor ? `, ${card.color.name}` : ''}, ${formatPrice(card.product.price)}`,
+    label: `${card.product.displayName}${card.perColor ? `, ${card.color.name}` : ''}, ${formatPrice(card.product.price)}`,
     face: <TeeCard card={card} sizes={sizes} />,
     onClick: () => onOpen(card),
   }));
-  // Three across is only used when the tees fill the rows, so the "More soon" card is a two-column thing.
-  if (columns === 2 && merchMoreCard === 'slot') {
-    const number = String(new Set(merchCards.map((card) => card.product.slug)).size + 1).padStart(3, '0');
-    cards.push({ key: 'more', label: 'More designs soon: notify me', face: <MoreCard number={number} />, onClick: onNotify });
-  } else if (columns === 2 && merchMoreCard === 'wide') {
-    cards.push({ key: 'more', label: 'More designs soon: notify me', face: <WideMoreCard />, wide: true, onClick: onNotify });
-  }
   const count = cards.length;
 
   return (
-    <div className={`store-grid merch-grid ${columns === 3 ? 'is-3col' : ''} ${active ? 'is-active' : ''}`}>
+    <div className={`store-grid merch-grid ${active ? 'is-active' : ''}`}>
       {cards.map((card, i) => {
         const slot = slotFor(i, count, columns, Boolean(card.wide));
         return (

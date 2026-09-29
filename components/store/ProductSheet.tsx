@@ -11,12 +11,26 @@ import { ResponsiveImage, placeholderBackground } from '../ResponsiveImage';
 import { usePlayer } from '../player/context';
 import { BagIcon, ChevronDownIcon, ShareIcon } from '../player/icons';
 import { useSheet } from '../useSheet';
+import { PhotoZoom } from './PhotoZoom';
 
 const iconButton =
   'flex h-10 w-10 items-center justify-center rounded-full text-white/75 transition-colors hover:bg-white/10 hover:text-white focus-visible:outline focus-visible:outline-2 focus-visible:outline-white/70';
 
 // Swipe (or use the arrows / dots) through every photo. `dots` darkens for light photos.
-export function Gallery({ images, label, alt, tone = 'light' }: { images: MediaAsset[]; label: string; alt: (i: number) => string; tone?: 'light' | 'dark' }) {
+export function Gallery({
+  images,
+  label,
+  alt,
+  tone = 'light',
+  views,
+}: {
+  images: MediaAsset[];
+  label: string;
+  alt: (i: number) => string;
+  tone?: 'light' | 'dark';
+  /** Which side each photo shows (apparel): adds a Front / Back switch that's always on screen. */
+  views?: ('front' | 'back' | null)[];
+}) {
   const scroller = useRef<HTMLDivElement>(null);
   const [index, setIndex] = useState(0);
   const count = images.length;
@@ -32,6 +46,10 @@ export function Gallery({ images, label, alt, tone = 'light' }: { images: MediaA
     if (!el) return;
     el.scrollTo({ left: el.clientWidth * Math.max(0, Math.min(count - 1, i)), behavior: 'smooth' });
   };
+
+  const [zoom, setZoom] = useState<number | null>(null);
+  const sides = views && views.includes('front') && views.includes('back') ? views : null;
+  const side = sides?.[index] ?? null;
 
   return (
     <div className="relative">
@@ -50,7 +68,13 @@ export function Gallery({ images, label, alt, tone = 'light' }: { images: MediaA
         }}
       >
         {images.map((image, i) => (
-          <div key={image.src} className="relative aspect-square w-full shrink-0 snap-center" style={placeholderBackground(image)}>
+          <div
+            key={image.src}
+            className="relative aspect-square w-full shrink-0 snap-center cursor-zoom-in"
+            style={placeholderBackground(image)}
+            // Tap a photo to see it full screen and zoom into the print.
+            onClick={() => setZoom(i)}
+          >
             <ResponsiveImage
               asset={image}
               alt={alt(i)}
@@ -69,11 +93,42 @@ export function Gallery({ images, label, alt, tone = 'light' }: { images: MediaA
       <button type="button" onClick={() => go(index + 1)} aria-label="Next photo" disabled={index === count - 1} className="store-gallery-arrow right-3">
         <ChevronDownIcon size={20} className="-rotate-90" />
       </button>
-      <div className="pointer-events-none absolute inset-x-0 bottom-3 flex justify-center gap-1.5" aria-hidden="true">
+      {sides ? (
+        <div className="gallery-sides" role="group" aria-label="Side shown">
+          {(['front', 'back'] as const).map((option) => (
+            <button
+              key={option}
+              type="button"
+              aria-pressed={side === option}
+              // From the current photo, the nearest one of that side.
+              onClick={() => {
+                const order = sides.map((view, i) => ({ view, i })).filter((entry) => entry.view === option).sort((a, b) => Math.abs(a.i - index) - Math.abs(b.i - index));
+                if (order.length) go(order[0].i);
+              }}
+            >
+              {option === 'front' ? 'Front' : 'Back'}
+            </button>
+          ))}
+        </div>
+      ) : null}
+      <div className={`pointer-events-none absolute inset-x-0 bottom-3 flex gap-1.5 ${sides ? 'justify-end pr-5 pb-2.5' : 'justify-center'}`} aria-hidden="true">
         {images.map((image, i) => (
           <span key={image.src} className={`h-1.5 rounded-full transition-all duration-300 ${tone === 'dark' ? 'bg-black' : 'bg-white'} ${i === index ? 'w-4 opacity-80' : 'w-1.5 opacity-30'}`} />
         ))}
       </div>
+      {zoom !== null ? (
+        <PhotoZoom
+          images={images}
+          index={zoom}
+          alt={alt}
+          onIndex={setZoom}
+          onClose={() => {
+            // Back in the sheet, on the photo you ended on.
+            if (zoom !== index) go(zoom);
+            setZoom(null);
+          }}
+        />
+      ) : null}
     </div>
   );
 }

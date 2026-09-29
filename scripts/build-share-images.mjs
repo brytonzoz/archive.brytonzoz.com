@@ -81,12 +81,24 @@ async function main() {
 
   // NonParallel tees: a square per tee color for Stripe's checkout page, and a link-preview card per design.
   const merchCatalog = JSON.parse(await fs.readFile(path.join(ROOT, 'lib', 'merch-catalog.json'), 'utf8').catch(() => '{"products":[]}'));
+  // The same photos the site shows (printify/mockups.json; lib/merch.ts): the first visible mockup,
+  // else the first studio shot.
+  const rules = JSON.parse(await fs.readFile(path.join(ROOT, 'printify', 'mockups.json'), 'utf8'));
+  const hidden = rules.hide.map((pattern) => new RegExp(pattern));
+  const studioDir = path.join(ROOT, 'assets-src', 'merch-studio');
+  const firstImage = async (product, color, colorSlug) => {
+    const mockup = rules.studioOnly.includes(product.line ?? 'tee') ? null : color.images.find((key) => !hidden.some((rule) => rule.test(key)));
+    if (mockup) return mockup;
+    const files = (await fs.readdir(path.join(studioDir, product.slug)).catch(() => [])).filter((file) => file.startsWith(`${colorSlug}-`)).sort();
+    return files.length ? `merch-studio/${product.slug}/${files[0].replace(/\.[a-z]+$/, '')}` : null;
+  };
   for (const product of merchCatalog.products) {
     for (const [i, color] of product.colors.entries()) {
-      if (!color.images.length) continue;
-      const source = await findSource(color.images[0]);
-      const hash = await hashOf(source);
       const colorSlug = color.name.toLowerCase().replace(/[^a-z0-9]+/g, '-');
+      const first = await firstImage(product, color, colorSlug);
+      if (!first) continue;
+      const source = await findSource(first);
+      const hash = await hashOf(source);
       const squareName = `merch-${product.slug}-${colorSlug}.${hash}.jpg`;
       if (!(await exists(path.join(OUT_DIR, squareName)))) {
         await sharp(source).resize(800, 800).jpeg({ quality: 82, mozjpeg: true }).toFile(path.join(OUT_DIR, squareName));

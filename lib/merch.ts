@@ -1,19 +1,39 @@
 import catalog from './merch-catalog.json';
+import mockupRules from '../printify/mockups.json';
 import shareImages from './share-images.json';
 import { media, type MediaAsset, type MediaKey } from './media';
 
-// NonParallel tees, printed to order by Printify. lib/merch-catalog.json is written by the Printify
-// workflow (scripts/printify-sync.mjs) from printify/products.json; the checkout Worker reads it too.
+// NonParallel merch (tees, hoodies, stickers, mugs…), printed to order by Printify. lib/merch-catalog.json
+// is written by the Printify workflow (scripts/printify-sync.mjs) from printify/products.json; the
+// checkout Worker reads it too.
 
 export type MerchSize = { size: string; variantId: number; price: number };
-export type MerchColor = { name: string; slug: string; swatch: string; images: MediaAsset[]; sizes: MerchSize[] };
-export type MerchProduct = { slug: string; number: string; name: string; title: string; price: number; colors: MerchColor[]; shareImage?: string };
+export type MerchView = 'front' | 'back' | null;
+/** `views` (apparel only) says which side each photo shows. */
+export type MerchColor = { name: string; slug: string; swatch: string; images: MediaAsset[]; views?: MerchView[]; sizes: MerchSize[] };
+export type MerchProduct = {
+  slug: string;
+  number: string;
+  /** The design ("Rainbow"). */
+  name: string;
+  /** The design and the item together ("Rainbow Hoodie"). */
+  displayName: string;
+  /** What the item is ("Hoodie"), and its shop category ("Hoodies"). */
+  lineName: string;
+  line: string;
+  category: string;
+  title: string;
+  price: number;
+  /** Starting price differs by size or color. */
+  priceVaries: boolean;
+  blank: string;
+  details: string[];
+  colors: MerchColor[];
+  shareImage?: string;
+};
 
 export const MERCH_PATH = '/nonparallel/';
 export const MERCH_KEY_PREFIX = 'np:';
-const rawDetails = (catalog.blueprint as { details?: string | string[] } | undefined)?.details;
-export const merchDetails: string[] = Array.isArray(rawDetails) ? rawDetails : [];
-export const merchBlank = `${catalog.blueprint?.name ?? ''}`.trim();
 
 // Swatch colors for the tee colors Printify names.
 const SWATCHES: Record<string, string> = {
@@ -25,47 +45,95 @@ const SWATCHES: Record<string, string> = {
 };
 const slugify = (text: string) => text.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '');
 
-type RawColor = { name: string; hex: string | null; images: string[]; sizes: MerchSize[] };
-type RawProduct = { slug: string; number: string; name: string; title: string; price: number; colors: RawColor[] };
+const studioKeys = (design: string, color: string) =>
+  Object.keys(media).filter((key) => key.startsWith(`merch-studio/${design}/${color}-`)).sort();
+// Only photographic mockups: printify/mockups.json lists the lines that show studio shots only
+// (Printify's are flat drawings) and single mockups to hide (models, blank or cropped frames).
+const STUDIO_ONLY = new Set<string>(mockupRules.studioOnly);
+const HIDDEN = mockupRules.hide.map((pattern) => new RegExp(pattern));
+const showMockup = (line: string | undefined, key: string) => !STUDIO_ONLY.has(line ?? 'tee') && !HIDDEN.some((rule) => rule.test(key));
+// Studio shots show the back (the big logo) unless the file says otherwise: black-5-front.jpg.
+const studioView = (key: string): MerchView => (key.endsWith('-front') ? 'front' : 'back');
+// Size labels as the sheet shows them: only the part that differs between a color's options
+// ("11″ x 14″", not "11″ x 14″ · Matte" on every poster; a candle's scent, not "One size · …"),
+// and never two buttons with the same label.
+function tidySizes(sizes: MerchSize[]): MerchSize[] {
+  const parts = sizes.map((size) => size.size.split(' · '));
+  const shared = parts.length > 1 ? parts[0].filter((part) => parts.every((other) => other.includes(part))) : [];
+  const labelled = sizes.map((size, i) => {
+    const kept = parts[i].filter((part) => !shared.includes(part) && !(part === 'One size' && parts[i].length > 1));
+    return { ...size, size: kept.join(' · ') || size.size.split(' · ')[0] };
+  });
+  return labelled.filter((size, i) => labelled.findIndex((other) => other.size === size.size) === i);
+}
+// Tees synced before views were recorded: Printify's back, front, front, back.
+const LEGACY_TEE_VIEWS: MerchView[] = ['back', 'front', 'front', 'back'];
+
+type RawColor = { name: string; hex: string | null; images: string[]; views?: MerchView[]; sizes: MerchSize[] };
+type RawProduct = {
+  slug: string; number: string; name: string; title: string; price: number; colors: RawColor[];
+  line?: string; lineName?: string; category?: string; blank?: string; details?: string[];
+};
+// Catalogs written before products had lines were all tees.
+const legacy = catalog as { blueprint?: { name?: string; details?: string[] } };
 
 export const merchProducts: MerchProduct[] = (catalog.products as RawProduct[])
   .map((product) => ({
     slug: product.slug,
     number: product.number,
     name: product.name,
+    displayName: `${product.name} ${product.lineName ?? 'Tee'}`,
+    lineName: product.lineName ?? 'Tee',
+    line: product.line ?? 'tee',
+    category: product.category ?? 'Tees',
     title: product.title,
     price: product.price,
+    priceVaries: new Set(product.colors.flatMap((color) => color.sizes.map((size) => size.price))).size > 1,
+    blank: product.blank ?? legacy.blueprint?.name ?? '',
+    details: product.details ?? legacy.blueprint?.details ?? [],
     shareImage: (shareImages as { merchCards?: Record<string, string> }).merchCards?.[product.slug],
     colors: product.colors
-      .map((color) => ({
-        name: color.name,
-        slug: slugify(color.name),
-        swatch: color.hex ?? SWATCHES[color.name] ?? '#888888',
-        images: color.images.map((key) => media[key as MediaKey]).filter(Boolean),
-        sizes: color.sizes,
-      }))
+      .map((color) => {
+        // Printify's mockups first, then any studio shots in assets-src/merch-studio/<design>/<color>-N.
+        const studio = studioKeys(product.slug, slugify(color.name));
+        const mockupViews = color.views ?? (product.line ? undefined : LEGACY_TEE_VIEWS.slice(0, color.images.length));
+        const pairs = [
+          ...color.images.map((key, i) => ({ key, view: mockupViews?.[i] ?? null })).filter(({ key }) => showMockup(product.line, key)),
+          ...studio.map((key) => ({ key, view: studioView(key) })),
+        ].filter(({ key }) => media[key as MediaKey]);
+        return {
+          name: color.name,
+          slug: slugify(color.name),
+          swatch: color.hex ?? SWATCHES[color.name] ?? '#888888',
+          images: pairs.map(({ key }) => media[key as MediaKey]),
+          views: mockupViews ? pairs.map(({ view }) => view) : undefined,
+          sizes: tidySizes(color.sizes),
+        };
+      })
       .filter((color) => color.images.length && color.sizes.length),
   }))
   .filter((product) => product.colors.length);
 
 export const merchPath = (product: MerchProduct) => `${MERCH_PATH}${product.slug}/`;
-
-// The grid's cards: one per colorway while there are only a couple of designs (so each tee shows),
-// one per design (with its color dots) once there are more.
-export type MerchCard = { product: MerchProduct; color: MerchColor; perColor: boolean };
-export const merchCards: MerchCard[] = merchProducts.length < 3
-  ? merchProducts.flatMap((product) => product.colors.map((color) => ({ product, color, perColor: true }))).slice(0, 4)
-  : merchProducts.map((product) => ({ product, color: product.colors[0], perColor: false }));
-// In two columns, an odd count ends with a "More soon" card in the free spot; two cards get a wide one under them.
-export const merchMoreCard: 'none' | 'slot' | 'wide' = merchCards.length % 2 ? 'slot' : merchCards.length === 2 ? 'wide' : 'none';
-// The homepage scene has one screen to fit in: six (or nine) tees sit three across instead.
-const sceneColumns: 2 | 3 = merchCards.length >= 5 && merchCards.length % 3 === 0 ? 3 : 2;
-export const merchScene = {
-  columns: sceneColumns,
-  rows: sceneColumns === 3 ? merchCards.length / 3 : Math.ceil(merchCards.length / 2) + (merchMoreCard === 'wide' ? 0.62 : 0),
-  // A row's height relative to the grid's width (card + gap + room to float).
-  rowHeight: sceneColumns === 3 ? 0.44 : 0.66,
+// "Black tee", or just "Mug" for things that come one way (Printify calls that color "Standard").
+export const colorName = (color: MerchColor) => (color.name === 'Standard' ? '' : color.name);
+export const variantLabel = (product: MerchProduct, color: MerchColor) => {
+  const text = [colorName(color), product.lineName.toLowerCase()].filter(Boolean).join(' ');
+  return text.charAt(0).toUpperCase() + text.slice(1);
 };
+// Shop categories in catalog order (the order products.json lists its lines).
+export const merchCategories = merchProducts.map((product) => product.category).filter((category, index, all) => all.indexOf(category) === index);
+// The homepage scene's best sellers: a 2x2 grid like Scrapwrk's, the rest of the range in the shop
+// below it. Listed by product slug (lib/merch-catalog.json); ones that aren't in the catalog are skipped.
+const BEST_SELLERS = ['rainbow', 'hoodie-rainbow', 'purple', 'trucker-rainbow'];
+export type MerchCard = { product: MerchProduct; color: MerchColor; perColor: boolean };
+export const merchCards: MerchCard[] = [
+  ...BEST_SELLERS.map((slug) => merchProducts.find((product) => product.slug === slug)),
+  ...merchProducts,
+]
+  .filter((product, index, all): product is MerchProduct => Boolean(product) && all.indexOf(product) === index)
+  .slice(0, 4)
+  .map((product) => ({ product, color: product.colors[0], perColor: false }));
 export const getMerch = (slug: string) => merchProducts.find((product) => product.slug === slug);
 // A tee in the bag: "np:<design>:<Printify variant>". Printify's variant ids name a blank's color and
 // size (every white M is the same id), so the design has to be part of the key.

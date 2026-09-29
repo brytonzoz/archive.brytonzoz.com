@@ -1178,7 +1178,9 @@ html {
 }
 
 .merch-size {
-  height: 2.75rem;
+  min-height: 2.75rem;
+  padding: 6px 8px;
+  line-height: 1.15;
   border-radius: 12px;
   background: #fff;
   font-size: 15px;
@@ -1417,4 +1419,759 @@ html {
     radial-gradient(circle at 90% 100%, rgba(98, 0, 238, 0.22), transparent 45%),
     linear-gradient(160deg, #1a1030 0%, #0d0a16 60%, #07060b 100%);
   background-attachment: fixed;
+}
+
+/* NonParallel shop (components/store/MerchShop.tsx): search, category chips and sort over a grid
+   that keeps loading. Quiet controls, product photos do the talking. */
+.shop-section {
+  background: #0a0a0b;
+}
+
+.shop-eyebrow {
+  font-size: 12px;
+  font-weight: 600;
+  letter-spacing: 0.16em;
+  color: rgba(255, 255, 255, 0.5);
+}
+
+.shop-title {
+  margin-top: 4px;
+  font-size: 30px;
+  font-weight: 700;
+  line-height: 1.05;
+  letter-spacing: -0.025em;
+  color: #fff;
+}
+
+@media (min-width: 640px) {
+  .shop-title {
+    font-size: 36px;
+  }
+}
+
+.shop-controls {
+  position: sticky;
+  top: 0;
+  z-index: 20;
+  margin: 16px -16px 0;
+  padding: 10px 16px;
+  background: rgba(10, 10, 11, 0.82);
+  -webkit-backdrop-filter: blur(20px) saturate(160%);
+  backdrop-filter: blur(20px) saturate(160%);
+  border-bottom: 0.5px solid rgba(255, 255, 255, 0.08);
+}
+
+@media (min-width: 640px) {
+  .shop-controls {
+    margin-left: -32px;
+    margin-right: -32px;
+    padding-left: 32px;
+    padding-right: 32px;
+  }
+}
+
+.shop-search {
+  position: relative;
+  display: flex;
+  min-width: 0;
+  flex: 1;
+  align-items: center;
+  gap: 8px;
+  height: 38px;
+  padding: 0 12px;
+  border-radius: 10px;
+  background: rgba(255, 255, 255, 0.07);
+  color: rgba(255, 255, 255, 0.45);
+  transition: background-color 160ms ease, box-shadow 160ms ease;
+}
+
+.shop-search:focus-within {
+  background: rgba(255, 255, 255, 0.1);
+  box-shadow: inset 0 0 0 1px rgba(255, 255, 255, 0.35);
+}
+
+.shop-search input {
+  min-width: 0;
+  flex: 1;
+  height: 100%;
+  background: transparent;
+  color: #fff;
+  font-size: 16px;
+  outline: none;
+}
+
+.shop-search input::placeholder {
+  color: rgba(255, 255, 255, 0.42);
+}
+
+.shop-search input::-webkit-search-cancel-button {
+  display: none;
+}
+
+.shop-search-clear {
+  display: flex;
+  height: 20px;
+  width: 20px;
+  align-items: center;
+  justify-content: center;
+  border-radius: 999px;
+  background: rgba(255, 255, 255, 0.28);
+  color: #0a0a0b;
+  font-size: 15px;
+  font-weight: 700;
+  line-height: 1;
+}
+
+.shop-sort {
+  position: relative;
+  display: flex;
+  flex-shrink: 0;
+  align-items: center;
+  color: rgba(255, 255, 255, 0.85);
+}
+
+.shop-sort select {
+  height: 38px;
+  appearance: none;
+  -webkit-appearance: none;
+  border-radius: 10px;
+  background: rgba(255, 255, 255, 0.07);
+  padding: 0 28px 0 12px;
+  color: #fff;
+  font-size: 14px;
+  font-weight: 500;
+  cursor: pointer;
+}
+
+.shop-sort select:focus-visible {
+  outline: 2px solid rgba(255, 255, 255, 0.6);
+  outline-offset: 2px;
+}
+
+.shop-sort select option {
+  color: #111;
+}
+
+.shop-sort svg {
+  pointer-events: none;
+  position: absolute;
+  right: 11px;
+  opacity: 0.6;
+}
+
+.shop-chips {
+  display: flex;
+  gap: 6px;
+  margin: 10px -16px 0;
+  padding: 0 16px;
+  overflow-x: auto;
+  scrollbar-width: none;
+  -webkit-overflow-scrolling: touch;
+}
+
+.shop-chips::-webkit-scrollbar {
+  display: none;
+}
+
+.shop-chip {
+  display: inline-flex;
+  flex-shrink: 0;
+  align-items: center;
+  height: 30px;
+  padding: 0 12px;
+  border-radius: 999px;
+  box-shadow: inset 0 0 0 1px rgba(255, 255, 255, 0.14);
+  color: rgba(255, 255, 255, 0.78);
+  font-size: 13px;
+  font-weight: 500;
+  white-space: nowrap;
+  transition: background-color 160ms ease, color 160ms ease, box-shadow 160ms ease;
+}
+
+.shop-chip:hover {
+  color: #fff;
+  box-shadow: inset 0 0 0 1px rgba(255, 255, 255, 0.3);
+}
+
+.shop-chip[aria-pressed='true'] {
+  background: #fff;
+  color: #0a0a0b;
+  box-shadow: none;
+}
+
+.shop-chip:focus-visible {
+  outline: 2px solid rgba(255, 255, 255, 0.7);
+  outline-offset: 2px;
+}
+
+.shop-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 22px 10px;
+  margin-top: 16px;
+}
+
+@media (min-width: 640px) {
+  .shop-grid {
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+    gap: 32px 16px;
+    margin-top: 24px;
+  }
+}
+
+@media (min-width: 1024px) {
+  .shop-grid {
+    grid-template-columns: repeat(4, minmax(0, 1fr));
+  }
+}
+
+.shop-grid {
+  perspective: 1400px;
+}
+
+/* The shop enters like the scenes (components/store/MerchShop.tsx): nothing shows until it scrolls
+   into view, then the heading rises out of a blur and the cards flip in one after another (the same
+   turn and easing as the Scrapwrk and NonParallel cards). Cards added later (more loading, a new
+   search or filter) flip in the same way. */
+.shop:not(.is-revealed) .shop-rise,
+.shop:not(.is-revealed) .shop-tile-wrap {
+  opacity: 0;
+}
+
+.shop.is-revealed .shop-rise {
+  animation: shopRise 760ms cubic-bezier(0.16, 1, 0.3, 1) var(--d, 0ms) both;
+}
+
+.shop.is-revealed .shop-tile-wrap {
+  transform-style: preserve-3d;
+  animation: shopFlip 720ms cubic-bezier(0.3, 0.9, 0.3, 1.04) calc(180ms + min(var(--i, 0), 11) * 70ms) both;
+}
+
+@keyframes shopRise {
+  from {
+    opacity: 0;
+    filter: blur(10px);
+    transform: translate3d(0, 22px, 0) scale(0.94);
+  }
+}
+
+@keyframes shopFlip {
+  0% {
+    opacity: 0;
+    filter: blur(6px);
+    transform: translate3d(0, 28px, 0) rotateY(-110deg) scale(0.88);
+  }
+  45% {
+    opacity: 1;
+    filter: blur(0);
+  }
+  100% {
+    opacity: 1;
+    filter: none;
+    transform: none;
+  }
+}
+
+.shop-tile {
+  display: block;
+  width: 100%;
+  text-align: left;
+  border-radius: 14px;
+  -webkit-tap-highlight-color: transparent;
+}
+
+.shop-tile:focus-visible {
+  outline: 2px solid rgba(255, 255, 255, 0.75);
+  outline-offset: 4px;
+}
+
+.shop-tile-photo {
+  position: relative;
+  display: block;
+  aspect-ratio: 1;
+  overflow: hidden;
+  border-radius: 14px;
+  background: #f4f4f4;
+  transition: transform 220ms cubic-bezier(0.22, 1, 0.36, 1);
+}
+
+.shop-tile:active .shop-tile-photo {
+  transform: scale(0.98);
+}
+
+.shop-tile-img {
+  position: absolute;
+  inset: 0;
+  height: 100%;
+  width: 100%;
+  object-fit: cover;
+  transition: opacity 260ms ease, transform 500ms cubic-bezier(0.22, 1, 0.36, 1);
+}
+
+.shop-tile-img-alt {
+  opacity: 0;
+}
+
+@media (hover: hover) {
+  .shop-tile:hover .shop-tile-img {
+    transform: scale(1.03);
+  }
+
+  .shop-tile:hover .shop-tile-img-alt {
+    opacity: 1;
+  }
+
+  .shop-tile.has-alt:hover .shop-tile-side-main,
+  .shop-tile.has-alt:not(:hover) .shop-tile-side-alt {
+    display: none;
+  }
+}
+
+@media (hover: none) {
+  .shop-tile-side-alt {
+    display: none;
+  }
+}
+
+/* Which side the tile shows (apparel): the back has the big logo. */
+.shop-tile-side {
+  position: absolute;
+  top: 8px;
+  left: 8px;
+  padding: 3px 8px;
+  border-radius: 999px;
+  background: rgba(255, 255, 255, 0.86);
+  color: rgba(0, 0, 0, 0.7);
+  font-size: 11px;
+  font-weight: 600;
+  letter-spacing: 0.02em;
+  box-shadow: 0 0 0 0.5px rgba(0, 0, 0, 0.1);
+}
+
+.shop-tile-swatches {
+  position: absolute;
+  bottom: 8px;
+  left: 8px;
+  display: flex;
+  gap: 3px;
+  padding: 3px;
+  border-radius: 999px;
+  background: rgba(255, 255, 255, 0.86);
+}
+
+.shop-tile-swatches span {
+  height: 9px;
+  width: 9px;
+  border-radius: 999px;
+  box-shadow: inset 0 0 0 1px rgba(0, 0, 0, 0.14);
+}
+
+.shop-tile-meta {
+  display: flex;
+  flex-direction: column;
+  gap: 1px;
+  padding: 9px 2px 0;
+}
+
+.shop-tile-name {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  color: rgba(255, 255, 255, 0.94);
+  font-size: 14px;
+  font-weight: 500;
+  line-height: 1.3;
+}
+
+.shop-tile-price {
+  color: rgba(255, 255, 255, 0.55);
+  font-size: 13px;
+  font-variant-numeric: tabular-nums;
+}
+
+.shop-empty {
+  margin-top: 40px;
+  padding: 32px 16px;
+  text-align: center;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .shop.is-revealed .shop-tile-wrap,
+  .shop.is-revealed .shop-rise {
+    animation: shopFade 300ms ease-out both;
+  }
+}
+
+@keyframes shopFade {
+  from { opacity: 0; }
+}
+
+/* Front / Back switch over apparel photos (components/store/ProductSheet.tsx Gallery): always
+   says which side you're looking at, since the front logo is small and the back one is big. */
+.gallery-sides {
+  position: absolute;
+  bottom: 12px;
+  left: 12px;
+  display: flex;
+  gap: 2px;
+  padding: 3px;
+  border-radius: 999px;
+  background: rgba(255, 255, 255, 0.82);
+  -webkit-backdrop-filter: blur(16px) saturate(170%);
+  backdrop-filter: blur(16px) saturate(170%);
+  box-shadow: 0 0 0 0.5px rgba(0, 0, 0, 0.1), 0 4px 14px rgba(0, 0, 0, 0.1);
+}
+
+.gallery-sides button {
+  height: 30px;
+  padding: 0 13px;
+  border-radius: 999px;
+  color: rgba(0, 0, 0, 0.55);
+  font-size: 13px;
+  font-weight: 600;
+  letter-spacing: 0.01em;
+  transition: background-color 200ms ease, color 200ms ease;
+}
+
+.gallery-sides button[aria-pressed='true'] {
+  background: #111;
+  color: #fff;
+}
+
+.gallery-sides button:focus-visible {
+  outline: 2px solid rgba(0, 0, 0, 0.6);
+  outline-offset: 1px;
+}
+
+/* The side tag on the homepage tee cards, scaled with the card. */
+.merch-card-side {
+  top: 6%;
+  left: 6%;
+  padding: 0.2em 0.65em;
+  font-size: max(9px, 2cqw);
+}
+
+/* Under NonParallel's best sellers: the way into the full shop below (app/page.tsx). */
+.np-scroll-hint {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  margin: 5cqw auto 0;
+  padding: 6px 12px;
+  border-radius: 999px;
+  color: rgba(255, 255, 255, 0.62);
+  font-size: 13px;
+  font-weight: 500;
+  letter-spacing: 0.01em;
+  transition: color 160ms ease;
+}
+
+.np-scroll-hint:hover {
+  color: #fff;
+}
+
+.np-scroll-hint:focus-visible {
+  outline: 2px solid rgba(255, 255, 255, 0.6);
+  outline-offset: 2px;
+}
+
+.np-scroll-hint svg {
+  animation: npHint 1.8s ease-in-out infinite;
+}
+
+@keyframes npHint {
+  0%, 100% { transform: translateY(0); opacity: 0.7; }
+  50% { transform: translateY(3px); opacity: 1; }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .np-scroll-hint svg {
+    animation: none;
+  }
+}
+
+/* Product sheet (components/store/MerchSheet.tsx): Add to bag turns into a green check for a
+   moment, and a price change rolls in from below. */
+.merch-add {
+  background: rgba(0, 0, 0, 0.07);
+  color: #111;
+  transition: background-color 220ms ease, color 220ms ease, transform 160ms ease;
+}
+
+.merch-add:hover {
+  background: rgba(0, 0, 0, 0.1);
+}
+
+.merch-add:active {
+  transform: scale(0.97);
+}
+
+.merch-add.is-added {
+  background: #1f9d55;
+  color: #fff;
+}
+
+.merch-add-check path {
+  stroke-dasharray: 24;
+  stroke-dashoffset: 24;
+  animation: merchCheck 360ms 60ms cubic-bezier(0.22, 1, 0.36, 1) forwards;
+}
+
+@keyframes merchCheck {
+  to { stroke-dashoffset: 0; }
+}
+
+.merch-price-roll {
+  animation: merchPriceRoll 320ms cubic-bezier(0.22, 1, 0.36, 1);
+}
+
+@keyframes merchPriceRoll {
+  from {
+    opacity: 0;
+    transform: translateY(60%);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .merch-add-check path {
+    animation: none;
+    stroke-dashoffset: 0;
+  }
+
+  .merch-price-roll {
+    animation: none;
+  }
+}
+
+/* Shop: photos shimmer until they arrive, and deep in the grid a "Top" pill brings the search and
+   filters back (components/store/MerchShop.tsx). */
+.shop-tile-photo::before {
+  content: '';
+  position: absolute;
+  inset: 0;
+  background: linear-gradient(100deg, transparent 30%, rgba(255, 255, 255, 0.7) 50%, transparent 70%) #eeeeee;
+  background-size: 250% 100%;
+  animation: shopShimmer 1.4s ease-in-out infinite;
+}
+
+@keyframes shopShimmer {
+  from { background-position: 120% 0; }
+  to { background-position: -120% 0; }
+}
+
+.shop-top {
+  position: fixed;
+  left: 50%;
+  bottom: calc(max(16px, env(safe-area-inset-bottom)) + var(--player-offset, 0px) + 12px);
+  z-index: 30;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  height: 38px;
+  padding: 0 16px 0 13px;
+  border-radius: 999px;
+  background: rgba(28, 28, 30, 0.82);
+  -webkit-backdrop-filter: blur(20px) saturate(170%);
+  backdrop-filter: blur(20px) saturate(170%);
+  box-shadow: inset 0 0 0 0.5px rgba(255, 255, 255, 0.12), 0 8px 24px rgba(0, 0, 0, 0.35);
+  color: #fff;
+  font-size: 14px;
+  font-weight: 600;
+  opacity: 0;
+  pointer-events: none;
+  transform: translate(-50%, 12px) scale(0.96);
+  transition: opacity 220ms ease, transform 320ms cubic-bezier(0.22, 1, 0.36, 1);
+}
+
+.shop-top.is-shown {
+  opacity: 1;
+  pointer-events: auto;
+  transform: translate(-50%, 0) scale(1);
+}
+
+.shop-top:active {
+  transform: translate(-50%, 0) scale(0.95);
+}
+
+.shop-top:focus-visible {
+  outline: 2px solid rgba(255, 255, 255, 0.7);
+  outline-offset: 2px;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .shop-tile-photo::before {
+    animation: none;
+  }
+}
+
+/* Full-screen photo with tap-to-zoom (components/store/PhotoZoom.tsx), above the product sheets. */
+.photo-zoom {
+  position: fixed;
+  inset: 0;
+  z-index: 140;
+  background: #0b0b0c;
+  animation: photoZoomIn 240ms ease-out;
+}
+
+@keyframes photoZoomIn {
+  from { opacity: 0; }
+}
+
+.photo-zoom-frame {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  overflow: hidden;
+  cursor: zoom-in;
+  -webkit-tap-highlight-color: transparent;
+}
+
+.photo-zoom-frame.is-zoomed {
+  display: block;
+  overflow: auto;
+  cursor: zoom-out;
+  overscroll-behavior: contain;
+  scrollbar-width: none;
+}
+
+.photo-zoom-frame.is-zoomed::-webkit-scrollbar {
+  display: none;
+}
+
+.photo-zoom-canvas {
+  margin: auto;
+  max-width: none;
+}
+
+.photo-zoom-frame:not(.is-zoomed) .photo-zoom-canvas {
+  width: min(100vw, 100dvh) !important;
+}
+
+.photo-zoom-img {
+  display: block;
+  height: auto;
+  width: 100%;
+  user-select: none;
+}
+
+.photo-zoom-button {
+  position: absolute;
+  z-index: 2;
+  display: flex;
+  height: 44px;
+  width: 44px;
+  align-items: center;
+  justify-content: center;
+  border-radius: 999px;
+  background: rgba(28, 28, 30, 0.72);
+  -webkit-backdrop-filter: blur(16px);
+  backdrop-filter: blur(16px);
+  color: #fff;
+  box-shadow: inset 0 0 0 0.5px rgba(255, 255, 255, 0.14);
+}
+
+.photo-zoom-button:focus-visible {
+  outline: 2px solid rgba(255, 255, 255, 0.7);
+  outline-offset: 2px;
+}
+
+.photo-zoom-close {
+  top: max(14px, env(safe-area-inset-top));
+  right: 14px;
+}
+
+.photo-zoom-prev,
+.photo-zoom-next {
+  top: 50%;
+  margin-top: -22px;
+}
+
+.photo-zoom-prev { left: 12px; }
+.photo-zoom-next { right: 12px; }
+
+.photo-zoom-count,
+.photo-zoom-hint {
+  position: absolute;
+  z-index: 2;
+  left: 50%;
+  transform: translateX(-50%);
+  padding: 5px 11px;
+  border-radius: 999px;
+  background: rgba(28, 28, 30, 0.72);
+  color: rgba(255, 255, 255, 0.85);
+  font-size: 12px;
+  font-weight: 600;
+  pointer-events: none;
+}
+
+.photo-zoom-count {
+  top: max(22px, calc(env(safe-area-inset-top) + 8px));
+  font-variant-numeric: tabular-nums;
+}
+
+.photo-zoom-hint {
+  bottom: max(20px, calc(env(safe-area-inset-bottom) + 8px));
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .photo-zoom {
+    animation: none;
+  }
+}
+
+.shop-suggest {
+  display: flex;
+  gap: 6px;
+  margin: 10px -16px 0;
+  padding: 0 16px;
+  overflow-x: auto;
+  scrollbar-width: none;
+  animation: shopRise 360ms cubic-bezier(0.16, 1, 0.3, 1) both;
+}
+
+.shop-suggest::-webkit-scrollbar {
+  display: none;
+}
+
+.shop-suggest-item {
+  flex-shrink: 0;
+  height: 28px;
+  padding: 0 11px;
+  border-radius: 8px;
+  background: rgba(255, 255, 255, 0.06);
+  color: rgba(255, 255, 255, 0.7);
+  font-size: 13px;
+  transition: background-color 160ms ease, color 160ms ease;
+}
+
+.shop-suggest-item:hover,
+.shop-suggest-item:focus-visible {
+  background: rgba(255, 255, 255, 0.12);
+  color: #fff;
+  outline: none;
+}
+
+/* The homepage stops snapping once you're in the shop below the scenes (app/page.tsx). */
+.scroll-container.is-free {
+  scroll-snap-type: none;
+}
+
+/* On the homepage the shop doesn't start with a hard edge: its top is see-through, so the last
+   scene's background carries on behind it, blurred and fading into the shop's black, the same way
+   the scenes blend into each other. */
+.shop-section-home {
+  background: linear-gradient(180deg, rgba(10, 10, 11, 0) 0, rgba(10, 10, 11, 0.55) 22vh, #0a0a0b 70vh);
+}
+
+.shop-section-home::before {
+  content: '';
+  position: absolute;
+  inset: 0 0 auto;
+  height: 80vh;
+  z-index: -1;
+  pointer-events: none;
+  -webkit-backdrop-filter: blur(28px) saturate(120%);
+  backdrop-filter: blur(28px) saturate(120%);
+  -webkit-mask-image: linear-gradient(180deg, transparent 0, #000 30vh);
+  mask-image: linear-gradient(180deg, transparent 0, #000 30vh);
 }

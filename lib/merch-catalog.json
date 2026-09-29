@@ -1,26 +1,24 @@
 {
   "shopId": 18462993,
   "currency": "usd",
-  "blueprint": {
-    "id": 12,
-    "name": "Bella+Canvas 3001",
-    "title": "Unisex Jersey Short Sleeve Tee",
-    "details": [
-      "Small logo on the chest, the full design across the back",
-      "100% Airlume combed and ring-spun cotton (solid colors)",
-      "Lightweight 4.2 oz jersey: soft and breathable",
-      "Unisex retail fit with a ribbed crew neck"
-    ]
-  },
   "products": [
     {
       "slug": "rainbow",
-      "number": "001",
+      "line": "tee",
+      "lineName": "Tee",
+      "category": "Tees",
       "name": "Rainbow",
       "title": "NonParallel Tee — Rainbow",
       "printifyId": "6abaa962e8d848fe71029ef0",
       "printProviderId": 99,
-      "price": 2500,
+      "price": 2900,
+      "blank": "Bella+Canvas 3001",
+      "details": [
+        "Small logo on the chest, the full design across the back",
+        "100% Airlume combed and ring-spun cotton (solid colors)",
+        "Lightweight 4.2 oz jersey: soft and breathable",
+        "Unisex retail fit with a ribbed crew neck"
+      ],
       "colors": [
         {
           "name": "Black",
@@ -31,49 +29,65 @@
             "merch/rainbow/black-3",
             "merch/rainbow/black-4"
           ],
+          "views": [
+            "back",
+            "back",
+            "back",
+            "front"
+          ],
           "sizes": [
             {
               "size": "S",
               "variantId": 18100,
-              "price": 2500
+              "price": 2900
             },
             {
               "size": "M",
               "variantId": 18101,
-              "price": 2500
+              "price": 2900
             },
             {
               "size": "L",
               "variantId": 18102,
-              "price": 2500
+              "price": 2900
             },
             {
               "size": "XL",
               "variantId": 18103,
-              "price": 2500
+              "price": 2900
             },
             {
               "size": "2XL",
               "variantId": 18104,
-              "price": 2800
+              "price": 3500
             },
             {
               "size": "3XL",
               "variantId": 18105,
-              "price": 3100
+              "price": 3500
             }
           ]
         }
-      ]
+      ],
+      "number": "001"
     },
     {
       "slug": "red",
-      "number": "002",
+      "line": "tee",
+      "lineName": "Tee",
+      "category": "Tees",
       "name": "Red",
       "title": "NonParallel Tee — Red",
       "printifyId": "6abab3199265c3bd1f03044c",
       "printProviderId": 99,
-      "price": 2500,
+      "price": 2900,
+      "blank": "Bella+Canvas 3001",
+      "details": [
+        "Small logo on the chest, the full design across the back",
+        "100% Airlume combed and ring-spun cotton (solid colors)",
+        "Lightweight 4.2 oz jersey: soft and breathable",
+        "Unisex retail fit with a ribbed crew neck"
+      ],
       "colors": [
         {
           "name": "White",
@@ -84,49 +98,65 @@
             "merch/red/white-3",
             "merch/red/white-4"
           ],
+          "views": [
+            "back",
+            "back",
+            "back",
+            "front"
+          ],
           "sizes": [
             {
               "size": "S",
               "variantId": 18540,
-              "price": 2500
+              "price": 2900
             },
             {
               "size": "M",
               "variantId": 18541,
-              "price": 2500
+              "price": 2900
             },
             {
               "size": "L",
               "variantId": 18542,
-              "price": 2500
+              "price": 2900
             },
             {
               "size": "XL",
               "variantId": 18543,
-              "price": 2500
+              "price": 2900
             },
             {
               "size": "2XL",
               "variantId": 18544,
-              "price": 2800
+              "price": 3500
             },
             {
               "size": "3XL",
               "variantId": 18545,
-              "price": 3100
+              "price": 3500
             }
           ]
         }
-      ]
+      ],
+      "number": "002"
     },
     {
       "slug": "yellow",
-      "number": "003",
+      "line": "tee",
+      "lineName": "Tee",
+      "category": "Tees",
       "name": "Yellow",
       "title": "NonParallel Tee — Yellow",
       "printifyId": "6abab33e4091a579950f7198",
       "printProviderId": 99,
-      "price": 2500,
+      "price": 2900,
+      "blank": "Bella+Canvas 3001",
+      "details": [
+        "Small logo on the chest, the full design across the back",
+        "100% Airlume combed and ring-spun cotton (solid colors)",
+        "Lightweight 4.2 oz jersey: soft and breathable",
+        "Unisex retail fit with a ribbed crew neck"
+      ],
       "colors": [
         {
           "name": "White",
@@ -137,49 +167,65 @@
             "merch/yellow/white-3",
             "merch/yellow/white-4"
           ],
+          "views": [
+            "back",
+            "back",
+            "back",
+            "front"
+          ],
           "sizes": [
             {
               "size": "S",
               "variantId": 18540,
-              "price": 2500
+              "price": 2900
             },
             {
               "size": "M",
               "variantId": 18541,
-              "price": 2500
+              "price": 2900
             },
             {
               "size": "L",
               "variantId": 18542,
-              "price": 2500
+              "price": 2900
             },
             {
               "size": "XL",
               "variantId": 18543,
-              "price": 2500
+              "price": 2900
             },
             {
               "size": "2XL",
               "variantId": 18544,
-              "price": 2800
+              "price": 3500
             },
             {
               "size": "3XL",
               "variantId": 18545,
-              "price": 3100
+              "price": 3500
             }
           ]
         }
-      ]
+      ],
+      "number": "003"
     },
     {
       "slug": "green",
-      "number": "004",
+      "line": "tee",
+      "lineName": "Tee",
+      "category": "Tees",
       "name": "Green",
       "title": "NonParallel Tee — Green",
       "printifyId": "6abab3669265c3bd1f030475",
       "printProviderId": 99,
-      "price": 2500,
+      "price": 2900,
+      "blank": "Bella+Canvas 3001",
+      "details": [
+        "Small logo on the chest, the full design across the back",
+        "100% Airlume combed and ring-spun cotton (solid colors)",
+        "Lightweight 4.2 oz jersey: soft and breathable",
+        "Unisex retail fit with a ribbed crew neck"
+      ],
       "colors": [
         {
           "name": "White",
@@ -190,49 +236,65 @@
             "merch/green/white-3",
             "merch/green/white-4"
           ],
+          "views": [
+            "back",
+            "back",
+            "back",
+            "front"
+          ],
           "sizes": [
             {
               "size": "S",
               "variantId": 18540,
-              "price": 2500
+              "price": 2900
             },
             {
               "size": "M",
               "variantId": 18541,
-              "price": 2500
+              "price": 2900
             },
             {
               "size": "L",
               "variantId": 18542,
-              "price": 2500
+              "price": 2900
             },
             {
               "size": "XL",
               "variantId": 18543,
-              "price": 2500
+              "price": 2900
             },
             {
               "size": "2XL",
               "variantId": 18544,
-              "price": 2800
+              "price": 3500
             },
             {
               "size": "3XL",
               "variantId": 18545,
-              "price": 3100
+              "price": 3500
             }
           ]
         }
-      ]
+      ],
+      "number": "004"
     },
     {
       "slug": "blue",
-      "number": "005",
+      "line": "tee",
+      "lineName": "Tee",
+      "category": "Tees",
       "name": "Blue",
       "title": "NonParallel Tee — Blue",
       "printifyId": "6abab383d5ab93157a0b7c8d",
       "printProviderId": 99,
-      "price": 2500,
+      "price": 2900,
+      "blank": "Bella+Canvas 3001",
+      "details": [
+        "Small logo on the chest, the full design across the back",
+        "100% Airlume combed and ring-spun cotton (solid colors)",
+        "Lightweight 4.2 oz jersey: soft and breathable",
+        "Unisex retail fit with a ribbed crew neck"
+      ],
       "colors": [
         {
           "name": "White",
@@ -243,49 +305,65 @@
             "merch/blue/white-3",
             "merch/blue/white-4"
           ],
+          "views": [
+            "back",
+            "back",
+            "back",
+            "front"
+          ],
           "sizes": [
             {
               "size": "S",
               "variantId": 18540,
-              "price": 2500
+              "price": 2900
             },
             {
               "size": "M",
               "variantId": 18541,
-              "price": 2500
+              "price": 2900
             },
             {
               "size": "L",
               "variantId": 18542,
-              "price": 2500
+              "price": 2900
             },
             {
               "size": "XL",
               "variantId": 18543,
-              "price": 2500
+              "price": 2900
             },
             {
               "size": "2XL",
               "variantId": 18544,
-              "price": 2800
+              "price": 3500
             },
             {
               "size": "3XL",
               "variantId": 18545,
-              "price": 3100
+              "price": 3500
             }
           ]
         }
-      ]
+      ],
+      "number": "005"
     },
     {
       "slug": "purple",
-      "number": "006",
+      "line": "tee",
+      "lineName": "Tee",
+      "category": "Tees",
       "name": "Purple",
       "title": "NonParallel Tee — Purple",
       "printifyId": "6abab3974ddfa5b7e80bd566",
       "printProviderId": 99,
-      "price": 2500,
+      "price": 2900,
+      "blank": "Bella+Canvas 3001",
+      "details": [
+        "Small logo on the chest, the full design across the back",
+        "100% Airlume combed and ring-spun cotton (solid colors)",
+        "Lightweight 4.2 oz jersey: soft and breathable",
+        "Unisex retail fit with a ribbed crew neck"
+      ],
       "colors": [
         {
           "name": "White",
@@ -296,40 +374,4131 @@
             "merch/purple/white-3",
             "merch/purple/white-4"
           ],
+          "views": [
+            "back",
+            "back",
+            "back",
+            "front"
+          ],
           "sizes": [
             {
               "size": "S",
               "variantId": 18540,
-              "price": 2500
+              "price": 2900
             },
             {
               "size": "M",
               "variantId": 18541,
-              "price": 2500
+              "price": 2900
             },
             {
               "size": "L",
               "variantId": 18542,
-              "price": 2500
+              "price": 2900
             },
             {
               "size": "XL",
               "variantId": 18543,
-              "price": 2500
+              "price": 2900
             },
             {
               "size": "2XL",
               "variantId": 18544,
-              "price": 2800
+              "price": 3500
             },
             {
               "size": "3XL",
               "variantId": 18545,
-              "price": 3100
+              "price": 3500
             }
           ]
         }
-      ]
+      ],
+      "number": "006"
+    },
+    {
+      "slug": "heavy-tee-rainbow",
+      "line": "heavy-tee",
+      "lineName": "Heavyweight Tee",
+      "category": "Tees",
+      "name": "Rainbow",
+      "title": "NonParallel Heavyweight Tee — Rainbow",
+      "printifyId": "6abae034d904a5ab710f11a8",
+      "printProviderId": 3,
+      "price": 4500,
+      "blank": "Comfort Colors® 1717",
+      "details": [
+        "Heavyweight fabric (6.1 oz/yd² (206.8 g/m²))",
+        "Relaxed fit",
+        "Pre-shrunk 100% ring-spun US cotton",
+        "Available in 62 colors",
+        "Sewn-in label"
+      ],
+      "colors": [
+        {
+          "name": "Black",
+          "hex": null,
+          "images": [
+            "merch/heavy-tee-rainbow/black-1",
+            "merch/heavy-tee-rainbow/black-2",
+            "merch/heavy-tee-rainbow/black-3",
+            "merch/heavy-tee-rainbow/black-4"
+          ],
+          "views": [
+            "back",
+            "front",
+            null,
+            null
+          ],
+          "sizes": [
+            {
+              "size": "S",
+              "variantId": 73196,
+              "price": 4500
+            },
+            {
+              "size": "XL",
+              "variantId": 73208,
+              "price": 4500
+            },
+            {
+              "size": "3XL",
+              "variantId": 79114,
+              "price": 5500
+            }
+          ]
+        },
+        {
+          "name": "Pepper",
+          "hex": null,
+          "images": [
+            "merch/heavy-tee-rainbow/pepper-1",
+            "merch/heavy-tee-rainbow/pepper-2",
+            "merch/heavy-tee-rainbow/pepper-3",
+            "merch/heavy-tee-rainbow/pepper-4"
+          ],
+          "views": [
+            "back",
+            "front",
+            null,
+            null
+          ],
+          "sizes": [
+            {
+              "size": "S",
+              "variantId": 79046,
+              "price": 4500
+            },
+            {
+              "size": "M",
+              "variantId": 79047,
+              "price": 4500
+            },
+            {
+              "size": "XL",
+              "variantId": 79049,
+              "price": 4500
+            },
+            {
+              "size": "2XL",
+              "variantId": 79050,
+              "price": 4900
+            },
+            {
+              "size": "3XL",
+              "variantId": 79155,
+              "price": 5500
+            }
+          ]
+        }
+      ],
+      "number": "007"
+    },
+    {
+      "slug": "heavy-tee-purple",
+      "line": "heavy-tee",
+      "lineName": "Heavyweight Tee",
+      "category": "Tees",
+      "name": "Purple",
+      "title": "NonParallel Heavyweight Tee — Purple",
+      "printifyId": "6abae03af1f32a80850df97b",
+      "printProviderId": 3,
+      "price": 4500,
+      "blank": "Comfort Colors® 1717",
+      "details": [
+        "Heavyweight fabric (6.1 oz/yd² (206.8 g/m²))",
+        "Relaxed fit",
+        "Pre-shrunk 100% ring-spun US cotton",
+        "Available in 62 colors",
+        "Sewn-in label"
+      ],
+      "colors": [
+        {
+          "name": "White",
+          "hex": null,
+          "images": [
+            "merch/heavy-tee-purple/white-1",
+            "merch/heavy-tee-purple/white-2",
+            "merch/heavy-tee-purple/white-3",
+            "merch/heavy-tee-purple/white-4"
+          ],
+          "views": [
+            "back",
+            "front",
+            null,
+            null
+          ],
+          "sizes": [
+            {
+              "size": "S",
+              "variantId": 73199,
+              "price": 4500
+            },
+            {
+              "size": "M",
+              "variantId": 73203,
+              "price": 4500
+            },
+            {
+              "size": "L",
+              "variantId": 73207,
+              "price": 4500
+            },
+            {
+              "size": "XL",
+              "variantId": 73211,
+              "price": 4500
+            },
+            {
+              "size": "2XL",
+              "variantId": 73215,
+              "price": 4900
+            },
+            {
+              "size": "3XL",
+              "variantId": 79169,
+              "price": 5500
+            }
+          ]
+        },
+        {
+          "name": "Ivory",
+          "hex": null,
+          "images": [
+            "merch/heavy-tee-purple/ivory-1",
+            "merch/heavy-tee-purple/ivory-2",
+            "merch/heavy-tee-purple/ivory-3",
+            "merch/heavy-tee-purple/ivory-4"
+          ],
+          "views": [
+            "back",
+            "front",
+            null,
+            null
+          ],
+          "sizes": [
+            {
+              "size": "M",
+              "variantId": 78992,
+              "price": 4500
+            },
+            {
+              "size": "L",
+              "variantId": 78993,
+              "price": 4500
+            },
+            {
+              "size": "XL",
+              "variantId": 78994,
+              "price": 4500
+            },
+            {
+              "size": "2XL",
+              "variantId": 78995,
+              "price": 4900
+            }
+          ]
+        }
+      ],
+      "number": "008"
+    },
+    {
+      "slug": "max-tee-rainbow",
+      "line": "max-tee",
+      "lineName": "Max Heavyweight Tee",
+      "category": "Tees",
+      "name": "Rainbow",
+      "title": "NonParallel Max Heavyweight Tee — Rainbow",
+      "printifyId": "6abadba0a43df71fd00b74bf",
+      "printProviderId": 74,
+      "price": 3900,
+      "blank": "Shaka Wear SHMHSS",
+      "details": [
+        "100% USA Cotton (7.5 oz / 245 - 255 GSM)",
+        "Yarn Count: 16 Singles",
+        "Available Sizes S - 7XL",
+        "Shoulder-to-shoulder neck tape and double-needle stitched neck",
+        "1\" double-needle stitched sleeve and bottom hems"
+      ],
+      "colors": [
+        {
+          "name": "Black",
+          "hex": null,
+          "images": [
+            "merch/max-tee-rainbow/black-1",
+            "merch/max-tee-rainbow/black-2",
+            "merch/max-tee-rainbow/black-3",
+            "merch/max-tee-rainbow/black-4"
+          ],
+          "views": [
+            "back",
+            "front",
+            null,
+            null
+          ],
+          "sizes": [
+            {
+              "size": "S",
+              "variantId": 117443,
+              "price": 3900
+            },
+            {
+              "size": "M",
+              "variantId": 117442,
+              "price": 3900
+            },
+            {
+              "size": "L",
+              "variantId": 117441,
+              "price": 3900
+            },
+            {
+              "size": "XL",
+              "variantId": 117444,
+              "price": 3900
+            },
+            {
+              "size": "2XL",
+              "variantId": 117437,
+              "price": 4500
+            },
+            {
+              "size": "3XL",
+              "variantId": 117438,
+              "price": 4900
+            }
+          ]
+        }
+      ],
+      "number": "009"
+    },
+    {
+      "slug": "long-sleeve-rainbow",
+      "line": "long-sleeve",
+      "lineName": "Long Sleeve",
+      "category": "Tees",
+      "name": "Rainbow",
+      "title": "NonParallel Long Sleeve — Rainbow",
+      "printifyId": "6abadbb097163e54500f1ab1",
+      "printProviderId": 99,
+      "price": 4500,
+      "blank": "Comfort Colors® 6014",
+      "details": [
+        "100% ring-spun cotton",
+        "Medium fabric (6.1 oz/yd² (206.8 g/m²))",
+        "Classic Fit",
+        "Sewn-in twill label"
+      ],
+      "colors": [
+        {
+          "name": "Black",
+          "hex": null,
+          "images": [
+            "merch/long-sleeve-rainbow/black-1",
+            "merch/long-sleeve-rainbow/black-2",
+            "merch/long-sleeve-rainbow/black-3",
+            "merch/long-sleeve-rainbow/black-4"
+          ],
+          "views": [
+            "back",
+            "front",
+            null,
+            null
+          ],
+          "sizes": [
+            {
+              "size": "S",
+              "variantId": 73218,
+              "price": 4500
+            },
+            {
+              "size": "M",
+              "variantId": 73220,
+              "price": 4500
+            },
+            {
+              "size": "L",
+              "variantId": 73222,
+              "price": 4500
+            },
+            {
+              "size": "XL",
+              "variantId": 73224,
+              "price": 4500
+            },
+            {
+              "size": "2XL",
+              "variantId": 73226,
+              "price": 4500
+            },
+            {
+              "size": "3XL",
+              "variantId": 98893,
+              "price": 4900
+            }
+          ]
+        }
+      ],
+      "number": "010"
+    },
+    {
+      "slug": "long-sleeve-purple",
+      "line": "long-sleeve",
+      "lineName": "Long Sleeve",
+      "category": "Tees",
+      "name": "Purple",
+      "title": "NonParallel Long Sleeve — Purple",
+      "printifyId": "6abadbbdf7af0f64eb06165c",
+      "printProviderId": 99,
+      "price": 4500,
+      "blank": "Comfort Colors® 6014",
+      "details": [
+        "100% ring-spun cotton",
+        "Medium fabric (6.1 oz/yd² (206.8 g/m²))",
+        "Classic Fit",
+        "Sewn-in twill label"
+      ],
+      "colors": [
+        {
+          "name": "White",
+          "hex": null,
+          "images": [
+            "merch/long-sleeve-purple/white-1",
+            "merch/long-sleeve-purple/white-2",
+            "merch/long-sleeve-purple/white-3",
+            "merch/long-sleeve-purple/white-4"
+          ],
+          "views": [
+            "back",
+            "front",
+            null,
+            null
+          ],
+          "sizes": [
+            {
+              "size": "S",
+              "variantId": 73219,
+              "price": 4500
+            },
+            {
+              "size": "M",
+              "variantId": 73221,
+              "price": 4500
+            },
+            {
+              "size": "L",
+              "variantId": 73223,
+              "price": 4500
+            },
+            {
+              "size": "XL",
+              "variantId": 73225,
+              "price": 4500
+            },
+            {
+              "size": "2XL",
+              "variantId": 73227,
+              "price": 4500
+            },
+            {
+              "size": "3XL",
+              "variantId": 98923,
+              "price": 4900
+            }
+          ]
+        }
+      ],
+      "number": "011"
+    },
+    {
+      "slug": "tank-rainbow",
+      "line": "tank",
+      "lineName": "Tank",
+      "category": "Tees",
+      "name": "Rainbow",
+      "title": "NonParallel Tank — Rainbow",
+      "printifyId": "6abadbcba47532b54006f4aa",
+      "printProviderId": 39,
+      "price": 3500,
+      "blank": "Gildan 5200",
+      "details": [
+        "100% cotton (fiber content varies for different colors)",
+        "Medium fabric (5.3 oz/yd² (180 g/m²))",
+        "Classic fit",
+        "Tear away label"
+      ],
+      "colors": [
+        {
+          "name": "Black",
+          "hex": null,
+          "images": [
+            "merch/tank-rainbow/black-1",
+            "merch/tank-rainbow/black-2",
+            "merch/tank-rainbow/black-3",
+            "merch/tank-rainbow/black-4"
+          ],
+          "views": [
+            "back",
+            "front",
+            null,
+            null
+          ],
+          "sizes": [
+            {
+              "size": "S",
+              "variantId": 76974,
+              "price": 3500
+            },
+            {
+              "size": "M",
+              "variantId": 76980,
+              "price": 3500
+            },
+            {
+              "size": "L",
+              "variantId": 76986,
+              "price": 3500
+            },
+            {
+              "size": "XL",
+              "variantId": 76992,
+              "price": 3500
+            },
+            {
+              "size": "2XL",
+              "variantId": 76998,
+              "price": 3500
+            }
+          ]
+        }
+      ],
+      "number": "012"
+    },
+    {
+      "slug": "hoodie-rainbow",
+      "line": "hoodie",
+      "lineName": "Hoodie",
+      "category": "Hoodies & Crews",
+      "name": "Rainbow",
+      "title": "NonParallel Hoodie — Rainbow",
+      "printifyId": "6abae0537225e4d1240d34b5",
+      "printProviderId": 29,
+      "price": 4900,
+      "blank": "Gildan 18500",
+      "details": [
+        "The Gildan 18500 is made from a medium-heavy fabric (8.0 oz/yd² (271 g/m²)) made of 50% cotton and 50% polyester. This blend delivers cozy warmth and a soft feel that makes it perfect for chilly days",
+        "The classic fit along with the pouch pocket and the tear-away label make for a highly comfortable, scratch-free wearing experience",
+        "The color-matched drawcord and the double-lined hood add a stylish flair and durability that tie everything together",
+        "Embroidery decoration method available on either left chest, center chest, or large center chest, as well as right + left wrists",
+        "Made using 100% ethically grown US cotton. Gildan is also a proud member of the US Cotton Trust Protocol ensuring ethical and sustainable means of production"
+      ],
+      "colors": [
+        {
+          "name": "Black",
+          "hex": null,
+          "images": [
+            "merch/hoodie-rainbow/black-1",
+            "merch/hoodie-rainbow/black-2",
+            "merch/hoodie-rainbow/black-3",
+            "merch/hoodie-rainbow/black-4"
+          ],
+          "views": [
+            "back",
+            "back",
+            "front",
+            "front"
+          ],
+          "sizes": [
+            {
+              "size": "S",
+              "variantId": 32918,
+              "price": 4900
+            },
+            {
+              "size": "M",
+              "variantId": 32919,
+              "price": 4900
+            },
+            {
+              "size": "L",
+              "variantId": 32920,
+              "price": 4900
+            },
+            {
+              "size": "XL",
+              "variantId": 32921,
+              "price": 4900
+            },
+            {
+              "size": "2XL",
+              "variantId": 32922,
+              "price": 5500
+            },
+            {
+              "size": "3XL",
+              "variantId": 32923,
+              "price": 5500
+            }
+          ]
+        }
+      ],
+      "number": "013"
+    },
+    {
+      "slug": "hoodie-purple",
+      "line": "hoodie",
+      "lineName": "Hoodie",
+      "category": "Hoodies & Crews",
+      "name": "Purple",
+      "title": "NonParallel Hoodie — Purple",
+      "printifyId": "6abae05a58cc02e6370f2a01",
+      "printProviderId": 29,
+      "price": 4900,
+      "blank": "Gildan 18500",
+      "details": [
+        "The Gildan 18500 is made from a medium-heavy fabric (8.0 oz/yd² (271 g/m²)) made of 50% cotton and 50% polyester. This blend delivers cozy warmth and a soft feel that makes it perfect for chilly days",
+        "The classic fit along with the pouch pocket and the tear-away label make for a highly comfortable, scratch-free wearing experience",
+        "The color-matched drawcord and the double-lined hood add a stylish flair and durability that tie everything together",
+        "Embroidery decoration method available on either left chest, center chest, or large center chest, as well as right + left wrists",
+        "Made using 100% ethically grown US cotton. Gildan is also a proud member of the US Cotton Trust Protocol ensuring ethical and sustainable means of production"
+      ],
+      "colors": [
+        {
+          "name": "White",
+          "hex": null,
+          "images": [
+            "merch/hoodie-purple/white-1",
+            "merch/hoodie-purple/white-2",
+            "merch/hoodie-purple/white-3",
+            "merch/hoodie-purple/white-4"
+          ],
+          "views": [
+            "back",
+            "back",
+            "front",
+            "front"
+          ],
+          "sizes": [
+            {
+              "size": "S",
+              "variantId": 32910,
+              "price": 4900
+            },
+            {
+              "size": "M",
+              "variantId": 32911,
+              "price": 4900
+            },
+            {
+              "size": "L",
+              "variantId": 32912,
+              "price": 4900
+            },
+            {
+              "size": "XL",
+              "variantId": 32913,
+              "price": 4900
+            },
+            {
+              "size": "2XL",
+              "variantId": 32914,
+              "price": 5500
+            },
+            {
+              "size": "3XL",
+              "variantId": 32915,
+              "price": 5500
+            }
+          ]
+        }
+      ],
+      "number": "014"
+    },
+    {
+      "slug": "hoodie-blue",
+      "line": "hoodie",
+      "lineName": "Hoodie",
+      "category": "Hoodies & Crews",
+      "name": "Blue",
+      "title": "NonParallel Hoodie — Blue",
+      "printifyId": "6abae061d904a5ab710f11bb",
+      "printProviderId": 29,
+      "price": 4900,
+      "blank": "Gildan 18500",
+      "details": [
+        "The Gildan 18500 is made from a medium-heavy fabric (8.0 oz/yd² (271 g/m²)) made of 50% cotton and 50% polyester. This blend delivers cozy warmth and a soft feel that makes it perfect for chilly days",
+        "The classic fit along with the pouch pocket and the tear-away label make for a highly comfortable, scratch-free wearing experience",
+        "The color-matched drawcord and the double-lined hood add a stylish flair and durability that tie everything together",
+        "Embroidery decoration method available on either left chest, center chest, or large center chest, as well as right + left wrists",
+        "Made using 100% ethically grown US cotton. Gildan is also a proud member of the US Cotton Trust Protocol ensuring ethical and sustainable means of production"
+      ],
+      "colors": [
+        {
+          "name": "Sport Grey",
+          "hex": null,
+          "images": [
+            "merch/hoodie-blue/sport-grey-1",
+            "merch/hoodie-blue/sport-grey-2",
+            "merch/hoodie-blue/sport-grey-3",
+            "merch/hoodie-blue/sport-grey-4"
+          ],
+          "views": [
+            "back",
+            "back",
+            "front",
+            "front"
+          ],
+          "sizes": [
+            {
+              "size": "S",
+              "variantId": 32902,
+              "price": 4900
+            },
+            {
+              "size": "M",
+              "variantId": 32903,
+              "price": 4900
+            },
+            {
+              "size": "L",
+              "variantId": 32904,
+              "price": 4900
+            },
+            {
+              "size": "XL",
+              "variantId": 32905,
+              "price": 4900
+            },
+            {
+              "size": "2XL",
+              "variantId": 32906,
+              "price": 5500
+            },
+            {
+              "size": "3XL",
+              "variantId": 32907,
+              "price": 5500
+            }
+          ]
+        }
+      ],
+      "number": "015"
+    },
+    {
+      "slug": "heavy-hoodie-rainbow",
+      "line": "heavy-hoodie",
+      "lineName": "Heavyweight Hoodie",
+      "category": "Hoodies & Crews",
+      "name": "Rainbow",
+      "title": "NonParallel Heavyweight Hoodie — Rainbow",
+      "printifyId": "6abae0671a274dea7508f740",
+      "printProviderId": 217,
+      "price": 9900,
+      "blank": "Independent Trading Company IND5000P",
+      "details": [
+        "70/30 ring-spun cotton/polyester fleece",
+        "100% cotton face yarns",
+        "Double fleece lined hood",
+        "Antique silver eyelets",
+        "Heavy duty cotton drawcord with silver tips"
+      ],
+      "colors": [
+        {
+          "name": "Black",
+          "hex": null,
+          "images": [
+            "merch/heavy-hoodie-rainbow/black-1",
+            "merch/heavy-hoodie-rainbow/black-2",
+            "merch/heavy-hoodie-rainbow/black-3",
+            "merch/heavy-hoodie-rainbow/black-4"
+          ],
+          "views": [
+            "back",
+            "front",
+            null,
+            null
+          ],
+          "sizes": [
+            {
+              "size": "S",
+              "variantId": 303211,
+              "price": 9900
+            },
+            {
+              "size": "M",
+              "variantId": 303181,
+              "price": 9900
+            },
+            {
+              "size": "L",
+              "variantId": 303165,
+              "price": 9900
+            },
+            {
+              "size": "XL",
+              "variantId": 303167,
+              "price": 9900
+            },
+            {
+              "size": "2XL",
+              "variantId": 303200,
+              "price": 10500
+            },
+            {
+              "size": "3XL",
+              "variantId": 303171,
+              "price": 10500
+            }
+          ]
+        }
+      ],
+      "number": "016"
+    },
+    {
+      "slug": "heavy-hoodie-purple",
+      "line": "heavy-hoodie",
+      "lineName": "Heavyweight Hoodie",
+      "category": "Hoodies & Crews",
+      "name": "Purple",
+      "title": "NonParallel Heavyweight Hoodie — Purple",
+      "printifyId": "6abae06c03c5f085d10dd60b",
+      "printProviderId": 217,
+      "price": 9900,
+      "blank": "Independent Trading Company IND5000P",
+      "details": [
+        "70/30 ring-spun cotton/polyester fleece",
+        "100% cotton face yarns",
+        "Double fleece lined hood",
+        "Antique silver eyelets",
+        "Heavy duty cotton drawcord with silver tips"
+      ],
+      "colors": [
+        {
+          "name": "Bone",
+          "hex": null,
+          "images": [
+            "merch/heavy-hoodie-purple/bone-1",
+            "merch/heavy-hoodie-purple/bone-2",
+            "merch/heavy-hoodie-purple/bone-3",
+            "merch/heavy-hoodie-purple/bone-4"
+          ],
+          "views": [
+            "back",
+            "front",
+            null,
+            null
+          ],
+          "sizes": [
+            {
+              "size": "S",
+              "variantId": 303212,
+              "price": 9900
+            },
+            {
+              "size": "M",
+              "variantId": 303182,
+              "price": 9900
+            },
+            {
+              "size": "L",
+              "variantId": 303175,
+              "price": 9900
+            },
+            {
+              "size": "XL",
+              "variantId": 303187,
+              "price": 9900
+            },
+            {
+              "size": "2XL",
+              "variantId": 303202,
+              "price": 10500
+            },
+            {
+              "size": "3XL",
+              "variantId": 303216,
+              "price": 10500
+            }
+          ]
+        },
+        {
+          "name": "Grey Heather",
+          "hex": null,
+          "images": [
+            "merch/heavy-hoodie-purple/grey-heather-1",
+            "merch/heavy-hoodie-purple/grey-heather-2",
+            "merch/heavy-hoodie-purple/grey-heather-3",
+            "merch/heavy-hoodie-purple/grey-heather-4"
+          ],
+          "views": [
+            "back",
+            "front",
+            null,
+            null
+          ],
+          "sizes": [
+            {
+              "size": "S",
+              "variantId": 303283,
+              "price": 9900
+            },
+            {
+              "size": "M",
+              "variantId": 303249,
+              "price": 9900
+            },
+            {
+              "size": "L",
+              "variantId": 303275,
+              "price": 9900
+            },
+            {
+              "size": "XL",
+              "variantId": 303227,
+              "price": 9900
+            },
+            {
+              "size": "2XL",
+              "variantId": 303277,
+              "price": 10500
+            },
+            {
+              "size": "3XL",
+              "variantId": 303250,
+              "price": 10500
+            }
+          ]
+        },
+        {
+          "name": "White",
+          "hex": null,
+          "images": [
+            "merch/heavy-hoodie-purple/white-1",
+            "merch/heavy-hoodie-purple/white-2",
+            "merch/heavy-hoodie-purple/white-3",
+            "merch/heavy-hoodie-purple/white-4"
+          ],
+          "views": [
+            "back",
+            "front",
+            null,
+            null
+          ],
+          "sizes": [
+            {
+              "size": "S",
+              "variantId": 303328,
+              "price": 9900
+            },
+            {
+              "size": "M",
+              "variantId": 303294,
+              "price": 9900
+            },
+            {
+              "size": "L",
+              "variantId": 303321,
+              "price": 9900
+            },
+            {
+              "size": "XL",
+              "variantId": 303331,
+              "price": 9900
+            },
+            {
+              "size": "2XL",
+              "variantId": 303329,
+              "price": 10500
+            },
+            {
+              "size": "3XL",
+              "variantId": 303327,
+              "price": 10500
+            }
+          ]
+        }
+      ],
+      "number": "017"
+    },
+    {
+      "slug": "crewneck-rainbow",
+      "line": "crewneck",
+      "lineName": "Crewneck",
+      "category": "Hoodies & Crews",
+      "name": "Rainbow",
+      "title": "NonParallel Crewneck — Rainbow",
+      "printifyId": "6abae07597163e54500f1d97",
+      "printProviderId": 50,
+      "price": 3900,
+      "blank": "Gildan 18000",
+      "details": [
+        "The Gildan 18000 sweatshirt is built for comfort and durability, made from a medium-heavy (8.0 oz/yd² (271 g/m²)) 50/50 cotton-polyester blend",
+        "The classic fit along with the crew neckline deliver a comfy wearing experience with a clean-cut style. Meanwhile, the double-needle stitching at the shoulder, armhole, neck, waistband, and cuff seams add top-tier durability",
+        "Say goodbye to itchiness thanks to the gray, pearlized tear-away label",
+        "The Gildan 18000 sweatshirt uses ethically grown US cotton, supported by the US Cotton Trust Protocol, with OEKO-TEX® STANDARD 100 (Certificate No. 168252, OETI - Institut fuer Oekologie) certified dyes",
+        "Fabric blends: Heather Sport colors - 60% polyester, 40% cotton"
+      ],
+      "colors": [
+        {
+          "name": "Black",
+          "hex": null,
+          "images": [
+            "merch/crewneck-rainbow/black-1",
+            "merch/crewneck-rainbow/black-2",
+            "merch/crewneck-rainbow/black-3",
+            "merch/crewneck-rainbow/black-4"
+          ],
+          "sizes": [
+            {
+              "size": "S",
+              "variantId": 25397,
+              "price": 3900
+            },
+            {
+              "size": "M",
+              "variantId": 25428,
+              "price": 3900
+            },
+            {
+              "size": "L",
+              "variantId": 25459,
+              "price": 3900
+            },
+            {
+              "size": "XL",
+              "variantId": 25490,
+              "price": 3900
+            },
+            {
+              "size": "2XL",
+              "variantId": 25521,
+              "price": 4500
+            }
+          ]
+        }
+      ],
+      "number": "018"
+    },
+    {
+      "slug": "crewneck-purple",
+      "line": "crewneck",
+      "lineName": "Crewneck",
+      "category": "Hoodies & Crews",
+      "name": "Purple",
+      "title": "NonParallel Crewneck — Purple",
+      "printifyId": "6abae07a80a6b91f7b06f6ed",
+      "printProviderId": 50,
+      "price": 3900,
+      "blank": "Gildan 18000",
+      "details": [
+        "The Gildan 18000 sweatshirt is built for comfort and durability, made from a medium-heavy (8.0 oz/yd² (271 g/m²)) 50/50 cotton-polyester blend",
+        "The classic fit along with the crew neckline deliver a comfy wearing experience with a clean-cut style. Meanwhile, the double-needle stitching at the shoulder, armhole, neck, waistband, and cuff seams add top-tier durability",
+        "Say goodbye to itchiness thanks to the gray, pearlized tear-away label",
+        "The Gildan 18000 sweatshirt uses ethically grown US cotton, supported by the US Cotton Trust Protocol, with OEKO-TEX® STANDARD 100 (Certificate No. 168252, OETI - Institut fuer Oekologie) certified dyes",
+        "Fabric blends: Heather Sport colors - 60% polyester, 40% cotton"
+      ],
+      "colors": [
+        {
+          "name": "Sport Grey",
+          "hex": null,
+          "images": [
+            "merch/crewneck-purple/sport-grey-1",
+            "merch/crewneck-purple/sport-grey-2",
+            "merch/crewneck-purple/sport-grey-3",
+            "merch/crewneck-purple/sport-grey-4"
+          ],
+          "sizes": [
+            {
+              "size": "S",
+              "variantId": 25395,
+              "price": 3900
+            },
+            {
+              "size": "M",
+              "variantId": 25426,
+              "price": 3900
+            },
+            {
+              "size": "L",
+              "variantId": 25457,
+              "price": 3900
+            },
+            {
+              "size": "XL",
+              "variantId": 25488,
+              "price": 3900
+            },
+            {
+              "size": "2XL",
+              "variantId": 25519,
+              "price": 4500
+            }
+          ]
+        },
+        {
+          "name": "White",
+          "hex": null,
+          "images": [
+            "merch/crewneck-purple/white-1",
+            "merch/crewneck-purple/white-2",
+            "merch/crewneck-purple/white-3",
+            "merch/crewneck-purple/white-4"
+          ],
+          "sizes": [
+            {
+              "size": "S",
+              "variantId": 25396,
+              "price": 3900
+            },
+            {
+              "size": "M",
+              "variantId": 25427,
+              "price": 3900
+            },
+            {
+              "size": "L",
+              "variantId": 25458,
+              "price": 3900
+            },
+            {
+              "size": "XL",
+              "variantId": 25489,
+              "price": 3900
+            },
+            {
+              "size": "2XL",
+              "variantId": 25520,
+              "price": 4500
+            }
+          ]
+        }
+      ],
+      "number": "019"
+    },
+    {
+      "slug": "sweatpants-rainbow",
+      "line": "sweatpants",
+      "lineName": "Sweatpants",
+      "category": "Bottoms",
+      "name": "Rainbow",
+      "title": "NonParallel Sweatpants — Rainbow",
+      "printifyId": "6abadbfaa43df71fd00b74e8",
+      "printProviderId": 39,
+      "price": 4500,
+      "blank": "Gildan 18200",
+      "details": [
+        "Material: 50% cotton, 50% polyester, 8.0 oz/yd²",
+        "Classic, relaxed silhouette suitable for all-day comfort",
+        "Covered elastic waistband with adjustable drawcord for a secure fit",
+        "Elastic ribbed ankle cuffs for a tapered, modern look",
+        "Side pockets for everyday convenience"
+      ],
+      "colors": [
+        {
+          "name": "Black",
+          "hex": null,
+          "images": [
+            "merch/sweatpants-rainbow/black-1",
+            "merch/sweatpants-rainbow/black-2"
+          ],
+          "sizes": [
+            {
+              "size": "S",
+              "variantId": 103932,
+              "price": 4500
+            },
+            {
+              "size": "M",
+              "variantId": 103933,
+              "price": 4500
+            },
+            {
+              "size": "L",
+              "variantId": 103934,
+              "price": 4500
+            },
+            {
+              "size": "XL",
+              "variantId": 103935,
+              "price": 4500
+            },
+            {
+              "size": "2XL",
+              "variantId": 103936,
+              "price": 5500
+            },
+            {
+              "size": "3XL",
+              "variantId": 103937,
+              "price": 5500
+            }
+          ]
+        }
+      ],
+      "number": "020"
+    },
+    {
+      "slug": "sweatpants-purple",
+      "line": "sweatpants",
+      "lineName": "Sweatpants",
+      "category": "Bottoms",
+      "name": "Purple",
+      "title": "NonParallel Sweatpants — Purple",
+      "printifyId": "6abadbfff1f32a80850df79e",
+      "printProviderId": 39,
+      "price": 4500,
+      "blank": "Gildan 18200",
+      "details": [
+        "Material: 50% cotton, 50% polyester, 8.0 oz/yd²",
+        "Classic, relaxed silhouette suitable for all-day comfort",
+        "Covered elastic waistband with adjustable drawcord for a secure fit",
+        "Elastic ribbed ankle cuffs for a tapered, modern look",
+        "Side pockets for everyday convenience"
+      ],
+      "colors": [
+        {
+          "name": "Ash",
+          "hex": null,
+          "images": [
+            "merch/sweatpants-purple/ash-1",
+            "merch/sweatpants-purple/ash-2"
+          ],
+          "sizes": [
+            {
+              "size": "S",
+              "variantId": 253656,
+              "price": 4500
+            },
+            {
+              "size": "M",
+              "variantId": 253657,
+              "price": 4500
+            },
+            {
+              "size": "L",
+              "variantId": 253658,
+              "price": 4500
+            },
+            {
+              "size": "XL",
+              "variantId": 253659,
+              "price": 4500
+            },
+            {
+              "size": "2XL",
+              "variantId": 253660,
+              "price": 5500
+            },
+            {
+              "size": "3XL",
+              "variantId": 253661,
+              "price": 5500
+            }
+          ]
+        },
+        {
+          "name": "Sport Grey",
+          "hex": null,
+          "images": [
+            "merch/sweatpants-purple/sport-grey-1",
+            "merch/sweatpants-purple/sport-grey-2"
+          ],
+          "sizes": [
+            {
+              "size": "S",
+              "variantId": 253668,
+              "price": 4500
+            },
+            {
+              "size": "M",
+              "variantId": 253669,
+              "price": 4500
+            },
+            {
+              "size": "L",
+              "variantId": 253670,
+              "price": 4500
+            },
+            {
+              "size": "XL",
+              "variantId": 253671,
+              "price": 4500
+            },
+            {
+              "size": "2XL",
+              "variantId": 253672,
+              "price": 5500
+            },
+            {
+              "size": "3XL",
+              "variantId": 253673,
+              "price": 5500
+            }
+          ]
+        }
+      ],
+      "number": "021"
+    },
+    {
+      "slug": "shorts-rainbow",
+      "line": "shorts",
+      "lineName": "Shorts",
+      "category": "Bottoms",
+      "name": "Rainbow",
+      "title": "NonParallel Shorts — Rainbow",
+      "printifyId": "6abae0871a274dea7508f754",
+      "printProviderId": 217,
+      "price": 5500,
+      "blank": "Independent Trading Company IND20SRT",
+      "details": [
+        "8.5 oz., 80/20 cotton/poly fleece",
+        "100% cotton face",
+        "Grey Heather: 52/48 cotton/poly",
+        "Relaxed fit, tapered knee",
+        "Elastic waistband, shoestring drawcord"
+      ],
+      "colors": [
+        {
+          "name": "Black",
+          "hex": null,
+          "images": [
+            "merch/shorts-rainbow/black-1",
+            "merch/shorts-rainbow/black-2"
+          ],
+          "sizes": [
+            {
+              "size": "XL",
+              "variantId": 302281,
+              "price": 5500
+            },
+            {
+              "size": "XS",
+              "variantId": 302283,
+              "price": 5500
+            },
+            {
+              "size": "2XL",
+              "variantId": 302290,
+              "price": 5500
+            },
+            {
+              "size": "L",
+              "variantId": 302302,
+              "price": 5500
+            },
+            {
+              "size": "S",
+              "variantId": 302305,
+              "price": 5500
+            },
+            {
+              "size": "M",
+              "variantId": 302309,
+              "price": 5500
+            }
+          ]
+        }
+      ],
+      "number": "022"
+    },
+    {
+      "slug": "shorts-purple",
+      "line": "shorts",
+      "lineName": "Shorts",
+      "category": "Bottoms",
+      "name": "Purple",
+      "title": "NonParallel Shorts — Purple",
+      "printifyId": "6abae08bb04d9ee8e10f9d5d",
+      "printProviderId": 217,
+      "price": 5500,
+      "blank": "Independent Trading Company IND20SRT",
+      "details": [
+        "8.5 oz., 80/20 cotton/poly fleece",
+        "100% cotton face",
+        "Grey Heather: 52/48 cotton/poly",
+        "Relaxed fit, tapered knee",
+        "Elastic waistband, shoestring drawcord"
+      ],
+      "colors": [
+        {
+          "name": "Grey Heather",
+          "hex": null,
+          "images": [
+            "merch/shorts-purple/grey-heather-1",
+            "merch/shorts-purple/grey-heather-2"
+          ],
+          "sizes": [
+            {
+              "size": "L",
+              "variantId": 302320,
+              "price": 5500
+            },
+            {
+              "size": "2XL",
+              "variantId": 302326,
+              "price": 5500
+            },
+            {
+              "size": "XL",
+              "variantId": 302330,
+              "price": 5500
+            },
+            {
+              "size": "M",
+              "variantId": 302346,
+              "price": 5500
+            },
+            {
+              "size": "XS",
+              "variantId": 302353,
+              "price": 5500
+            },
+            {
+              "size": "S",
+              "variantId": 302360,
+              "price": 5500
+            }
+          ]
+        },
+        {
+          "name": "White",
+          "hex": null,
+          "images": [
+            "merch/shorts-purple/white-1",
+            "merch/shorts-purple/white-2"
+          ],
+          "sizes": [
+            {
+              "size": "XL",
+              "variantId": 302388,
+              "price": 5500
+            },
+            {
+              "size": "S",
+              "variantId": 302392,
+              "price": 5500
+            },
+            {
+              "size": "M",
+              "variantId": 302395,
+              "price": 5500
+            },
+            {
+              "size": "L",
+              "variantId": 302398,
+              "price": 5500
+            },
+            {
+              "size": "XS",
+              "variantId": 302401,
+              "price": 5500
+            },
+            {
+              "size": "2XL",
+              "variantId": 302405,
+              "price": 5500
+            }
+          ]
+        }
+      ],
+      "number": "023"
+    },
+    {
+      "slug": "trucker-rainbow",
+      "line": "trucker",
+      "lineName": "Trucker Hat",
+      "category": "Hats & Bags",
+      "name": "Rainbow",
+      "title": "NonParallel Trucker Hat — Rainbow",
+      "printifyId": "6abae22503c5f085d10dd70b",
+      "printProviderId": 99,
+      "price": 3500,
+      "blank": "Yupoong 6606",
+      "details": [
+        "Structured mid- profile six-panel cap",
+        "Hard buckram front panels",
+        "Permacurv® visor, matching undervisor",
+        "Front and visor: 60% cotton, 40% polyester",
+        "Back: 100% polyester mesh"
+      ],
+      "colors": [
+        {
+          "name": "Black",
+          "hex": null,
+          "images": [
+            "merch/trucker-rainbow/black-1",
+            "merch/trucker-rainbow/black-2",
+            "merch/trucker-rainbow/black-3"
+          ],
+          "sizes": [
+            {
+              "size": "One size",
+              "variantId": 105362,
+              "price": 3500
+            }
+          ]
+        }
+      ],
+      "number": "024"
+    },
+    {
+      "slug": "trucker-purple",
+      "line": "trucker",
+      "lineName": "Trucker Hat",
+      "category": "Hats & Bags",
+      "name": "Purple",
+      "title": "NonParallel Trucker Hat — Purple",
+      "printifyId": "6abae23894b2a9796d077a3a",
+      "printProviderId": 99,
+      "price": 3500,
+      "blank": "Yupoong 6606",
+      "details": [
+        "Structured mid- profile six-panel cap",
+        "Hard buckram front panels",
+        "Permacurv® visor, matching undervisor",
+        "Front and visor: 60% cotton, 40% polyester",
+        "Back: 100% polyester mesh"
+      ],
+      "colors": [
+        {
+          "name": "Black",
+          "hex": null,
+          "images": [
+            "merch/trucker-purple/black-1",
+            "merch/trucker-purple/black-2",
+            "merch/trucker-purple/black-3"
+          ],
+          "sizes": [
+            {
+              "size": "One size",
+              "variantId": 105362,
+              "price": 3500
+            }
+          ]
+        },
+        {
+          "name": "Black / White",
+          "hex": null,
+          "images": [
+            "merch/trucker-purple/black-white-1",
+            "merch/trucker-purple/black-white-2",
+            "merch/trucker-purple/black-white-3"
+          ],
+          "sizes": [
+            {
+              "size": "One size",
+              "variantId": 105364,
+              "price": 3500
+            }
+          ]
+        },
+        {
+          "name": "Charcoal / White",
+          "hex": null,
+          "images": [
+            "merch/trucker-purple/charcoal-white-1",
+            "merch/trucker-purple/charcoal-white-2",
+            "merch/trucker-purple/charcoal-white-3"
+          ],
+          "sizes": [
+            {
+              "size": "One size",
+              "variantId": 105367,
+              "price": 3500
+            }
+          ]
+        },
+        {
+          "name": "Heather Grey / White",
+          "hex": null,
+          "images": [
+            "merch/trucker-purple/heather-grey-white-1",
+            "merch/trucker-purple/heather-grey-white-2",
+            "merch/trucker-purple/heather-grey-white-3"
+          ],
+          "sizes": [
+            {
+              "size": "One size",
+              "variantId": 105369,
+              "price": 3500
+            }
+          ]
+        }
+      ],
+      "number": "025"
+    },
+    {
+      "slug": "tote-rainbow",
+      "line": "tote",
+      "lineName": "Tote",
+      "category": "Hats & Bags",
+      "name": "Rainbow",
+      "title": "NonParallel Tote — Rainbow",
+      "printifyId": "6abadc3e94b2a9796d07776a",
+      "printProviderId": 74,
+      "price": 3500,
+      "blank": "Econscious EC8040",
+      "details": [
+        "100% Certified Organic Cotton",
+        "Medium heavy fabric (9 oz/yd² (305 g/m²))",
+        "Econscious tag on handle base",
+        "Blank product sourced from Pakistan",
+        "Tear-away label"
+      ],
+      "colors": [
+        {
+          "name": "Black",
+          "hex": null,
+          "images": [
+            "merch/tote-rainbow/black-1",
+            "merch/tote-rainbow/black-2",
+            "merch/tote-rainbow/black-3"
+          ],
+          "sizes": [
+            {
+              "size": "One size",
+              "variantId": 71925,
+              "price": 3500
+            }
+          ]
+        }
+      ],
+      "number": "026"
+    },
+    {
+      "slug": "tote-purple",
+      "line": "tote",
+      "lineName": "Tote",
+      "category": "Hats & Bags",
+      "name": "Purple",
+      "title": "NonParallel Tote — Purple",
+      "printifyId": "6abadc44fa29275705030bcb",
+      "printProviderId": 74,
+      "price": 3500,
+      "blank": "Econscious EC8040",
+      "details": [
+        "100% Certified Organic Cotton",
+        "Medium heavy fabric (9 oz/yd² (305 g/m²))",
+        "Econscious tag on handle base",
+        "Blank product sourced from Pakistan",
+        "Tear-away label"
+      ],
+      "colors": [
+        {
+          "name": "Natural",
+          "hex": null,
+          "images": [
+            "merch/tote-purple/natural-1",
+            "merch/tote-purple/natural-2",
+            "merch/tote-purple/natural-3"
+          ],
+          "sizes": [
+            {
+              "size": "One size",
+              "variantId": 71926,
+              "price": 3500
+            }
+          ]
+        }
+      ],
+      "number": "027"
+    },
+    {
+      "slug": "sticker-rainbow",
+      "line": "sticker",
+      "lineName": "Sticker",
+      "category": "Stickers & Pins",
+      "name": "Rainbow",
+      "title": "NonParallel Sticker — Rainbow",
+      "printifyId": "6abadc4a82c1a5844303e600",
+      "printProviderId": 1,
+      "price": 900,
+      "blank": "Generic brand",
+      "details": [
+        "Made with 100% durable vinyl that comes with strong glue for decorations that last. Perfect for spicing up indoor decor (not waterproof)",
+        "Quick, smooth, and bubble-free application",
+        "Choose between 4 sizes with a glossy finish to match your needs",
+        "White and transparent sticker options available"
+      ],
+      "colors": [
+        {
+          "name": "Standard",
+          "hex": null,
+          "images": [
+            "merch/sticker-rainbow/standard-1",
+            "merch/sticker-rainbow/standard-2",
+            "merch/sticker-rainbow/standard-3"
+          ],
+          "sizes": [
+            {
+              "size": "2\" × 2\" · Transparent",
+              "variantId": 45747,
+              "price": 900
+            },
+            {
+              "size": "2\" × 2\" · White",
+              "variantId": 45748,
+              "price": 900
+            },
+            {
+              "size": "3\" × 3\" · Transparent",
+              "variantId": 45749,
+              "price": 900
+            },
+            {
+              "size": "3\" × 3\" · White",
+              "variantId": 45750,
+              "price": 900
+            },
+            {
+              "size": "4\" × 4\" · Transparent",
+              "variantId": 45751,
+              "price": 900
+            },
+            {
+              "size": "4\" × 4\" · White",
+              "variantId": 45752,
+              "price": 900
+            },
+            {
+              "size": "6\" × 6\" · Transparent",
+              "variantId": 45753,
+              "price": 900
+            },
+            {
+              "size": "6\" × 6\" · White",
+              "variantId": 45754,
+              "price": 900
+            }
+          ]
+        }
+      ],
+      "number": "028"
+    },
+    {
+      "slug": "sticker-red",
+      "line": "sticker",
+      "lineName": "Sticker",
+      "category": "Stickers & Pins",
+      "name": "Red",
+      "title": "NonParallel Sticker — Red",
+      "printifyId": "6abadc5182c1a5844303e607",
+      "printProviderId": 1,
+      "price": 900,
+      "blank": "Generic brand",
+      "details": [
+        "Made with 100% durable vinyl that comes with strong glue for decorations that last. Perfect for spicing up indoor decor (not waterproof)",
+        "Quick, smooth, and bubble-free application",
+        "Choose between 4 sizes with a glossy finish to match your needs",
+        "White and transparent sticker options available"
+      ],
+      "colors": [
+        {
+          "name": "Standard",
+          "hex": null,
+          "images": [
+            "merch/sticker-red/standard-1",
+            "merch/sticker-red/standard-2",
+            "merch/sticker-red/standard-3"
+          ],
+          "sizes": [
+            {
+              "size": "2\" × 2\" · Transparent",
+              "variantId": 45747,
+              "price": 900
+            },
+            {
+              "size": "2\" × 2\" · White",
+              "variantId": 45748,
+              "price": 900
+            },
+            {
+              "size": "3\" × 3\" · Transparent",
+              "variantId": 45749,
+              "price": 900
+            },
+            {
+              "size": "3\" × 3\" · White",
+              "variantId": 45750,
+              "price": 900
+            },
+            {
+              "size": "4\" × 4\" · Transparent",
+              "variantId": 45751,
+              "price": 900
+            },
+            {
+              "size": "4\" × 4\" · White",
+              "variantId": 45752,
+              "price": 900
+            },
+            {
+              "size": "6\" × 6\" · Transparent",
+              "variantId": 45753,
+              "price": 900
+            },
+            {
+              "size": "6\" × 6\" · White",
+              "variantId": 45754,
+              "price": 900
+            }
+          ]
+        }
+      ],
+      "number": "029"
+    },
+    {
+      "slug": "sticker-yellow",
+      "line": "sticker",
+      "lineName": "Sticker",
+      "category": "Stickers & Pins",
+      "name": "Yellow",
+      "title": "NonParallel Sticker — Yellow",
+      "printifyId": "6abadc580133bdff1b043fc8",
+      "printProviderId": 1,
+      "price": 900,
+      "blank": "Generic brand",
+      "details": [
+        "Made with 100% durable vinyl that comes with strong glue for decorations that last. Perfect for spicing up indoor decor (not waterproof)",
+        "Quick, smooth, and bubble-free application",
+        "Choose between 4 sizes with a glossy finish to match your needs",
+        "White and transparent sticker options available"
+      ],
+      "colors": [
+        {
+          "name": "Standard",
+          "hex": null,
+          "images": [
+            "merch/sticker-yellow/standard-1",
+            "merch/sticker-yellow/standard-2",
+            "merch/sticker-yellow/standard-3"
+          ],
+          "sizes": [
+            {
+              "size": "2\" × 2\" · Transparent",
+              "variantId": 45747,
+              "price": 900
+            },
+            {
+              "size": "2\" × 2\" · White",
+              "variantId": 45748,
+              "price": 900
+            },
+            {
+              "size": "3\" × 3\" · Transparent",
+              "variantId": 45749,
+              "price": 900
+            },
+            {
+              "size": "3\" × 3\" · White",
+              "variantId": 45750,
+              "price": 900
+            },
+            {
+              "size": "4\" × 4\" · Transparent",
+              "variantId": 45751,
+              "price": 900
+            },
+            {
+              "size": "4\" × 4\" · White",
+              "variantId": 45752,
+              "price": 900
+            },
+            {
+              "size": "6\" × 6\" · Transparent",
+              "variantId": 45753,
+              "price": 900
+            },
+            {
+              "size": "6\" × 6\" · White",
+              "variantId": 45754,
+              "price": 900
+            }
+          ]
+        }
+      ],
+      "number": "030"
+    },
+    {
+      "slug": "sticker-green",
+      "line": "sticker",
+      "lineName": "Sticker",
+      "category": "Stickers & Pins",
+      "name": "Green",
+      "title": "NonParallel Sticker — Green",
+      "printifyId": "6abadc6182c1a5844303e61a",
+      "printProviderId": 1,
+      "price": 900,
+      "blank": "Generic brand",
+      "details": [
+        "Made with 100% durable vinyl that comes with strong glue for decorations that last. Perfect for spicing up indoor decor (not waterproof)",
+        "Quick, smooth, and bubble-free application",
+        "Choose between 4 sizes with a glossy finish to match your needs",
+        "White and transparent sticker options available"
+      ],
+      "colors": [
+        {
+          "name": "Standard",
+          "hex": null,
+          "images": [
+            "merch/sticker-green/standard-1",
+            "merch/sticker-green/standard-2",
+            "merch/sticker-green/standard-3"
+          ],
+          "sizes": [
+            {
+              "size": "2\" × 2\" · Transparent",
+              "variantId": 45747,
+              "price": 900
+            },
+            {
+              "size": "2\" × 2\" · White",
+              "variantId": 45748,
+              "price": 900
+            },
+            {
+              "size": "3\" × 3\" · Transparent",
+              "variantId": 45749,
+              "price": 900
+            },
+            {
+              "size": "3\" × 3\" · White",
+              "variantId": 45750,
+              "price": 900
+            },
+            {
+              "size": "4\" × 4\" · Transparent",
+              "variantId": 45751,
+              "price": 900
+            },
+            {
+              "size": "4\" × 4\" · White",
+              "variantId": 45752,
+              "price": 900
+            },
+            {
+              "size": "6\" × 6\" · Transparent",
+              "variantId": 45753,
+              "price": 900
+            },
+            {
+              "size": "6\" × 6\" · White",
+              "variantId": 45754,
+              "price": 900
+            }
+          ]
+        }
+      ],
+      "number": "031"
+    },
+    {
+      "slug": "sticker-blue",
+      "line": "sticker",
+      "lineName": "Sticker",
+      "category": "Stickers & Pins",
+      "name": "Blue",
+      "title": "NonParallel Sticker — Blue",
+      "printifyId": "6abadc6a1a274dea7508f521",
+      "printProviderId": 1,
+      "price": 900,
+      "blank": "Generic brand",
+      "details": [
+        "Made with 100% durable vinyl that comes with strong glue for decorations that last. Perfect for spicing up indoor decor (not waterproof)",
+        "Quick, smooth, and bubble-free application",
+        "Choose between 4 sizes with a glossy finish to match your needs",
+        "White and transparent sticker options available"
+      ],
+      "colors": [
+        {
+          "name": "Standard",
+          "hex": null,
+          "images": [
+            "merch/sticker-blue/standard-1",
+            "merch/sticker-blue/standard-2",
+            "merch/sticker-blue/standard-3"
+          ],
+          "sizes": [
+            {
+              "size": "2\" × 2\" · Transparent",
+              "variantId": 45747,
+              "price": 900
+            },
+            {
+              "size": "2\" × 2\" · White",
+              "variantId": 45748,
+              "price": 900
+            },
+            {
+              "size": "3\" × 3\" · Transparent",
+              "variantId": 45749,
+              "price": 900
+            },
+            {
+              "size": "3\" × 3\" · White",
+              "variantId": 45750,
+              "price": 900
+            },
+            {
+              "size": "4\" × 4\" · Transparent",
+              "variantId": 45751,
+              "price": 900
+            },
+            {
+              "size": "4\" × 4\" · White",
+              "variantId": 45752,
+              "price": 900
+            },
+            {
+              "size": "6\" × 6\" · Transparent",
+              "variantId": 45753,
+              "price": 900
+            },
+            {
+              "size": "6\" × 6\" · White",
+              "variantId": 45754,
+              "price": 900
+            }
+          ]
+        }
+      ],
+      "number": "032"
+    },
+    {
+      "slug": "sticker-purple",
+      "line": "sticker",
+      "lineName": "Sticker",
+      "category": "Stickers & Pins",
+      "name": "Purple",
+      "title": "NonParallel Sticker — Purple",
+      "printifyId": "6abadc7182c1a5844303e62d",
+      "printProviderId": 1,
+      "price": 900,
+      "blank": "Generic brand",
+      "details": [
+        "Made with 100% durable vinyl that comes with strong glue for decorations that last. Perfect for spicing up indoor decor (not waterproof)",
+        "Quick, smooth, and bubble-free application",
+        "Choose between 4 sizes with a glossy finish to match your needs",
+        "White and transparent sticker options available"
+      ],
+      "colors": [
+        {
+          "name": "Standard",
+          "hex": null,
+          "images": [
+            "merch/sticker-purple/standard-1",
+            "merch/sticker-purple/standard-2",
+            "merch/sticker-purple/standard-3"
+          ],
+          "sizes": [
+            {
+              "size": "2\" × 2\" · Transparent",
+              "variantId": 45747,
+              "price": 900
+            },
+            {
+              "size": "2\" × 2\" · White",
+              "variantId": 45748,
+              "price": 900
+            },
+            {
+              "size": "3\" × 3\" · Transparent",
+              "variantId": 45749,
+              "price": 900
+            },
+            {
+              "size": "3\" × 3\" · White",
+              "variantId": 45750,
+              "price": 900
+            },
+            {
+              "size": "4\" × 4\" · Transparent",
+              "variantId": 45751,
+              "price": 900
+            },
+            {
+              "size": "4\" × 4\" · White",
+              "variantId": 45752,
+              "price": 900
+            },
+            {
+              "size": "6\" × 6\" · Transparent",
+              "variantId": 45753,
+              "price": 900
+            },
+            {
+              "size": "6\" × 6\" · White",
+              "variantId": 45754,
+              "price": 900
+            }
+          ]
+        }
+      ],
+      "number": "033"
+    },
+    {
+      "slug": "holo-sticker-rainbow",
+      "line": "holo-sticker",
+      "lineName": "Holographic Sticker",
+      "category": "Stickers & Pins",
+      "name": "Rainbow",
+      "title": "NonParallel Holographic Sticker — Rainbow",
+      "printifyId": "6abadc79970cf6d28208df5c",
+      "printProviderId": 73,
+      "price": 1500,
+      "blank": "Generic brand",
+      "details": [
+        "Custom holographic stickers with a shiny rainbow effect",
+        "Available in five sizes",
+        "Material: Premium printable vinyl",
+        "Please note: white design elements will NOT be visible. The lighter the design color, the more transparent it will appear when printing the custom holographic stickers",
+        "Please note: small details close to each other will most likely be cut out as one shape"
+      ],
+      "colors": [
+        {
+          "name": "Standard",
+          "hex": null,
+          "images": [
+            "merch/holo-sticker-rainbow/standard-1",
+            "merch/holo-sticker-rainbow/standard-2",
+            "merch/holo-sticker-rainbow/standard-3"
+          ],
+          "sizes": [
+            {
+              "size": "2\" × 2\" · Die-Cut · Holographic",
+              "variantId": 76266,
+              "price": 1500
+            },
+            {
+              "size": "3\" × 3\" · Die-Cut · Holographic",
+              "variantId": 76267,
+              "price": 1500
+            },
+            {
+              "size": "4\" × 4\" · Die-Cut · Holographic",
+              "variantId": 76268,
+              "price": 1500
+            },
+            {
+              "size": "5\" × 5\" · Die-Cut · Holographic",
+              "variantId": 76269,
+              "price": 1500
+            },
+            {
+              "size": "6\" × 6\" · Die-Cut · Holographic",
+              "variantId": 76270,
+              "price": 1500
+            }
+          ]
+        }
+      ],
+      "number": "034"
+    },
+    {
+      "slug": "holo-sticker-purple",
+      "line": "holo-sticker",
+      "lineName": "Holographic Sticker",
+      "category": "Stickers & Pins",
+      "name": "Purple",
+      "title": "NonParallel Holographic Sticker — Purple",
+      "printifyId": "6abadc8382c1a5844303e636",
+      "printProviderId": 73,
+      "price": 1500,
+      "blank": "Generic brand",
+      "details": [
+        "Custom holographic stickers with a shiny rainbow effect",
+        "Available in five sizes",
+        "Material: Premium printable vinyl",
+        "Please note: white design elements will NOT be visible. The lighter the design color, the more transparent it will appear when printing the custom holographic stickers",
+        "Please note: small details close to each other will most likely be cut out as one shape"
+      ],
+      "colors": [
+        {
+          "name": "Standard",
+          "hex": null,
+          "images": [
+            "merch/holo-sticker-purple/standard-1",
+            "merch/holo-sticker-purple/standard-2",
+            "merch/holo-sticker-purple/standard-3"
+          ],
+          "sizes": [
+            {
+              "size": "2\" × 2\" · Die-Cut · Holographic",
+              "variantId": 76266,
+              "price": 1500
+            },
+            {
+              "size": "3\" × 3\" · Die-Cut · Holographic",
+              "variantId": 76267,
+              "price": 1500
+            },
+            {
+              "size": "4\" × 4\" · Die-Cut · Holographic",
+              "variantId": 76268,
+              "price": 1500
+            },
+            {
+              "size": "5\" × 5\" · Die-Cut · Holographic",
+              "variantId": 76269,
+              "price": 1500
+            },
+            {
+              "size": "6\" × 6\" · Die-Cut · Holographic",
+              "variantId": 76270,
+              "price": 1500
+            }
+          ]
+        }
+      ],
+      "number": "035"
+    },
+    {
+      "slug": "button-rainbow",
+      "line": "button",
+      "lineName": "Button",
+      "category": "Stickers & Pins",
+      "name": "Rainbow",
+      "title": "NonParallel Button — Rainbow",
+      "printifyId": "6abadc8d511bf688ce00508e",
+      "printProviderId": 1,
+      "price": 900,
+      "blank": "Generic brand",
+      "details": [
+        "Materials: metal with mylar face",
+        "Available in 3 sizes",
+        "Safety pin backing",
+        "Glossy scratch and UV resistant front",
+        "Assembled in the USA from globally sourced parts"
+      ],
+      "colors": [
+        {
+          "name": "Standard",
+          "hex": null,
+          "images": [
+            "merch/button-rainbow/standard-1",
+            "merch/button-rainbow/standard-2",
+            "merch/button-rainbow/standard-3"
+          ],
+          "sizes": [
+            {
+              "size": "1.25\"",
+              "variantId": 62070,
+              "price": 900
+            },
+            {
+              "size": "2.25\"",
+              "variantId": 62071,
+              "price": 900
+            },
+            {
+              "size": "3\"",
+              "variantId": 67977,
+              "price": 1500
+            }
+          ]
+        }
+      ],
+      "number": "036"
+    },
+    {
+      "slug": "button-purple",
+      "line": "button",
+      "lineName": "Button",
+      "category": "Stickers & Pins",
+      "name": "Purple",
+      "title": "NonParallel Button — Purple",
+      "printifyId": "6abadc940133bdff1b043ff6",
+      "printProviderId": 1,
+      "price": 900,
+      "blank": "Generic brand",
+      "details": [
+        "Materials: metal with mylar face",
+        "Available in 3 sizes",
+        "Safety pin backing",
+        "Glossy scratch and UV resistant front",
+        "Assembled in the USA from globally sourced parts"
+      ],
+      "colors": [
+        {
+          "name": "Standard",
+          "hex": null,
+          "images": [
+            "merch/button-purple/standard-1",
+            "merch/button-purple/standard-2",
+            "merch/button-purple/standard-3"
+          ],
+          "sizes": [
+            {
+              "size": "1.25\"",
+              "variantId": 62070,
+              "price": 900
+            },
+            {
+              "size": "2.25\"",
+              "variantId": 62071,
+              "price": 900
+            },
+            {
+              "size": "3\"",
+              "variantId": 67977,
+              "price": 1500
+            }
+          ]
+        }
+      ],
+      "number": "037"
+    },
+    {
+      "slug": "button-blue",
+      "line": "button",
+      "lineName": "Button",
+      "category": "Stickers & Pins",
+      "name": "Blue",
+      "title": "NonParallel Button — Blue",
+      "printifyId": "6abadc9a511bf688ce00509b",
+      "printProviderId": 1,
+      "price": 900,
+      "blank": "Generic brand",
+      "details": [
+        "Materials: metal with mylar face",
+        "Available in 3 sizes",
+        "Safety pin backing",
+        "Glossy scratch and UV resistant front",
+        "Assembled in the USA from globally sourced parts"
+      ],
+      "colors": [
+        {
+          "name": "Standard",
+          "hex": null,
+          "images": [
+            "merch/button-blue/standard-1",
+            "merch/button-blue/standard-2",
+            "merch/button-blue/standard-3"
+          ],
+          "sizes": [
+            {
+              "size": "1.25\"",
+              "variantId": 62070,
+              "price": 900
+            },
+            {
+              "size": "2.25\"",
+              "variantId": 62071,
+              "price": 900
+            },
+            {
+              "size": "3\"",
+              "variantId": 67977,
+              "price": 1500
+            }
+          ]
+        }
+      ],
+      "number": "038"
+    },
+    {
+      "slug": "mug-rainbow",
+      "line": "mug",
+      "lineName": "Mug",
+      "category": "Drinkware",
+      "name": "Rainbow",
+      "title": "NonParallel Mug — Rainbow",
+      "printifyId": "6abadcbd82c1a5844303e658",
+      "printProviderId": 1,
+      "price": 1900,
+      "blank": "Generic brand",
+      "details": [
+        "White ceramic",
+        "11oz (0.33 l)",
+        "Rounded corners",
+        "C-Handle",
+        "Lead and BPA-free"
+      ],
+      "colors": [
+        {
+          "name": "Standard",
+          "hex": null,
+          "images": [
+            "merch/mug-rainbow/standard-1",
+            "merch/mug-rainbow/standard-2",
+            "merch/mug-rainbow/standard-3"
+          ],
+          "sizes": [
+            {
+              "size": "11oz",
+              "variantId": 33719,
+              "price": 1900
+            }
+          ]
+        }
+      ],
+      "number": "039"
+    },
+    {
+      "slug": "mug-purple",
+      "line": "mug",
+      "lineName": "Mug",
+      "category": "Drinkware",
+      "name": "Purple",
+      "title": "NonParallel Mug — Purple",
+      "printifyId": "6abadcc8e1e64d3a850c9978",
+      "printProviderId": 1,
+      "price": 1900,
+      "blank": "Generic brand",
+      "details": [
+        "White ceramic",
+        "11oz (0.33 l)",
+        "Rounded corners",
+        "C-Handle",
+        "Lead and BPA-free"
+      ],
+      "colors": [
+        {
+          "name": "Standard",
+          "hex": null,
+          "images": [
+            "merch/mug-purple/standard-1",
+            "merch/mug-purple/standard-2",
+            "merch/mug-purple/standard-3"
+          ],
+          "sizes": [
+            {
+              "size": "11oz",
+              "variantId": 33719,
+              "price": 1900
+            }
+          ]
+        }
+      ],
+      "number": "040"
+    },
+    {
+      "slug": "mug-blue",
+      "line": "mug",
+      "lineName": "Mug",
+      "category": "Drinkware",
+      "name": "Blue",
+      "title": "NonParallel Mug — Blue",
+      "printifyId": "6abadccda47532b54006f58c",
+      "printProviderId": 1,
+      "price": 1900,
+      "blank": "Generic brand",
+      "details": [
+        "White ceramic",
+        "11oz (0.33 l)",
+        "Rounded corners",
+        "C-Handle",
+        "Lead and BPA-free"
+      ],
+      "colors": [
+        {
+          "name": "Standard",
+          "hex": null,
+          "images": [
+            "merch/mug-blue/standard-1",
+            "merch/mug-blue/standard-2",
+            "merch/mug-blue/standard-3"
+          ],
+          "sizes": [
+            {
+              "size": "11oz",
+              "variantId": 33719,
+              "price": 1900
+            }
+          ]
+        }
+      ],
+      "number": "041"
+    },
+    {
+      "slug": "camp-mug-rainbow",
+      "line": "camp-mug",
+      "lineName": "Camping Mug",
+      "category": "Drinkware",
+      "name": "Rainbow",
+      "title": "NonParallel Camping Mug — Rainbow",
+      "printifyId": "6abadcd2ee90ba74190037be",
+      "printProviderId": 28,
+      "price": 2500,
+      "blank": "Generic brand",
+      "details": [
+        "12oz (0.35 l)",
+        "Lightweight stainless steel",
+        "Rounded corners",
+        "Lead and BPA-free",
+        "Please note: Do not microwave"
+      ],
+      "colors": [
+        {
+          "name": "Standard",
+          "hex": null,
+          "images": [
+            "merch/camp-mug-rainbow/standard-1",
+            "merch/camp-mug-rainbow/standard-2",
+            "merch/camp-mug-rainbow/standard-3"
+          ],
+          "sizes": [
+            {
+              "size": "12oz",
+              "variantId": 70768,
+              "price": 2500
+            }
+          ]
+        }
+      ],
+      "number": "042"
+    },
+    {
+      "slug": "camp-mug-purple",
+      "line": "camp-mug",
+      "lineName": "Camping Mug",
+      "category": "Drinkware",
+      "name": "Purple",
+      "title": "NonParallel Camping Mug — Purple",
+      "printifyId": "6abadcd8970cf6d28208df9c",
+      "printProviderId": 28,
+      "price": 2500,
+      "blank": "Generic brand",
+      "details": [
+        "12oz (0.35 l)",
+        "Lightweight stainless steel",
+        "Rounded corners",
+        "Lead and BPA-free",
+        "Please note: Do not microwave"
+      ],
+      "colors": [
+        {
+          "name": "Standard",
+          "hex": null,
+          "images": [
+            "merch/camp-mug-purple/standard-1",
+            "merch/camp-mug-purple/standard-2",
+            "merch/camp-mug-purple/standard-3"
+          ],
+          "sizes": [
+            {
+              "size": "12oz",
+              "variantId": 70768,
+              "price": 2500
+            }
+          ]
+        }
+      ],
+      "number": "043"
+    },
+    {
+      "slug": "tumbler-rainbow",
+      "line": "tumbler",
+      "lineName": "Tumbler",
+      "category": "Drinkware",
+      "name": "Rainbow",
+      "title": "NonParallel Tumbler — Rainbow",
+      "printifyId": "6abadcdd82c1a5844303e676",
+      "printProviderId": 1,
+      "price": 3900,
+      "blank": "Generic brand",
+      "details": [
+        "Materials: stainless steel (body), plastic and rubber (lid)",
+        "One size: 20oz (0.59 l)",
+        "Rounded corners",
+        "Vacuum insulated steel body with a clear push on lid with a rubber gasket",
+        "Glossy finish"
+      ],
+      "colors": [
+        {
+          "name": "Standard",
+          "hex": null,
+          "images": [
+            "merch/tumbler-rainbow/standard-1",
+            "merch/tumbler-rainbow/standard-2",
+            "merch/tumbler-rainbow/standard-3"
+          ],
+          "sizes": [
+            {
+              "size": "20oz",
+              "variantId": 44519,
+              "price": 3900
+            }
+          ]
+        }
+      ],
+      "number": "044"
+    },
+    {
+      "slug": "tumbler-purple",
+      "line": "tumbler",
+      "lineName": "Tumbler",
+      "category": "Drinkware",
+      "name": "Purple",
+      "title": "NonParallel Tumbler — Purple",
+      "printifyId": "6abadce31a274dea7508f567",
+      "printProviderId": 1,
+      "price": 3900,
+      "blank": "Generic brand",
+      "details": [
+        "Materials: stainless steel (body), plastic and rubber (lid)",
+        "One size: 20oz (0.59 l)",
+        "Rounded corners",
+        "Vacuum insulated steel body with a clear push on lid with a rubber gasket",
+        "Glossy finish"
+      ],
+      "colors": [
+        {
+          "name": "Standard",
+          "hex": null,
+          "images": [
+            "merch/tumbler-purple/standard-1",
+            "merch/tumbler-purple/standard-2",
+            "merch/tumbler-purple/standard-3"
+          ],
+          "sizes": [
+            {
+              "size": "20oz",
+              "variantId": 44519,
+              "price": 3900
+            }
+          ]
+        }
+      ],
+      "number": "045"
+    },
+    {
+      "slug": "bottle-rainbow",
+      "line": "bottle",
+      "lineName": "Water Bottle",
+      "category": "Drinkware",
+      "name": "Rainbow",
+      "title": "NonParallel Water Bottle — Rainbow",
+      "printifyId": "6abadce997163e54500f1b5e",
+      "printProviderId": 86,
+      "price": 3500,
+      "blank": "Generic brand",
+      "details": [
+        "One size: 20oz (0.60 l)",
+        "Double-walled stainless steel frame with matte finish",
+        "Vacuum sealed",
+        "Silver stainless steel cap",
+        "Glossy print"
+      ],
+      "colors": [
+        {
+          "name": "White",
+          "hex": null,
+          "images": [
+            "merch/bottle-rainbow/white-1",
+            "merch/bottle-rainbow/white-2",
+            "merch/bottle-rainbow/white-3"
+          ],
+          "sizes": [
+            {
+              "size": "20oz",
+              "variantId": 72251,
+              "price": 3500
+            }
+          ]
+        }
+      ],
+      "number": "046"
+    },
+    {
+      "slug": "bottle-purple",
+      "line": "bottle",
+      "lineName": "Water Bottle",
+      "category": "Drinkware",
+      "name": "Purple",
+      "title": "NonParallel Water Bottle — Purple",
+      "printifyId": "6abadcee1a274dea7508f56c",
+      "printProviderId": 86,
+      "price": 3500,
+      "blank": "Generic brand",
+      "details": [
+        "One size: 20oz (0.60 l)",
+        "Double-walled stainless steel frame with matte finish",
+        "Vacuum sealed",
+        "Silver stainless steel cap",
+        "Glossy print"
+      ],
+      "colors": [
+        {
+          "name": "White",
+          "hex": null,
+          "images": [
+            "merch/bottle-purple/white-1",
+            "merch/bottle-purple/white-2",
+            "merch/bottle-purple/white-3"
+          ],
+          "sizes": [
+            {
+              "size": "20oz",
+              "variantId": 72251,
+              "price": 3500
+            }
+          ]
+        }
+      ],
+      "number": "047"
+    },
+    {
+      "slug": "camelbak-rainbow",
+      "line": "camelbak",
+      "lineName": "CamelBak Bottle",
+      "category": "Drinkware",
+      "name": "Rainbow",
+      "title": "NonParallel CamelBak Bottle — Rainbow",
+      "printifyId": "6abadcf4d904a5ab710f0f9e",
+      "printProviderId": 75,
+      "price": 3900,
+      "blank": "CamelBak Eddy",
+      "details": [
+        "Material: Eastman Tritan™ Copolyester",
+        "Available in two sizes: 25oz (740 ml) and 20oz (590 ml)",
+        "Easy-carry handle",
+        "Shatter, stain, and odor resistant",
+        "Leak-proof when closed, spill-proof when open"
+      ],
+      "colors": [
+        {
+          "name": "Charcoal",
+          "hex": null,
+          "images": [
+            "merch/camelbak-rainbow/charcoal-1",
+            "merch/camelbak-rainbow/charcoal-2",
+            "merch/camelbak-rainbow/charcoal-3"
+          ],
+          "sizes": [
+            {
+              "size": "25oz",
+              "variantId": 71946,
+              "price": 3900
+            }
+          ]
+        }
+      ],
+      "number": "048"
+    },
+    {
+      "slug": "phone-case-rainbow",
+      "line": "phone-case",
+      "lineName": "Phone Case",
+      "category": "Tech",
+      "name": "Rainbow",
+      "title": "NonParallel Phone Case — Rainbow",
+      "printifyId": "6abadcfcfa29275705030c24",
+      "printProviderId": 1,
+      "price": 2500,
+      "blank": "Generic brand",
+      "details": [
+        "Materials: polycarbonate (shell), TPU (lining)",
+        "2-piece design with impact resistance and shock dispersion",
+        "Interior rubber liner for extra protection (appearance may vary across phone models)",
+        "Glossy finish",
+        "Supports wireless charging (not including MagSafe)"
+      ],
+      "colors": [
+        {
+          "name": "Standard",
+          "hex": null,
+          "images": [
+            "merch/phone-case-rainbow/standard-1",
+            "merch/phone-case-rainbow/standard-2",
+            "merch/phone-case-rainbow/standard-3"
+          ],
+          "sizes": [
+            {
+              "size": "iPhone 11",
+              "variantId": 62582,
+              "price": 2500
+            },
+            {
+              "size": "iPhone 11 Pro",
+              "variantId": 62583,
+              "price": 2500
+            },
+            {
+              "size": "iPhone 11 Pro Max",
+              "variantId": 62584,
+              "price": 2500
+            },
+            {
+              "size": "iPhone 12",
+              "variantId": 70871,
+              "price": 2500
+            },
+            {
+              "size": "iPhone 12 Mini",
+              "variantId": 70872,
+              "price": 2500
+            },
+            {
+              "size": "iPhone 12 Pro",
+              "variantId": 70873,
+              "price": 2500
+            },
+            {
+              "size": "iPhone 12 Pro Max",
+              "variantId": 70874,
+              "price": 2500
+            },
+            {
+              "size": "iPhone 13",
+              "variantId": 76611,
+              "price": 2500
+            },
+            {
+              "size": "iPhone 13 Mini",
+              "variantId": 76612,
+              "price": 2500
+            },
+            {
+              "size": "iPhone 13 Pro",
+              "variantId": 76613,
+              "price": 2500
+            },
+            {
+              "size": "iPhone 13 Pro Max",
+              "variantId": 76614,
+              "price": 2500
+            },
+            {
+              "size": "iPhone 14",
+              "variantId": 93905,
+              "price": 2500
+            },
+            {
+              "size": "iPhone 14 Pro",
+              "variantId": 93906,
+              "price": 2500
+            },
+            {
+              "size": "iPhone 14 Pro Max",
+              "variantId": 93907,
+              "price": 2500
+            },
+            {
+              "size": "iPhone 14 Plus",
+              "variantId": 93908,
+              "price": 2500
+            },
+            {
+              "size": "iPhone 15",
+              "variantId": 103561,
+              "price": 2500
+            },
+            {
+              "size": "iPhone 15 Pro",
+              "variantId": 103562,
+              "price": 2500
+            },
+            {
+              "size": "iPhone 15 Plus",
+              "variantId": 103563,
+              "price": 2500
+            },
+            {
+              "size": "iPhone 15 Pro Max",
+              "variantId": 103564,
+              "price": 2500
+            },
+            {
+              "size": "Samsung Galaxy S24",
+              "variantId": 105527,
+              "price": 2500
+            },
+            {
+              "size": "Samsung Galaxy S23",
+              "variantId": 105528,
+              "price": 2500
+            },
+            {
+              "size": "Samsung Galaxy S22",
+              "variantId": 105529,
+              "price": 2500
+            },
+            {
+              "size": "Samsung Galaxy S21",
+              "variantId": 105530,
+              "price": 2500
+            },
+            {
+              "size": "iPhone 16 Pro",
+              "variantId": 112812,
+              "price": 2500
+            },
+            {
+              "size": "iPhone 16 Pro Max",
+              "variantId": 112813,
+              "price": 2500
+            },
+            {
+              "size": "iPhone 16",
+              "variantId": 112814,
+              "price": 2500
+            },
+            {
+              "size": "iPhone 16 Plus",
+              "variantId": 112815,
+              "price": 2500
+            },
+            {
+              "size": "Samsung Galaxy S25",
+              "variantId": 125531,
+              "price": 2500
+            },
+            {
+              "size": "iPhone 17",
+              "variantId": 130115,
+              "price": 2500
+            },
+            {
+              "size": "iPhone 17 Pro",
+              "variantId": 130116,
+              "price": 2500
+            },
+            {
+              "size": "iPhone 17 Pro Max",
+              "variantId": 130117,
+              "price": 2500
+            },
+            {
+              "size": "Samsung Galaxy S26",
+              "variantId": 254190,
+              "price": 2500
+            },
+            {
+              "size": "iPhone 18 Pro",
+              "variantId": 423467,
+              "price": 2500
+            },
+            {
+              "size": "iPhone 18 Pro Max",
+              "variantId": 423468,
+              "price": 2500
+            }
+          ]
+        }
+      ],
+      "number": "049"
+    },
+    {
+      "slug": "phone-case-purple",
+      "line": "phone-case",
+      "lineName": "Phone Case",
+      "category": "Tech",
+      "name": "Purple",
+      "title": "NonParallel Phone Case — Purple",
+      "printifyId": "6abadd04970cf6d28208dfb3",
+      "printProviderId": 1,
+      "price": 2500,
+      "blank": "Generic brand",
+      "details": [
+        "Materials: polycarbonate (shell), TPU (lining)",
+        "2-piece design with impact resistance and shock dispersion",
+        "Interior rubber liner for extra protection (appearance may vary across phone models)",
+        "Glossy finish",
+        "Supports wireless charging (not including MagSafe)"
+      ],
+      "colors": [
+        {
+          "name": "Standard",
+          "hex": null,
+          "images": [
+            "merch/phone-case-purple/standard-1",
+            "merch/phone-case-purple/standard-2",
+            "merch/phone-case-purple/standard-3"
+          ],
+          "sizes": [
+            {
+              "size": "iPhone 11",
+              "variantId": 62582,
+              "price": 2500
+            },
+            {
+              "size": "iPhone 11 Pro",
+              "variantId": 62583,
+              "price": 2500
+            },
+            {
+              "size": "iPhone 11 Pro Max",
+              "variantId": 62584,
+              "price": 2500
+            },
+            {
+              "size": "iPhone 12",
+              "variantId": 70871,
+              "price": 2500
+            },
+            {
+              "size": "iPhone 12 Mini",
+              "variantId": 70872,
+              "price": 2500
+            },
+            {
+              "size": "iPhone 12 Pro",
+              "variantId": 70873,
+              "price": 2500
+            },
+            {
+              "size": "iPhone 12 Pro Max",
+              "variantId": 70874,
+              "price": 2500
+            },
+            {
+              "size": "iPhone 13",
+              "variantId": 76611,
+              "price": 2500
+            },
+            {
+              "size": "iPhone 13 Mini",
+              "variantId": 76612,
+              "price": 2500
+            },
+            {
+              "size": "iPhone 13 Pro",
+              "variantId": 76613,
+              "price": 2500
+            },
+            {
+              "size": "iPhone 13 Pro Max",
+              "variantId": 76614,
+              "price": 2500
+            },
+            {
+              "size": "iPhone 14",
+              "variantId": 93905,
+              "price": 2500
+            },
+            {
+              "size": "iPhone 14 Pro",
+              "variantId": 93906,
+              "price": 2500
+            },
+            {
+              "size": "iPhone 14 Pro Max",
+              "variantId": 93907,
+              "price": 2500
+            },
+            {
+              "size": "iPhone 14 Plus",
+              "variantId": 93908,
+              "price": 2500
+            },
+            {
+              "size": "iPhone 15",
+              "variantId": 103561,
+              "price": 2500
+            },
+            {
+              "size": "iPhone 15 Pro",
+              "variantId": 103562,
+              "price": 2500
+            },
+            {
+              "size": "iPhone 15 Plus",
+              "variantId": 103563,
+              "price": 2500
+            },
+            {
+              "size": "iPhone 15 Pro Max",
+              "variantId": 103564,
+              "price": 2500
+            },
+            {
+              "size": "Samsung Galaxy S24",
+              "variantId": 105527,
+              "price": 2500
+            },
+            {
+              "size": "Samsung Galaxy S23",
+              "variantId": 105528,
+              "price": 2500
+            },
+            {
+              "size": "Samsung Galaxy S22",
+              "variantId": 105529,
+              "price": 2500
+            },
+            {
+              "size": "Samsung Galaxy S21",
+              "variantId": 105530,
+              "price": 2500
+            },
+            {
+              "size": "iPhone 16 Pro",
+              "variantId": 112812,
+              "price": 2500
+            },
+            {
+              "size": "iPhone 16 Pro Max",
+              "variantId": 112813,
+              "price": 2500
+            },
+            {
+              "size": "iPhone 16",
+              "variantId": 112814,
+              "price": 2500
+            },
+            {
+              "size": "iPhone 16 Plus",
+              "variantId": 112815,
+              "price": 2500
+            },
+            {
+              "size": "Samsung Galaxy S25",
+              "variantId": 125531,
+              "price": 2500
+            },
+            {
+              "size": "iPhone 17",
+              "variantId": 130115,
+              "price": 2500
+            },
+            {
+              "size": "iPhone 17 Pro",
+              "variantId": 130116,
+              "price": 2500
+            },
+            {
+              "size": "iPhone 17 Pro Max",
+              "variantId": 130117,
+              "price": 2500
+            },
+            {
+              "size": "Samsung Galaxy S26",
+              "variantId": 254190,
+              "price": 2500
+            },
+            {
+              "size": "iPhone 18 Pro",
+              "variantId": 423467,
+              "price": 2500
+            },
+            {
+              "size": "iPhone 18 Pro Max",
+              "variantId": 423468,
+              "price": 2500
+            }
+          ]
+        }
+      ],
+      "number": "050"
+    },
+    {
+      "slug": "airpods-rainbow",
+      "line": "airpods",
+      "lineName": "AirPods Case",
+      "category": "Tech",
+      "name": "Rainbow",
+      "title": "NonParallel AirPods Case — Rainbow",
+      "printifyId": "6abadd0c30d57e7fdf080ed4",
+      "printProviderId": 23,
+      "price": 1900,
+      "blank": "Generic brand",
+      "details": [
+        "Material: Premium Thermoplastic Polyurethane (TPU)",
+        "Great protection from drops and scratches",
+        "NB! AirPods case cover is compatible with 1st and 2nd generations AirPods; AirPodsPro case cover is compatible with 1st generation AirPods Pro",
+        "Stipple print texture",
+        "Metal ring included"
+      ],
+      "colors": [
+        {
+          "name": "White",
+          "hex": null,
+          "images": [
+            "merch/airpods-rainbow/white-1",
+            "merch/airpods-rainbow/white-2",
+            "merch/airpods-rainbow/white-3"
+          ],
+          "sizes": [
+            {
+              "size": "AirPods",
+              "variantId": 72110,
+              "price": 1900
+            },
+            {
+              "size": "AirPods Pro",
+              "variantId": 72111,
+              "price": 1900
+            },
+            {
+              "size": "AirPods Gen 3",
+              "variantId": 399614,
+              "price": 1900
+            },
+            {
+              "size": "AirPods Gen 4",
+              "variantId": 399615,
+              "price": 1900
+            },
+            {
+              "size": "AirPods Pro Gen 2",
+              "variantId": 399616,
+              "price": 1900
+            }
+          ]
+        },
+        {
+          "name": "Black",
+          "hex": null,
+          "images": [
+            "merch/airpods-rainbow/black-1",
+            "merch/airpods-rainbow/black-2",
+            "merch/airpods-rainbow/black-3"
+          ],
+          "sizes": [
+            {
+              "size": "AirPods",
+              "variantId": 76859,
+              "price": 1900
+            },
+            {
+              "size": "AirPods Pro",
+              "variantId": 76863,
+              "price": 1900
+            },
+            {
+              "size": "AirPods Gen 3",
+              "variantId": 244358,
+              "price": 1900
+            },
+            {
+              "size": "AirPods Gen 4",
+              "variantId": 244363,
+              "price": 1900
+            },
+            {
+              "size": "AirPods Pro Gen 2",
+              "variantId": 244452,
+              "price": 1900
+            }
+          ]
+        },
+        {
+          "name": "Mint",
+          "hex": null,
+          "images": [
+            "merch/airpods-rainbow/mint-1",
+            "merch/airpods-rainbow/mint-2",
+            "merch/airpods-rainbow/mint-3"
+          ],
+          "sizes": [
+            {
+              "size": "AirPods",
+              "variantId": 76860,
+              "price": 1900
+            },
+            {
+              "size": "AirPods Pro",
+              "variantId": 76864,
+              "price": 1900
+            },
+            {
+              "size": "AirPods Gen 3",
+              "variantId": 244360,
+              "price": 1900
+            },
+            {
+              "size": "AirPods Gen 4",
+              "variantId": 244365,
+              "price": 1900
+            },
+            {
+              "size": "AirPods Pro Gen 2",
+              "variantId": 244454,
+              "price": 1900
+            }
+          ]
+        },
+        {
+          "name": "Navy",
+          "hex": null,
+          "images": [
+            "merch/airpods-rainbow/navy-1",
+            "merch/airpods-rainbow/navy-2",
+            "merch/airpods-rainbow/navy-3"
+          ],
+          "sizes": [
+            {
+              "size": "AirPods",
+              "variantId": 76861,
+              "price": 1900
+            },
+            {
+              "size": "AirPods Pro",
+              "variantId": 76865,
+              "price": 1900
+            },
+            {
+              "size": "AirPods Gen 3",
+              "variantId": 244361,
+              "price": 1900
+            },
+            {
+              "size": "AirPods Gen 4",
+              "variantId": 244366,
+              "price": 1900
+            },
+            {
+              "size": "AirPods Pro Gen 2",
+              "variantId": 244455,
+              "price": 1900
+            }
+          ]
+        },
+        {
+          "name": "Pink",
+          "hex": null,
+          "images": [
+            "merch/airpods-rainbow/pink-1",
+            "merch/airpods-rainbow/pink-2",
+            "merch/airpods-rainbow/pink-3"
+          ],
+          "sizes": [
+            {
+              "size": "AirPods",
+              "variantId": 76862,
+              "price": 1900
+            },
+            {
+              "size": "AirPods Pro",
+              "variantId": 76866,
+              "price": 1900
+            },
+            {
+              "size": "AirPods Gen 3",
+              "variantId": 244362,
+              "price": 1900
+            },
+            {
+              "size": "AirPods Gen 4",
+              "variantId": 244367,
+              "price": 1900
+            },
+            {
+              "size": "AirPods Pro Gen 2",
+              "variantId": 244456,
+              "price": 1900
+            }
+          ]
+        }
+      ],
+      "number": "051"
+    },
+    {
+      "slug": "desk-mat-rainbow",
+      "line": "desk-mat",
+      "lineName": "Desk Mat",
+      "category": "Tech",
+      "name": "Rainbow",
+      "title": "NonParallel Desk Mat — Rainbow",
+      "printifyId": "6abadd2a03c5f085d10dd4b1",
+      "printProviderId": 1,
+      "price": 2500,
+      "blank": "Generic brand",
+      "details": [
+        "Material: 100% Neoprene",
+        "Available in 3 sizes",
+        "Anti-slip backing",
+        "Multifunctional use"
+      ],
+      "colors": [
+        {
+          "name": "Standard",
+          "hex": null,
+          "images": [
+            "merch/desk-mat-rainbow/standard-1",
+            "merch/desk-mat-rainbow/standard-2",
+            "merch/desk-mat-rainbow/standard-3"
+          ],
+          "sizes": [
+            {
+              "size": "12\" × 18\"",
+              "variantId": 65240,
+              "price": 2500
+            },
+            {
+              "size": "12\" × 22\"",
+              "variantId": 65241,
+              "price": 2500
+            },
+            {
+              "size": "16\" × 32\"",
+              "variantId": 72580,
+              "price": 3500
+            }
+          ]
+        }
+      ],
+      "number": "052"
+    },
+    {
+      "slug": "desk-mat-purple",
+      "line": "desk-mat",
+      "lineName": "Desk Mat",
+      "category": "Tech",
+      "name": "Purple",
+      "title": "NonParallel Desk Mat — Purple",
+      "printifyId": "6abadd2f7225e4d1240d3323",
+      "printProviderId": 1,
+      "price": 2500,
+      "blank": "Generic brand",
+      "details": [
+        "Material: 100% Neoprene",
+        "Available in 3 sizes",
+        "Anti-slip backing",
+        "Multifunctional use"
+      ],
+      "colors": [
+        {
+          "name": "Standard",
+          "hex": null,
+          "images": [
+            "merch/desk-mat-purple/standard-1",
+            "merch/desk-mat-purple/standard-2",
+            "merch/desk-mat-purple/standard-3"
+          ],
+          "sizes": [
+            {
+              "size": "12\" × 18\"",
+              "variantId": 65240,
+              "price": 2500
+            },
+            {
+              "size": "12\" × 22\"",
+              "variantId": 65241,
+              "price": 2500
+            },
+            {
+              "size": "16\" × 32\"",
+              "variantId": 72580,
+              "price": 3500
+            }
+          ]
+        }
+      ],
+      "number": "053"
+    },
+    {
+      "slug": "notebook-rainbow",
+      "line": "notebook",
+      "lineName": "Notebook",
+      "category": "Home",
+      "name": "Rainbow",
+      "title": "NonParallel Notebook — Rainbow",
+      "printifyId": "6abadd347225e4d1240d3325",
+      "printProviderId": 99,
+      "price": 1900,
+      "blank": "Generic brand",
+      "details": [
+        "Material: 100% paper",
+        "Paper weights: 350 gsm (covers), 90 gsm (inside pages)",
+        "One size: 6\" x 8\" (15.2 x 20.3 cm)",
+        "118 ruled line pages (59 sheets)",
+        "Front cover print"
+      ],
+      "colors": [
+        {
+          "name": "Standard",
+          "hex": null,
+          "images": [
+            "merch/notebook-rainbow/standard-1",
+            "merch/notebook-rainbow/standard-2",
+            "merch/notebook-rainbow/standard-3"
+          ],
+          "sizes": [
+            {
+              "size": "One Size",
+              "variantId": 34240,
+              "price": 1900
+            }
+          ]
+        }
+      ],
+      "number": "054"
+    },
+    {
+      "slug": "notebook-purple",
+      "line": "notebook",
+      "lineName": "Notebook",
+      "category": "Home",
+      "name": "Purple",
+      "title": "NonParallel Notebook — Purple",
+      "printifyId": "6abadd39e1e64d3a850c99a5",
+      "printProviderId": 99,
+      "price": 1900,
+      "blank": "Generic brand",
+      "details": [
+        "Material: 100% paper",
+        "Paper weights: 350 gsm (covers), 90 gsm (inside pages)",
+        "One size: 6\" x 8\" (15.2 x 20.3 cm)",
+        "118 ruled line pages (59 sheets)",
+        "Front cover print"
+      ],
+      "colors": [
+        {
+          "name": "Standard",
+          "hex": null,
+          "images": [
+            "merch/notebook-purple/standard-1",
+            "merch/notebook-purple/standard-2",
+            "merch/notebook-purple/standard-3"
+          ],
+          "sizes": [
+            {
+              "size": "One Size",
+              "variantId": 34240,
+              "price": 1900
+            }
+          ]
+        }
+      ],
+      "number": "055"
+    },
+    {
+      "slug": "poster-rainbow",
+      "line": "poster",
+      "lineName": "Poster",
+      "category": "Home",
+      "name": "Rainbow",
+      "title": "NonParallel Poster — Rainbow",
+      "printifyId": "6abadd3f1a274dea7508f594",
+      "printProviderId": 2,
+      "price": 1900,
+      "blank": "Generic brand",
+      "details": [
+        "Made with museum-grade archival paper for excellent printing fidelity and vibrant color reproduction",
+        "Paper weight: 175 g/m² (Sensaria), 180 g/m² (Roma Imaging), 189 g/m² (Printify Choice)",
+        "Find the perfect match to your customers' needs with 46 available sizes",
+        "For indoor use only",
+        "Please note: Due to the production process of these posters, please allow for slight size deviations with a tolerance +/- 1/16\""
+      ],
+      "colors": [
+        {
+          "name": "Standard",
+          "hex": null,
+          "images": [
+            "merch/poster-rainbow/standard-1",
+            "merch/poster-rainbow/standard-2",
+            "merch/poster-rainbow/standard-3"
+          ],
+          "sizes": [
+            {
+              "size": "11″ x 14″ · Matte",
+              "variantId": 43135,
+              "price": 1900
+            },
+            {
+              "size": "12″ x 18″ · Matte",
+              "variantId": 43138,
+              "price": 2500
+            },
+            {
+              "size": "18″ x 24″ · Matte",
+              "variantId": 43144,
+              "price": 2500
+            },
+            {
+              "size": "24″ x 36″ · Matte",
+              "variantId": 43150,
+              "price": 3900
+            }
+          ]
+        }
+      ],
+      "number": "056"
+    },
+    {
+      "slug": "poster-purple",
+      "line": "poster",
+      "lineName": "Poster",
+      "category": "Home",
+      "name": "Purple",
+      "title": "NonParallel Poster — Purple",
+      "printifyId": "6abadd45e1e64d3a850c99a7",
+      "printProviderId": 2,
+      "price": 1900,
+      "blank": "Generic brand",
+      "details": [
+        "Made with museum-grade archival paper for excellent printing fidelity and vibrant color reproduction",
+        "Paper weight: 175 g/m² (Sensaria), 180 g/m² (Roma Imaging), 189 g/m² (Printify Choice)",
+        "Find the perfect match to your customers' needs with 46 available sizes",
+        "For indoor use only",
+        "Please note: Due to the production process of these posters, please allow for slight size deviations with a tolerance +/- 1/16\""
+      ],
+      "colors": [
+        {
+          "name": "Standard",
+          "hex": null,
+          "images": [
+            "merch/poster-purple/standard-1",
+            "merch/poster-purple/standard-2",
+            "merch/poster-purple/standard-3"
+          ],
+          "sizes": [
+            {
+              "size": "11″ x 14″ · Matte",
+              "variantId": 43135,
+              "price": 1900
+            },
+            {
+              "size": "12″ x 18″ · Matte",
+              "variantId": 43138,
+              "price": 2500
+            },
+            {
+              "size": "18″ x 24″ · Matte",
+              "variantId": 43144,
+              "price": 2500
+            },
+            {
+              "size": "24″ x 36″ · Matte",
+              "variantId": 43150,
+              "price": 3900
+            }
+          ]
+        }
+      ],
+      "number": "057"
+    },
+    {
+      "slug": "poster-blue",
+      "line": "poster",
+      "lineName": "Poster",
+      "category": "Home",
+      "name": "Blue",
+      "title": "NonParallel Poster — Blue",
+      "printifyId": "6abadd4bd904a5ab710f0fbd",
+      "printProviderId": 2,
+      "price": 1900,
+      "blank": "Generic brand",
+      "details": [
+        "Made with museum-grade archival paper for excellent printing fidelity and vibrant color reproduction",
+        "Paper weight: 175 g/m² (Sensaria), 180 g/m² (Roma Imaging), 189 g/m² (Printify Choice)",
+        "Find the perfect match to your customers' needs with 46 available sizes",
+        "For indoor use only",
+        "Please note: Due to the production process of these posters, please allow for slight size deviations with a tolerance +/- 1/16\""
+      ],
+      "colors": [
+        {
+          "name": "Standard",
+          "hex": null,
+          "images": [
+            "merch/poster-blue/standard-1",
+            "merch/poster-blue/standard-2",
+            "merch/poster-blue/standard-3"
+          ],
+          "sizes": [
+            {
+              "size": "11″ x 14″ · Matte",
+              "variantId": 43135,
+              "price": 1900
+            },
+            {
+              "size": "12″ x 18″ · Matte",
+              "variantId": 43138,
+              "price": 2500
+            },
+            {
+              "size": "18″ x 24″ · Matte",
+              "variantId": 43144,
+              "price": 2500
+            },
+            {
+              "size": "24″ x 36″ · Matte",
+              "variantId": 43150,
+              "price": 3900
+            }
+          ]
+        }
+      ],
+      "number": "058"
+    },
+    {
+      "slug": "framed-poster-rainbow",
+      "line": "framed-poster",
+      "lineName": "Framed Poster",
+      "category": "Home",
+      "name": "Rainbow",
+      "title": "NonParallel Framed Poster — Rainbow",
+      "printifyId": "6abae337a47532b54006f8a4",
+      "printProviderId": 2,
+      "price": 7500,
+      "blank": "Roma Imaging",
+      "details": [
+        "Museum-quality matte paper",
+        "Paper weight: 200 g/m² (Sensaria), 189 g/m² (Printify Choice)",
+        "Frame: MDF (Sensaria), Kiln-Dried Pine (Roma Imaging), Ayous wood (Printify Choice)",
+        "Protective acrylic cover",
+        "Hanging hardware is built into the back of the frame (Sensaria, Roma Imaging) or included in the package (Printify Choice)"
+      ],
+      "colors": [
+        {
+          "name": "Black",
+          "hex": null,
+          "images": [
+            "merch/framed-poster-rainbow/black-1",
+            "merch/framed-poster-rainbow/black-2",
+            "merch/framed-poster-rainbow/black-3"
+          ],
+          "sizes": [
+            {
+              "size": "11\" x 14\"",
+              "variantId": 69663,
+              "price": 7500
+            },
+            {
+              "size": "12″ x 16″",
+              "variantId": 69664,
+              "price": 7500
+            },
+            {
+              "size": "16″ x 20″",
+              "variantId": 69667,
+              "price": 9500
+            }
+          ]
+        },
+        {
+          "name": "Walnut",
+          "hex": null,
+          "images": [
+            "merch/framed-poster-rainbow/walnut-1",
+            "merch/framed-poster-rainbow/walnut-2",
+            "merch/framed-poster-rainbow/walnut-3"
+          ],
+          "sizes": [
+            {
+              "size": "12″ x 16″",
+              "variantId": 69671,
+              "price": 7500
+            },
+            {
+              "size": "16″ x 20″",
+              "variantId": 69674,
+              "price": 9500
+            },
+            {
+              "size": "11\" x 14\"",
+              "variantId": 69670,
+              "price": 7500
+            }
+          ]
+        }
+      ],
+      "number": "059"
+    },
+    {
+      "slug": "framed-poster-purple",
+      "line": "framed-poster",
+      "lineName": "Framed Poster",
+      "category": "Home",
+      "name": "Purple",
+      "title": "NonParallel Framed Poster — Purple",
+      "printifyId": "6abae3442868f59b700b7b9b",
+      "printProviderId": 2,
+      "price": 7500,
+      "blank": "Roma Imaging",
+      "details": [
+        "Museum-quality matte paper",
+        "Paper weight: 200 g/m² (Sensaria), 189 g/m² (Printify Choice)",
+        "Frame: MDF (Sensaria), Kiln-Dried Pine (Roma Imaging), Ayous wood (Printify Choice)",
+        "Protective acrylic cover",
+        "Hanging hardware is built into the back of the frame (Sensaria, Roma Imaging) or included in the package (Printify Choice)"
+      ],
+      "colors": [
+        {
+          "name": "Black",
+          "hex": null,
+          "images": [
+            "merch/framed-poster-purple/black-1",
+            "merch/framed-poster-purple/black-2",
+            "merch/framed-poster-purple/black-3"
+          ],
+          "sizes": [
+            {
+              "size": "11\" x 14\"",
+              "variantId": 69663,
+              "price": 7500
+            },
+            {
+              "size": "12″ x 16″",
+              "variantId": 69664,
+              "price": 7500
+            },
+            {
+              "size": "16″ x 20″",
+              "variantId": 69667,
+              "price": 9500
+            }
+          ]
+        },
+        {
+          "name": "Walnut",
+          "hex": null,
+          "images": [
+            "merch/framed-poster-purple/walnut-1",
+            "merch/framed-poster-purple/walnut-2",
+            "merch/framed-poster-purple/walnut-3"
+          ],
+          "sizes": [
+            {
+              "size": "12″ x 16″",
+              "variantId": 69671,
+              "price": 7500
+            },
+            {
+              "size": "16″ x 20″",
+              "variantId": 69674,
+              "price": 9500
+            },
+            {
+              "size": "11\" x 14\"",
+              "variantId": 69670,
+              "price": 7500
+            }
+          ]
+        }
+      ],
+      "number": "060"
+    },
+    {
+      "slug": "flag-rainbow",
+      "line": "flag",
+      "lineName": "Flag",
+      "category": "Home",
+      "name": "Rainbow",
+      "title": "NonParallel Flag — Rainbow",
+      "printifyId": "6abadd5d03c5f085d10dd4d2",
+      "printProviderId": 48,
+      "price": 2900,
+      "blank": "Generic brand",
+      "details": [
+        "Material: 100% polyester organza",
+        "Extra light/thin fabric (3.8 oz/yd² (110 g/m²))",
+        "Available in three sizes: 18\" x 12\", 36\" x 24\", 60\" x 36\"",
+        "One-sided print with a satin finish",
+        "Side tunnel"
+      ],
+      "colors": [
+        {
+          "name": "Standard",
+          "hex": null,
+          "images": [
+            "merch/flag-rainbow/standard-1",
+            "merch/flag-rainbow/standard-2",
+            "merch/flag-rainbow/standard-3"
+          ],
+          "sizes": [
+            {
+              "size": "36\" x 24\"",
+              "variantId": 102239,
+              "price": 3500
+            },
+            {
+              "size": "18\" x 12\"",
+              "variantId": 102240,
+              "price": 2900
+            },
+            {
+              "size": "60\" x 36\"",
+              "variantId": 102241,
+              "price": 4900
+            }
+          ]
+        }
+      ],
+      "number": "061"
+    },
+    {
+      "slug": "tapestry-rainbow",
+      "line": "tapestry",
+      "lineName": "Tapestry",
+      "category": "Home",
+      "name": "Rainbow",
+      "title": "NonParallel Tapestry — Rainbow",
+      "printifyId": "6abadd65f7af0f64eb061725",
+      "printProviderId": 99,
+      "price": 2900,
+      "blank": "Generic brand",
+      "details": [
+        "100% Polyester",
+        "Lightweight and versatile, easy to hang, move, or fold for storage",
+        "Multiple sizes",
+        "Blanks sourced from China"
+      ],
+      "colors": [
+        {
+          "name": "Standard",
+          "hex": null,
+          "images": [
+            "merch/tapestry-rainbow/standard-1",
+            "merch/tapestry-rainbow/standard-2"
+          ],
+          "sizes": [
+            {
+              "size": "26\" × 36\"",
+              "variantId": 41686,
+              "price": 2900
+            },
+            {
+              "size": "50\" × 60\"",
+              "variantId": 41687,
+              "price": 3900
+            }
+          ]
+        }
+      ],
+      "number": "062"
+    },
+    {
+      "slug": "blanket-purple",
+      "line": "blanket",
+      "lineName": "Blanket",
+      "category": "Home",
+      "name": "Purple",
+      "title": "NonParallel Blanket — Purple",
+      "printifyId": "6abadd6af1f32a80850df82c",
+      "printProviderId": 1,
+      "price": 2900,
+      "blank": "Generic brand",
+      "details": [
+        "100% polyester (SPOKE and Printify Choice) or 83% Polyester and 17% Spandex (Miami Sublimation)",
+        "Your print goes on one side of the blanket in high detail and vibrant color",
+        "Medium heavy-weight fabric (8.85 oz/yd² (300 g/m²)) that feels extra soft to the touch (thickness of the fabric may slightly vary)"
+      ],
+      "colors": [
+        {
+          "name": "Standard",
+          "hex": null,
+          "images": [
+            "merch/blanket-purple/standard-1",
+            "merch/blanket-purple/standard-2",
+            "merch/blanket-purple/standard-3"
+          ],
+          "sizes": [
+            {
+              "size": "30\" × 40\"",
+              "variantId": 68322,
+              "price": 2900
+            },
+            {
+              "size": "50\" × 60\"",
+              "variantId": 68323,
+              "price": 4500
+            }
+          ]
+        }
+      ],
+      "number": "063"
+    },
+    {
+      "slug": "candle-purple",
+      "line": "candle",
+      "lineName": "Candle",
+      "category": "Home",
+      "name": "Purple",
+      "title": "NonParallel Candle — Purple",
+      "printifyId": "6abadd71a47532b54006f5cc",
+      "printProviderId": 75,
+      "price": 4900,
+      "blank": "Seventh Avenue Apothecary",
+      "details": [
+        "Made with clean burning 100% Food Grade Soy Wax and finest fragrance oils (color of wax may vary from white to yellow)",
+        "Premium 360 degree print on glass",
+        "Lid made of cardboard",
+        "Two cotton-cored wicks",
+        "Average burn time - 65 hours"
+      ],
+      "colors": [
+        {
+          "name": "Standard",
+          "hex": null,
+          "images": [
+            "merch/candle-purple/standard-1",
+            "merch/candle-purple/standard-2",
+            "merch/candle-purple/standard-3"
+          ],
+          "sizes": [
+            {
+              "size": "One size · White Tea and Fig",
+              "variantId": 73688,
+              "price": 4900
+            },
+            {
+              "size": "One size · Ocean Mist and Moss",
+              "variantId": 73689,
+              "price": 4900
+            }
+          ]
+        }
+      ],
+      "number": "064"
+    },
+    {
+      "slug": "kids-tee-rainbow",
+      "line": "kids-tee",
+      "lineName": "Kids Tee",
+      "category": "Kids & Pets",
+      "name": "Rainbow",
+      "title": "NonParallel Kids Tee — Rainbow",
+      "printifyId": "6abadd78a47532b54006f5cf",
+      "printProviderId": 29,
+      "price": 1900,
+      "blank": "Gildan 2000B",
+      "details": [
+        "Regular Fit",
+        "100% cotton (fiber content may vary for different colors)",
+        "Light fabric (6 oz/yd² (203 g/m²))",
+        "Tear away label"
+      ],
+      "colors": [
+        {
+          "name": "Black",
+          "hex": null,
+          "images": [
+            "merch/kids-tee-rainbow/black-1",
+            "merch/kids-tee-rainbow/black-2",
+            "merch/kids-tee-rainbow/black-3"
+          ],
+          "sizes": [
+            {
+              "size": "S",
+              "variantId": 61430,
+              "price": 1900
+            },
+            {
+              "size": "M",
+              "variantId": 61431,
+              "price": 1900
+            },
+            {
+              "size": "L",
+              "variantId": 61432,
+              "price": 1900
+            }
+          ]
+        }
+      ],
+      "number": "065"
+    },
+    {
+      "slug": "onesie-purple",
+      "line": "onesie",
+      "lineName": "Baby Bodysuit",
+      "category": "Kids & Pets",
+      "name": "Purple",
+      "title": "NonParallel Baby Bodysuit — Purple",
+      "printifyId": "6abadd8103c5f085d10dd4de",
+      "printProviderId": 39,
+      "price": 2500,
+      "blank": "Rabbit Skins 4400",
+      "details": [
+        "100% combed ringspun cotton (fiber content may vary for different colors)",
+        "Light fabric (5.0 oz/yd² (170 g/m²))",
+        "Tear-away label",
+        "Infant unisex fit"
+      ],
+      "colors": [
+        {
+          "name": "White",
+          "hex": null,
+          "images": [
+            "merch/onesie-purple/white-1",
+            "merch/onesie-purple/white-2",
+            "merch/onesie-purple/white-3"
+          ],
+          "sizes": [
+            {
+              "size": "NB (0-3M)",
+              "variantId": 70807,
+              "price": 2500
+            },
+            {
+              "size": "6M",
+              "variantId": 70815,
+              "price": 2500
+            },
+            {
+              "size": "12M",
+              "variantId": 70823,
+              "price": 2500
+            },
+            {
+              "size": "18M",
+              "variantId": 70831,
+              "price": 2500
+            },
+            {
+              "size": "24M",
+              "variantId": 70839,
+              "price": 2500
+            }
+          ]
+        }
+      ],
+      "number": "066"
+    },
+    {
+      "slug": "bandana-rainbow",
+      "line": "bandana",
+      "lineName": "Pet Bandana",
+      "category": "Kids & Pets",
+      "name": "Rainbow",
+      "title": "NonParallel Pet Bandana — Rainbow",
+      "printifyId": "6abadd8b7225e4d1240d3337",
+      "printProviderId": 70,
+      "price": 2900,
+      "blank": "Evergreen",
+      "details": [
+        "Material: 100% polyester",
+        "Available in 2 sizes: 20\" × 9.75\" (50.8 × 24.8cm) and 27\" × 13\" (68.6 × 33.0cm)",
+        "One-sided print",
+        "Sewn in label",
+        "Pre-constructed item (size varies +/- 1\"(2.5cm))"
+      ],
+      "colors": [
+        {
+          "name": "Standard",
+          "hex": null,
+          "images": [
+            "merch/bandana-rainbow/standard-1",
+            "merch/bandana-rainbow/standard-2",
+            "merch/bandana-rainbow/standard-3"
+          ],
+          "sizes": [
+            {
+              "size": "20\" × 10\"",
+              "variantId": 101403,
+              "price": 2900
+            },
+            {
+              "size": "27\" × 13\"",
+              "variantId": 101404,
+              "price": 2900
+            }
+          ]
+        }
+      ],
+      "number": "067"
     }
   ]
 }

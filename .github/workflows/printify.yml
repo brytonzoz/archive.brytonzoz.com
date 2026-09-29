@@ -32,6 +32,11 @@ jobs:
         env:
           PRINTIFY_ACCESS: ${{ secrets.PRINTIFY_ACCESS }}
         run: node scripts/printify.mjs inspect
+      - name: List Printify blanks by category (printify/catalog.md)
+        if: hashFiles('printify/catalog.md') == ''
+        env:
+          PRINTIFY_ACCESS: ${{ secrets.PRINTIFY_ACCESS }}
+        run: node scripts/printify.mjs catalog
       - name: Create/update the products and fetch their mockups
         env:
           PRINTIFY_ACCESS: ${{ secrets.PRINTIFY_ACCESS }}
@@ -40,7 +45,7 @@ jobs:
         run: |
           git config user.name "github-actions[bot]"
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
-          git add lib/merch-catalog.json assets-src/merch
+          git add lib/merch-catalog.json assets-src/merch printify/catalog.md
           if git diff --cached --quiet; then
             echo "Nothing changed."
             exit 0

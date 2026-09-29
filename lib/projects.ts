@@ -1,6 +1,5 @@
 import { ProjectData, Project } from './utils';
 import { cautionSceneAssets, nonparallelAssets, reminderSceneAssets, scrapwrkSceneAssets, solenyaSceneAssets } from './assets';
-import { merchProducts } from './merch';
 
 // For now, we'll use hardcoded data that matches our YAML structure
 // In a production app, this would load from the YAML file
@@ -58,7 +57,8 @@ const projectData: ProjectData = {
       type: "merch",
       description: "the label and company behind all of this",
       highlight: "Shop",
-      image: merchProducts[0]?.colors[0]?.images[0] ?? nonparallelAssets.logo
+      // Bryton's own rainbow tee mockup (a site image, so pages listing projects don't load the shop).
+      image: nonparallelAssets.tees.rainbow
     }
   ]
 };

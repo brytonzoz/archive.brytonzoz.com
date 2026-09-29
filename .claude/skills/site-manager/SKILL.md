@@ -35,7 +35,7 @@ Then run `npm ci`.
 | Songs for the on-site player | `lib/tracks.json` (see "Music player" below) |
 
 Images the owner sends in chat: save the original under `assets-src/` (never `public/`), run
-`npm run media`, and commit both the original and `lib/media-manifest.json`.
+`npm run media`, and commit the original with `lib/media-manifest.json` (and `lib/merch-media.json` for merch photos).
 
 A homepage project without its own scene renders as a `ProjectCard`. A full scene like SOLENYA's
 needs a scene component in `app/page.tsx`. For bigger "test a new structure" requests, build it in

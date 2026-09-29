@@ -3,7 +3,7 @@
 import React, { useEffect, useId, useState } from 'react';
 import { createPortal } from 'react-dom';
 import { track } from '../../lib/analytics';
-import { merchKey, merchPath, variantLabel, type MerchProduct } from '../../lib/merch';
+import { merchKey, merchPath, variantLabel, type MerchProduct } from '../../lib/merch-shared';
 import { shareLink } from '../../lib/share';
 import { formatPrice, shippingLabel } from '../../lib/store';
 import { addToBag } from '../../lib/store-client';

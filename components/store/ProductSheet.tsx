@@ -34,11 +34,15 @@ export function Gallery({
   const scroller = useRef<HTMLDivElement>(null);
   const [index, setIndex] = useState(0);
   const count = images.length;
+  // Photos load one ahead of the furthest you've swiped, not all at once when the sheet opens.
+  const [reach, setReach] = useState(0);
+  useEffect(() => setReach((furthest) => Math.max(furthest, index)), [index]);
 
   // A new set of photos (another tee color) starts from the first one.
   useEffect(() => {
     scroller.current?.scrollTo({ left: 0 });
     setIndex(0);
+    setReach(0);
   }, [images]);
 
   const go = (i: number) => {
@@ -75,15 +79,16 @@ export function Gallery({
             // Tap a photo to see it full screen and zoom into the print.
             onClick={() => setZoom(i)}
           >
-            <ResponsiveImage
-              asset={image}
-              alt={alt(i)}
-              sizes="(min-width: 640px) 480px, 100vw"
-              priority={i === 0}
-              loading={i < 2 ? 'eager' : 'lazy'}
-              draggable={false}
-              className="absolute inset-0 h-full w-full object-cover"
-            />
+            {i <= reach + 1 ? (
+              <ResponsiveImage
+                asset={image}
+                alt={alt(i)}
+                sizes="(min-width: 640px) 480px, 100vw"
+                priority={i === 0}
+                draggable={false}
+                className="absolute inset-0 h-full w-full object-cover"
+              />
+            ) : null}
           </div>
         ))}
       </div>

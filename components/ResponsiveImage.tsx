@@ -10,6 +10,7 @@ type ResponsiveImageProps = {
   priority?: boolean;
   draggable?: boolean;
   loading?: 'lazy' | 'eager';
+  onLoad?: React.ReactEventHandler<HTMLImageElement>;
 };
 
 export function ResponsiveImage({
@@ -21,6 +22,7 @@ export function ResponsiveImage({
   priority = false,
   draggable,
   loading,
+  onLoad,
 }: ResponsiveImageProps) {
   return (
     <picture className="contents">
@@ -38,6 +40,7 @@ export function ResponsiveImage({
         draggable={draggable}
         className={className}
         style={style}
+        onLoad={onLoad}
       />
     </picture>
   );

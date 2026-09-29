@@ -1,7 +1,8 @@
 'use client';
 
 import React, { useCallback, useDeferredValue, useEffect, useMemo, useRef, useState } from 'react';
-import { getMerch, MERCH_PATH, merchCategories, merchPath, merchProducts, type MerchProduct } from '../../lib/merch';
+import { useMerch } from '../../lib/merch-client';
+import { MERCH_PATH, merchPath, type MerchProduct } from '../../lib/merch-shared';
 import { formatPrice } from '../../lib/store';
 import { ResponsiveImage } from '../ResponsiveImage';
 import { BagButton, BagSheet, useCheckout } from './Bag';
@@ -29,25 +30,50 @@ const SYNONYMS: Record<string, string> = {
 };
 const words = (text: string) => text.toLowerCase().normalize('NFKD').replace(/[^a-z0-9\s-]/g, ' ').split(/\s+/).filter(Boolean);
 const stem = (word: string) => (word.length > 3 ? word.replace(/(es|s)$/, '') : word);
-const haystack = new Map(merchProducts.map((product) => [
-  product.slug,
-  words([product.displayName, product.lineName, product.category, product.blank, 'nonparallel', ...product.colors.map((color) => color.name)].join(' ')).map(stem).join(' '),
-]));
+// Each product's searchable words, worked out once.
+const haystacks = new WeakMap<MerchProduct, string>();
+const haystack = (product: MerchProduct) => {
+  let text = haystacks.get(product);
+  if (text === undefined) {
+    text = words([product.displayName, product.lineName, product.category, product.blank, 'nonparallel', ...product.colors.map((color) => color.name)].join(' ')).map(stem).join(' ');
+    haystacks.set(product, text);
+  }
+  return text;
+};
 
 function matches(product: MerchProduct, query: string[]) {
-  const text = haystack.get(product.slug) ?? '';
+  const text = haystack(product);
   return query.every((word) => text.includes(stem(SYNONYMS[word] ?? word)));
 }
 
-export function MerchShop({
+// One observer for every tile: a tile's shimmer only runs while it's near the screen (and until its
+// photo arrives), so the tiles further down don't keep the phone busy.
+let tileObserver: IntersectionObserver | null = null;
+function watchTile(node: HTMLElement) {
+  tileObserver ??= new IntersectionObserver((entries) => {
+    for (const entry of entries) entry.target.classList.toggle('is-near', entry.isIntersecting);
+  }, { rootMargin: '200px 0px' });
+  tileObserver.observe(node);
+  return () => tileObserver?.unobserve(node);
+}
+
+type ShopProps = { title?: React.ReactNode; initialProduct?: string; headingLevel?: 1 | 2 };
+
+// The catalog arrives separately (lib/merch-client.ts): on the homepage it's fetched in the
+// background and is ready long before anyone scrolls this far; until then the space is kept.
+export function MerchShop(props: ShopProps) {
+  const merch = useMerch(false);
+  if (!merch) return <div className="min-h-screen" aria-busy="true" />;
+  return <MerchShopView {...props} merch={merch} />;
+}
+
+function MerchShopView({
+  merch,
   title,
   initialProduct,
   headingLevel = 2,
-}: {
-  title?: React.ReactNode;
-  initialProduct?: string;
-  headingLevel?: 1 | 2;
-}) {
+}: ShopProps & { merch: NonNullable<ReturnType<typeof useMerch>> }) {
+  const { getMerch, merchCategories, merchProducts } = merch;
   const [query, setQuery] = useState('');
   const [category, setCategory] = useState<string | null>(null);
   const [sort, setSort] = useState<Sort>('featured');
@@ -107,7 +133,7 @@ export function MerchShop({
   useEffect(() => {
     const initial = initialProduct ? getMerch(initialProduct) : undefined;
     if (initial) setOpen(initial);
-  }, [initialProduct]);
+  }, [getMerch, initialProduct]);
 
   const results = useMemo(() => {
     const terms = words(deferredQuery);
@@ -115,7 +141,7 @@ export function MerchShop({
     if (sort === 'low') list.sort((a, b) => a.price - b.price);
     if (sort === 'high') list.sort((a, b) => b.price - a.price);
     return list;
-  }, [deferredQuery, category, sort]);
+  }, [merchProducts, deferredQuery, category, sort]);
 
   // A new search or filter starts from the top of the grid.
   useEffect(() => setShown(PAGE), [deferredQuery, category, sort]);
@@ -253,17 +279,30 @@ const ShopTile = React.memo(function ShopTile({ product, onOpen }: { product: Me
   const altView = second ? color.views?.[1] : undefined;
   const sideLabel = (side: string) => (side === 'front' ? 'Front' : 'Back');
   const price = `${product.priceVaries ? 'From ' : ''}${formatPrice(product.price)}`;
+  // The shimmer stops once the photo is in (it may already be, from the cache, before this runs).
+  const photoRef = useRef<HTMLSpanElement>(null);
+  const [loaded, setLoaded] = useState(false);
+  useEffect(() => {
+    const node = photoRef.current;
+    if (!node) return;
+    if (node.querySelector('img')?.complete) setLoaded(true);
+    return watchTile(node);
+  }, []);
+  // The second photo only shows on hover with a mouse, so it's only fetched once a mouse arrives:
+  // phones never download it.
+  const [hovered, setHovered] = useState(false);
   return (
     <button
       type="button"
       onClick={() => onOpen(product)}
+      onPointerEnter={(event) => { if (event.pointerType === 'mouse') setHovered(true); }}
       aria-label={`${product.displayName}, ${price}`}
       className={`shop-tile group ${altView && altView !== view ? 'has-alt' : ''}`}
     >
-      <span className="shop-tile-photo">
-        <ResponsiveImage asset={color.images[0]} alt="" sizes="(min-width: 1024px) 260px, (min-width: 640px) 30vw, 46vw" loading="lazy" draggable={false} className="shop-tile-img" />
-        {second ? (
-          <ResponsiveImage asset={second} alt="" sizes="(min-width: 1024px) 260px, (min-width: 640px) 30vw, 46vw" loading="lazy" draggable={false} className="shop-tile-img shop-tile-img-alt" />
+      <span ref={photoRef} className={`shop-tile-photo ${loaded ? 'is-loaded' : ''}`}>
+        <ResponsiveImage asset={color.images[0]} alt="" sizes="(min-width: 1024px) 260px, (min-width: 640px) 30vw, 46vw" loading="lazy" draggable={false} className="shop-tile-img" onLoad={() => setLoaded(true)} />
+        {second && hovered ? (
+          <ResponsiveImage asset={second} alt="" sizes="(min-width: 1024px) 260px, (min-width: 640px) 30vw, 46vw" draggable={false} className="shop-tile-img shop-tile-img-alt" />
         ) : null}
         {view ? <span className="shop-tile-side shop-tile-side-main" aria-hidden="true">{sideLabel(view)}</span> : null}
         {altView && altView !== view ? <span className="shop-tile-side shop-tile-side-alt" aria-hidden="true">{sideLabel(altView)}</span> : null}

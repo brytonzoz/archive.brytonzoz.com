@@ -10,6 +10,24 @@ export type MediaAsset = {
   placeholder?: string;
 };
 
+/** How the manifests store an image: every size shares one base name (`<base>-<width>.avif|webp`). */
+export type PackedMedia = { b: string; s: number[]; w: number; h: number; p?: string };
+
+export function unpackMedia(packed: PackedMedia): MediaAsset {
+  const set = (format: 'avif' | 'webp') => packed.s.map((width) => `${packed.b}-${width}.${format} ${width}w`).join(', ');
+  return {
+    width: packed.w,
+    height: packed.h,
+    src: `${packed.b}-${packed.s[packed.s.length - 1]}.webp`,
+    avif: set('avif'),
+    webp: set('webp'),
+    placeholder: packed.p,
+  };
+}
+
+// Covers, scenes, Scrapwrk and icons. NonParallel's photos are in lib/merch-media.json (lib/merch.ts).
 export type MediaKey = keyof typeof manifest;
 
-export const media: Record<MediaKey, MediaAsset> = manifest;
+export const media = Object.fromEntries(
+  Object.entries(manifest as Record<string, PackedMedia>).map(([key, packed]) => [key, unpackMedia(packed)]),
+) as Record<MediaKey, MediaAsset>;

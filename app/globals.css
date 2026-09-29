@@ -1944,19 +1944,44 @@ html {
 }
 
 /* Shop: photos shimmer until they arrive, and deep in the grid a "Top" pill brings the search and
-   filters back (components/store/MerchShop.tsx). */
+   filters back (components/store/MerchShop.tsx). The shimmer is a band sliding across (transform
+   only, so the phone's compositor moves it without repainting), and it stops once the photo is in. */
 .shop-tile-photo::before {
   content: '';
   position: absolute;
   inset: 0;
-  background: linear-gradient(100deg, transparent 30%, rgba(255, 255, 255, 0.7) 50%, transparent 70%) #eeeeee;
-  background-size: 250% 100%;
-  animation: shopShimmer 1.4s ease-in-out infinite;
+  width: 250%;
+  left: -75%;
+  background: linear-gradient(100deg, transparent 38%, rgba(255, 255, 255, 0.7) 50%, transparent 62%);
+  animation: shopShimmer 1.4s ease-in-out infinite paused;
+}
+
+.shop-tile-photo.is-near::before {
+  animation-play-state: running;
+}
+
+.shop-tile-photo.is-loaded::before {
+  display: none;
 }
 
 @keyframes shopShimmer {
-  from { background-position: 120% 0; }
-  to { background-position: -120% 0; }
+  from { transform: translate3d(-30%, 0, 0); }
+  to { transform: translate3d(30%, 0, 0); }
+}
+
+/* Performance: scenes more than a screen away (app/page.tsx) hold their animations still and aren't
+   drawn at all, so nothing off screen costs the phone a frame. Only far scenes skip drawing: they
+   can't be on screen, and a scene coming near is drawn normally again well before it shows. */
+.scene-still,
+.scene-still *,
+.scene-still *::before,
+.scene-still *::after {
+  animation-play-state: paused !important;
+}
+
+.scene-wrap.scene-still {
+  content-visibility: auto;
+  contain-intrinsic-size: auto 100vh;
 }
 
 .shop-top {

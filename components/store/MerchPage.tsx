@@ -3,6 +3,8 @@
 import React from 'react';
 import Link from 'next/link';
 import { nonparallelAssets } from '../../lib/assets';
+import * as merch from '../../lib/merch';
+import { MerchProvider } from '../../lib/merch-client';
 import { ResponsiveImage } from '../ResponsiveImage';
 import { SiteFooter } from '../SiteFooter';
 import { MerchShop } from './MerchShop';
@@ -22,15 +24,18 @@ export function MerchPage({ initialProduct }: { initialProduct?: string }) {
           Bryton Zoz
         </Link>
         <div className="mt-6 sm:mt-10">
-          <MerchShop
-            headingLevel={1}
-            initialProduct={initialProduct}
-            title={(
-              <div className="mb-3 w-[180px] sm:w-[220px]" style={{ aspectRatio: '466 / 216' }}>
-                <ResponsiveImage asset={nonparallelAssets.logo} alt="" sizes="220px" priority draggable={false} className="h-full w-full object-contain" />
-              </div>
-            )}
-          />
+          {/* This page is the shop, so the catalog comes with it (the homepage loads it later). */}
+          <MerchProvider value={merch}>
+            <MerchShop
+              headingLevel={1}
+              initialProduct={initialProduct}
+              title={(
+                <div className="mb-3 w-[180px] sm:w-[220px]" style={{ aspectRatio: '466 / 216' }}>
+                  <ResponsiveImage asset={nonparallelAssets.logo} alt="" sizes="220px" priority draggable={false} className="h-full w-full object-contain" />
+                </div>
+              )}
+            />
+          </MerchProvider>
         </div>
       </div>
       <SiteFooter />

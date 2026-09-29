@@ -54,6 +54,18 @@ const HIDDEN = mockupRules.hide.map((pattern) => new RegExp(pattern));
 const showMockup = (line: string | undefined, key: string) => !STUDIO_ONLY.has(line ?? 'tee') && !HIDDEN.some((rule) => rule.test(key));
 // Studio shots show the back (the big logo) unless the file says otherwise: black-5-front.jpg.
 const studioView = (key: string): MerchView => (key.endsWith('-front') ? 'front' : 'back');
+// Size labels as the sheet shows them: only the part that differs between a color's options
+// ("11″ x 14″", not "11″ x 14″ · Matte" on every poster; a candle's scent, not "One size · …"),
+// and never two buttons with the same label.
+function tidySizes(sizes: MerchSize[]): MerchSize[] {
+  const parts = sizes.map((size) => size.size.split(' · '));
+  const shared = parts.length > 1 ? parts[0].filter((part) => parts.every((other) => other.includes(part))) : [];
+  const labelled = sizes.map((size, i) => {
+    const kept = parts[i].filter((part) => !shared.includes(part) && !(part === 'One size' && parts[i].length > 1));
+    return { ...size, size: kept.join(' · ') || size.size.split(' · ')[0] };
+  });
+  return labelled.filter((size, i) => labelled.findIndex((other) => other.size === size.size) === i);
+}
 // Tees synced before views were recorded: Printify's back, front, front, back.
 const LEGACY_TEE_VIEWS: MerchView[] = ['back', 'front', 'front', 'back'];
 
@@ -95,8 +107,7 @@ export const merchProducts: MerchProduct[] = (catalog.products as RawProduct[])
           swatch: color.hex ?? SWATCHES[color.name] ?? '#888888',
           images: pairs.map(({ key }) => media[key as MediaKey]),
           views: mockupViews ? pairs.map(({ view }) => view) : undefined,
-          // Never two buttons with the same label: keep the first of any repeats.
-          sizes: color.sizes.filter((size, i, all) => all.findIndex((other) => other.size === size.size) === i),
+          sizes: tidySizes(color.sizes),
         };
       })
       .filter((color) => color.images.length && color.sizes.length),

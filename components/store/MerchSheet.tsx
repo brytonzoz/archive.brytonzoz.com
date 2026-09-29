@@ -59,6 +59,8 @@ export function MerchSheet({
   const color = product.colors[Math.min(colorIndex, product.colors.length - 1)];
   // One-size things (stickers, mugs…) skip the size row.
   const oneSize = color.sizes.length === 1;
+  // "Size" for sizes; a candle's scents and the like are just options.
+  const sizeWord = color.sizes.some((option) => /\d|^(XS|S|M|L|XL)$/.test(option.size)) ? 'Size' : 'Option';
   const chosen = oneSize ? color.sizes[0] : color.sizes.find((entry) => entry.size === size);
   const price = chosen?.price ?? color.sizes[0]?.price ?? product.price;
   // Bigger sizes cost more to make; say so under the sizes.
@@ -153,7 +155,7 @@ export function MerchSheet({
 
             {oneSize ? null : <fieldset key={nudge} className={`mt-6 ${nudge ? 'merch-nudge' : ''}`}>
               <legend className="text-[13px] font-semibold text-black/60">
-                Size{chosen ? <> · <span className="text-black">{chosen.size}</span></> : nudge ? <span className="text-[#c4252a]"> · pick one</span> : null}
+                {sizeWord}{chosen ? <> · <span className="text-black">{chosen.size}</span></> : nudge ? <span className="text-[#c4252a]"> · pick one</span> : null}
               </legend>
               <div
                 className="mt-2.5 grid gap-2"

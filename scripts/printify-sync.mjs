@@ -4,7 +4,8 @@
 //
 // products.json has `designs` (the artwork) and `lines` (a blank: tee, hoodie, sticker, mug…). Every
 // line is made in each of its designs. A line's price is either fixed (`price`, `sizePrices`) or, with
-// `margin`, worked out from what Printify charges: cost + US shipping + Stripe's fee + the margin.
+// `margin`, worked out from what Printify charges; or, by default (`markup` at the top of the file),
+// cost + US shipping + that markup, with Stripe's fee on top, rounded up to a tidy price.
 // A line names its blank by `blueprintId`, or by `find` (regexes tried in order against Printify's
 // "brand model title"); without `printProviders`, any US provider that has the colors will do.
 import fs from 'node:fs/promises';
@@ -23,6 +24,14 @@ const loose = (text) => String(text).replace(/[″”]/g, '"').replace(/[′’]
 // Stripe's fee is 2.9% + 30¢: the smallest whole-dollar price that leaves `margin` after cost,
 // shipping and the fee.
 const autoPrice = (cost, shipping, margin) => Math.ceil((cost + shipping + margin + 30) / 0.971 / 100) * 100;
+// A tidy price: whole dollars ending in 5 or 9 ($9, $15, $19, $25, $29…).
+const tidy = (cents) => {
+  let dollars = Math.ceil(cents / 100);
+  while (dollars % 10 !== 5 && dollars % 10 !== 9) dollars++;
+  return dollars * 100;
+};
+// What Printify charges us (item + US shipping), plus the markup, left after Stripe's 2.9% + 30¢.
+const markupPrice = (cost, shipping, markup) => tidy(((cost + shipping) * (1 + markup) + 30) / 0.971);
 
 export async function sync(printify, root) {
   const config = JSON.parse(await fs.readFile(path.join(root, 'printify', 'products.json'), 'utf8'));
@@ -210,10 +219,13 @@ export async function sync(printify, root) {
       let fresh = await printify('GET', `/shops/${shopId}/products/${product.id}.json`);
       const shipOf = (id) => shipping.profiles?.find((entry) => entry.variant_ids.includes(id) && entry.countries.includes('US'))?.first_item?.cost ?? 0;
       const costOf = new Map(fresh.variants.map((variant) => [variant.id, variant.cost]));
-      const priceOf = new Map(variants.map((variant) => [variant.id, line.margin
-        ? autoPrice(costOf.get(variant.id) ?? 0, shipOf(variant.id), line.margin)
-        : fixedPrice(variant)]));
-      if (line.margin) {
+      const markup = line.markup ?? config.markup;
+      const priceOf = new Map(variants.map((variant) => [variant.id, markup != null
+        ? markupPrice(costOf.get(variant.id) ?? 0, shipOf(variant.id), markup)
+        : line.margin
+          ? autoPrice(costOf.get(variant.id) ?? 0, shipOf(variant.id), line.margin)
+          : fixedPrice(variant)]));
+      if (markup != null || line.margin) {
         await printify('PUT', `/shops/${shopId}/products/${product.id}.json`, {
           variants: fresh.variants.map((variant) => ({ id: variant.id, price: priceOf.get(variant.id) ?? variant.price, is_enabled: priceOf.has(variant.id) })),
         });
@@ -221,7 +233,7 @@ export async function sync(printify, root) {
       for (const variant of variants) {
         const price = priceOf.get(variant.id);
         const fee = Math.round(price * 0.029) + 30;
-        report.push(`${productSlug.padEnd(22)} ${`${colorOf(variant, line)} / ${sizeOf(variant)}`.padEnd(26)} price ${price}  cost ${costOf.get(variant.id)}  ship ${shipOf(variant.id)}  stripe ${fee}  left ${price - costOf.get(variant.id) - shipOf(variant.id) - fee}`);
+        report.push(`${productSlug.padEnd(22)} ${`${colorOf(variant, line)} / ${sizeOf(variant)}`.padEnd(26)} price ${price}  cost ${costOf.get(variant.id)}  ship ${shipOf(variant.id)}  stripe ${fee}  left ${price - costOf.get(variant.id) - shipOf(variant.id) - fee} (${Math.round(((price - fee) / (costOf.get(variant.id) + shipOf(variant.id)) - 1) * 100)}% over cost)`);
       }
 
       // Printify renders mockups asynchronously.

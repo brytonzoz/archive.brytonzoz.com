@@ -1,6 +1,7 @@
 {
-  "_comment": "NonParallel merch, made by the Printify workflow (scripts/printify-sync.mjs). `designs` are the artwork (8000px PNGs in Printify's uploads; `url` is a public PNG Printify fetches once, found again by `fileName`). Each of `lines` is one blank (tee, hoodie, sticker, mug…) made in each of its `designs`, on the colors in `designColors` (or `colors`). A blank is `blueprintId` or `find` (regexes tried in order against Printify's \"brand model title\"); without `printProviders` any US printer with those colors is used. `placements` are Printify print-area coordinates (x, y = centre, scale = width of the 8000px design canvas relative to the print area; the art fills ~80% of the canvas width and ~60% of its height). Tees are fixed at $25 (2XL $28, 3XL $31, Bryton's spec). Everything else is priced from what Printify charges: cost + US shipping + Stripe's fee + `margin` (cents), rounded up to a whole dollar. `category` is the shop filter, in this order. Edit and push: the workflow creates/updates the products and commits lib/merch-catalog.json plus the mockups.",
+  "_comment": "NonParallel merch, made by the Printify workflow (scripts/printify-sync.mjs). `designs` are the artwork (8000px PNGs in Printify's uploads; `url` is a public PNG Printify fetches once, found again by `fileName`). Each of `lines` is one blank (tee, hoodie, sticker, mug…) made in each of its `designs`, on the colors in `designColors` (or `colors`). A blank is `blueprintId` or `find` (regexes tried in order against Printify's \"brand model title\"); without `printProviders` any US printer with those colors is used. `placements` are Printify print-area coordinates (x, y = centre, scale = width of the 8000px design canvas relative to the print area; the art fills ~80% of the canvas width and ~60% of its height). Every price is what Printify charges us (the item plus US shipping) plus `markup` (0.2 = 20%), with Stripe's 2.9% + 30¢ on top so the 20% is what we keep, rounded up to a tidy price ending in 5 or 9 ($15, $19, $25, $29…). A line can set its own `markup`. `category` is the shop filter, in this order. Edit and push: the workflow creates/updates the products and commits lib/merch-catalog.json plus the mockups.",
   "shopId": 18462993,
+  "markup": 0.2,
   "designs": {
     "rainbow": {
       "name": "Rainbow",
@@ -80,11 +81,6 @@
         "2XL",
         "3XL"
       ],
-      "price": 2500,
-      "sizePrices": {
-        "2XL": 2800,
-        "3XL": 3100
-      },
       "placements": {
         "front": {
           "x": 0.5,
@@ -144,8 +140,7 @@
           "y": 0.4,
           "scale": 1
         }
-      },
-      "margin": 900
+      }
     },
     {
       "key": "max-tee",
@@ -179,8 +174,7 @@
           "y": 0.4,
           "scale": 1
         }
-      },
-      "margin": 1000
+      }
     },
     {
       "key": "long-sleeve",
@@ -218,8 +212,7 @@
           "y": 0.4,
           "scale": 1
         }
-      },
-      "margin": 1000
+      }
     },
     {
       "key": "tank",
@@ -252,8 +245,7 @@
           "y": 0.4,
           "scale": 1
         }
-      },
-      "margin": 800
+      }
     },
     {
       "key": "hoodie",
@@ -295,8 +287,7 @@
           "y": 0.35,
           "scale": 1
         }
-      },
-      "margin": 1400
+      }
     },
     {
       "key": "heavy-hoodie",
@@ -342,8 +333,7 @@
           "y": 0.35,
           "scale": 1
         }
-      },
-      "margin": 1800
+      }
     },
     {
       "key": "crewneck",
@@ -377,7 +367,6 @@
           "scale": 0.9
         }
       },
-      "margin": 1200,
       "lead": "front"
     },
     {
@@ -413,7 +402,6 @@
           "scale": 1
         }
       },
-      "margin": 1200,
       "lead": "front"
     },
     {
@@ -459,7 +447,6 @@
           "scale": 1
         }
       },
-      "margin": 1000,
       "lead": "front",
       "shotOrder": [
         1,
@@ -493,7 +480,6 @@
           "scale": 0.7
         }
       },
-      "margin": 700,
       "lead": "front",
       "shots": 3,
       "find": [
@@ -526,7 +512,6 @@
           "scale": 0.85
         }
       },
-      "margin": 600,
       "lead": "front",
       "shots": 3
     },
@@ -550,7 +535,6 @@
           "scale": 1.1
         }
       },
-      "margin": 250,
       "lead": "front",
       "shots": 3
     },
@@ -570,7 +554,6 @@
           "scale": 1.05
         }
       },
-      "margin": 300,
       "lead": "front",
       "shots": 3
     },
@@ -591,7 +574,6 @@
           "scale": 0.78
         }
       },
-      "margin": 250,
       "lead": "front",
       "shots": 3
     },
@@ -612,7 +594,6 @@
           "scale": 0.32
         }
       },
-      "margin": 500,
       "lead": "front",
       "shots": 3
     },
@@ -632,7 +613,6 @@
           "scale": 0.3
         }
       },
-      "margin": 500,
       "lead": "front",
       "shots": 3
     },
@@ -652,7 +632,6 @@
           "scale": 0.36
         }
       },
-      "margin": 600,
       "lead": "front",
       "shots": 3
     },
@@ -672,7 +651,6 @@
           "scale": 0.34
         }
       },
-      "margin": 700,
       "lead": "front",
       "shots": 3
     },
@@ -691,7 +669,6 @@
           "scale": 0.42
         }
       },
-      "margin": 800,
       "lead": "front",
       "shots": 3
     },
@@ -711,7 +688,6 @@
           "scale": 0.7
         }
       },
-      "margin": 600,
       "lead": "front",
       "shots": 3
     },
@@ -732,7 +708,6 @@
           "scale": 1.1
         }
       },
-      "margin": 600,
       "lead": "front",
       "shots": 3
     },
@@ -752,7 +727,6 @@
           "scale": 0.6
         }
       },
-      "margin": 700,
       "lead": "front",
       "shots": 3
     },
@@ -772,7 +746,6 @@
           "scale": 0.85
         }
       },
-      "margin": 500,
       "lead": "front",
       "shots": 3
     },
@@ -799,7 +772,6 @@
           "scale": 0.9
         }
       },
-      "margin": 600,
       "lead": "front",
       "shots": 3
     },
@@ -825,7 +797,6 @@
           "scale": 0.9
         }
       },
-      "margin": 1200,
       "lead": "front",
       "shots": 3,
       "find": [
@@ -851,7 +822,6 @@
           "scale": 0.8
         }
       },
-      "margin": 700,
       "lead": "front",
       "shots": 3
     },
@@ -874,7 +844,6 @@
           "scale": 0.8
         }
       },
-      "margin": 900,
       "lead": "front",
       "shots": 3
     },
@@ -897,7 +866,6 @@
           "scale": 0.7
         }
       },
-      "margin": 1200,
       "lead": "front",
       "shots": 3
     },
@@ -919,7 +887,6 @@
           "scale": 0.42
         }
       },
-      "margin": 600,
       "maxColors": 3,
       "lead": "front",
       "shots": 3
@@ -945,7 +912,6 @@
         }
       },
       "lead": "front",
-      "margin": 600,
       "shots": 3
     },
     {
@@ -969,7 +935,6 @@
         }
       },
       "lead": "front",
-      "margin": 600,
       "shots": 3
     },
     {
@@ -987,7 +952,6 @@
           "scale": 0.5
         }
       },
-      "margin": 400,
       "lead": "front",
       "shots": 3
     }

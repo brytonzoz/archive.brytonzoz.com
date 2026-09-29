@@ -55,8 +55,8 @@ push, and give the owner the staging link from the PR comment once the Staging w
   below the last scene the page stops snapping and the whole range is a shop with search, category chips and price sort
   (`components/store/MerchShop.tsx`, also `/nonparallel/`, and `/nonparallel/<slug>/` opens one piece).
   `printify/products.json` has `designs` (the artwork) and `lines` (one blank each: tee, hoodie, sticker, mug…; by
-  `blueprintId` or `find`, colors per design, placements, and a fixed `price` or a `margin` over Printify's real cost +
-  US shipping + Stripe). `printify/catalog.md` lists blanks by category. Pushing products.json runs the **Printify**
+  `blueprintId` or `find`, colors per design, placements). Every price is Printify's real cost + US shipping + `markup`
+  (20%), with Stripe's fee on top, rounded up to a tidy price ending in 5 or 9. `printify/catalog.md` lists blanks by category. Pushing products.json runs the **Printify**
   workflow, which creates/updates every product and commits their mockups (`assets-src/merch/`) and
   `lib/merch-catalog.json`; its log prints the per-sale margin and any line it skipped. Then run `npm run media`.
   Extra studio shots (Higgsfield, floating / dress form / flat lay, never people) go in

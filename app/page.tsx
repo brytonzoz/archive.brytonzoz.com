@@ -1269,7 +1269,7 @@ const NonParallelScene = React.memo(function NonParallelScene({ distance, onShop
               <ChevronDownIcon size={16} />
             </button>
           )}
-          intro={<p className="store-caption">The label and company behind all of this. A tee is a way to support it: you get something to wear, and it keeps the work going.</p>}
+          intro={<p className="store-caption">The label and company behind all of this. Buying something here supports it and keeps the work going. Everything else is in the shop below.</p>}
         />
       </div>
     </div>

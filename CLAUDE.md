@@ -58,7 +58,8 @@ push, and give the owner the staging link from the PR comment once the Staging w
   `blueprintId` or `find`, colors per design, placements). Every price is Printify's real cost + US shipping + `markup`
   (20%), with Stripe's fee on top, rounded up to a tidy price ending in 5 or 9. `printify/catalog.md` lists blanks by category. Pushing products.json runs the **Printify**
   workflow, which creates/updates every product and commits their mockups (`assets-src/merch/`) and
-  `lib/merch-catalog.json`; its log prints the per-sale margin and any line it skipped. Then run `npm run media`.
+  `lib/merch-catalog.json`; its log prints the per-sale margin and any line it skipped. Then run `npm run media`. Its commit comes from the
+  GitHub Actions bot, which doesn't redeploy staging on its own: pull it and push your next change to update staging.
   Extra studio shots (Higgsfield, floating / dress form / flat lay, never people) go in
   `assets-src/merch-studio/<slug>/<color>-N.jpg` and show after Printify's mockups.
   Everything sells through the same bag and Stripe checkout as Scrapwrk (`components/store/Merch*.tsx`, `Bag.tsx`);

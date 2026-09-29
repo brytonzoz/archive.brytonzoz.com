@@ -64,6 +64,12 @@ push, and give the owner the staging link from the PR comment once the Staging w
   `assets-src/merch-studio/<slug>/<color>-N.jpg` (`-front` in the name for a front view) and show after Printify's mockups.
   The site only ever shows photographic mockups: `printify/mockups.json` hides flat 2D drawings, models and blank frames,
   and lists lines that show studio shots only (every color of those needs studio shots). Check new products' mockups.
+  **Must fix (open): the NonParallel design files have white holes.** The counters inside the letters (the inside of the
+  O, the P, etc.) are filled white instead of transparent, so every printed product and every mockup and studio shot shows
+  white blobs inside the lettering (obvious on the candle, black tees, dark hoodies). Fix: re-export each design in
+  `printify/products.json` `designs` with transparent counters (or knock out the enclosed white areas), upload the new files,
+  push products.json so the Printify workflow re-renders every product, then regenerate the studio shots in
+  `assets-src/merch-studio/` from the new mockups. Deferred only because regenerating the studio shots costs Higgsfield credits.
   Everything sells through the same bag and Stripe checkout as Scrapwrk (`components/store/Merch*.tsx`, `Bag.tsx`);
   `worker/merch.ts` sends each paid order to Printify (created, then sent to production once Printify has priced it;
   on the thank-you page, plus a 10-minute cron catch-up), tracked in D1 `merch_orders` and shown in `/admin`. One-off

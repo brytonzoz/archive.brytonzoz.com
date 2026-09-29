@@ -95,7 +95,8 @@ export const merchProducts: MerchProduct[] = (catalog.products as RawProduct[])
           swatch: color.hex ?? SWATCHES[color.name] ?? '#888888',
           images: pairs.map(({ key }) => media[key as MediaKey]),
           views: mockupViews ? pairs.map(({ view }) => view) : undefined,
-          sizes: color.sizes,
+          // Never two buttons with the same label: keep the first of any repeats.
+          sizes: color.sizes.filter((size, i, all) => all.findIndex((other) => other.size === size.size) === i),
         };
       })
       .filter((color) => color.images.length && color.sizes.length),

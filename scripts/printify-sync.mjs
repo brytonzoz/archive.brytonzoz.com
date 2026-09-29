@@ -17,7 +17,13 @@ const stripHtml = (html = '') => html.replace(/<li>/g, '\n• ').replace(/<[^>]+
 
 // A variant's color and size (or whatever single option it has), as the site shows them.
 const colorOf = (variant, line) => variant.options?.color ?? line.color ?? 'Standard';
-const sizeOf = (variant) => variant.options?.size ?? Object.values(variant.options ?? {}).find((value) => value !== variant.options?.color) ?? 'One size';
+// A variant's size, plus any other option Printify has (a sticker's finish, a candle's scent), so two
+// variants never share a label: "3\" × 3\" · Transparent".
+const sizeOf = (variant) => {
+  const { color, size, ...rest } = variant.options ?? {};
+  const parts = [size, ...Object.values(rest)].filter((value) => value && value !== color);
+  return parts.length ? parts.join(' · ') : 'One size';
+};
 // Printify mixes ″ and " in sizes: compare them loosely.
 const loose = (text) => String(text).replace(/[″”]/g, '"').replace(/[′’]/g, "'").replace(/\s+/g, ' ').trim().toLowerCase();
 
@@ -150,7 +156,8 @@ export async function sync(printify, root) {
         const found = new Set(list.map((variant) => colorOf(variant, line))).size;
         if (list.length && found > best) {
           providerId = candidate;
-          variants = list.slice(0, 100);
+          // One variant per color + label (Printify sometimes lists the same one twice).
+          variants = list.filter((variant, i) => list.findIndex((other) => colorOf(other, line) === colorOf(variant, line) && sizeOf(other) === sizeOf(variant)) === i).slice(0, 100);
           best = found;
         }
         if (list.length && (!wantedColors || found === wantedColors.length)) break;

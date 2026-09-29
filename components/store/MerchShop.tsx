@@ -61,6 +61,22 @@ export function MerchShop({
   const searchRef = useRef<HTMLInputElement>(null);
   const [showTop, setShowTop] = useState(false);
   const [searching, setSearching] = useState(false);
+  // Enters like the scenes above it: once it scrolls into view the heading rises in out of a blur
+  // and the cards flip in one after another.
+  const sectionRef = useRef<HTMLElement>(null);
+  const [revealed, setRevealed] = useState(false);
+  useEffect(() => {
+    const node = sectionRef.current;
+    if (!node) return;
+    const observer = new IntersectionObserver((entries) => {
+      if (entries.some((entry) => entry.isIntersecting)) {
+        setRevealed(true);
+        observer.disconnect();
+      }
+    }, { threshold: 0.08 });
+    observer.observe(node);
+    return () => observer.disconnect();
+  }, []);
 
   // Deep in the grid, a small "Top" button brings the search and filters back.
   useEffect(() => {
@@ -134,8 +150,8 @@ export function MerchShop({
   const Heading = headingLevel === 1 ? 'h1' : 'h2';
 
   return (
-    <section aria-labelledby="shop-title" className="shop">
-      <div className="flex items-end justify-between gap-4">
+    <section ref={sectionRef} aria-labelledby="shop-title" className={`shop ${revealed ? 'is-revealed' : ''}`}>
+      <div className="shop-rise flex items-end justify-between gap-4" style={{ '--d': '0ms' } as React.CSSProperties}>
         <div className="min-w-0">
           {title}
           {/* The /nonparallel/ page shows the logo instead; the homepage says the name. */}
@@ -148,7 +164,7 @@ export function MerchShop({
         </div>
       </div>
 
-      <div ref={topRef} className="shop-controls">
+      <div ref={topRef} className="shop-controls shop-rise" style={{ '--d': '90ms' } as React.CSSProperties}>
         <div className="flex gap-2">
           <label className="shop-search">
             <svg aria-hidden="true" width="15" height="15" viewBox="0 0 24 24" fill="none"><circle cx="11" cy="11" r="7" stroke="currentColor" strokeWidth="2.4" /><path d="m20 20-3.5-3.5" stroke="currentColor" strokeWidth="2.4" strokeLinecap="round" /></svg>
@@ -196,7 +212,7 @@ export function MerchShop({
         </div>
       </div>
 
-      <p className="mt-4 text-[13px] text-white/45 sm:mt-5" aria-live="polite">{results.length} {results.length === 1 ? 'item' : 'items'}</p>
+      <p className="shop-rise mt-4 text-[13px] text-white/45 sm:mt-5" style={{ '--d': '160ms' } as React.CSSProperties} aria-live="polite">{results.length} {results.length === 1 ? 'item' : 'items'}</p>
       {results.length ? (
         <ul className="shop-grid !mt-3">
           {results.slice(0, shown).map((product, index) => (

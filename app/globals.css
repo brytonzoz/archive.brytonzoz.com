@@ -1625,15 +1625,50 @@ html {
   }
 }
 
-.shop-tile-wrap {
-  animation: shopTileIn 380ms cubic-bezier(0.22, 1, 0.36, 1) both;
-  animation-delay: calc(min(var(--i, 0), 12) * 24ms);
+.shop-grid {
+  perspective: 1400px;
 }
 
-@keyframes shopTileIn {
+/* The shop enters like the scenes (components/store/MerchShop.tsx): nothing shows until it scrolls
+   into view, then the heading rises out of a blur and the cards flip in one after another (the same
+   turn and easing as the Scrapwrk and NonParallel cards). Cards added later (more loading, a new
+   search or filter) flip in the same way. */
+.shop:not(.is-revealed) .shop-rise,
+.shop:not(.is-revealed) .shop-tile-wrap {
+  opacity: 0;
+}
+
+.shop.is-revealed .shop-rise {
+  animation: shopRise 760ms cubic-bezier(0.16, 1, 0.3, 1) var(--d, 0ms) both;
+}
+
+.shop.is-revealed .shop-tile-wrap {
+  transform-style: preserve-3d;
+  animation: shopFlip 720ms cubic-bezier(0.3, 0.9, 0.3, 1.04) calc(180ms + min(var(--i, 0), 11) * 70ms) both;
+}
+
+@keyframes shopRise {
   from {
     opacity: 0;
-    transform: translate3d(0, 10px, 0);
+    filter: blur(10px);
+    transform: translate3d(0, 22px, 0) scale(0.94);
+  }
+}
+
+@keyframes shopFlip {
+  0% {
+    opacity: 0;
+    filter: blur(6px);
+    transform: translate3d(0, 28px, 0) rotateY(-110deg) scale(0.88);
+  }
+  45% {
+    opacity: 1;
+    filter: blur(0);
+  }
+  100% {
+    opacity: 1;
+    filter: none;
+    transform: none;
   }
 }
 
@@ -1761,9 +1796,14 @@ html {
 }
 
 @media (prefers-reduced-motion: reduce) {
-  .shop-tile-wrap {
-    animation: none;
+  .shop.is-revealed .shop-tile-wrap,
+  .shop.is-revealed .shop-rise {
+    animation: shopFade 300ms ease-out both;
   }
+}
+
+@keyframes shopFade {
+  from { opacity: 0; }
 }
 
 /* Front / Back switch over apparel photos (components/store/ProductSheet.tsx Gallery): always
@@ -2086,7 +2126,7 @@ html {
   padding: 0 16px;
   overflow-x: auto;
   scrollbar-width: none;
-  animation: shopTileIn 240ms cubic-bezier(0.22, 1, 0.36, 1) both;
+  animation: shopRise 360ms cubic-bezier(0.16, 1, 0.3, 1) both;
 }
 
 .shop-suggest::-webkit-scrollbar {
@@ -2109,4 +2149,29 @@ html {
   background: rgba(255, 255, 255, 0.12);
   color: #fff;
   outline: none;
+}
+
+/* The homepage stops snapping once you're in the shop below the scenes (app/page.tsx). */
+.scroll-container.is-free {
+  scroll-snap-type: none;
+}
+
+/* On the homepage the shop doesn't start with a hard edge: its top is see-through, so the last
+   scene's background carries on behind it, blurred and fading into the shop's black, the same way
+   the scenes blend into each other. */
+.shop-section-home {
+  background: linear-gradient(180deg, rgba(10, 10, 11, 0) 0, rgba(10, 10, 11, 0.55) 22vh, #0a0a0b 70vh);
+}
+
+.shop-section-home::before {
+  content: '';
+  position: absolute;
+  inset: 0 0 auto;
+  height: 80vh;
+  z-index: -1;
+  pointer-events: none;
+  -webkit-backdrop-filter: blur(28px) saturate(120%);
+  backdrop-filter: blur(28px) saturate(120%);
+  -webkit-mask-image: linear-gradient(180deg, transparent 0, #000 30vh);
+  mask-image: linear-gradient(180deg, transparent 0, #000 30vh);
 }

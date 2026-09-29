@@ -1410,6 +1410,10 @@ export default function HomePage() {
 
       const scrollTop = container.scrollTop;
       const containerHeight = container.clientHeight;
+      // Inside the shop the page scrolls freely. Snapping stays off there: with it on, iOS Safari
+      // re-snaps to the shop's top whenever the page bounces at the bottom or the grid grows.
+      const shop = document.getElementById('shop');
+      container.classList.toggle('is-free', Boolean(shop) && scrollTop >= (shop?.offsetTop ?? Infinity) - 2);
       const newIndex = Math.round(scrollTop / containerHeight);
 
       // Past the scenes (in the shop) nothing moves, so stop re-rendering on every scroll.
@@ -1570,7 +1574,7 @@ export default function HomePage() {
           })}
 
           {/* After the scenes, the page scrolls normally: the whole NonParallel shop, then the footer. */}
-          <section id="shop" aria-label="Shop" className="shop-section relative min-h-screen snap-start">
+          <section id="shop" aria-label="Shop" className="shop-section shop-section-home relative min-h-screen snap-start">
             <div className="mx-auto max-w-[1120px] px-4 pt-14 sm:px-8 sm:pt-20">
               <MerchShop />
             </div>

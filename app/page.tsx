@@ -52,21 +52,24 @@ type SlideBackground = {
   edgeGlow: string;
 };
 
-function getSceneStickerState(sticker: SceneStickerConfig, distance: number) {
+// `order` is the sticker's place in its scene, so they don't all move as one block.
+function getSceneStickerState(sticker: SceneStickerConfig, distance: number, order = 0) {
   const baseRotate = sticker.baseRotate || 0;
 
   if (distance < 0) {
-    // Arriving: the stickers travel in with the scene itself (from as soon as it starts to show),
-    // decelerating so they settle exactly as the page lands; then their float takes over.
-    const arrive = clamp(1 + (distance / 0.94), 0, 1);
-    const left = Math.pow(1 - arrive, 2.2);
+    // Arriving mirrors leaving (the return scroll): the card and its buttons lead, the stickers hold
+    // back, then fly in quicker over the last stretch and land together as the page settles, each
+    // setting off a beat apart. Their float takes over from there.
+    const span = 0.36 + (((order * 3) % 5) * 0.025);
+    const progress = easeOutCubic(clamp(-distance / span, 0, 1));
+    const travel = progress * 1.6;
 
     return {
-      opacity: clamp(arrive * 1.7, 0, 1),
-      scale: 1 - (left * 0.16),
-      translateX: sticker.intro.x * left,
-      translateY: sticker.intro.y * left,
-      rotate: baseRotate + (sticker.intro.rotate * left),
+      opacity: Math.max(0, 1 - (progress * sticker.movement.fadeRate * 1.25)),
+      scale: 1 - Math.min(Math.abs(distance) * sticker.movement.scale, 0.12),
+      translateX: sticker.intro.x * travel,
+      translateY: sticker.intro.y * travel,
+      rotate: baseRotate + (sticker.intro.rotate * travel),
     };
   }
 
@@ -130,8 +133,8 @@ function useSceneMotion() {
 
 const useIsActiveScene = () => React.useContext(ActiveSceneContext) === React.useContext(SceneIndexContext);
 
-function stickerMotion(sticker: SceneStickerConfig, distance: number, alpha = 1): MotionStyle {
-  const state = getSceneStickerState(sticker, distance);
+function stickerMotion(sticker: SceneStickerConfig & { movement: SceneStickerMotion }, distance: number, order: number, alpha = 1): MotionStyle {
+  const state = getSceneStickerState(sticker, distance, order);
   return {
     opacity: state.opacity * alpha,
     transform: `translate3d(${scaleValue(state.translateX)}, ${scaleValue(state.translateY)}, 0) rotate(${state.rotate}deg) scale(${state.scale})`,
@@ -906,7 +909,7 @@ const SolenyaScene = React.memo(function SolenyaScene({
   const motion = useSceneMotion();
   return (
     <div className="relative h-full w-full overflow-hidden">
-      {solenyaStickers.map((sticker) => {
+      {solenyaStickers.map((sticker, order) => {
 
         return (
           <div
@@ -925,8 +928,8 @@ const SolenyaScene = React.memo(function SolenyaScene({
             } as React.CSSProperties}
           >
             <div
-              ref={motion.ref(sticker.key, (d) => stickerMotion(sticker, d))}
-              style={{ ...motion.initial((d) => stickerMotion(sticker, d)), willChange: 'transform, opacity' }}
+              ref={motion.ref(sticker.key, (d) => stickerMotion(sticker, d, order))}
+              style={{ ...motion.initial((d) => stickerMotion(sticker, d, order)), willChange: 'transform, opacity' }}
             >
               <div
                 className="solenya-sticker-float h-full w-full"
@@ -985,7 +988,7 @@ const CautionScene = React.memo(function CautionScene({
   const motion = useSceneMotion();
   return (
     <div className="relative h-full w-full overflow-hidden">
-      {cautionStickers.map((sticker) => {
+      {cautionStickers.map((sticker, order) => {
 
         return (
           <div
@@ -1004,8 +1007,8 @@ const CautionScene = React.memo(function CautionScene({
             } as React.CSSProperties}
           >
             <div
-              ref={motion.ref(sticker.key, (d) => stickerMotion(sticker, d))}
-              style={{ ...motion.initial((d) => stickerMotion(sticker, d)), willChange: 'transform, opacity' }}
+              ref={motion.ref(sticker.key, (d) => stickerMotion(sticker, d, order))}
+              style={{ ...motion.initial((d) => stickerMotion(sticker, d, order)), willChange: 'transform, opacity' }}
             >
               <div
                 className="solenya-sticker-float h-full w-full"
@@ -1060,7 +1063,7 @@ const ReminderScene = React.memo(function ReminderScene({
   const motion = useSceneMotion();
   return (
     <div className="relative h-full w-full overflow-hidden">
-      {reminderStickers.map((sticker) => {
+      {reminderStickers.map((sticker, order) => {
 
         return (
           <div
@@ -1079,8 +1082,8 @@ const ReminderScene = React.memo(function ReminderScene({
             } as React.CSSProperties}
           >
             <div
-              ref={motion.ref(sticker.key, (d) => stickerMotion(sticker, d))}
-              style={{ ...motion.initial((d) => stickerMotion(sticker, d)), willChange: 'transform, opacity' }}
+              ref={motion.ref(sticker.key, (d) => stickerMotion(sticker, d, order))}
+              style={{ ...motion.initial((d) => stickerMotion(sticker, d, order)), willChange: 'transform, opacity' }}
             >
               <div
                 className="solenya-sticker-float h-full w-full"
@@ -1135,7 +1138,7 @@ const ScrapwrkScene = React.memo(function ScrapwrkScene({ loadImages }: { loadIm
     <div className="relative flex h-full w-full items-center justify-center overflow-hidden pb-[132px] pt-10">
       {/* The pieces as cut-out stickers, drifting around the grid's corners (behind the cards). */}
       <div aria-hidden="true" className="pointer-events-none absolute inset-0 z-0">
-        {scrapwrkStickers.map((sticker) => {
+        {scrapwrkStickers.map((sticker, order) => {
 
           return (
             <div
@@ -1154,8 +1157,8 @@ const ScrapwrkScene = React.memo(function ScrapwrkScene({ loadImages }: { loadIm
               } as React.CSSProperties}
             >
               <div
-                ref={motion.ref(sticker.key, (d) => stickerMotion(sticker, d))}
-                style={{ ...motion.initial((d) => stickerMotion(sticker, d)), willChange: 'transform, opacity' }}
+                ref={motion.ref(sticker.key, (d) => stickerMotion(sticker, d, order))}
+                style={{ ...motion.initial((d) => stickerMotion(sticker, d, order)), willChange: 'transform, opacity' }}
               >
                 <div
                   className="solenya-sticker-float h-full w-full"
@@ -1233,7 +1236,7 @@ const NonParallelScene = React.memo(function NonParallelScene({ onShop }: { onSh
   return (
     <div className="relative flex h-full w-full items-center justify-center overflow-hidden pb-[132px] pt-10">
       <div aria-hidden="true" className="np-scene-stickers pointer-events-none absolute inset-0 z-0">
-        {nonparallelStickers.map((sticker) => {
+        {nonparallelStickers.map((sticker, order) => {
           const size = `calc(var(--np-sticker) * ${sticker.size})`;
           return (
             <div
@@ -1252,8 +1255,8 @@ const NonParallelScene = React.memo(function NonParallelScene({ onShop }: { onSh
               } as React.CSSProperties}
             >
               <div
-                ref={motion.ref(sticker.key, (d) => stickerMotion(sticker, d, sticker.alpha))}
-                style={{ ...motion.initial((d) => stickerMotion(sticker, d, sticker.alpha)), willChange: 'transform, opacity' }}
+                ref={motion.ref(sticker.key, (d) => stickerMotion(sticker, d, order, sticker.alpha))}
+                style={{ ...motion.initial((d) => stickerMotion(sticker, d, order, sticker.alpha)), willChange: 'transform, opacity' }}
               >
                 <div
                   className="solenya-sticker-float h-full w-full"

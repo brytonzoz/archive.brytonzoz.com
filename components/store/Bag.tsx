@@ -12,6 +12,7 @@ import { ResponsiveImage, placeholderBackground } from '../ResponsiveImage';
 import { usePlayer } from '../player/context';
 import { BagIcon, CloseIcon, RemoveIcon } from '../player/icons';
 import { useSheet } from '../useSheet';
+import { ExpressPay } from './ExpressPay';
 
 // The bag both stores share (Scrapwrk pieces and NonParallel tees), and the checkout they share.
 
@@ -78,7 +79,10 @@ export function BagSheet({ isOpen, onClose, onBuy, busy }: { isOpen: boolean; on
   const titleId = useId();
   const { sheetRef, isClosing, requestClose, dragHandlers, sheetStyle } = useSheet(isOpen, onClose);
   const bag = useBag();
+  const [wallet, setWallet] = useState(false);
   if (!isOpen) return null;
+  // Wallet buttons are for printed-to-order pieces; a bag with a 1-of-1 in it uses hosted checkout.
+  const merchOnly = bag.length > 0 && bag.every((key) => merchVariant(key));
   const total = bag.reduce((sum, id) => sum + linePrice(id), 0);
   const lines = bagLines(bag);
 
@@ -110,15 +114,22 @@ export function BagSheet({ isOpen, onClose, onBuy, busy }: { isOpen: boolean; on
                 <span className="text-[15px] text-white/55">{shippingLabel}</span>
                 <span className="text-[22px] font-semibold tabular-nums">{formatPrice(total)}</span>
               </div>
-              <button
-                type="button"
-                disabled={busy}
-                onClick={() => onBuy(bag)}
-                className="mt-5 flex h-[56px] w-full items-center justify-center gap-2 rounded-full bg-white text-[17px] font-semibold text-black transition-[transform,opacity] active:scale-[0.98] disabled:opacity-70 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-white/70"
-              >
-                {busy ? <span className="player-spinner store-spinner-dark h-5 w-5 rounded-full" aria-hidden="true" /> : null}
-                {busy ? 'Opening checkout…' : 'Checkout'}
-              </button>
+              <div className="relative mt-5">
+                <button
+                  type="button"
+                  disabled={busy}
+                  onClick={() => onBuy(bag)}
+                  aria-hidden={wallet || undefined}
+                  tabIndex={wallet ? -1 : undefined}
+                  className={`flex h-[56px] w-full items-center justify-center gap-2 rounded-full bg-white text-[17px] font-semibold text-black transition-[transform,opacity] active:scale-[0.98] disabled:opacity-70 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-white/70 ${wallet ? 'invisible' : ''}`}
+                >
+                  {busy ? <span className="player-spinner store-spinner-dark h-5 w-5 rounded-full" aria-hidden="true" /> : null}
+                  {busy ? 'Opening checkout…' : 'Checkout'}
+                </button>
+                <div className={`absolute inset-0 transition-opacity duration-300 ${wallet ? 'opacity-100' : 'pointer-events-none opacity-0'}`}>
+                  <ExpressPay keys={merchOnly ? bag : null} theme="white" onAvailable={setWallet} />
+                </div>
+              </div>
             </>
           ) : (
             <p className="mt-3 pb-4 text-[15px] text-white/50">Your bag is empty.</p>

@@ -12,6 +12,8 @@ export interface StoreEnv {
   DB?: D1Database;
   STRIPE_SECRET_KEY?: string;
   STRIPE_WEBHOOK_SECRET?: string;
+  /** Public (pk_...): lets the browser show Apple Pay / Google Pay buttons. Without it, only hosted checkout. */
+  STRIPE_PUBLISHABLE_KEY?: string;
   /** Local testing only (.dev.vars): point at a mock of Stripe's API. */
   STRIPE_API_BASE?: string;
 }
@@ -25,6 +27,7 @@ export type ShippingDetails = {
 export type StripeSession = {
   id: string;
   url?: string | null;
+  client_secret?: string | null;
   status?: 'open' | 'complete' | 'expired';
   payment_status?: 'paid' | 'unpaid' | 'no_payment_required';
   amount_total?: number | null;
@@ -133,7 +136,7 @@ async function cancelSession(env: StoreEnv & { DB: D1Database }, sessionId: stri
 
 async function checkout(request: Request, env: StoreEnv & { DB: D1Database }): Promise<Response> {
   if (!env.STRIPE_SECRET_KEY) return json({ error: 'not-configured' }, 503);
-  let body: { items?: unknown; previous?: unknown };
+  let body: { items?: unknown; previous?: unknown; express?: unknown };
   try {
     body = await request.json();
   } catch {
@@ -146,6 +149,11 @@ async function checkout(request: Request, env: StoreEnv & { DB: D1Database }): P
   if ((!ids.length && !merchCounts?.size) || !merchCounts || ids.length > PRODUCTS.size || ids.some((id) => !PRODUCTS.has(id))) {
     return json({ error: 'bad-request' }, 400);
   }
+
+  // Express (Apple Pay / Google Pay buttons on our own page) is for printed-to-order pieces only: it
+  // creates its session before the tap, which would tie up a 1-of-1 piece for anyone who just looks.
+  const express = body.express === true;
+  if (express && ids.length) return json({ error: 'bad-request' }, 400);
 
   // Coming back to checkout (e.g. after pressing back on Stripe's page) replaces the earlier session.
   if (typeof body.previous === 'string') await cancelSession(env, body.previous);
@@ -172,10 +180,12 @@ async function checkout(request: Request, env: StoreEnv & { DB: D1Database }): P
 
   const origin = new URL(request.url).origin;
   try {
+    const returnUrl = `${origin}/scrapwrk/order/?session_id={CHECKOUT_SESSION_ID}`;
     const session = await stripe<StripeSession>(env, 'POST', 'checkout/sessions', {
       mode: 'payment',
-      success_url: `${origin}/scrapwrk/order/?session_id={CHECKOUT_SESSION_ID}`,
-      cancel_url: `${origin}/${ids.length ? 'scrapwrk' : 'nonparallel'}/?checkout=cancelled`,
+      ...(express
+        ? { ui_mode: 'elements', return_url: returnUrl }
+        : { success_url: returnUrl, cancel_url: `${origin}/${ids.length ? 'scrapwrk' : 'nonparallel'}/?checkout=cancelled`, submit_type: 'pay' }),
       expires_at: expiresAt,
       billing_address_collection: 'auto',
       phone_number_collection: { enabled: true },
@@ -187,7 +197,6 @@ async function checkout(request: Request, env: StoreEnv & { DB: D1Database }): P
           fixed_amount: { amount: 0, currency: catalog.currency },
         },
       }],
-      submit_type: 'pay',
       metadata: { source: 'brytonzoz.com', product_ids: ids.join(','), merch: merchCounts.size ? encodeMerch(merchCounts) : undefined },
       payment_intent_data: { metadata: { product_ids: ids.join(','), merch: merchCounts.size ? encodeMerch(merchCounts) : undefined } },
       line_items: [...ids.map((id) => {
@@ -209,11 +218,11 @@ async function checkout(request: Request, env: StoreEnv & { DB: D1Database }): P
       }), ...merchLineItems(merchCounts, origin)],
     });
     await env.DB.prepare('UPDATE store_items SET session_id = ? WHERE session_id = ?').bind(session.id, token).run();
-    return json({ url: session.url, id: session.id });
+    return json(express ? { clientSecret: session.client_secret, id: session.id } : { url: session.url, id: session.id });
   } catch (error) {
     await release(env.DB, token);
     console.error('checkout failed', error);
-    return json({ error: 'stripe-error' }, 502);
+    return json({ error: 'stripe-error', detail: error instanceof Error ? error.message.slice(0, 200) : undefined }, 502);
   }
 }
 
@@ -304,6 +313,7 @@ export async function handleStore(request: Request, env: MerchEnv): Promise<Resp
     '/api/store': 'GET',
     '/api/checkout': 'POST',
     '/api/checkout/cancel': 'POST',
+    '/api/checkout/config': 'GET',
     '/api/order': 'GET',
     '/api/stripe/webhook': 'POST',
   };
@@ -318,6 +328,8 @@ export async function handleStore(request: Request, env: MerchEnv): Promise<Resp
       return json({ items: await inventory(storeEnv), checkout: Boolean(env.STRIPE_SECRET_KEY) });
     case '/api/checkout':
       return checkout(request, storeEnv);
+    case '/api/checkout/config':
+      return json({ publishableKey: env.STRIPE_SECRET_KEY ? env.STRIPE_PUBLISHABLE_KEY ?? null : null });
     case '/api/checkout/cancel': {
       const body = await request.json().catch(() => ({})) as { session?: string };
       if (env.STRIPE_SECRET_KEY && typeof body.session === 'string') await cancelSession(storeEnv, body.session);

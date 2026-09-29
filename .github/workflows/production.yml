@@ -87,6 +87,34 @@ jobs:
             printf '%s' "$STRIPE_WEBHOOK_SECRET" | npx wrangler secret put STRIPE_WEBHOOK_SECRET --env=""
           fi
 
+      # Public key for the Apple Pay / Google Pay buttons (STRIPE_PUBLISHABLE_KEY; not secret, but kept beside the others).
+      - name: Sync Stripe publishable key
+        env:
+          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          STRIPE_PUBLISHABLE_KEY: ${{ secrets.STRIPE_PUBLISHABLE_KEY }}
+        run: |
+          if [ -z "$STRIPE_PUBLISHABLE_KEY" ]; then
+            echo "::notice::STRIPE_PUBLISHABLE_KEY is not set, so there are no Apple Pay / Google Pay buttons (hosted checkout still works)."
+            exit 0
+          fi
+          case "$STRIPE_PUBLISHABLE_KEY" in
+            pk_live_*) ;;
+            *) echo "::error::STRIPE_PUBLISHABLE_KEY must look like pk_live_...."; exit 1 ;;
+          esac
+          printf '%s' "$STRIPE_PUBLISHABLE_KEY" | npx wrangler secret put STRIPE_PUBLISHABLE_KEY --env=""
+
+      # Apple Pay needs the domain registered with Stripe (its verification file is public/.well-known).
+      # Never fails the deploy: a wallet button that can't register simply doesn't show.
+      - name: Register domain for Apple Pay
+        env:
+          STRIPE_KEY: ${{ secrets.STRIPE_SECRET_KEY }}
+          DEPLOY_URL: https://brytonzoz.com
+        run: |
+          [ -n "$STRIPE_KEY" ] || exit 0
+          domain=$(printf '%s' "$DEPLOY_URL" | sed -E 's#^https?://##; s#/.*$##')
+          curl -sS -u "$STRIPE_KEY:" https://api.stripe.com/v1/payment_method_domains -d "domain_name=$domain" | head -c 400 || true
+          echo
+
       # NonParallel tees: paid orders are sent to Printify with the PRINTIFY_ACCESS repository secret.
       - name: Sync Printify token
         env:

@@ -105,25 +105,17 @@ export const variantLabel = (product: MerchProduct, color: MerchColor) => {
 };
 // Shop categories in catalog order (the order products.json lists its lines).
 export const merchCategories = merchProducts.map((product) => product.category).filter((category, index, all) => all.indexOf(category) === index);
-// The homepage scene's cards are the tees; everything else is in the shop below it.
-const merchTees = merchProducts.filter((product) => product.line === 'tee');
-
-// The grid's cards: one per colorway while there are only a couple of designs (so each tee shows),
-// one per design (with its color dots) once there are more.
+// The homepage scene's best sellers: a 2x2 grid like Scrapwrk's, the rest of the range in the shop
+// below it. Listed by product slug (lib/merch-catalog.json); ones that aren't in the catalog are skipped.
+const BEST_SELLERS = ['rainbow', 'hoodie-rainbow', 'purple', 'trucker-rainbow'];
 export type MerchCard = { product: MerchProduct; color: MerchColor; perColor: boolean };
-export const merchCards: MerchCard[] = merchTees.length < 3
-  ? merchTees.flatMap((product) => product.colors.map((color) => ({ product, color, perColor: true }))).slice(0, 4)
-  : merchTees.map((product) => ({ product, color: product.colors[0], perColor: false }));
-// In two columns, an odd count ends with a "More soon" card in the free spot; two cards get a wide one under them.
-export const merchMoreCard: 'none' | 'slot' | 'wide' = merchCards.length % 2 ? 'slot' : merchCards.length === 2 ? 'wide' : 'none';
-// The homepage scene has one screen to fit in: six (or nine) tees sit three across instead.
-const sceneColumns: 2 | 3 = merchCards.length >= 5 && merchCards.length % 3 === 0 ? 3 : 2;
-export const merchScene = {
-  columns: sceneColumns,
-  rows: sceneColumns === 3 ? merchCards.length / 3 : Math.ceil(merchCards.length / 2) + (merchMoreCard === 'wide' ? 0.62 : 0),
-  // A row's height relative to the grid's width (card + gap + room to float).
-  rowHeight: sceneColumns === 3 ? 0.44 : 0.66,
-};
+export const merchCards: MerchCard[] = [
+  ...BEST_SELLERS.map((slug) => merchProducts.find((product) => product.slug === slug)),
+  ...merchProducts,
+]
+  .filter((product, index, all): product is MerchProduct => Boolean(product) && all.indexOf(product) === index)
+  .slice(0, 4)
+  .map((product) => ({ product, color: product.colors[0], perColor: false }));
 export const getMerch = (slug: string) => merchProducts.find((product) => product.slug === slug);
 // A tee in the bag: "np:<design>:<Printify variant>". Printify's variant ids name a blank's color and
 // size (every white M is the same id), so the design has to be part of the key.

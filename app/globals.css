@@ -1810,3 +1810,42 @@ html {
   padding: 0.2em 0.65em;
   font-size: max(9px, 2cqw);
 }
+
+/* Under NonParallel's best sellers: the way into the full shop below (app/page.tsx). */
+.np-scroll-hint {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  margin: 5cqw auto 0;
+  padding: 6px 12px;
+  border-radius: 999px;
+  color: rgba(255, 255, 255, 0.62);
+  font-size: 13px;
+  font-weight: 500;
+  letter-spacing: 0.01em;
+  transition: color 160ms ease;
+}
+
+.np-scroll-hint:hover {
+  color: #fff;
+}
+
+.np-scroll-hint:focus-visible {
+  outline: 2px solid rgba(255, 255, 255, 0.6);
+  outline-offset: 2px;
+}
+
+.np-scroll-hint svg {
+  animation: npHint 1.8s ease-in-out infinite;
+}
+
+@keyframes npHint {
+  0%, 100% { transform: translateY(0); opacity: 0.7; }
+  50% { transform: translateY(3px); opacity: 1; }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .np-scroll-hint svg {
+    animation: none;
+  }
+}

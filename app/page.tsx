@@ -14,7 +14,6 @@ import { ArrowUpRightIcon, ChevronDownIcon, EqualizerBars } from '../components/
 import { ResponsiveImage, placeholderBackground } from '../components/ResponsiveImage';
 import { getProjects } from '../lib/projects';
 import { cautionSceneAssets, nonparallelAssets, reminderSceneAssets, scrapwrkSceneAssets, solenyaSceneAssets } from '../lib/assets';
-import { merchScene } from '../lib/merch';
 import type { MediaAsset } from '../lib/media';
 import { nextRelease, nextReleaseProject } from '../lib/next-release';
 import { getStreamingServices, getVisitLabel } from '../lib/streaming';
@@ -1188,8 +1187,9 @@ const nonparallelStickers = [
     movement: { x: 40, y: -120, rotate: 6, scale: 0.06, fadeRate: 1 }, float: { x: 5, y: -6, rotate: 2.4, duration: '7.6s', delay: '0.2s' }, intro: { x: 90, y: -150, rotate: 12, delay: '0.46s' } },
 ];
 
-// NonParallel: the label behind all of this. Its logo (a sticker) heads the scene, a short note
-// says what it is, and the tees follow in the same card system as Scrapwrk.
+// NonParallel: the label behind all of this. Laid out like Scrapwrk's scene: its logo heads it, a
+// line says what it is, four best sellers sit in the same 2x2 card grid, and a small "Scroll for
+// more" leads into the full shop below.
 const NonParallelScene = React.memo(function NonParallelScene({ distance, onShop }: { distance: number; onShop: () => void }) {
   const distanceMagnitude = clamp(Math.abs(distance), 0, 1);
   const active = distanceMagnitude < 0.45;
@@ -1243,10 +1243,8 @@ const NonParallelScene = React.memo(function NonParallelScene({ distance, onShop
         })}
       </div>
       <div
-        className="np-scene relative z-10"
+        className="store-scene relative z-10"
         style={{
-          '--rows': merchScene.rows,
-          '--row-h': merchScene.rowHeight,
           opacity: 1 - (distanceMagnitude * 0.3),
           transform: `translate3d(0, ${incoming * 32}px, 0)`,
           transition: 'transform 480ms cubic-bezier(0.22, 1, 0.36, 1), opacity 280ms ease-out',
@@ -1254,9 +1252,8 @@ const NonParallelScene = React.memo(function NonParallelScene({ distance, onShop
       >
         <MerchExperience
           active={active}
-          columns={merchScene.columns}
-          sizes={merchScene.columns === 3 ? '(min-width: 640px) 180px, 30vw' : '(min-width: 640px) 270px, 44vw'}
-          headerClassName="np-scene-header"
+          sizes="(min-width: 640px) 280px, 46vw"
+          headerClassName="store-scene-header"
           title={(
             <h2 className="np-scene-logo">
               <span className="sr-only">NonParallel</span>
@@ -1269,7 +1266,13 @@ const NonParallelScene = React.memo(function NonParallelScene({ distance, onShop
               <ChevronDownIcon size={16} />
             </button>
           )}
-          intro={<p className="store-caption">The label and company behind all of this. Buying something here supports it and keeps the work going. Everything else is in the shop below.</p>}
+          intro={<p className="store-caption">Best sellers from the label behind all of this. Every piece supports the work.</p>}
+          footer={(
+            <button type="button" onClick={onShop} className="np-scroll-hint">
+              Scroll for more
+              <ChevronDownIcon size={14} />
+            </button>
+          )}
         />
       </div>
     </div>

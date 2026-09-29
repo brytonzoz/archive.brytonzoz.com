@@ -95,6 +95,10 @@ push, and give the owner the staging link from the PR comment once the Staging w
   - Scenes more than one screen away get `scene-still` (their animations pause and they skip drawing with
     `content-visibility`, globals.css). New animations: transform/opacity only (a moving
     `background-position` repaints every frame), and stop them when they're done (the shop shimmer stops per photo).
+  - Scroll-linked motion (cards, stickers, store grids, background cross-fade) is written straight to the elements
+    once per frame by the homepage's frame loop (`useSceneMotion` / `cardMotion` / `stickerMotion` in app/page.tsx),
+    never through React state or CSS transitions: those lag the finger and jitter. Scenes get their index from
+    `SceneIndexContext`; `useIsActiveScene()` is for things that flip once per scene (grid flips, warming a song).
   - Photos load when needed: shop tiles lazily, the hover photo only with a mouse, gallery photos one ahead of the
     swipe. `public/sw.js` keeps shop photos in their own cache so they never push out the scenes' artwork.
 - Search and AI (SEO/GEO): how Bryton shows up is one story in `lib/artist.ts` (`ARTIST`: headline "New York Artist,

@@ -77,6 +77,15 @@ push, and give the owner the staging link from the PR comment once the Staging w
   owner first. Token: the `PRINTIFY_ACCESS` repository secret (production only, so staging checkouts never print).
   Never put it in code or chat. The scene's background tees are Bryton's own mockups from the "NP merch" Drive folder,
   cut out in `assets-src/scenes/nonparallel/` (kept faint: `alpha` in `nonparallelStickers`, app/page.tsx).
+- Wallet buttons (Apple Pay / Google Pay / Link): on a NonParallel piece's sheet and in a merch-only bag, `Buy now` /
+  `Checkout` is replaced by Stripe's Express Checkout Element (`components/store/ExpressPay.tsx`) once the device has a
+  wallet; otherwise the normal button opens hosted checkout. It creates a Checkout Session with `ui_mode: elements`
+  (`express: true` on `/api/checkout`, `worker/store.ts`), so orders, Printify fulfilment and `/scrapwrk/order/` are
+  unchanged. Scrapwrk 1-of-1s never use it (the session is made before the tap and would hold the piece). Needs the
+  `STRIPE_PUBLISHABLE_KEY` (live, `pk_live_`) and `STRIPE_TEST_PUBLISHABLE_KEY` (staging, `pk_test_`) repository
+  secrets; without them the buttons just don't show. Both deploy workflows register the domain with Stripe for Apple Pay
+  (verification file: `public/.well-known/apple-developer-merchantid-domain-association`). Real wallets can only be
+  tested on staging from an iPhone/Android with a card in the wallet (test keys aren't charged).
 - Metrics: `lib/analytics.ts` (anonymous, batched) -> `/api/e` in `worker/metrics.ts` -> D1 `brytonzoz-metrics`
   (`brytonzoz-metrics-staging` for staging; schema `worker/schema.sql`). The dashboard is `/admin`; its password is
   the `ADMIN_PASSWORD` repository secret, which both deploy workflows copy to the Worker. Never put it in code or chat.

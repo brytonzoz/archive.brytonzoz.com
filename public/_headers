@@ -8,3 +8,8 @@
 # The offline worker must always be checked for updates.
 /sw.js
   Cache-Control: no-cache
+
+# Apple Pay domain verification (Stripe's file), served as plain bytes.
+/.well-known/apple-developer-merchantid-domain-association
+  Content-Type: text/plain
+  Cache-Control: public, max-age=3600

@@ -10,6 +10,7 @@ import { addToBag } from '../../lib/store-client';
 import { usePlayer } from '../player/context';
 import { BagIcon, ChevronDownIcon, ShareIcon } from '../player/icons';
 import { useSheet } from '../useSheet';
+import { ExpressPay } from './ExpressPay';
 import { Gallery } from './ProductSheet';
 
 const iconButton =
@@ -39,6 +40,8 @@ export function MerchSheet({
   const [nudge, setNudge] = useState(0);
   // Briefly true after Add to bag: the button turns into a green check (a success state, not just a toast).
   const [added, setAdded] = useState(0);
+  // True once Stripe has a wallet button (Apple Pay / Google Pay / Link) ready for this device.
+  const [wallet, setWallet] = useState(false);
 
   useEffect(() => {
     if (!product) return;
@@ -218,15 +221,23 @@ export function MerchSheet({
                 </svg>
               ) : <BagIcon size={20} />}
             </button>
-            <button
-              type="button"
-              disabled={busy}
-              onClick={withSize((key) => onBuy([key]))}
-              className="flex h-[56px] min-w-0 flex-1 items-center justify-center gap-2 rounded-full bg-[#111] text-[17px] font-semibold text-white shadow-[0_10px_30px_rgba(0,0,0,0.18)] transition-[transform,opacity] active:scale-[0.98] disabled:opacity-70 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-black/50"
-            >
-              {busy ? <span className="player-spinner h-5 w-5 rounded-full" aria-hidden="true" /> : null}
-              {busy ? 'Opening checkout…' : chosen ? `Buy now · ${formatPrice(price)}` : 'Buy now'}
-            </button>
+            <div className="relative min-w-0 flex-1">
+              <button
+                type="button"
+                disabled={busy}
+                onClick={withSize((key) => onBuy([key]))}
+                aria-hidden={wallet || undefined}
+                tabIndex={wallet ? -1 : undefined}
+                className={`flex h-[56px] w-full min-w-0 items-center justify-center gap-2 rounded-full bg-[#111] text-[17px] font-semibold text-white shadow-[0_10px_30px_rgba(0,0,0,0.18)] transition-[transform,opacity] active:scale-[0.98] disabled:opacity-70 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-black/50 ${wallet ? 'invisible' : ''}`}
+              >
+                {busy ? <span className="player-spinner h-5 w-5 rounded-full" aria-hidden="true" /> : null}
+                {busy ? 'Opening checkout…' : chosen ? `Buy now · ${formatPrice(price)}` : 'Buy now'}
+              </button>
+              {/* Same slot: once the device's wallet button is ready it replaces Buy now. */}
+              <div className={`absolute inset-0 transition-opacity duration-300 ${wallet ? 'opacity-100' : 'pointer-events-none opacity-0'}`}>
+                <ExpressPay keys={chosen ? [merchKey(product, chosen.variantId)] : null} onAvailable={setWallet} />
+              </div>
+            </div>
           </div>
         </div>
       </div>

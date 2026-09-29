@@ -80,7 +80,11 @@ export async function sync(printify, root) {
     try {
       await syncLine(line);
     } catch (error) {
-      console.log(`! ${line.name}: ${String(error).slice(0, 300)}; skipped`);
+      // A Printify hiccup (their API sometimes answers 500) must never take products off the site:
+      // the line keeps what the catalog already had.
+      const kept = previous.products.filter((product) => product.line === line.key && !catalog.products.some((done) => done.slug === product.slug));
+      catalog.products.push(...kept);
+      console.log(`! ${line.name}: ${String(error).slice(0, 300)}; skipped, kept ${kept.length} from the catalog`);
     }
   }
 
@@ -143,7 +147,11 @@ export async function sync(printify, root) {
       let variants = [];
       let best = 0;
       const sizes = line.sizes?.map(loose);
-      for (const candidate of providerIds.slice(0, 6)) {
+      // Stay with the printer the product already uses (so a re-sync updates it rather than making a
+      // new product elsewhere); the rest are fallbacks.
+      const current = previous.products.find((product) => product.slug === productSlug)?.printProviderId;
+      const candidates = current && providerIds.includes(current) ? [current, ...providerIds.filter((id) => id !== current)] : providerIds;
+      for (const candidate of candidates.slice(0, 6)) {
         let data;
         try {
           data = variantCache.get(candidate) ?? await printify('GET', `/catalog/blueprints/${line.blueprintId}/print_providers/${candidate}/variants.json?show-out-of-stock=0`);

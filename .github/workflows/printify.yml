@@ -37,10 +37,15 @@ jobs:
         env:
           PRINTIFY_ACCESS: ${{ secrets.PRINTIFY_ACCESS }}
         run: node scripts/printify.mjs catalog
+      # A commit message with "[printify only: candle,mug]" syncs just those lines (by key in
+      # printify/products.json); everything else keeps what the catalog has.
       - name: Create/update the products and fetch their mockups
         env:
           PRINTIFY_ACCESS: ${{ secrets.PRINTIFY_ACCESS }}
-        run: node scripts/printify.mjs sync
+        run: |
+          only=$(git log -1 --format=%B | sed -n 's/.*\[printify only: *\([a-z0-9,-]*\)\].*/\1/p' | head -1)
+          if [ -n "$only" ]; then echo "Syncing only: $only"; fi
+          PRINTIFY_ONLY="$only" node scripts/printify.mjs sync
       - name: Commit the catalog and mockups back to the branch
         run: |
           git config user.name "github-actions[bot]"

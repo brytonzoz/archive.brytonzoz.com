@@ -57,6 +57,34 @@ export function MerchShop({
   const sentinel = useRef<HTMLDivElement>(null);
   const topRef = useRef<HTMLDivElement>(null);
   const deferredQuery = useDeferredValue(query);
+  const searchRef = useRef<HTMLInputElement>(null);
+  const [showTop, setShowTop] = useState(false);
+
+  // Deep in the grid, a small "Top" button brings the search and filters back.
+  useEffect(() => {
+    const onScroll = () => {
+      const top = topRef.current?.getBoundingClientRect().top ?? 0;
+      setShowTop(top < -window.innerHeight * 1.2);
+    };
+    // Scroll events don't bubble, but a capturing listener hears the homepage's scroll container too.
+    document.addEventListener('scroll', onScroll, { capture: true, passive: true });
+    return () => document.removeEventListener('scroll', onScroll, { capture: true });
+  }, []);
+
+  // "/" jumps to search (desktop), unless you're already typing somewhere.
+  useEffect(() => {
+    const onKey = (event: KeyboardEvent) => {
+      const target = event.target as HTMLElement | null;
+      if (event.key !== '/' || event.metaKey || event.ctrlKey || target?.closest('input, textarea, [contenteditable="true"]')) return;
+      const box = searchRef.current;
+      if (!box || !box.getClientRects().length) return;
+      event.preventDefault();
+      box.focus({ preventScroll: true });
+      topRef.current?.scrollIntoView({ block: 'start', behavior: 'smooth' });
+    };
+    window.addEventListener('keydown', onKey);
+    return () => window.removeEventListener('keydown', onKey);
+  }, []);
 
   useEffect(() => {
     const initial = initialProduct ? getMerch(initialProduct) : undefined;
@@ -123,6 +151,7 @@ export function MerchShop({
             <svg aria-hidden="true" width="15" height="15" viewBox="0 0 24 24" fill="none"><circle cx="11" cy="11" r="7" stroke="currentColor" strokeWidth="2.4" /><path d="m20 20-3.5-3.5" stroke="currentColor" strokeWidth="2.4" strokeLinecap="round" /></svg>
             <span className="sr-only">Search the shop</span>
             <input
+              ref={searchRef}
               type="search"
               value={query}
               onChange={(event) => setQuery(event.target.value)}
@@ -169,6 +198,16 @@ export function MerchShop({
         </div>
       )}
       <div ref={sentinel} aria-hidden="true" />
+      <button
+        type="button"
+        onClick={() => topRef.current?.scrollIntoView({ block: 'start', behavior: 'smooth' })}
+        className={`shop-top ${showTop ? 'is-shown' : ''}`}
+        tabIndex={showTop ? 0 : -1}
+        aria-hidden={!showTop}
+      >
+        <svg aria-hidden="true" width="14" height="14" viewBox="0 0 24 24" fill="none"><path d="M6 15l6-6 6 6" stroke="currentColor" strokeWidth="2.6" strokeLinecap="round" strokeLinejoin="round" /></svg>
+        Top
+      </button>
 
       <MerchSheet product={open} onClose={closeProduct} onBuy={buy} busy={busy} />
       <BagSheet isOpen={bagOpen} onClose={() => setBagOpen(false)} onBuy={buy} busy={busy} />

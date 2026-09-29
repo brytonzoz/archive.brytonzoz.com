@@ -1849,3 +1849,232 @@ html {
     animation: none;
   }
 }
+
+/* Product sheet (components/store/MerchSheet.tsx): Add to bag turns into a green check for a
+   moment, and a price change rolls in from below. */
+.merch-add {
+  background: rgba(0, 0, 0, 0.07);
+  color: #111;
+  transition: background-color 220ms ease, color 220ms ease, transform 160ms ease;
+}
+
+.merch-add:hover {
+  background: rgba(0, 0, 0, 0.1);
+}
+
+.merch-add:active {
+  transform: scale(0.97);
+}
+
+.merch-add.is-added {
+  background: #1f9d55;
+  color: #fff;
+}
+
+.merch-add-check path {
+  stroke-dasharray: 24;
+  stroke-dashoffset: 24;
+  animation: merchCheck 360ms 60ms cubic-bezier(0.22, 1, 0.36, 1) forwards;
+}
+
+@keyframes merchCheck {
+  to { stroke-dashoffset: 0; }
+}
+
+.merch-price-roll {
+  animation: merchPriceRoll 320ms cubic-bezier(0.22, 1, 0.36, 1);
+}
+
+@keyframes merchPriceRoll {
+  from {
+    opacity: 0;
+    transform: translateY(60%);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .merch-add-check path {
+    animation: none;
+    stroke-dashoffset: 0;
+  }
+
+  .merch-price-roll {
+    animation: none;
+  }
+}
+
+/* Shop: photos shimmer until they arrive, and deep in the grid a "Top" pill brings the search and
+   filters back (components/store/MerchShop.tsx). */
+.shop-tile-photo::before {
+  content: '';
+  position: absolute;
+  inset: 0;
+  background: linear-gradient(100deg, transparent 30%, rgba(255, 255, 255, 0.7) 50%, transparent 70%) #eeeeee;
+  background-size: 250% 100%;
+  animation: shopShimmer 1.4s ease-in-out infinite;
+}
+
+@keyframes shopShimmer {
+  from { background-position: 120% 0; }
+  to { background-position: -120% 0; }
+}
+
+.shop-top {
+  position: fixed;
+  left: 50%;
+  bottom: calc(max(16px, env(safe-area-inset-bottom)) + var(--player-offset, 0px) + 12px);
+  z-index: 30;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  height: 38px;
+  padding: 0 16px 0 13px;
+  border-radius: 999px;
+  background: rgba(28, 28, 30, 0.82);
+  -webkit-backdrop-filter: blur(20px) saturate(170%);
+  backdrop-filter: blur(20px) saturate(170%);
+  box-shadow: inset 0 0 0 0.5px rgba(255, 255, 255, 0.12), 0 8px 24px rgba(0, 0, 0, 0.35);
+  color: #fff;
+  font-size: 14px;
+  font-weight: 600;
+  opacity: 0;
+  pointer-events: none;
+  transform: translate(-50%, 12px) scale(0.96);
+  transition: opacity 220ms ease, transform 320ms cubic-bezier(0.22, 1, 0.36, 1);
+}
+
+.shop-top.is-shown {
+  opacity: 1;
+  pointer-events: auto;
+  transform: translate(-50%, 0) scale(1);
+}
+
+.shop-top:active {
+  transform: translate(-50%, 0) scale(0.95);
+}
+
+.shop-top:focus-visible {
+  outline: 2px solid rgba(255, 255, 255, 0.7);
+  outline-offset: 2px;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .shop-tile-photo::before {
+    animation: none;
+  }
+}
+
+/* Full-screen photo with tap-to-zoom (components/store/PhotoZoom.tsx), above the product sheets. */
+.photo-zoom {
+  position: fixed;
+  inset: 0;
+  z-index: 140;
+  background: #0b0b0c;
+  animation: photoZoomIn 240ms ease-out;
+}
+
+@keyframes photoZoomIn {
+  from { opacity: 0; }
+}
+
+.photo-zoom-frame {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  overflow: hidden;
+  cursor: zoom-in;
+  -webkit-tap-highlight-color: transparent;
+}
+
+.photo-zoom-frame.is-zoomed {
+  display: block;
+  overflow: auto;
+  cursor: zoom-out;
+  overscroll-behavior: contain;
+  scrollbar-width: none;
+}
+
+.photo-zoom-frame.is-zoomed::-webkit-scrollbar {
+  display: none;
+}
+
+.photo-zoom-canvas {
+  margin: auto;
+  max-width: none;
+}
+
+.photo-zoom-frame:not(.is-zoomed) .photo-zoom-canvas {
+  width: min(100vw, 100dvh) !important;
+}
+
+.photo-zoom-img {
+  display: block;
+  height: auto;
+  width: 100%;
+  user-select: none;
+}
+
+.photo-zoom-button {
+  position: absolute;
+  z-index: 2;
+  display: flex;
+  height: 44px;
+  width: 44px;
+  align-items: center;
+  justify-content: center;
+  border-radius: 999px;
+  background: rgba(28, 28, 30, 0.72);
+  -webkit-backdrop-filter: blur(16px);
+  backdrop-filter: blur(16px);
+  color: #fff;
+  box-shadow: inset 0 0 0 0.5px rgba(255, 255, 255, 0.14);
+}
+
+.photo-zoom-button:focus-visible {
+  outline: 2px solid rgba(255, 255, 255, 0.7);
+  outline-offset: 2px;
+}
+
+.photo-zoom-close {
+  top: max(14px, env(safe-area-inset-top));
+  right: 14px;
+}
+
+.photo-zoom-prev,
+.photo-zoom-next {
+  top: 50%;
+  margin-top: -22px;
+}
+
+.photo-zoom-prev { left: 12px; }
+.photo-zoom-next { right: 12px; }
+
+.photo-zoom-count,
+.photo-zoom-hint {
+  position: absolute;
+  z-index: 2;
+  left: 50%;
+  transform: translateX(-50%);
+  padding: 5px 11px;
+  border-radius: 999px;
+  background: rgba(28, 28, 30, 0.72);
+  color: rgba(255, 255, 255, 0.85);
+  font-size: 12px;
+  font-weight: 600;
+  pointer-events: none;
+}
+
+.photo-zoom-count {
+  top: max(22px, calc(env(safe-area-inset-top) + 8px));
+  font-variant-numeric: tabular-nums;
+}
+
+.photo-zoom-hint {
+  bottom: max(20px, calc(env(safe-area-inset-bottom) + 8px));
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .photo-zoom {
+    animation: none;
+  }
+}

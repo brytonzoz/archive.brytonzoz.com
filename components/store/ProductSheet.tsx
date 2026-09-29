@@ -11,6 +11,7 @@ import { ResponsiveImage, placeholderBackground } from '../ResponsiveImage';
 import { usePlayer } from '../player/context';
 import { BagIcon, ChevronDownIcon, ShareIcon } from '../player/icons';
 import { useSheet } from '../useSheet';
+import { PhotoZoom } from './PhotoZoom';
 
 const iconButton =
   'flex h-10 w-10 items-center justify-center rounded-full text-white/75 transition-colors hover:bg-white/10 hover:text-white focus-visible:outline focus-visible:outline-2 focus-visible:outline-white/70';
@@ -46,6 +47,7 @@ export function Gallery({
     el.scrollTo({ left: el.clientWidth * Math.max(0, Math.min(count - 1, i)), behavior: 'smooth' });
   };
 
+  const [zoom, setZoom] = useState<number | null>(null);
   const sides = views && views.includes('front') && views.includes('back') ? views : null;
   const side = sides?.[index] ?? null;
 
@@ -66,7 +68,13 @@ export function Gallery({
         }}
       >
         {images.map((image, i) => (
-          <div key={image.src} className="relative aspect-square w-full shrink-0 snap-center" style={placeholderBackground(image)}>
+          <div
+            key={image.src}
+            className="relative aspect-square w-full shrink-0 snap-center cursor-zoom-in"
+            style={placeholderBackground(image)}
+            // Tap a photo to see it full screen and zoom into the print.
+            onClick={() => setZoom(i)}
+          >
             <ResponsiveImage
               asset={image}
               alt={alt(i)}
@@ -108,6 +116,19 @@ export function Gallery({
           <span key={image.src} className={`h-1.5 rounded-full transition-all duration-300 ${tone === 'dark' ? 'bg-black' : 'bg-white'} ${i === index ? 'w-4 opacity-80' : 'w-1.5 opacity-30'}`} />
         ))}
       </div>
+      {zoom !== null ? (
+        <PhotoZoom
+          images={images}
+          index={zoom}
+          alt={alt}
+          onIndex={setZoom}
+          onClose={() => {
+            // Back in the sheet, on the photo you ended on.
+            if (zoom !== index) go(zoom);
+            setZoom(null);
+          }}
+        />
+      ) : null}
     </div>
   );
 }

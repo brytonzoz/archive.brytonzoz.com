@@ -37,11 +37,14 @@ export function MerchSheet({
   const [colorIndex, setColorIndex] = useState(0);
   const [size, setSize] = useState<string | null>(null);
   const [nudge, setNudge] = useState(0);
+  // Briefly true after Add to bag: the button turns into a green check (a success state, not just a toast).
+  const [added, setAdded] = useState(0);
 
   useEffect(() => {
     if (!product) return;
     setColorIndex(Math.max(0, product.colors.findIndex((color) => color.slug === initialColor)));
     setSize(null);
+    setAdded(0);
     track({ type: 'product', detail: `np:${product.slug}` });
     if (!document.querySelector('link[data-stripe-preconnect]')) {
       const link = document.createElement('link');
@@ -123,7 +126,10 @@ export function MerchSheet({
                 </p>
                 <h2 id={titleId} className="mt-1 text-[30px] font-bold leading-none tracking-[-0.03em]">{product.name}</h2>
               </div>
-              <p className="shrink-0 text-[24px] font-semibold tabular-nums tracking-[-0.02em]">{formatPrice(price)}</p>
+              <p className="shrink-0 overflow-hidden text-[24px] font-semibold tabular-nums tracking-[-0.02em]" aria-live="polite">
+                {/* Keyed by the price, so a size that costs more rolls the new price in. */}
+                <span key={price} className="merch-price-roll inline-block">{formatPrice(price)}</span>
+              </p>
             </div>
 
             {product.colors.length > 1 ? (
@@ -198,11 +204,17 @@ export function MerchSheet({
                 navigator.vibrate?.(10);
                 track({ type: 'bag', detail: key });
                 notify('Added to bag');
+                setAdded(Date.now());
+                window.setTimeout(() => setAdded(0), 1400);
               })}
-              aria-label="Add to bag"
-              className="flex h-[56px] shrink-0 items-center justify-center gap-2 rounded-full bg-black/[0.07] px-5 text-[16px] font-semibold text-black transition-[transform,background-color] hover:bg-black/[0.1] active:scale-[0.97] focus-visible:outline focus-visible:outline-2 focus-visible:outline-black/50"
+              aria-label={added ? 'Added to bag' : 'Add to bag'}
+              className={`merch-add ${added ? 'is-added' : ''} flex h-[56px] shrink-0 items-center justify-center gap-2 rounded-full px-5 text-[16px] font-semibold focus-visible:outline focus-visible:outline-2 focus-visible:outline-black/50`}
             >
-              <BagIcon size={20} />
+              {added ? (
+                <svg key={added} className="merch-add-check" width="20" height="20" viewBox="0 0 24 24" fill="none" aria-hidden="true">
+                  <path d="M5 12.5l4.5 4.5L19 7.5" stroke="currentColor" strokeWidth="2.6" strokeLinecap="round" strokeLinejoin="round" />
+                </svg>
+              ) : <BagIcon size={20} />}
             </button>
             <button
               type="button"

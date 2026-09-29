@@ -102,11 +102,11 @@ export async function sync(printify, root) {
   }
 
   // What the catalog already has for a line, for lines this run leaves alone or can't reach.
-  const keepLine = (line) => {
+  function keepLine(line) {
     const kept = previous.products.filter((product) => product.line === line.key && !catalog.products.some((done) => done.slug === product.slug));
     catalog.products.push(...kept);
     return kept.length;
-  };
+  }
 
   async function syncLine(line) {
     // Lines not asked for this run (PRINTIFY_ONLY=hoodie,mug) keep what the catalog had, without

@@ -1,4 +1,5 @@
 import catalog from './merch-catalog.json';
+import mockupRules from '../printify/mockups.json';
 import shareImages from './share-images.json';
 import { media, type MediaAsset, type MediaKey } from './media';
 
@@ -46,6 +47,11 @@ const slugify = (text: string) => text.toLowerCase().replace(/[^a-z0-9]+/g, '-')
 
 const studioKeys = (design: string, color: string) =>
   Object.keys(media).filter((key) => key.startsWith(`merch-studio/${design}/${color}-`)).sort();
+// Only photographic mockups: printify/mockups.json lists the lines that show studio shots only
+// (Printify's are flat drawings) and single mockups to hide (models, blank or cropped frames).
+const STUDIO_ONLY = new Set<string>(mockupRules.studioOnly);
+const HIDDEN = mockupRules.hide.map((pattern) => new RegExp(pattern));
+const showMockup = (line: string | undefined, key: string) => !STUDIO_ONLY.has(line ?? 'tee') && !HIDDEN.some((rule) => rule.test(key));
 // Studio shots show the back (the big logo) unless the file says otherwise: black-5-front.jpg.
 const studioView = (key: string): MerchView => (key.endsWith('-front') ? 'front' : 'back');
 // Tees synced before views were recorded: Printify's back, front, front, back.
@@ -80,7 +86,7 @@ export const merchProducts: MerchProduct[] = (catalog.products as RawProduct[])
         const studio = studioKeys(product.slug, slugify(color.name));
         const mockupViews = color.views ?? (product.line ? undefined : LEGACY_TEE_VIEWS.slice(0, color.images.length));
         const pairs = [
-          ...color.images.map((key, i) => ({ key, view: mockupViews?.[i] ?? null })),
+          ...color.images.map((key, i) => ({ key, view: mockupViews?.[i] ?? null })).filter(({ key }) => showMockup(product.line, key)),
           ...studio.map((key) => ({ key, view: studioView(key) })),
         ].filter(({ key }) => media[key as MediaKey]);
         return {

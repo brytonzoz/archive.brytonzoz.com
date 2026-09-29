@@ -468,6 +468,14 @@
     "webp": "/media/merch-studio/green/white-4.049e5ab6cb-320.webp 320w, /media/merch-studio/green/white-4.049e5ab6cb-480.webp 480w, /media/merch-studio/green/white-4.049e5ab6cb-640.webp 640w, /media/merch-studio/green/white-4.049e5ab6cb-800.webp 800w, /media/merch-studio/green/white-4.049e5ab6cb-1080.webp 1080w, /media/merch-studio/green/white-4.049e5ab6cb-1440.webp 1440w",
     "placeholder": "data:image/webp;base64,UklGRr4AAABXRUJQVlA4ILIAAABwBQCdASoYABgAPu1wr1IppiQiqAgBMB2JZgC+aQSBg72dpZZ6O+/9AYo60D0ea82722nQAP7vu/fJj/X/1ZT1JrOai1dH7jrxGIFJ6J5uS74JqY8ZaAQhNjQTrJ7x+te2xXwMLyO20f7Nqw9pl3nx2YWkTq5PZJqaEyWHgAUcCt83ByE4DpqDQCJiShI+5LzM2cFi+5Ozd+FMarOakMtbQvhiOq/GAokbsdeCBOXnQAAA"
   },
+  "merch-studio/heavy-hoodie-purple/bone-1-front": {
+    "width": 1440,
+    "height": 1440,
+    "src": "/media/merch-studio/heavy-hoodie-purple/bone-1-front.d843260683-1440.webp",
+    "avif": "/media/merch-studio/heavy-hoodie-purple/bone-1-front.d843260683-320.avif 320w, /media/merch-studio/heavy-hoodie-purple/bone-1-front.d843260683-480.avif 480w, /media/merch-studio/heavy-hoodie-purple/bone-1-front.d843260683-640.avif 640w, /media/merch-studio/heavy-hoodie-purple/bone-1-front.d843260683-800.avif 800w, /media/merch-studio/heavy-hoodie-purple/bone-1-front.d843260683-1080.avif 1080w, /media/merch-studio/heavy-hoodie-purple/bone-1-front.d843260683-1440.avif 1440w",
+    "webp": "/media/merch-studio/heavy-hoodie-purple/bone-1-front.d843260683-320.webp 320w, /media/merch-studio/heavy-hoodie-purple/bone-1-front.d843260683-480.webp 480w, /media/merch-studio/heavy-hoodie-purple/bone-1-front.d843260683-640.webp 640w, /media/merch-studio/heavy-hoodie-purple/bone-1-front.d843260683-800.webp 800w, /media/merch-studio/heavy-hoodie-purple/bone-1-front.d843260683-1080.webp 1080w, /media/merch-studio/heavy-hoodie-purple/bone-1-front.d843260683-1440.webp 1440w",
+    "placeholder": "data:image/webp;base64,UklGRr4AAABXRUJQVlA4ILIAAAAwBQCdASoYABgAPu1qrFEppaQiqAqpMB2JZQAFEz7tCDc6vFL0VJMl/UwVsPjAoLRIAAD+8NKP75u4Nayun4TWM+WKHo/qcLKHWMDWYpfX4hJbMBTfrF/E+fP7QbdWUPp7wlSNla9RRfpaUNxSPmZy4/EvLnosnsvHSSfdM8J4U2xnk9CxSa6dIAJG5WAmMta++0+m/xizFpkvAkk1BZ8n8a4yqbdxgfkU4/Zh3xBAAAAA"
+  },
   "merch-studio/heavy-hoodie-purple/bone-1": {
     "width": 1440,
     "height": 1440,
@@ -491,6 +499,46 @@
     "avif": "/media/merch-studio/heavy-hoodie-purple/bone-3.4d45ca2515-320.avif 320w, /media/merch-studio/heavy-hoodie-purple/bone-3.4d45ca2515-480.avif 480w, /media/merch-studio/heavy-hoodie-purple/bone-3.4d45ca2515-640.avif 640w, /media/merch-studio/heavy-hoodie-purple/bone-3.4d45ca2515-800.avif 800w, /media/merch-studio/heavy-hoodie-purple/bone-3.4d45ca2515-1080.avif 1080w, /media/merch-studio/heavy-hoodie-purple/bone-3.4d45ca2515-1440.avif 1440w",
     "webp": "/media/merch-studio/heavy-hoodie-purple/bone-3.4d45ca2515-320.webp 320w, /media/merch-studio/heavy-hoodie-purple/bone-3.4d45ca2515-480.webp 480w, /media/merch-studio/heavy-hoodie-purple/bone-3.4d45ca2515-640.webp 640w, /media/merch-studio/heavy-hoodie-purple/bone-3.4d45ca2515-800.webp 800w, /media/merch-studio/heavy-hoodie-purple/bone-3.4d45ca2515-1080.webp 1080w, /media/merch-studio/heavy-hoodie-purple/bone-3.4d45ca2515-1440.webp 1440w",
     "placeholder": "data:image/webp;base64,UklGRpAAAABXRUJQVlA4IIQAAACQBACdASoYABgAPu1wsFIppiSiqAgBMB2JQBhQAglNopJOd9CDZB3kfDT+eIAA/sbZ5cbrI5uCa0GT5Vy5q8W3PAtnD8DzeFUWSP9VmLiNApHrbnKtuLzZRM9ujAgiLHTB99WXoC+tFEUIwUOCqH1kUOwYTIUa021RfvdXvATKBWzwAAA="
+  },
+  "merch-studio/heavy-hoodie-purple/grey-heather-1-front": {
+    "width": 1440,
+    "height": 1440,
+    "src": "/media/merch-studio/heavy-hoodie-purple/grey-heather-1-front.ddee30cbe3-1440.webp",
+    "avif": "/media/merch-studio/heavy-hoodie-purple/grey-heather-1-front.ddee30cbe3-320.avif 320w, /media/merch-studio/heavy-hoodie-purple/grey-heather-1-front.ddee30cbe3-480.avif 480w, /media/merch-studio/heavy-hoodie-purple/grey-heather-1-front.ddee30cbe3-640.avif 640w, /media/merch-studio/heavy-hoodie-purple/grey-heather-1-front.ddee30cbe3-800.avif 800w, /media/merch-studio/heavy-hoodie-purple/grey-heather-1-front.ddee30cbe3-1080.avif 1080w, /media/merch-studio/heavy-hoodie-purple/grey-heather-1-front.ddee30cbe3-1440.avif 1440w",
+    "webp": "/media/merch-studio/heavy-hoodie-purple/grey-heather-1-front.ddee30cbe3-320.webp 320w, /media/merch-studio/heavy-hoodie-purple/grey-heather-1-front.ddee30cbe3-480.webp 480w, /media/merch-studio/heavy-hoodie-purple/grey-heather-1-front.ddee30cbe3-640.webp 640w, /media/merch-studio/heavy-hoodie-purple/grey-heather-1-front.ddee30cbe3-800.webp 800w, /media/merch-studio/heavy-hoodie-purple/grey-heather-1-front.ddee30cbe3-1080.webp 1080w, /media/merch-studio/heavy-hoodie-purple/grey-heather-1-front.ddee30cbe3-1440.webp 1440w",
+    "placeholder": "data:image/webp;base64,UklGRqYAAABXRUJQVlA4IJoAAAAQBQCdASoYABgAPu1qqFCppaOiqA1RMB2JZwDMWBDexv/ZcexUwPjH9uFKoFi43jAAAP7ukPuHS5cadZj1r/KuYkNZU7p+wBkxZz3bgI73B6QfCClLn3QAfEpdXfiOn9W+oP7RkE0jRNw2jg2JDRIReRuDeju7W6Y/222QpMUzpQw8OdtgWzosPm1FfVilqxDCNhgfalHlb3AA"
+  },
+  "merch-studio/heavy-hoodie-purple/grey-heather-1": {
+    "width": 1440,
+    "height": 1440,
+    "src": "/media/merch-studio/heavy-hoodie-purple/grey-heather-1.9110fa73ea-1440.webp",
+    "avif": "/media/merch-studio/heavy-hoodie-purple/grey-heather-1.9110fa73ea-320.avif 320w, /media/merch-studio/heavy-hoodie-purple/grey-heather-1.9110fa73ea-480.avif 480w, /media/merch-studio/heavy-hoodie-purple/grey-heather-1.9110fa73ea-640.avif 640w, /media/merch-studio/heavy-hoodie-purple/grey-heather-1.9110fa73ea-800.avif 800w, /media/merch-studio/heavy-hoodie-purple/grey-heather-1.9110fa73ea-1080.avif 1080w, /media/merch-studio/heavy-hoodie-purple/grey-heather-1.9110fa73ea-1440.avif 1440w",
+    "webp": "/media/merch-studio/heavy-hoodie-purple/grey-heather-1.9110fa73ea-320.webp 320w, /media/merch-studio/heavy-hoodie-purple/grey-heather-1.9110fa73ea-480.webp 480w, /media/merch-studio/heavy-hoodie-purple/grey-heather-1.9110fa73ea-640.webp 640w, /media/merch-studio/heavy-hoodie-purple/grey-heather-1.9110fa73ea-800.webp 800w, /media/merch-studio/heavy-hoodie-purple/grey-heather-1.9110fa73ea-1080.webp 1080w, /media/merch-studio/heavy-hoodie-purple/grey-heather-1.9110fa73ea-1440.webp 1440w",
+    "placeholder": "data:image/webp;base64,UklGRrQAAABXRUJQVlA4IKgAAADwBACdASoYABgAPu1wr1KppiQiqAgBMB2JZwDKtywA1nEn3rmJRa5mQqvGC03ZpgAA/vDQ/yQEunahoeWlmA8ARbt/7ypDUZHa7pDhsm897IKA8aQNLP++fAYTJLwuXweWBFcnYYgYq45UePYqr06DJcqW35r3bruRGtBE8q2T55nbIdQaKJV7ZgQw8PudG8/GfpYLjLhKTXHlEB2+xWAyX2CvcenYIAA="
+  },
+  "merch-studio/heavy-hoodie-purple/white-1-front": {
+    "width": 1440,
+    "height": 1440,
+    "src": "/media/merch-studio/heavy-hoodie-purple/white-1-front.cea9ad222e-1440.webp",
+    "avif": "/media/merch-studio/heavy-hoodie-purple/white-1-front.cea9ad222e-320.avif 320w, /media/merch-studio/heavy-hoodie-purple/white-1-front.cea9ad222e-480.avif 480w, /media/merch-studio/heavy-hoodie-purple/white-1-front.cea9ad222e-640.avif 640w, /media/merch-studio/heavy-hoodie-purple/white-1-front.cea9ad222e-800.avif 800w, /media/merch-studio/heavy-hoodie-purple/white-1-front.cea9ad222e-1080.avif 1080w, /media/merch-studio/heavy-hoodie-purple/white-1-front.cea9ad222e-1440.avif 1440w",
+    "webp": "/media/merch-studio/heavy-hoodie-purple/white-1-front.cea9ad222e-320.webp 320w, /media/merch-studio/heavy-hoodie-purple/white-1-front.cea9ad222e-480.webp 480w, /media/merch-studio/heavy-hoodie-purple/white-1-front.cea9ad222e-640.webp 640w, /media/merch-studio/heavy-hoodie-purple/white-1-front.cea9ad222e-800.webp 800w, /media/merch-studio/heavy-hoodie-purple/white-1-front.cea9ad222e-1080.webp 1080w, /media/merch-studio/heavy-hoodie-purple/white-1-front.cea9ad222e-1440.webp 1440w",
+    "placeholder": "data:image/webp;base64,UklGRsAAAABXRUJQVlA4ILQAAACwBQCdASoYABgAPu1ur1IppiQiqAgBMB2JZwAFEB7wyGO2YMcNutXyXPRspHREnerzLkK1oAAA/vDSGv561ENqfeeKBdFYcGawaK8iJ/r5zREE8pHoZculWDfyv6EJ0fsa7r9WidDsG1Hh/44h78tCBEyIC8+rZRSKLCVvxeTgLUYcifsuH9axP1Ev8ir79tw9x9cTLFVhYDTeZmv9Ac22KcrzVMEBypBchcuJkFeZieIAAAA="
+  },
+  "merch-studio/heavy-hoodie-purple/white-1": {
+    "width": 1440,
+    "height": 1440,
+    "src": "/media/merch-studio/heavy-hoodie-purple/white-1.6b5afcc803-1440.webp",
+    "avif": "/media/merch-studio/heavy-hoodie-purple/white-1.6b5afcc803-320.avif 320w, /media/merch-studio/heavy-hoodie-purple/white-1.6b5afcc803-480.avif 480w, /media/merch-studio/heavy-hoodie-purple/white-1.6b5afcc803-640.avif 640w, /media/merch-studio/heavy-hoodie-purple/white-1.6b5afcc803-800.avif 800w, /media/merch-studio/heavy-hoodie-purple/white-1.6b5afcc803-1080.avif 1080w, /media/merch-studio/heavy-hoodie-purple/white-1.6b5afcc803-1440.avif 1440w",
+    "webp": "/media/merch-studio/heavy-hoodie-purple/white-1.6b5afcc803-320.webp 320w, /media/merch-studio/heavy-hoodie-purple/white-1.6b5afcc803-480.webp 480w, /media/merch-studio/heavy-hoodie-purple/white-1.6b5afcc803-640.webp 640w, /media/merch-studio/heavy-hoodie-purple/white-1.6b5afcc803-800.webp 800w, /media/merch-studio/heavy-hoodie-purple/white-1.6b5afcc803-1080.webp 1080w, /media/merch-studio/heavy-hoodie-purple/white-1.6b5afcc803-1440.webp 1440w",
+    "placeholder": "data:image/webp;base64,UklGRuwAAABXRUJQVlA4IOAAAADQBQCdASoYABgAPu1ur1IppiQiqAgBMB2JZwC/7YtycVycPLIybtwiydWuetOybg3OockcPeMAAP7w0QLUB2RMWt1HYMbBuQWjnaJpvsmmecLI29PlSZcKDLNG972IqFrj4Usl63LZPedA5Nr0sYNtpDpcibk2I5RBEmpmavfnKM7yeqzRtALx63RM+OyeIaU3xZ29bAE3cIOEjeOgwSOv9xjJmedsBi9lKnZHNG5AbAvy8n3hBbM70M75SCYQkzrgMFRu1S+j1clQwMYf2JuybM21ASuWTFuUO2Hs63AAAA=="
+  },
+  "merch-studio/heavy-hoodie-rainbow/black-1-front": {
+    "width": 1440,
+    "height": 1440,
+    "src": "/media/merch-studio/heavy-hoodie-rainbow/black-1-front.2dbe02055f-1440.webp",
+    "avif": "/media/merch-studio/heavy-hoodie-rainbow/black-1-front.2dbe02055f-320.avif 320w, /media/merch-studio/heavy-hoodie-rainbow/black-1-front.2dbe02055f-480.avif 480w, /media/merch-studio/heavy-hoodie-rainbow/black-1-front.2dbe02055f-640.avif 640w, /media/merch-studio/heavy-hoodie-rainbow/black-1-front.2dbe02055f-800.avif 800w, /media/merch-studio/heavy-hoodie-rainbow/black-1-front.2dbe02055f-1080.avif 1080w, /media/merch-studio/heavy-hoodie-rainbow/black-1-front.2dbe02055f-1440.avif 1440w",
+    "webp": "/media/merch-studio/heavy-hoodie-rainbow/black-1-front.2dbe02055f-320.webp 320w, /media/merch-studio/heavy-hoodie-rainbow/black-1-front.2dbe02055f-480.webp 480w, /media/merch-studio/heavy-hoodie-rainbow/black-1-front.2dbe02055f-640.webp 640w, /media/merch-studio/heavy-hoodie-rainbow/black-1-front.2dbe02055f-800.webp 800w, /media/merch-studio/heavy-hoodie-rainbow/black-1-front.2dbe02055f-1080.webp 1080w, /media/merch-studio/heavy-hoodie-rainbow/black-1-front.2dbe02055f-1440.webp 1440w",
+    "placeholder": "data:image/webp;base64,UklGRmgAAABXRUJQVlA4IFwAAAAQBACdASoYABgAPu1wr1IppiQiqAgBMB2JZwDMWBFB8qfb1k5isVngAAD+7pIq4OsjOb8/ojRWVRdpx04pEwkurvV1cD/tKu4d/dczefl+j+VajKm32osmMAAAAA=="
   },
   "merch-studio/heavy-hoodie-rainbow/black-1": {
     "width": 1440,
@@ -1108,6 +1156,22 @@
     "webp": "/media/merch-studio/shorts-purple/grey-heather-2.3d62d403be-320.webp 320w, /media/merch-studio/shorts-purple/grey-heather-2.3d62d403be-480.webp 480w, /media/merch-studio/shorts-purple/grey-heather-2.3d62d403be-640.webp 640w, /media/merch-studio/shorts-purple/grey-heather-2.3d62d403be-800.webp 800w, /media/merch-studio/shorts-purple/grey-heather-2.3d62d403be-1080.webp 1080w, /media/merch-studio/shorts-purple/grey-heather-2.3d62d403be-1440.webp 1440w",
     "placeholder": "data:image/webp;base64,UklGRooAAABXRUJQVlA4IH4AAADQBACdASoYABgAPu1oq08ppiOiMBgIATAdiWcAzuwR6CYQ2y3zn4ZNJ9jRwn/2gAD+58rmAD/wWGEQ6ANgg/DKsXnIKoprVJCH/hS3MHXoKTOKF7QInYKsz+B7Tak4sc0LwEvlXhoYW/Ow+la/1+qOrcU9/nkwza7wTLwAAAA="
   },
+  "merch-studio/shorts-purple/white-1": {
+    "width": 1440,
+    "height": 1440,
+    "src": "/media/merch-studio/shorts-purple/white-1.f2e734e95d-1440.webp",
+    "avif": "/media/merch-studio/shorts-purple/white-1.f2e734e95d-320.avif 320w, /media/merch-studio/shorts-purple/white-1.f2e734e95d-480.avif 480w, /media/merch-studio/shorts-purple/white-1.f2e734e95d-640.avif 640w, /media/merch-studio/shorts-purple/white-1.f2e734e95d-800.avif 800w, /media/merch-studio/shorts-purple/white-1.f2e734e95d-1080.avif 1080w, /media/merch-studio/shorts-purple/white-1.f2e734e95d-1440.avif 1440w",
+    "webp": "/media/merch-studio/shorts-purple/white-1.f2e734e95d-320.webp 320w, /media/merch-studio/shorts-purple/white-1.f2e734e95d-480.webp 480w, /media/merch-studio/shorts-purple/white-1.f2e734e95d-640.webp 640w, /media/merch-studio/shorts-purple/white-1.f2e734e95d-800.webp 800w, /media/merch-studio/shorts-purple/white-1.f2e734e95d-1080.webp 1080w, /media/merch-studio/shorts-purple/white-1.f2e734e95d-1440.webp 1440w",
+    "placeholder": "data:image/webp;base64,UklGRrQAAABXRUJQVlA4IKgAAAAQBQCdASoYABgAPu1mqU4ppaOiMAgBMB2JZwAAUquaj4XURUa0/hfn5B+FVM5o4D4AAP7ujF5y5Y4CXueYGZoXaCiaoW4oVcCKPKrawPBwhhHKd49+cAF7ed91f+9pIqXm0pudrLZRyRXyuHa02KJ7ct+Wb5g0JA4wHlnGm6O5nA53rzZ4lejG2ZJ199JNKjI0/aCSRsmTlFC/jjhS7D2RdVEwWlAAAAA="
+  },
+  "merch-studio/shorts-purple/white-2": {
+    "width": 1440,
+    "height": 1440,
+    "src": "/media/merch-studio/shorts-purple/white-2.0c83478398-1440.webp",
+    "avif": "/media/merch-studio/shorts-purple/white-2.0c83478398-320.avif 320w, /media/merch-studio/shorts-purple/white-2.0c83478398-480.avif 480w, /media/merch-studio/shorts-purple/white-2.0c83478398-640.avif 640w, /media/merch-studio/shorts-purple/white-2.0c83478398-800.avif 800w, /media/merch-studio/shorts-purple/white-2.0c83478398-1080.avif 1080w, /media/merch-studio/shorts-purple/white-2.0c83478398-1440.avif 1440w",
+    "webp": "/media/merch-studio/shorts-purple/white-2.0c83478398-320.webp 320w, /media/merch-studio/shorts-purple/white-2.0c83478398-480.webp 480w, /media/merch-studio/shorts-purple/white-2.0c83478398-640.webp 640w, /media/merch-studio/shorts-purple/white-2.0c83478398-800.webp 800w, /media/merch-studio/shorts-purple/white-2.0c83478398-1080.webp 1080w, /media/merch-studio/shorts-purple/white-2.0c83478398-1440.webp 1440w",
+    "placeholder": "data:image/webp;base64,UklGRpYAAABXRUJQVlA4IIoAAABwBACdASoYABgAPuVepE2pJSOiMAwBIByJZwDLLB49+oHZ8YWf7GShsNY4AAD+1DkkgxQuClOFc5UngCz1Zm41Gr+oW6wirw/qu5+eh6LjcUg6I8MRbWtzUYF1tiisqZEYBlIo7xncaScCILSjN/Vz/o15cPtCGAZsip6c6RNTIRzvhxXmMgMAAAA="
+  },
   "merch-studio/shorts-rainbow/black-1": {
     "width": 1440,
     "height": 1440,
@@ -1267,6 +1331,46 @@
     "avif": "/media/merch-studio/sticker-yellow/standard-3.4692e033f5-320.avif 320w, /media/merch-studio/sticker-yellow/standard-3.4692e033f5-480.avif 480w, /media/merch-studio/sticker-yellow/standard-3.4692e033f5-640.avif 640w, /media/merch-studio/sticker-yellow/standard-3.4692e033f5-800.avif 800w, /media/merch-studio/sticker-yellow/standard-3.4692e033f5-1080.avif 1080w, /media/merch-studio/sticker-yellow/standard-3.4692e033f5-1440.avif 1440w",
     "webp": "/media/merch-studio/sticker-yellow/standard-3.4692e033f5-320.webp 320w, /media/merch-studio/sticker-yellow/standard-3.4692e033f5-480.webp 480w, /media/merch-studio/sticker-yellow/standard-3.4692e033f5-640.webp 640w, /media/merch-studio/sticker-yellow/standard-3.4692e033f5-800.webp 800w, /media/merch-studio/sticker-yellow/standard-3.4692e033f5-1080.webp 1080w, /media/merch-studio/sticker-yellow/standard-3.4692e033f5-1440.webp 1440w",
     "placeholder": "data:image/webp;base64,UklGRqQAAABXRUJQVlA4IJgAAABQBQCdASoYABgAPuFcp02opSOiMAwBEBwJZQDLaCHfwdqYz7EMGkYlxE600VgdK/3BTQAA/q6XRPAOg7dq5dz4ctekZekKm0UJ48J4HziwYqO28F8P/xNjelIshZQiGXoSknxkbrnpz/JCJ3Fo/MzNJsmNHKaFMtr10044UAHuwXJIvtUaffxkJ25/3xQUrD3SMdRzoKAAAA=="
+  },
+  "merch-studio/sweatpants-purple/ash-1": {
+    "width": 1440,
+    "height": 1440,
+    "src": "/media/merch-studio/sweatpants-purple/ash-1.5855751f31-1440.webp",
+    "avif": "/media/merch-studio/sweatpants-purple/ash-1.5855751f31-320.avif 320w, /media/merch-studio/sweatpants-purple/ash-1.5855751f31-480.avif 480w, /media/merch-studio/sweatpants-purple/ash-1.5855751f31-640.avif 640w, /media/merch-studio/sweatpants-purple/ash-1.5855751f31-800.avif 800w, /media/merch-studio/sweatpants-purple/ash-1.5855751f31-1080.avif 1080w, /media/merch-studio/sweatpants-purple/ash-1.5855751f31-1440.avif 1440w",
+    "webp": "/media/merch-studio/sweatpants-purple/ash-1.5855751f31-320.webp 320w, /media/merch-studio/sweatpants-purple/ash-1.5855751f31-480.webp 480w, /media/merch-studio/sweatpants-purple/ash-1.5855751f31-640.webp 640w, /media/merch-studio/sweatpants-purple/ash-1.5855751f31-800.webp 800w, /media/merch-studio/sweatpants-purple/ash-1.5855751f31-1080.webp 1080w, /media/merch-studio/sweatpants-purple/ash-1.5855751f31-1440.webp 1440w",
+    "placeholder": "data:image/webp;base64,UklGRoAAAABXRUJQVlA4IHQAAAAwBACdASoYABgAPu1mrE8ppaQpqA1RMB2JZQDKABE2zMOjsXNnSs0NYAAA/vDLnf+VABbJlmcsJTqQAWCdT3ujJRpdBwAkHMB9P8vjCSGeGU/HLc1jMamDkiwLXWE/2pE6CmuDUwqu6i/WLYDYCYmVB2BwAA=="
+  },
+  "merch-studio/sweatpants-purple/ash-2": {
+    "width": 1440,
+    "height": 1440,
+    "src": "/media/merch-studio/sweatpants-purple/ash-2.dad5c7cfbe-1440.webp",
+    "avif": "/media/merch-studio/sweatpants-purple/ash-2.dad5c7cfbe-320.avif 320w, /media/merch-studio/sweatpants-purple/ash-2.dad5c7cfbe-480.avif 480w, /media/merch-studio/sweatpants-purple/ash-2.dad5c7cfbe-640.avif 640w, /media/merch-studio/sweatpants-purple/ash-2.dad5c7cfbe-800.avif 800w, /media/merch-studio/sweatpants-purple/ash-2.dad5c7cfbe-1080.avif 1080w, /media/merch-studio/sweatpants-purple/ash-2.dad5c7cfbe-1440.avif 1440w",
+    "webp": "/media/merch-studio/sweatpants-purple/ash-2.dad5c7cfbe-320.webp 320w, /media/merch-studio/sweatpants-purple/ash-2.dad5c7cfbe-480.webp 480w, /media/merch-studio/sweatpants-purple/ash-2.dad5c7cfbe-640.webp 640w, /media/merch-studio/sweatpants-purple/ash-2.dad5c7cfbe-800.webp 800w, /media/merch-studio/sweatpants-purple/ash-2.dad5c7cfbe-1080.webp 1080w, /media/merch-studio/sweatpants-purple/ash-2.dad5c7cfbe-1440.webp 1440w",
+    "placeholder": "data:image/webp;base64,UklGRn4AAABXRUJQVlA4IHIAAACQBACdASoYABgAPu1srlIppaQiqAgBMB2JZwDG9ywAemY4EeaIbbjiQXyY44AA/udllzZ11n3eqA14KiCunsdVDnf6Neb4hv3CSaVwGgKnfxsdL2hk1hVAgUCnWUZXuVxuWaDb8nv5l4Uge+gOAOAAAAA="
+  },
+  "merch-studio/sweatpants-purple/ash-3": {
+    "width": 1440,
+    "height": 1440,
+    "src": "/media/merch-studio/sweatpants-purple/ash-3.eec5978e6d-1440.webp",
+    "avif": "/media/merch-studio/sweatpants-purple/ash-3.eec5978e6d-320.avif 320w, /media/merch-studio/sweatpants-purple/ash-3.eec5978e6d-480.avif 480w, /media/merch-studio/sweatpants-purple/ash-3.eec5978e6d-640.avif 640w, /media/merch-studio/sweatpants-purple/ash-3.eec5978e6d-800.avif 800w, /media/merch-studio/sweatpants-purple/ash-3.eec5978e6d-1080.avif 1080w, /media/merch-studio/sweatpants-purple/ash-3.eec5978e6d-1440.avif 1440w",
+    "webp": "/media/merch-studio/sweatpants-purple/ash-3.eec5978e6d-320.webp 320w, /media/merch-studio/sweatpants-purple/ash-3.eec5978e6d-480.webp 480w, /media/merch-studio/sweatpants-purple/ash-3.eec5978e6d-640.webp 640w, /media/merch-studio/sweatpants-purple/ash-3.eec5978e6d-800.webp 800w, /media/merch-studio/sweatpants-purple/ash-3.eec5978e6d-1080.webp 1080w, /media/merch-studio/sweatpants-purple/ash-3.eec5978e6d-1440.webp 1440w",
+    "placeholder": "data:image/webp;base64,UklGRoQAAABXRUJQVlA4IHgAAAAQBACdASoYABgAPu1oqU+ppiOiKA1RMB2JQBdgAuKBzLyGsNi/5tc/AAD+7PzoLR4s/eoNN/105fjYzLXJJn1irJcW6Q1MvEtaNmJItvOg3qrls0QUtcNMNubpQPUUsxsQ3RiI/uG5AkFfuIS/gsvg6eCKCkAAAAA="
+  },
+  "merch-studio/sweatpants-purple/sport-grey-1": {
+    "width": 1440,
+    "height": 1440,
+    "src": "/media/merch-studio/sweatpants-purple/sport-grey-1.e3119e62f0-1440.webp",
+    "avif": "/media/merch-studio/sweatpants-purple/sport-grey-1.e3119e62f0-320.avif 320w, /media/merch-studio/sweatpants-purple/sport-grey-1.e3119e62f0-480.avif 480w, /media/merch-studio/sweatpants-purple/sport-grey-1.e3119e62f0-640.avif 640w, /media/merch-studio/sweatpants-purple/sport-grey-1.e3119e62f0-800.avif 800w, /media/merch-studio/sweatpants-purple/sport-grey-1.e3119e62f0-1080.avif 1080w, /media/merch-studio/sweatpants-purple/sport-grey-1.e3119e62f0-1440.avif 1440w",
+    "webp": "/media/merch-studio/sweatpants-purple/sport-grey-1.e3119e62f0-320.webp 320w, /media/merch-studio/sweatpants-purple/sport-grey-1.e3119e62f0-480.webp 480w, /media/merch-studio/sweatpants-purple/sport-grey-1.e3119e62f0-640.webp 640w, /media/merch-studio/sweatpants-purple/sport-grey-1.e3119e62f0-800.webp 800w, /media/merch-studio/sweatpants-purple/sport-grey-1.e3119e62f0-1080.webp 1080w, /media/merch-studio/sweatpants-purple/sport-grey-1.e3119e62f0-1440.webp 1440w",
+    "placeholder": "data:image/webp;base64,UklGRnoAAABXRUJQVlA4IG4AAADwBACdASoYABgAPu1mq1AppSOisBgIATAdiWcAznQRB2ycruyOntEAEQYixovPRYAA/vDLr9fZFIdG50kZatMYL95ySVAMyX9sEIWXzu4UggyOlepLMvGK/jbg+C2Hch5yNtrY2wl2cSjZmZgAAA=="
+  },
+  "merch-studio/sweatpants-purple/sport-grey-2": {
+    "width": 1440,
+    "height": 1440,
+    "src": "/media/merch-studio/sweatpants-purple/sport-grey-2.d2eabc3cae-1440.webp",
+    "avif": "/media/merch-studio/sweatpants-purple/sport-grey-2.d2eabc3cae-320.avif 320w, /media/merch-studio/sweatpants-purple/sport-grey-2.d2eabc3cae-480.avif 480w, /media/merch-studio/sweatpants-purple/sport-grey-2.d2eabc3cae-640.avif 640w, /media/merch-studio/sweatpants-purple/sport-grey-2.d2eabc3cae-800.avif 800w, /media/merch-studio/sweatpants-purple/sport-grey-2.d2eabc3cae-1080.avif 1080w, /media/merch-studio/sweatpants-purple/sport-grey-2.d2eabc3cae-1440.avif 1440w",
+    "webp": "/media/merch-studio/sweatpants-purple/sport-grey-2.d2eabc3cae-320.webp 320w, /media/merch-studio/sweatpants-purple/sport-grey-2.d2eabc3cae-480.webp 480w, /media/merch-studio/sweatpants-purple/sport-grey-2.d2eabc3cae-640.webp 640w, /media/merch-studio/sweatpants-purple/sport-grey-2.d2eabc3cae-800.webp 800w, /media/merch-studio/sweatpants-purple/sport-grey-2.d2eabc3cae-1080.webp 1080w, /media/merch-studio/sweatpants-purple/sport-grey-2.d2eabc3cae-1440.webp 1440w",
+    "placeholder": "data:image/webp;base64,UklGRoIAAABXRUJQVlA4IHYAAABwBACdASoYABgAPu1sqVEppaOiqAqpMB2JZwDKtA9LprQd69oBYWayZaOTwAD+50rn03f8X4ASSwAcIm/xN1hAoKwpCpMJn/4W/eF/Ck2UlPtzWAsntPUxGrpvxHfnl2qhrf4xPpykBOuI8eQWBo/E5uPEX4AA"
   },
   "merch-studio/sweatpants-rainbow/black-1": {
     "width": 1440,

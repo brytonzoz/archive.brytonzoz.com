@@ -61,7 +61,9 @@ push, and give the owner the staging link from the PR comment once the Staging w
   `lib/merch-catalog.json`; its log prints the per-sale margin and any line it skipped. Then run `npm run media`. Its commit comes from the
   GitHub Actions bot, which doesn't redeploy staging on its own: pull it and push your next change to update staging.
   Extra studio shots (Higgsfield, floating / dress form / flat lay, never people) go in
-  `assets-src/merch-studio/<slug>/<color>-N.jpg` and show after Printify's mockups.
+  `assets-src/merch-studio/<slug>/<color>-N.jpg` (`-front` in the name for a front view) and show after Printify's mockups.
+  The site only ever shows photographic mockups: `printify/mockups.json` hides flat 2D drawings, models and blank frames,
+  and lists lines that show studio shots only (every color of those needs studio shots). Check new products' mockups.
   Everything sells through the same bag and Stripe checkout as Scrapwrk (`components/store/Merch*.tsx`, `Bag.tsx`);
   `worker/merch.ts` sends each paid order to Printify (created, then sent to production once Printify has priced it;
   on the thank-you page, plus a 10-minute cron catch-up), tracked in D1 `merch_orders` and shown in `/admin`. One-off

@@ -1,7 +1,8 @@
 'use client';
 
 import React, { useCallback, useEffect, useState } from 'react';
-import { getMerch, MERCH_PATH, merchPath, type MerchCard, type MerchProduct } from '../../lib/merch';
+import { useMerch } from '../../lib/merch-client';
+import { MERCH_PATH, merchPath, type MerchCard, type MerchProduct } from '../../lib/merch-shared';
 import { BagButton, BagSheet, useCheckout } from './Bag';
 import { MerchGrid } from './MerchGrid';
 import { MerchSheet } from './MerchSheet';
@@ -30,11 +31,13 @@ export function MerchExperience({
   const [open, setOpen] = useState<{ product: MerchProduct; color?: string } | null>(null);
   const [bagOpen, setBagOpen] = useState(false);
   const { busy, buy } = useCheckout();
+  // The homepage starts loading the catalog once it's up (app/page.tsx), not when this mounts.
+  const merch = useMerch(false);
 
   useEffect(() => {
-    const initial = initialProduct ? getMerch(initialProduct) : undefined;
+    const initial = initialProduct ? merch?.getMerch(initialProduct) : undefined;
     if (initial) setOpen({ product: initial });
-  }, [initialProduct]);
+  }, [merch, initialProduct]);
 
   const openCard = useCallback(({ product, color, perColor }: MerchCard) => {
     setOpen({ product, color: perColor ? color.slug : undefined });
@@ -57,6 +60,7 @@ export function MerchExperience({
       </div>
       {intro}
       <MerchGrid
+        cards={merch?.merchCards ?? null}
         active={active}
         sizes={sizes}
         onOpen={openCard}

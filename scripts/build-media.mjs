@@ -1,6 +1,8 @@
 // Converts originals in assets-src/ into responsive, content-hashed AVIF + WebP files in
-// public/media/ and writes lib/media-manifest.json. Outputs are cached by filename, so
-// re-runs only encode images whose source or settings changed.
+// public/media/ and writes the manifests the site reads: lib/media-manifest.json (covers, scenes,
+// Scrapwrk, icons) and lib/merch-media.json (NonParallel mockups and studio shots, only loaded with
+// the shop). Outputs are cached by filename, so re-runs only encode images whose source or
+// settings changed.
 import crypto from 'node:crypto';
 import fs from 'node:fs/promises';
 import path from 'node:path';
@@ -10,6 +12,8 @@ const ROOT = path.resolve(path.dirname(new URL(import.meta.url).pathname), '..')
 const SRC_DIR = path.join(ROOT, 'assets-src');
 const OUT_DIR = path.join(ROOT, 'public', 'media');
 const MANIFEST = path.join(ROOT, 'lib', 'media-manifest.json');
+const MERCH_MANIFEST = path.join(ROOT, 'lib', 'merch-media.json');
+const MERCH_PREFIXES = ['merch/', 'merch-studio/'];
 const PIPELINE_VERSION = 1;
 
 // Covers render at up to ~1100 device px (large retina screens); scene stickers are 696 px originals.
@@ -161,5 +165,20 @@ const keep = new Set(Object.values(manifest).flatMap((asset) => (
 )));
 await prune(OUT_DIR, keep);
 
-await fs.writeFile(MANIFEST, `${JSON.stringify(manifest, null, 2)}\n`);
+// Written packed: every size of an image shares one base name, so an entry is just that base, the
+// widths and the full size ({ b, s, w, h, p? }); lib/media.ts expands it back into srcsets. This
+// keeps the manifest a few KB instead of half a megabyte of JavaScript on every page.
+// Merch photos sit on white, so they go without the blurred placeholder (most of their weight).
+const pack = (asset, withPlaceholder) => {
+  const entries = asset.avif.split(', ').map((entry) => entry.split(' '));
+  const base = entries[0][0].replace(/-\d+\.avif$/, '');
+  const packed = { b: base, s: entries.map(([, width]) => Number.parseInt(width, 10)), w: asset.width, h: asset.height };
+  if (withPlaceholder && asset.placeholder) packed.p = asset.placeholder;
+  return packed;
+};
+const isMerch = (key) => MERCH_PREFIXES.some((prefix) => key.startsWith(prefix));
+// One image per line, so a diff shows exactly which images changed.
+const write = (file, keys) => fs.writeFile(file, `{\n${keys.map((key) => `${JSON.stringify(key)}: ${JSON.stringify(pack(manifest[key], !isMerch(key)))}`).join(',\n')}\n}\n`);
+await write(MANIFEST, Object.keys(manifest).filter((key) => !isMerch(key)));
+await write(MERCH_MANIFEST, Object.keys(manifest).filter(isMerch));
 console.log(`media: ${sources.length} sources -> ${keep.size} files in ${((Date.now() - started) / 1000).toFixed(1)}s`);

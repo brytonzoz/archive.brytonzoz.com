@@ -1,5 +1,5 @@
 import { useSyncExternalStore } from 'react';
-import { merchVariant, MERCH_KEY_PREFIX } from './merch';
+import { isMerchKey, MERCH_KEY_PREFIX } from './merch-shared';
 import { productById, type Availability, type Product } from './store';
 
 // Browser side of the store: which pieces are still available, the bag, and checkout.
@@ -53,11 +53,18 @@ function readBag(): string[] {
   if (bag) return bag;
   try {
     const parsed = JSON.parse(window.localStorage.getItem(BAG_KEY) ?? '[]');
-    bag = Array.isArray(parsed) ? parsed.filter((id): id is string => typeof id === 'string' && Boolean(productById(id) || merchVariant(id))) : [];
+    bag = Array.isArray(parsed) ? parsed.filter((id): id is string => typeof id === 'string' && Boolean(productById(id) || isMerchKey(id))) : [];
   } catch {
     bag = [];
   }
   return bag;
+}
+
+// Removes what `keep` rejects (e.g. a NonParallel piece that's no longer sold), once the catalog is here.
+export function pruneBag(keep: (id: string) => boolean) {
+  const current = readBag();
+  const next = current.filter(keep);
+  if (next.length !== current.length) writeBag(next);
 }
 
 function writeBag(next: string[]) {

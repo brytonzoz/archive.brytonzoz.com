@@ -2,7 +2,7 @@
 
 import React from 'react';
 import { nonparallelAssets } from '../../lib/assets';
-import { merchCards, type MerchCard } from '../../lib/merch';
+import type { MerchCard } from '../../lib/merch-shared';
 import { formatPrice } from '../../lib/store';
 import { ResponsiveImage } from '../ResponsiveImage';
 
@@ -66,25 +66,30 @@ function TeeCard({ card: { product, color, perColor }, sizes }: { card: MerchCar
 }
 
 export function MerchGrid({
+  cards: merchCards,
   active,
   onOpen,
   sizes = '(min-width: 640px) 280px, 46vw',
 }: {
+  /** The best sellers; null while the catalog is still loading (the cards show their logo side). */
+  cards: MerchCard[] | null;
   active: boolean;
   onOpen: (card: MerchCard) => void;
   sizes?: string;
 }) {
   const columns = 2;
-  const cards: { key: string; label: string; face: React.ReactNode; wide?: boolean; onClick: () => void }[] = merchCards.map((card) => ({
-    key: `${card.product.slug}-${card.color.slug}`,
-    label: `${card.product.displayName}${card.perColor ? `, ${card.color.name}` : ''}, ${formatPrice(card.product.price)}`,
-    face: <TeeCard card={card} sizes={sizes} />,
-    onClick: () => onOpen(card),
-  }));
+  const cards: { key: string; label: string; face: React.ReactNode; wide?: boolean; onClick: () => void }[] = merchCards
+    ? merchCards.map((card) => ({
+      key: `${card.product.slug}-${card.color.slug}`,
+      label: `${card.product.displayName}${card.perColor ? `, ${card.color.name}` : ''}, ${formatPrice(card.product.price)}`,
+      face: <TeeCard card={card} sizes={sizes} />,
+      onClick: () => onOpen(card),
+    }))
+    : [0, 1, 2, 3].map((i) => ({ key: `loading-${i}`, label: 'Loading', face: <><span className="store-card-face store-card-front merch-card-front" /><Back number="" /></>, onClick: () => {} }));
   const count = cards.length;
 
   return (
-    <div className={`store-grid merch-grid ${active ? 'is-active' : ''}`}>
+    <div className={`store-grid merch-grid ${active && merchCards ? 'is-active' : ''}`}>
       {cards.map((card, i) => {
         const slot = slotFor(i, count, columns, Boolean(card.wide));
         return (

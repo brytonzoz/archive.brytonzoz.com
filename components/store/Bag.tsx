@@ -3,10 +3,11 @@
 import React, { useCallback, useEffect, useId, useState } from 'react';
 import { createPortal } from 'react-dom';
 import { track } from '../../lib/analytics';
-import { merchVariant, variantLabel } from '../../lib/merch';
+import { useMerch } from '../../lib/merch-client';
+import { isMerchKey, variantLabel, type MerchVariant } from '../../lib/merch-shared';
 import { formatPrice, productById, shippingLabel } from '../../lib/store';
 import {
-  addToBag, bagLines, cancelCheckout, hasPendingCheckout, removeFromBag, removeOneFromBag, startCheckout, useAvailability, useBag,
+  addToBag, bagLines, cancelCheckout, hasPendingCheckout, pruneBag, removeFromBag, removeOneFromBag, startCheckout, useAvailability, useBag,
 } from '../../lib/store-client';
 import { ResponsiveImage, placeholderBackground } from '../ResponsiveImage';
 import { usePlayer } from '../player/context';
@@ -16,7 +17,8 @@ import { ExpressPay } from './ExpressPay';
 
 // The bag both stores share (Scrapwrk pieces and NonParallel tees), and the checkout they share.
 
-export const linePrice = (key: string) => productById(key)?.price ?? merchVariant(key)?.size.price ?? 0;
+type VariantOf = (key: string) => MerchVariant | undefined;
+const linePrice = (key: string, variantOf: VariantOf) => productById(key)?.price ?? variantOf(key)?.size.price ?? 0;
 
 const stepButton =
   'flex h-7 w-7 items-center justify-center rounded-full text-[18px] font-semibold text-white/85 transition-colors hover:bg-white/[0.12] disabled:opacity-35 focus-visible:outline focus-visible:outline-2 focus-visible:outline-white/70';
@@ -49,9 +51,7 @@ function PieceRow({ id }: { id: string }) {
   );
 }
 
-function TeeRow({ id, quantity }: { id: string; quantity: number }) {
-  const variant = merchVariant(id);
-  if (!variant) return null;
+function TeeRow({ id, quantity, variant }: { id: string; quantity: number; variant: MerchVariant }) {
   const image = variant.color.images[0];
   const name = variant.product.displayName;
   return (
@@ -80,10 +80,19 @@ export function BagSheet({ isOpen, onClose, onBuy, busy }: { isOpen: boolean; on
   const { sheetRef, isClosing, requestClose, dragHandlers, sheetStyle } = useSheet(isOpen, onClose);
   const bag = useBag();
   const [wallet, setWallet] = useState(false);
+  // NonParallel pieces need the catalog (their photo, name and price); it loads when the bag has one.
+  const hasMerch = bag.some(isMerchKey);
+  const merch = useMerch(isOpen && hasMerch);
+  // Drop pieces the shop no longer sells.
+  useEffect(() => {
+    if (merch) pruneBag((id) => !isMerchKey(id) || Boolean(merch.merchVariant(id)));
+  }, [merch]);
   if (!isOpen) return null;
+  const variantOf: VariantOf = (key) => merch?.merchVariant(key);
+  const waiting = hasMerch && !merch;
   // Wallet buttons are for printed-to-order pieces; a bag with a 1-of-1 in it uses hosted checkout.
-  const merchOnly = bag.length > 0 && bag.every((key) => merchVariant(key));
-  const total = bag.reduce((sum, id) => sum + linePrice(id), 0);
+  const merchOnly = bag.length > 0 && bag.every((key) => variantOf(key));
+  const total = bag.reduce((sum, id) => sum + linePrice(id, variantOf), 0);
   const lines = bagLines(bag);
 
   return createPortal(
@@ -106,9 +115,12 @@ export function BagSheet({ isOpen, onClose, onBuy, busy }: { isOpen: boolean; on
           {bag.length ? (
             <>
               <ul className="mt-3 max-h-[50dvh] divide-y divide-white/[0.07] overflow-y-auto overscroll-contain">
-                {lines.map((line) => (merchVariant(line.key)
-                  ? <TeeRow key={line.key} id={line.key} quantity={line.quantity} />
-                  : <PieceRow key={line.key} id={line.key} />))}
+                {waiting ? <li className="py-6 text-center text-[14px] text-white/50">Loading…</li> : lines.map((line) => {
+                  const variant = variantOf(line.key);
+                  return variant
+                    ? <TeeRow key={line.key} id={line.key} quantity={line.quantity} variant={variant} />
+                    : <PieceRow key={line.key} id={line.key} />;
+                })}
               </ul>
               <div className="mt-3 flex items-baseline justify-between border-t border-white/[0.08] pt-4">
                 <span className="text-[15px] text-white/55">{shippingLabel}</span>
@@ -117,7 +129,7 @@ export function BagSheet({ isOpen, onClose, onBuy, busy }: { isOpen: boolean; on
               <div className="relative mt-5">
                 <button
                   type="button"
-                  disabled={busy}
+                  disabled={busy || waiting}
                   onClick={() => onBuy(bag)}
                   aria-hidden={wallet || undefined}
                   tabIndex={wallet ? -1 : undefined}

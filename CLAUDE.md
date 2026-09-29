@@ -35,7 +35,8 @@ push, and give the owner the staging link from the PR comment once the Staging w
 - Next-release teaser (first homepage scene): `lib/next-release.ts`. Set `title` to reveal the name, `date` for a
   live countdown, `enabled: false` to remove it. The link-preview image `public/og.jpg` is a render of that scene.
 - Artwork: originals in `assets-src/{covers,scenes/<scene>,icons}/`; `npm run media` builds
-  `public/media/` and `lib/media-manifest.json` (commit the manifest). Never put large images in `public/`.
+  `public/media/`, `lib/media-manifest.json` and `lib/merch-media.json` (NonParallel photos; commit both manifests).
+  Never put large images in `public/`.
 - Music player: `lib/tracks.json` lists every release and its songs; each plays from `/audio/<file>`, which
   `worker/index.ts` streams from the `brytonzoz-media` R2 bucket. Songs come from the owner's Google Drive folder:
   `music/sources.json` maps Drive files to bucket keys and the **Music sync** workflow uploads them. A release only
@@ -86,6 +87,16 @@ push, and give the owner the staging link from the PR comment once the Staging w
   secrets; without them the buttons just don't show. Both deploy workflows register the domain with Stripe for Apple Pay
   (verification file: `public/.well-known/apple-developer-merchantid-domain-association`). Real wallets can only be
   tested on staging from an iPhone/Android with a card in the wallet (test keys aren't charged).
+- Speed (keep it fast; this is what made the site slow before):
+  - The homepage never loads the NonParallel catalog up front. `lib/merch.ts` (every product and photo) is fetched in
+    the background once the page is up (`loadMerch`, app/page.tsx); components read it with `useMerch()`
+    (`lib/merch-client.ts`) and show a placeholder until then. `/nonparallel/` pages pass it in with `MerchProvider`.
+    Homepage code imports types and helpers from `lib/merch-shared.ts`, never `lib/merch.ts` directly.
+  - Scenes more than one screen away get `scene-still` (their animations pause and they skip drawing with
+    `content-visibility`, globals.css). New animations: transform/opacity only (a moving
+    `background-position` repaints every frame), and stop them when they're done (the shop shimmer stops per photo).
+  - Photos load when needed: shop tiles lazily, the hover photo only with a mouse, gallery photos one ahead of the
+    swipe. `public/sw.js` keeps shop photos in their own cache so they never push out the scenes' artwork.
 - Metrics: `lib/analytics.ts` (anonymous, batched) -> `/api/e` in `worker/metrics.ts` -> D1 `brytonzoz-metrics`
   (`brytonzoz-metrics-staging` for staging; schema `worker/schema.sql`). The dashboard is `/admin`; its password is
   the `ADMIN_PASSWORD` repository secret, which both deploy workflows copy to the Worker. Never put it in code or chat.

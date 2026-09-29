@@ -1,39 +1,15 @@
 import catalog from './merch-catalog.json';
 import mockupRules from '../printify/mockups.json';
+import merchMedia from './merch-media.json';
 import shareImages from './share-images.json';
-import { media, type MediaAsset, type MediaKey } from './media';
+import { unpackMedia, type MediaAsset, type PackedMedia } from './media';
+import { merchKey, type MerchCard, type MerchColor, type MerchProduct, type MerchSize, type MerchVariant, type MerchView } from './merch-shared';
 
 // NonParallel merch (tees, hoodies, stickers, mugs…), printed to order by Printify. lib/merch-catalog.json
 // is written by the Printify workflow (scripts/printify-sync.mjs) from printify/products.json; the
 // checkout Worker reads it too.
 
-export type MerchSize = { size: string; variantId: number; price: number };
-export type MerchView = 'front' | 'back' | null;
-/** `views` (apparel only) says which side each photo shows. */
-export type MerchColor = { name: string; slug: string; swatch: string; images: MediaAsset[]; views?: MerchView[]; sizes: MerchSize[] };
-export type MerchProduct = {
-  slug: string;
-  number: string;
-  /** The design ("Rainbow"). */
-  name: string;
-  /** The design and the item together ("Rainbow Hoodie"). */
-  displayName: string;
-  /** What the item is ("Hoodie"), and its shop category ("Hoodies"). */
-  lineName: string;
-  line: string;
-  category: string;
-  title: string;
-  price: number;
-  /** Starting price differs by size or color. */
-  priceVaries: boolean;
-  blank: string;
-  details: string[];
-  colors: MerchColor[];
-  shareImage?: string;
-};
-
-export const MERCH_PATH = '/nonparallel/';
-export const MERCH_KEY_PREFIX = 'np:';
+export * from './merch-shared';
 
 // Swatch colors for the tee colors Printify names.
 const SWATCHES: Record<string, string> = {
@@ -45,8 +21,11 @@ const SWATCHES: Record<string, string> = {
 };
 const slugify = (text: string) => text.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '');
 
-const studioKeys = (design: string, color: string) =>
-  Object.keys(media).filter((key) => key.startsWith(`merch-studio/${design}/${color}-`)).sort();
+// The mockups and studio shots (scripts/build-media.mjs), expanded as products use them.
+const PACKED = merchMedia as Record<string, PackedMedia>;
+const photo = (key: string): MediaAsset | undefined => (PACKED[key] ? unpackMedia(PACKED[key]) : undefined);
+const STUDIO_KEYS = Object.keys(PACKED).filter((key) => key.startsWith('merch-studio/')).sort();
+const studioKeys = (design: string, color: string) => STUDIO_KEYS.filter((key) => key.startsWith(`merch-studio/${design}/${color}-`));
 // Only photographic mockups: printify/mockups.json lists the lines that show studio shots only
 // (Printify's are flat drawings) and single mockups to hide (models, blank or cropped frames).
 const STUDIO_ONLY = new Set<string>(mockupRules.studioOnly);
@@ -100,12 +79,12 @@ export const merchProducts: MerchProduct[] = (catalog.products as RawProduct[])
         const pairs = [
           ...color.images.map((key, i) => ({ key, view: mockupViews?.[i] ?? null })).filter(({ key }) => showMockup(product.line, key)),
           ...studio.map((key) => ({ key, view: studioView(key) })),
-        ].filter(({ key }) => media[key as MediaKey]);
+        ].map((pair) => ({ ...pair, image: photo(pair.key) })).filter((pair): pair is typeof pair & { image: MediaAsset } => Boolean(pair.image));
         return {
           name: color.name,
           slug: slugify(color.name),
           swatch: color.hex ?? SWATCHES[color.name] ?? '#888888',
-          images: pairs.map(({ key }) => media[key as MediaKey]),
+          images: pairs.map(({ image }) => image),
           views: mockupViews ? pairs.map(({ view }) => view) : undefined,
           sizes: tidySizes(color.sizes),
         };
@@ -114,19 +93,11 @@ export const merchProducts: MerchProduct[] = (catalog.products as RawProduct[])
   }))
   .filter((product) => product.colors.length);
 
-export const merchPath = (product: MerchProduct) => `${MERCH_PATH}${product.slug}/`;
-// "Black tee", or just "Mug" for things that come one way (Printify calls that color "Standard").
-export const colorName = (color: MerchColor) => (color.name === 'Standard' ? '' : color.name);
-export const variantLabel = (product: MerchProduct, color: MerchColor) => {
-  const text = [colorName(color), product.lineName.toLowerCase()].filter(Boolean).join(' ');
-  return text.charAt(0).toUpperCase() + text.slice(1);
-};
 // Shop categories in catalog order (the order products.json lists its lines).
 export const merchCategories = merchProducts.map((product) => product.category).filter((category, index, all) => all.indexOf(category) === index);
 // The homepage scene's best sellers: a 2x2 grid like Scrapwrk's, the rest of the range in the shop
 // below it. Listed by product slug (lib/merch-catalog.json); ones that aren't in the catalog are skipped.
 const BEST_SELLERS = ['rainbow', 'hoodie-rainbow', 'purple', 'trucker-rainbow'];
-export type MerchCard = { product: MerchProduct; color: MerchColor; perColor: boolean };
 export const merchCards: MerchCard[] = [
   ...BEST_SELLERS.map((slug) => merchProducts.find((product) => product.slug === slug)),
   ...merchProducts,
@@ -135,11 +106,7 @@ export const merchCards: MerchCard[] = [
   .slice(0, 4)
   .map((product) => ({ product, color: product.colors[0], perColor: false }));
 export const getMerch = (slug: string) => merchProducts.find((product) => product.slug === slug);
-// A tee in the bag: "np:<design>:<Printify variant>". Printify's variant ids name a blank's color and
-// size (every white M is the same id), so the design has to be part of the key.
-export const merchKey = (product: MerchProduct, variantId: number) => `${MERCH_KEY_PREFIX}${product.slug}:${variantId}`;
 
-export type MerchVariant = { product: MerchProduct; color: MerchColor; size: MerchSize };
 const variants = new Map<string, MerchVariant>();
 for (const product of merchProducts) {
   for (const color of product.colors) for (const size of color.sizes) variants.set(merchKey(product, size.variantId), { product, color, size });

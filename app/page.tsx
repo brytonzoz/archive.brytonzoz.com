@@ -56,14 +56,17 @@ function getSceneStickerState(sticker: SceneStickerConfig, distance: number) {
   const baseRotate = sticker.baseRotate || 0;
 
   if (distance < 0) {
-    const incomingProgress = clamp(Math.abs(distance) / 0.78, 0, 1);
+    // Arriving: the stickers travel in with the scene itself (from as soon as it starts to show),
+    // decelerating so they settle exactly as the page lands; then their float takes over.
+    const arrive = clamp(1 + (distance / 0.94), 0, 1);
+    const left = Math.pow(1 - arrive, 2.2);
 
     return {
-      opacity: 1 - incomingProgress,
-      scale: 1 - (incomingProgress * 0.18),
-      translateX: sticker.intro.x * incomingProgress,
-      translateY: sticker.intro.y * incomingProgress,
-      rotate: baseRotate + (sticker.intro.rotate * incomingProgress),
+      opacity: clamp(arrive * 1.7, 0, 1),
+      scale: 1 - (left * 0.16),
+      translateX: sticker.intro.x * left,
+      translateY: sticker.intro.y * left,
+      rotate: baseRotate + (sticker.intro.rotate * left),
     };
   }
 
@@ -78,6 +81,78 @@ function getSceneStickerState(sticker: SceneStickerConfig, distance: number) {
     translateY: sticker.movement.y * departure,
     rotate: baseRotate + (sticker.movement.rotate * departure),
   };
+}
+
+// --- Scroll-linked motion ----------------------------------------------------------------------
+// Everything that moves with the scroll (cards, stickers, the store grids, the background blend)
+// is set straight on its element once per frame from the scroll position: no React render and no
+// CSS transition in between, so it tracks the finger exactly at the display's frame rate instead
+// of easing after it (which read as lag, and as jitter when transitions restarted every event).
+type MotionStyle = { transform?: string; opacity?: number };
+type MotionFn = (distance: number) => MotionStyle;
+type MotionRegistry = { register: (index: number, apply: (distance: number) => void) => () => void };
+
+const MotionContext = React.createContext<MotionRegistry | null>(null);
+// Which scene a component belongs to, and which scene is on screen.
+const SceneIndexContext = React.createContext(0);
+const ActiveSceneContext = React.createContext(0);
+
+function applyMotion(element: HTMLElement, style: MotionStyle) {
+  if (style.transform !== undefined) element.style.transform = style.transform;
+  if (style.opacity !== undefined) element.style.opacity = String(style.opacity);
+}
+
+// motion.ref(key, fn) is a stable callback ref that keeps the element in step with the scroll;
+// motion.initial(fn) is its first-paint style (the page starts at the top).
+function useSceneMotion() {
+  const index = React.useContext(SceneIndexContext);
+  const registry = React.useContext(MotionContext);
+  const fns = React.useRef(new Map<string, MotionFn>());
+  const refs = React.useRef(new Map<string, (element: HTMLElement | null) => void>());
+  return {
+    ref(key: string, fn: MotionFn) {
+      fns.current.set(key, fn);
+      let callback = refs.current.get(key);
+      if (!callback) {
+        let off: (() => void) | undefined;
+        callback = (element) => {
+          off?.();
+          off = undefined;
+          if (element && registry) off = registry.register(index, (distance) => applyMotion(element, fns.current.get(key)!(distance)));
+        };
+        refs.current.set(key, callback);
+      }
+      return callback;
+    },
+    initial: (fn: MotionFn): React.CSSProperties => fn(clamp(-index, -1, 1)),
+  };
+}
+
+const useIsActiveScene = () => React.useContext(ActiveSceneContext) === React.useContext(SceneIndexContext);
+
+function stickerMotion(sticker: SceneStickerConfig, distance: number, alpha = 1): MotionStyle {
+  const state = getSceneStickerState(sticker, distance);
+  return {
+    opacity: state.opacity * alpha,
+    transform: `translate3d(${scaleValue(state.translateX)}, ${scaleValue(state.translateY)}, 0) rotate(${state.rotate}deg) scale(${state.scale})`,
+  };
+}
+
+// A release card (or the teaser): eases in slightly larger than it lands, and sinks back as it leaves.
+function cardMotion(distance: number): MotionStyle {
+  const outgoing = easeOutCubic(clamp((distance - 0.08) / 0.78, 0, 1));
+  const incoming = easeOutCubic(clamp(Math.abs(Math.min(distance, 0)) / 0.9, 0, 1));
+  const scale = distance >= 0 ? 1 - (outgoing * 0.26) : 1 - (incoming * 0.18);
+  return {
+    opacity: 1 - (clamp(Math.abs(distance), 0, 1) * 0.18),
+    transform: `translate3d(0, ${scaleValue(outgoing * 58)}, 0) scale(${scale})`,
+  };
+}
+
+// The Scrapwrk and NonParallel grids: rise into place as their scene arrives.
+function gridMotion(distance: number): MotionStyle {
+  const incoming = easeOutCubic(clamp(Math.abs(Math.min(distance, 0)) / 0.9, 0, 1));
+  return { opacity: 1 - (clamp(Math.abs(distance), 0, 1) * 0.3), transform: `translate3d(0, ${incoming * 32}px, 0)` };
 }
 
 const HOMEPAGE_PROJECT_ORDER = [
@@ -189,16 +264,20 @@ function getProjectBackground(project: Project): SlideBackground {
 
 function BackgroundLayer({
   background,
-  opacity,
+  layerRef,
+  visible,
 }: {
   background: SlideBackground;
-  opacity: number;
+  layerRef: (element: HTMLDivElement | null) => void;
+  visible: boolean;
 }) {
   return (
     <div
+      ref={layerRef}
       className="pointer-events-none fixed inset-0"
       style={{
-        opacity,
+        opacity: visible ? 1 : 0,
+        visibility: visible ? 'visible' : 'hidden',
         willChange: 'opacity',
       }}
     >
@@ -278,7 +357,6 @@ const SCENE_TONES = {
 function SceneCard({
   project,
   cover,
-  distance,
   loadImages,
   priority = false,
   coverPosition = 'center',
@@ -289,7 +367,6 @@ function SceneCard({
   cover: MediaAsset;
   coverPosition?: string;
   tone?: keyof typeof SCENE_TONES;
-  distance: number;
   loadImages: boolean;
   priority?: boolean;
   onModalStateChange?: (isOpen: boolean) => void;
@@ -310,18 +387,14 @@ function SceneCard({
 
   // Once this scene has been on screen for a moment, fetch the start of its first song so Play
   // answers instantly (a finger or cursor reaching the button does the same, sooner).
-  const isOnScreen = Math.abs(distance) < 0.5;
+  const motion = useSceneMotion();
+  const isOnScreen = useIsActiveScene();
   const firstTrack = release?.tracks[0];
   useEffect(() => {
     if (!isOnScreen || !loadImages || !firstTrack) return;
     const timer = window.setTimeout(() => warmTrack(firstTrack), 1200);
     return () => window.clearTimeout(timer);
   }, [isOnScreen, loadImages, firstTrack]);
-
-  const distanceMagnitude = clamp(Math.abs(distance), 0, 1);
-  const outgoing = easeOutCubic(clamp((distance - 0.08) / 0.78, 0, 1));
-  const incoming = easeOutCubic(clamp(Math.abs(Math.min(distance, 0)) / 0.9, 0, 1));
-  const scale = distance >= 0 ? 1 - (outgoing * 0.26) : 1 - (incoming * 0.18);
 
   // One action. Releases open the full sheet (play right here, streaming apps at the bottom);
   // everything else opens its site.
@@ -376,13 +449,12 @@ function SceneCard({
       >
         <div
           className="scene-card"
+          ref={motion.ref('card', cardMotion)}
           style={{
-            opacity: 1 - (distanceMagnitude * 0.18),
-            transform: `translate3d(0, ${scaleValue(outgoing * 58)}, 0) scale(${scale})`,
+            ...motion.initial(cardMotion),
             transformOrigin: 'center center',
             // Only transform: will-change on opacity would make this a backdrop root for blur effects.
             willChange: 'transform',
-            transition: 'transform 760ms cubic-bezier(0.22, 1, 0.36, 1), opacity 420ms ease-out',
           }}
         >
           <div
@@ -485,12 +557,9 @@ function useReleaseStatus(date: string | null): string {
 
 // Leads the homepage while the next release is being made: the same layout as every release,
 // but the cover is still developing, light moving behind frosted glass. Nothing given away.
-const ComingSoonScene = React.memo(function ComingSoonScene({ distance, onNext }: { distance: number; onNext: () => void }) {
+const ComingSoonScene = React.memo(function ComingSoonScene({ onNext }: { onNext: () => void }) {
   const status = useReleaseStatus(nextRelease.date);
-  const distanceMagnitude = clamp(Math.abs(distance), 0, 1);
-  const outgoing = easeOutCubic(clamp((distance - 0.08) / 0.78, 0, 1));
-  const incoming = easeOutCubic(clamp(Math.abs(Math.min(distance, 0)) / 0.9, 0, 1));
-  const scale = distance >= 0 ? 1 - (outgoing * 0.26) : 1 - (incoming * 0.18);
+  const motion = useSceneMotion();
   const title = nextRelease.title ?? 'New project';
   const [notifyOpen, setNotifyOpen] = useState(false);
   const [signedUp, setSignedUp] = useState(false);
@@ -508,12 +577,11 @@ const ComingSoonScene = React.memo(function ComingSoonScene({ distance, onNext }
             style={{ left: scaleValue(120), top: scaleValue(214), width: scaleValue(722), zIndex: 10, animationDelay: '0.1s' }}
           >
             <div
+              ref={motion.ref('card', cardMotion)}
               style={{
-                opacity: 1 - (distanceMagnitude * 0.18),
-                transform: `translate3d(0, ${scaleValue(outgoing * 58)}, 0) scale(${scale})`,
+                ...motion.initial(cardMotion),
                 transformOrigin: 'center center',
                 willChange: 'transform',
-                transition: 'transform 760ms cubic-bezier(0.22, 1, 0.36, 1), opacity 420ms ease-out',
               }}
             >
               <div
@@ -828,19 +896,17 @@ const scrapwrkStickers = [
 
 const SolenyaScene = React.memo(function SolenyaScene({
   project,
-  distance,
   loadImages,
   onModalStateChange,
 }: {
   project: Project;
-  distance: number;
   loadImages: boolean;
   onModalStateChange?: (isOpen: boolean) => void;
 }) {
+  const motion = useSceneMotion();
   return (
     <div className="relative h-full w-full overflow-hidden">
       {solenyaStickers.map((sticker) => {
-        const stickerState = getSceneStickerState(sticker, distance);
 
         return (
           <div
@@ -859,12 +925,8 @@ const SolenyaScene = React.memo(function SolenyaScene({
             } as React.CSSProperties}
           >
             <div
-              style={{
-                opacity: stickerState.opacity,
-                transform: `translate3d(${scaleValue(stickerState.translateX)}, ${scaleValue(stickerState.translateY)}, 0) rotate(${stickerState.rotate}deg) scale(${stickerState.scale})`,
-                willChange: 'transform, opacity',
-                transition: 'transform 400ms cubic-bezier(0.22, 1, 0.36, 1), opacity 260ms ease-out',
-              }}
+              ref={motion.ref(sticker.key, (d) => stickerMotion(sticker, d))}
+              style={{ ...motion.initial((d) => stickerMotion(sticker, d)), willChange: 'transform, opacity' }}
             >
               <div
                 className="solenya-sticker-float h-full w-full"
@@ -901,7 +963,6 @@ const SolenyaScene = React.memo(function SolenyaScene({
           <SceneCard
             project={project}
             cover={solenyaSceneAssets.cover}
-            distance={distance}
             loadImages={loadImages}
             priority
             onModalStateChange={onModalStateChange}
@@ -914,19 +975,17 @@ const SolenyaScene = React.memo(function SolenyaScene({
 
 const CautionScene = React.memo(function CautionScene({
   project,
-  distance,
   loadImages,
   onModalStateChange,
 }: {
   project: Project;
-  distance: number;
   loadImages: boolean;
   onModalStateChange?: (isOpen: boolean) => void;
 }) {
+  const motion = useSceneMotion();
   return (
     <div className="relative h-full w-full overflow-hidden">
       {cautionStickers.map((sticker) => {
-        const stickerState = getSceneStickerState(sticker, distance);
 
         return (
           <div
@@ -945,12 +1004,8 @@ const CautionScene = React.memo(function CautionScene({
             } as React.CSSProperties}
           >
             <div
-              style={{
-                opacity: stickerState.opacity,
-                transform: `translate3d(${scaleValue(stickerState.translateX)}, ${scaleValue(stickerState.translateY)}, 0) rotate(${stickerState.rotate}deg) scale(${stickerState.scale})`,
-                willChange: 'transform, opacity',
-                transition: 'transform 400ms cubic-bezier(0.22, 1, 0.36, 1), opacity 260ms ease-out',
-              }}
+              ref={motion.ref(sticker.key, (d) => stickerMotion(sticker, d))}
+              style={{ ...motion.initial((d) => stickerMotion(sticker, d)), willChange: 'transform, opacity' }}
             >
               <div
                 className="solenya-sticker-float h-full w-full"
@@ -985,7 +1040,6 @@ const CautionScene = React.memo(function CautionScene({
           <SceneCard
             project={project}
             cover={cautionSceneAssets.cover}
-            distance={distance}
             loadImages={loadImages}
             coverPosition="center top"
             onModalStateChange={onModalStateChange}
@@ -998,17 +1052,15 @@ const CautionScene = React.memo(function CautionScene({
 
 const ReminderScene = React.memo(function ReminderScene({
   project,
-  distance,
   loadImages,
 }: {
   project: Project;
-  distance: number;
   loadImages: boolean;
 }) {
+  const motion = useSceneMotion();
   return (
     <div className="relative h-full w-full overflow-hidden">
       {reminderStickers.map((sticker) => {
-        const stickerState = getSceneStickerState(sticker, distance);
 
         return (
           <div
@@ -1027,12 +1079,8 @@ const ReminderScene = React.memo(function ReminderScene({
             } as React.CSSProperties}
           >
             <div
-              style={{
-                opacity: stickerState.opacity,
-                transform: `translate3d(${scaleValue(stickerState.translateX)}, ${scaleValue(stickerState.translateY)}, 0) rotate(${stickerState.rotate}deg) scale(${stickerState.scale})`,
-                willChange: 'transform, opacity',
-                transition: 'transform 400ms cubic-bezier(0.22, 1, 0.36, 1), opacity 260ms ease-out',
-              }}
+              ref={motion.ref(sticker.key, (d) => stickerMotion(sticker, d))}
+              style={{ ...motion.initial((d) => stickerMotion(sticker, d)), willChange: 'transform, opacity' }}
             >
               <div
                 className="solenya-sticker-float h-full w-full"
@@ -1067,7 +1115,6 @@ const ReminderScene = React.memo(function ReminderScene({
             project={project}
             cover={reminderSceneAssets.cover}
             tone="dark"
-            distance={distance}
             loadImages={loadImages}
           />
         </div>
@@ -1078,10 +1125,9 @@ const ReminderScene = React.memo(function ReminderScene({
 
 // Scrapwrk: the store itself, right here. Four cards fly in, turn over and float; tapping one opens
 // the piece (photos, details, Buy now). The full store also lives at /scrapwrk/.
-const ScrapwrkScene = React.memo(function ScrapwrkScene({ distance, loadImages }: { distance: number; loadImages: boolean }) {
-  const distanceMagnitude = clamp(Math.abs(distance), 0, 1);
-  const active = distanceMagnitude < 0.45;
-  const incoming = easeOutCubic(clamp(Math.abs(Math.min(distance, 0)) / 0.9, 0, 1));
+const ScrapwrkScene = React.memo(function ScrapwrkScene({ loadImages }: { loadImages: boolean }) {
+  const motion = useSceneMotion();
+  const active = useIsActiveScene();
 
   // Sized to the screen rather than the portrait scene frame, so the pieces are as large as the
   // screen allows (phone to desktop) while the grid and the footer both fit.
@@ -1090,7 +1136,6 @@ const ScrapwrkScene = React.memo(function ScrapwrkScene({ distance, loadImages }
       {/* The pieces as cut-out stickers, drifting around the grid's corners (behind the cards). */}
       <div aria-hidden="true" className="pointer-events-none absolute inset-0 z-0">
         {scrapwrkStickers.map((sticker) => {
-          const stickerState = getSceneStickerState(sticker, distance);
 
           return (
             <div
@@ -1109,12 +1154,8 @@ const ScrapwrkScene = React.memo(function ScrapwrkScene({ distance, loadImages }
               } as React.CSSProperties}
             >
               <div
-                style={{
-                  opacity: stickerState.opacity,
-                  transform: `translate3d(${scaleValue(stickerState.translateX)}, ${scaleValue(stickerState.translateY)}, 0) rotate(${stickerState.rotate}deg) scale(${stickerState.scale})`,
-                  willChange: 'transform, opacity',
-                  transition: 'transform 400ms cubic-bezier(0.22, 1, 0.36, 1), opacity 260ms ease-out',
-                }}
+                ref={motion.ref(sticker.key, (d) => stickerMotion(sticker, d))}
+                style={{ ...motion.initial((d) => stickerMotion(sticker, d)), willChange: 'transform, opacity' }}
               >
                 <div
                   className="solenya-sticker-float h-full w-full"
@@ -1146,11 +1187,8 @@ const ScrapwrkScene = React.memo(function ScrapwrkScene({ distance, loadImages }
       </div>
       <div
         className="store-scene relative z-10"
-        style={{
-          opacity: 1 - (distanceMagnitude * 0.3),
-          transform: `translate3d(0, ${incoming * 32}px, 0)`,
-          transition: 'transform 480ms cubic-bezier(0.22, 1, 0.36, 1), opacity 280ms ease-out',
-        }}
+        ref={motion.ref('grid', gridMotion)}
+        style={motion.initial(gridMotion)}
       >
         <StoreExperience
           active={active}
@@ -1188,16 +1226,14 @@ const nonparallelStickers = [
 // NonParallel: the label behind all of this. Laid out like Scrapwrk's scene: its logo heads it, a
 // line says what it is, four best sellers sit in the same 2x2 card grid, and a small "Scroll for
 // more" leads into the full shop below.
-const NonParallelScene = React.memo(function NonParallelScene({ distance, onShop }: { distance: number; onShop: () => void }) {
-  const distanceMagnitude = clamp(Math.abs(distance), 0, 1);
-  const active = distanceMagnitude < 0.45;
-  const incoming = easeOutCubic(clamp(Math.abs(Math.min(distance, 0)) / 0.9, 0, 1));
+const NonParallelScene = React.memo(function NonParallelScene({ onShop }: { onShop: () => void }) {
+  const motion = useSceneMotion();
+  const active = useIsActiveScene();
 
   return (
     <div className="relative flex h-full w-full items-center justify-center overflow-hidden pb-[132px] pt-10">
       <div aria-hidden="true" className="np-scene-stickers pointer-events-none absolute inset-0 z-0">
         {nonparallelStickers.map((sticker) => {
-          const stickerState = getSceneStickerState(sticker, distance);
           const size = `calc(var(--np-sticker) * ${sticker.size})`;
           return (
             <div
@@ -1216,12 +1252,8 @@ const NonParallelScene = React.memo(function NonParallelScene({ distance, onShop
               } as React.CSSProperties}
             >
               <div
-                style={{
-                  opacity: stickerState.opacity * sticker.alpha,
-                  transform: `translate3d(${scaleValue(stickerState.translateX)}, ${scaleValue(stickerState.translateY)}, 0) rotate(${stickerState.rotate}deg) scale(${stickerState.scale})`,
-                  willChange: 'transform, opacity',
-                  transition: 'transform 400ms cubic-bezier(0.22, 1, 0.36, 1), opacity 260ms ease-out',
-                }}
+                ref={motion.ref(sticker.key, (d) => stickerMotion(sticker, d, sticker.alpha))}
+                style={{ ...motion.initial((d) => stickerMotion(sticker, d, sticker.alpha)), willChange: 'transform, opacity' }}
               >
                 <div
                   className="solenya-sticker-float h-full w-full"
@@ -1242,11 +1274,8 @@ const NonParallelScene = React.memo(function NonParallelScene({ distance, onShop
       </div>
       <div
         className="store-scene relative z-10"
-        style={{
-          opacity: 1 - (distanceMagnitude * 0.3),
-          transform: `translate3d(0, ${incoming * 32}px, 0)`,
-          transition: 'transform 480ms cubic-bezier(0.22, 1, 0.36, 1), opacity 280ms ease-out',
-        } as React.CSSProperties}
+        ref={motion.ref('grid', gridMotion)}
+        style={motion.initial(gridMotion)}
       >
         <MerchExperience
           active={active}
@@ -1318,17 +1347,25 @@ export default function HomePage() {
       return safeLeftIndex - safeRightIndex;
     })];
   const [activeIndex, setActiveIndex] = useState(0);
-  const [scrollProgress, setScrollProgress] = useState(0);
+  // Scroll-linked motion: scenes register their moving elements here, and one frame loop (below)
+  // drives them all from the scroll position.
+  const motionUpdaters = React.useRef(new Map<number, Set<(distance: number) => void>>());
+  const lastDistances = React.useRef(new Map<number, number>());
+  const progressRef = React.useRef(0);
+  const backgroundLayers = React.useRef<(HTMLDivElement | null)[]>([]);
+  const motionRegistry = React.useMemo<MotionRegistry>(() => ({
+    register(index, apply) {
+      const set = motionUpdaters.current.get(index) ?? new Set();
+      motionUpdaters.current.set(index, set);
+      set.add(apply);
+      apply(clamp(progressRef.current - index, -1, 1));
+      return () => { set.delete(apply); };
+    },
+  }), []);
   const [isTransitioning, setIsTransitioning] = useState(false);
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [loadDeferredScenes, setLoadDeferredScenes] = useState(false);
   const [containerSize, setContainerSize] = useState({ width: 0, height: 0, imageAspectRatio: 16 / 9 });
-  const clampedBackgroundProgress = clamp(scrollProgress, 0, allProjects.length - 1);
-  const currentBackgroundIndex = Math.floor(clampedBackgroundProgress);
-  const nextBackgroundIndex = Math.min(currentBackgroundIndex + 1, allProjects.length - 1);
-  const backgroundBlend = clampedBackgroundProgress - currentBackgroundIndex;
-  const currentBackground = getProjectBackground(allProjects[currentBackgroundIndex]);
-  const nextBackground = getProjectBackground(allProjects[nextBackgroundIndex]);
 
   const handleModalStateChange = useCallback((isOpen: boolean) => {
     setIsModalOpen(isOpen);
@@ -1413,7 +1450,6 @@ export default function HomePage() {
       if (container) {
         container.scrollTop = 0;
         setActiveIndex(0);
-        setScrollProgress(0);
       }
     };
 
@@ -1422,27 +1458,46 @@ export default function HomePage() {
   }, []);
 
   useEffect(() => {
-    const handleScroll = () => {
-      const container = document.querySelector('.scroll-container');
-      if (!container) return;
+    const container = document.querySelector<HTMLElement>('.scroll-container');
+    if (!container) return;
+    const sceneCount = allProjects.length;
+    let frame = 0;
 
+    // One pass per display frame: read the scroll position once, then write every moving element.
+    const update = () => {
+      frame = 0;
       const scrollTop = container.scrollTop;
-      const containerHeight = container.clientHeight;
+      const containerHeight = container.clientHeight || 1;
+      const progress = Math.min(scrollTop / containerHeight, sceneCount);
+      progressRef.current = progress;
+
+      motionUpdaters.current.forEach((updaters, index) => {
+        const distance = clamp(progress - index, -1, 1);
+        if (lastDistances.current.get(index) === distance) return;
+        lastDistances.current.set(index, distance);
+        updaters.forEach((apply) => apply(distance));
+      });
+
+      // Backgrounds cross-fade: each one fades in over the one before it as its scene arrives.
+      const backgroundProgress = clamp(progress, 0, sceneCount - 1);
+      backgroundLayers.current.forEach((layer, index) => {
+        if (!layer) return;
+        const opacity = index === 0 ? 1 : clamp(backgroundProgress - index + 1, 0, 1);
+        const covered = index + 1 < backgroundLayers.current.length && backgroundProgress >= index + 1;
+        layer.style.opacity = String(opacity);
+        layer.style.visibility = opacity > 0 && !covered ? 'visible' : 'hidden';
+      });
+
       // Inside the shop the page scrolls freely. Snapping stays off there: with it on, iOS Safari
       // re-snaps to the shop's top whenever the page bounces at the bottom or the grid grows.
       const shop = document.getElementById('shop');
       container.classList.toggle('is-free', Boolean(shop) && scrollTop >= (shop?.offsetTop ?? Infinity) - 2);
+      if (scrollTop > 0) setLoadDeferredScenes(true);
+
       // Anywhere in the shop counts as the shop (it's taller than a screen).
-      const newIndex = Math.min(Math.round(scrollTop / containerHeight), allProjects.length);
-
-      // Past the scenes (in the shop) nothing moves, so stop re-rendering on every scroll.
-      setScrollProgress(Math.min(scrollTop / containerHeight, allProjects.length));
-      if (scrollTop > 0) {
-        setLoadDeferredScenes(true);
-      }
-
+      const newIndex = Math.min(Math.round(scrollTop / containerHeight), sceneCount);
       setActiveIndex((currentIndex) => {
-        if (newIndex !== currentIndex && newIndex >= 0 && newIndex <= allProjects.length) {
+        if (newIndex !== currentIndex && newIndex >= 0 && newIndex <= sceneCount) {
           setIsTransitioning(true);
           setTimeout(() => setIsTransitioning(false), 400);
           return newIndex;
@@ -1450,12 +1505,18 @@ export default function HomePage() {
         return currentIndex;
       });
     };
+    const schedule = () => {
+      if (!frame) frame = requestAnimationFrame(update);
+    };
 
-    const container = document.querySelector('.scroll-container');
-    if (container) {
-      container.addEventListener('scroll', handleScroll, { passive: true });
-      return () => container.removeEventListener('scroll', handleScroll);
-    }
+    update();
+    container.addEventListener('scroll', schedule, { passive: true });
+    window.addEventListener('resize', schedule);
+    return () => {
+      if (frame) cancelAnimationFrame(frame);
+      container.removeEventListener('scroll', schedule);
+      window.removeEventListener('resize', schedule);
+    };
   }, [allProjects.length]);
 
   // A scene more than one screen away holds still (globals.css .scene-still): its floating stickers,
@@ -1468,10 +1529,14 @@ export default function HomePage() {
       {/* The page's heading for search engines and screen readers; the scenes are the visual one. */}
       <h1 className="sr-only">Bryton Zoz — New York artist, musician and designer</h1>
       <div className="fixed inset-0 bg-black" />
-      <BackgroundLayer background={currentBackground} opacity={1} />
-      {nextBackgroundIndex !== currentBackgroundIndex ? (
-        <BackgroundLayer background={nextBackground} opacity={backgroundBlend} />
-      ) : null}
+      {allProjects.map((project, index) => (
+        <BackgroundLayer
+          key={project.name}
+          background={getProjectBackground(project)}
+          visible={index === 0}
+          layerRef={(element) => { backgroundLayers.current[index] = element; }}
+        />
+      ))}
       <div className="solenya-gradient-reveal pointer-events-none fixed inset-0 z-[1] bg-black" />
 
       <SceneDots
@@ -1481,9 +1546,12 @@ export default function HomePage() {
         hidden={activeIndex >= allProjects.length}
       />
 
+      <MotionContext.Provider value={motionRegistry}>
+      <ActiveSceneContext.Provider value={activeIndex}>
       <div className="scroll-container relative z-10 h-screen overflow-y-auto snap-y snap-mandatory scroll-smooth">
         <div className="w-full max-w-none">
-          {allProjects.map((project, index) => {
+          {allProjects.map((project, index) => (
+            <SceneIndexContext.Provider key={project.name} value={index}>{((): React.ReactNode => {
             const isActive = index === activeIndex;
             const isPrevious = index === activeIndex - 1;
             const isNext = index === activeIndex + 1;
@@ -1492,15 +1560,13 @@ export default function HomePage() {
             const isReminder = project.name === 'Just A Reminder To Live Life';
             const isScrapwrk = project.name === 'Scrapwrk Store';
             const isNonParallel = project.name === 'NonParallel';
-            const distanceFromCenter = Math.abs(scrollProgress - index);
+            const distanceFromCenter = Math.abs(activeIndex - index);
             const continuousDistance = clamp(distanceFromCenter, 0, 1.2);
-            // Scene motion saturates at one screen away; clamping lets memoized far-off scenes skip re-rendering.
-            const sceneDistance = clamp(scrollProgress - index, -1, 1);
 
             if (project.type === 'coming-soon') {
               return (
                 <div key={project.name} className={sceneClass(index)}>
-                  <ComingSoonScene distance={sceneDistance} onNext={() => scrollToScene(index + 1)} />
+                  <ComingSoonScene onNext={() => scrollToScene(index + 1)} />
                 </div>
               );
             }
@@ -1510,7 +1576,6 @@ export default function HomePage() {
                 <div key={project.name} className={sceneClass(index)}>
                   <SolenyaScene
                     project={project}
-                    distance={sceneDistance}
                     loadImages={index === 0 || loadDeferredScenes}
                     onModalStateChange={handleModalStateChange}
                   />
@@ -1523,7 +1588,6 @@ export default function HomePage() {
                 <div key={project.name} className={sceneClass(index)}>
                   <CautionScene
                     project={project}
-                    distance={sceneDistance}
                     loadImages={index === 0 || loadDeferredScenes}
                     onModalStateChange={handleModalStateChange}
                   />
@@ -1536,7 +1600,6 @@ export default function HomePage() {
                 <div key={project.name} className={sceneClass(index)}>
                   <ReminderScene
                     project={project}
-                    distance={sceneDistance}
                     loadImages={index === 0 || loadDeferredScenes}
                   />
                 </div>
@@ -1546,7 +1609,7 @@ export default function HomePage() {
             if (isNonParallel) {
               return (
                 <div key={project.name} className={sceneClass(index)}>
-                  <NonParallelScene distance={sceneDistance} onShop={scrollToShop} />
+                  <NonParallelScene onShop={scrollToShop} />
                 </div>
               );
             }
@@ -1554,7 +1617,7 @@ export default function HomePage() {
             if (isScrapwrk) {
               return (
                 <div key={project.name} className={sceneClass(index)}>
-                  <ScrapwrkScene distance={sceneDistance} loadImages={index === 0 || loadDeferredScenes} />
+                  <ScrapwrkScene loadImages={index === 0 || loadDeferredScenes} />
                 </div>
               );
             }
@@ -1597,7 +1660,8 @@ export default function HomePage() {
                 </div>
               </div>
             );
-          })}
+          })()}</SceneIndexContext.Provider>
+          ))}
 
           {/* After the scenes, the page scrolls normally: the whole NonParallel shop, then the footer. */}
           <section id="shop" aria-label="Shop" className={`shop-section shop-section-home relative min-h-screen snap-start${activeIndex < allProjects.length - 1 ? ' scene-still' : ''}`}>
@@ -1608,6 +1672,8 @@ export default function HomePage() {
           </section>
         </div>
       </div>
+      </ActiveSceneContext.Provider>
+      </MotionContext.Provider>
     </div>
   );
 }

@@ -15,7 +15,7 @@ export const motionVariables = {
 };
 
 export function stickerFlight(box: Box, viewport: { width: number; height: number }, order: number) {
-  const scale = 1.6 + (order % 3) * 0.08;
+  const scale = 1.12 + (order % 3) * 0.02;
   const cx = box.left + box.width / 2;
   const cy = box.top + box.height / 2;
   let dx = cx - viewport.width / 2;
@@ -26,5 +26,5 @@ export function stickerFlight(box: Box, viewport: { width: number; height: numbe
   const tx = dx ? ((dx > 0 ? viewport.width + radius : -radius) - cx) / dx : Infinity;
   const ty = dy ? ((dy > 0 ? viewport.height + radius : -radius) - cy) / dy : Infinity;
   const travel = Math.max(0, Math.min(tx, ty));
-  return { x: dx * travel, y: dy * travel, scale, rotate: Math.sign(dx || dy) * (7 + order % 3 * 3) };
+  return { x: dx * travel, y: dy * travel, scale, rotate: Math.sign(dx || dy) * (3 + order % 3) };
 }

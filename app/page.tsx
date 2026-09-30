@@ -10,7 +10,6 @@ import { MerchShop } from '../components/store/MerchShop';
 import { StoreExperience } from '../components/store/StoreExperience';
 import { ReleaseSheet } from '../components/release/ReleaseSheet';
 import { cardSource, transitionCard, type CardSource } from '../lib/card-motion';
-import { easeOutCubic } from '../lib/scene-motion';
 import { usePlayer } from '../components/player/context';
 import { ArrowUpRightIcon, ChevronDownIcon, EqualizerBars } from '../components/player/icons';
 import { ResponsiveImage, placeholderBackground } from '../components/ResponsiveImage';
@@ -24,7 +23,7 @@ import { getRelease, getReleaseForProject, releasePath, warmTrack } from '../lib
 import { Project, getProjectTypeLabel, isProjectReleased } from '../lib/utils';
 
 const clamp = (value: number, min: number, max: number) => Math.min(Math.max(value, min), max);
-
+const easeOutCubic = (value: number) => 1 - Math.pow(1 - value, 3);
 
 type SceneStickerMotion = {
   x: number;
@@ -935,7 +934,7 @@ const SolenyaScene = React.memo(function SolenyaScene({
               top: sceneTop(sticker.frame.top),
               width: scaleValue(sticker.frame.size),
               height: scaleValue(sticker.frame.size),
-              zIndex: 20 + sticker.zIndex,
+              zIndex: sticker.zIndex,
               '--intro-x': scaleValue(sticker.intro.x),
               '--intro-y': scaleValue(sticker.intro.y),
               '--intro-rotate': `${sticker.intro.rotate}deg`,
@@ -1014,7 +1013,7 @@ const CautionScene = React.memo(function CautionScene({
               top: sceneTop(sticker.frame.top),
               width: scaleValue(sticker.frame.size),
               height: scaleValue(sticker.frame.size),
-              zIndex: 20 + sticker.zIndex,
+              zIndex: sticker.zIndex,
               '--intro-x': scaleValue(sticker.intro.x),
               '--intro-y': scaleValue(sticker.intro.y),
               '--intro-rotate': `${sticker.intro.rotate}deg`,
@@ -1089,7 +1088,7 @@ const ReminderScene = React.memo(function ReminderScene({
               top: sceneTop(sticker.frame.top),
               width: scaleValue(sticker.frame.size),
               height: scaleValue(sticker.frame.size),
-              zIndex: 20 + sticker.zIndex,
+              zIndex: sticker.zIndex,
               '--intro-x': scaleValue(sticker.intro.x),
               '--intro-y': scaleValue(sticker.intro.y),
               '--intro-rotate': `${sticker.intro.rotate}deg`,
@@ -1151,8 +1150,8 @@ const ScrapwrkScene = React.memo(function ScrapwrkScene({ loadImages }: { loadIm
   // screen allows (phone to desktop) while the grid and the footer both fit.
   return (
     <div className="relative flex h-full w-full items-center justify-center overflow-hidden pb-[132px] pt-10">
-      {/* The pieces as cut-out stickers, drifting around the grid's corners, above the artwork. */}
-      <div aria-hidden="true" className="pointer-events-none absolute inset-0 z-20">
+      {/* The pieces as cut-out stickers, drifting around the grid's corners (behind the cards). */}
+      <div aria-hidden="true" className="pointer-events-none absolute inset-0 z-0">
         {scrapwrkStickers.map((sticker, order) => {
 
           return (
@@ -1164,7 +1163,7 @@ const ScrapwrkScene = React.memo(function ScrapwrkScene({ loadImages }: { loadIm
                 top: sceneTop(sticker.frame.top),
                 width: scaleValue(sticker.frame.size),
                 height: scaleValue(sticker.frame.size),
-                zIndex: 20 + sticker.zIndex,
+                zIndex: sticker.zIndex,
                 '--intro-x': scaleValue(sticker.intro.x),
                 '--intro-y': scaleValue(sticker.intro.y),
                 '--intro-rotate': `${sticker.intro.rotate}deg`,
@@ -1226,16 +1225,18 @@ const ScrapwrkScene = React.memo(function ScrapwrkScene({ loadImages }: { loadIm
   );
 });
 
-// Opaque product cutouts at the edges, including pieces beyond the quick-shop grid.
-// Scroll motion and card depth motion use separate transform channels.
+// NonParallel's background: four of the tees, faint and tucked into the corners. Placed by percentage of the screen (not the portrait scene frame) so they sit in the
+// corners on a phone and spread out on a wide screen; `size` is in units of --np-sticker
+// (globals.css) and `alpha` keeps them in the background. They move with the scroll like the
+// Scrapwrk stickers.
 const nonparallelStickers = [
-  { key: 'sweatpants', src: nonparallelAssets.sweatpants, x: 4, y: 16, size: 1.15, baseRotate: -18,
+  { key: 'rainbow', src: nonparallelAssets.tees.rainbow, x: 3, y: 9, size: 0.95, alpha: 0.35, baseRotate: -16,
     movement: { x: -70, y: -110, rotate: -6, scale: 0.07, fadeRate: 0.96 }, float: { x: -7, y: -8, rotate: -2, duration: '8.4s', delay: '0.1s' }, intro: { x: -170, y: -130, rotate: -10, delay: '0.1s' } },
-  { key: 'blue', src: nonparallelAssets.tees.blue, x: 96, y: 26, size: 0.85, baseRotate: 14,
+  { key: 'blue', src: nonparallelAssets.tees.blue, x: 99, y: 30, size: 0.85, alpha: 0.2, baseRotate: 14,
     movement: { x: 76, y: -118, rotate: 5, scale: 0.07, fadeRate: 0.96 }, float: { x: 8, y: -7, rotate: 2, duration: '8.9s', delay: '0.4s' }, intro: { x: 160, y: -140, rotate: 10, delay: '0.16s' } },
-  { key: 'red', src: nonparallelAssets.tees.red, x: 4, y: 76, size: 0.85, baseRotate: -9,
+  { key: 'green', src: nonparallelAssets.tees.green, x: 1, y: 70, size: 0.85, alpha: 0.2, baseRotate: -9,
     movement: { x: -64, y: 112, rotate: 4, scale: 0.08, fadeRate: 1.02 }, float: { x: -7, y: -8, rotate: -1.4, duration: '8.2s', delay: '0.3s' }, intro: { x: -150, y: 160, rotate: 8, delay: '0.34s' } },
-  { key: 'yellow', src: nonparallelAssets.tees.yellow, x: 96, y: 95, size: 0.95, baseRotate: 17,
+  { key: 'purple', src: nonparallelAssets.tees.purple, x: 97, y: 93, size: 0.95, alpha: 0.2, baseRotate: 17,
     movement: { x: 78, y: 124, rotate: -5, scale: 0.08, fadeRate: 1.04 }, float: { x: 9, y: -9, rotate: 1.6, duration: '8.6s', delay: '0.55s' }, intro: { x: 170, y: 164, rotate: -8, delay: '0.4s' } },
 ];
 
@@ -1248,7 +1249,7 @@ const NonParallelScene = React.memo(function NonParallelScene({ onShop }: { onSh
 
   return (
     <div className="relative flex h-full w-full items-center justify-center overflow-hidden pb-[132px] pt-10">
-      <div aria-hidden="true" className="np-scene-stickers pointer-events-none absolute inset-0 z-20">
+      <div aria-hidden="true" className="np-scene-stickers pointer-events-none absolute inset-0 z-0">
         {nonparallelStickers.map((sticker, order) => {
           const size = `calc(var(--np-sticker) * ${sticker.size})`;
           return (
@@ -1268,8 +1269,8 @@ const NonParallelScene = React.memo(function NonParallelScene({ onShop }: { onSh
               } as React.CSSProperties}
             >
               <div
-                ref={motion.ref(sticker.key, (d) => stickerMotion(sticker, d, order))}
-                style={{ ...motion.initial((d) => stickerMotion(sticker, d, order)), willChange: 'transform, opacity' }}
+                ref={motion.ref(sticker.key, (d) => stickerMotion(sticker, d, order, sticker.alpha))}
+                style={{ ...motion.initial((d) => stickerMotion(sticker, d, order, sticker.alpha)), willChange: 'transform, opacity' }}
               >
                 <div
                   className="solenya-sticker-float h-full w-full"

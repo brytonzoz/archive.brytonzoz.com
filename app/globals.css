@@ -1378,11 +1378,9 @@ html {
   width: min(84vw, 540px, calc((100dvh - 250px) / (0.5 + var(--row-h, 0.66) * var(--rows, 1))));
 }
 
-/* Frame the grid without losing the product artwork beyond a wide viewport. */
+/* Its background tees and logo stickers (app/page.tsx) are sized in --np-sticker. */
 .np-scene-stickers {
-  --np-sticker: min(30vmin, 260px);
-  max-width: 1120px;
-  margin-inline: auto;
+  --np-sticker: min(34vmin, 300px);
 }
 
 .np-scene-header {
@@ -2219,15 +2217,6 @@ html {
   mask-image: linear-gradient(180deg, transparent 0, #000 30vh);
 }
 
-/* Foreground artwork keeps one stacking order while the card crosses containers. */
-.card-sticker-layer {
-  position: fixed;
-  inset: 0;
-  overflow: clip;
-  pointer-events: none;
-  z-index: 102;
-}
-.card-sticker-copy { pointer-events: none; }
 button[class*="transition"], a[class*="transition"] {
   transition-timing-function: var(--motion-ease);
 }

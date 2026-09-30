@@ -212,7 +212,10 @@ export function transitionControls(before: HTMLElement | null, update: () => voi
   const previous = controlMotions.get(before);
   const visible = previous && parseFloat(getComputedStyle(before).opacity) < 0.5 ? previous.tile : before;
   const from = visible.getBoundingClientRect();
-  const tile = freezeCard(visible, from);
+  // A reversal can start at an intermediate scale. Keep natural layout sizes in
+  // the clone and carry the rendered scale in its transform, including the text.
+  const tileBounds = new DOMRect(from.left, from.top, visible.offsetWidth, visible.offsetHeight);
+  const tile = freezeCard(visible, tileBounds);
   tile.style.opacity = '1';
   previous?.cancel();
   tile.style.zIndex = '104';
@@ -224,7 +227,7 @@ export function transitionControls(before: HTMLElement | null, update: () => voi
   target.classList.add('card-is-moving');
   const timing = { duration: 220, easing, fill: 'both' as const };
   const animations = [
-    tile.animate([{ transform: 'none' }, { transform: transformTo(from, to) }], timing),
+    tile.animate([{ transform: transformTo(tileBounds, from) }, { transform: transformTo(tileBounds, to) }], timing),
     tile.animate(handoff('1', '0'), { duration: 220, fill: 'both' }),
     target.animate([{ transform: transformTo(to, from) }, { transform: 'none' }], timing),
     target.animate(handoff('0', '1'), { duration: 220, fill: 'both' }),

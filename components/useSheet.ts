@@ -2,7 +2,7 @@
 
 import React, { useCallback, useEffect, useRef, useState } from 'react';
 
-const CLOSE_MS = 220;
+import { CLOSE_MS, MOTION_EASING } from '../lib/scene-motion';
 // Open sheets, most recent last: Escape closes only the top one (e.g. Now Playing over Listen Now).
 const openSheets: object[] = [];
 const DISMISS_DRAG_PX = 90;
@@ -23,11 +23,25 @@ export function useSheet(isOpen: boolean, onClose: () => void, onRequestClose?: 
   const [isClosing, setIsClosing] = useState(false);
 
   const requestClose = useCallback(() => {
+    if (closeRequested.current) return;
+    closeRequested.current = true;
     if (closeTransitionRef.current) {
-      if (closeRequested.current) return;
-      closeRequested.current = true;
       closeTransitionRef.current();
-    } else setIsClosing(true);
+    } else {
+      // Exit from the rendered frame, including a quick reversal of the opener
+      // or a partially released drag. CSS must not jump back to its resting pose.
+      const panel = sheetRef.current;
+      const backdrop = panel?.classList.contains('sheet-panel')
+        ? panel.parentElement?.querySelector<HTMLElement>('.sheet-backdrop') : null;
+      const style = panel ? getComputedStyle(panel) : null;
+      const transform = style?.transform ?? 'none';
+      const opacity = style?.opacity ?? '1';
+      const backdropOpacity = backdrop ? getComputedStyle(backdrop).opacity : '1';
+      panel?.style.setProperty('--sheet-from-transform', transform);
+      panel?.style.setProperty('--sheet-from-opacity', opacity);
+      backdrop?.style.setProperty('--backdrop-from-opacity', backdropOpacity);
+      setIsClosing(true);
+    }
   }, []);
 
   useEffect(() => {
@@ -36,7 +50,7 @@ export function useSheet(isOpen: boolean, onClose: () => void, onRequestClose?: 
       setIsClosing(false);
       setDragY(0);
       onCloseRef.current();
-    }, CLOSE_MS);
+    }, window.matchMedia('(prefers-reduced-motion: reduce)').matches ? 0 : CLOSE_MS);
     return () => window.clearTimeout(timer);
   }, [isClosing]);
 
@@ -94,7 +108,7 @@ export function useSheet(isOpen: boolean, onClose: () => void, onRequestClose?: 
   const sheetStyle = {
     '--drag-y': `${dragY}px`,
     transform: dragY ? `translateY(${dragY}px)` : undefined,
-    transition: isDragging ? 'none' : 'transform 320ms cubic-bezier(0.32, 0.72, 0, 1)',
+    transition: isDragging ? 'none' : `transform ${CLOSE_MS}ms ${MOTION_EASING}`,
   } as React.CSSProperties;
 
   return { sheetRef, isClosing, requestClose, dragHandlers, sheetStyle };

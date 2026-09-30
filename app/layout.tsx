@@ -2,6 +2,7 @@ import React from 'react'
 import type { Metadata, Viewport } from 'next'
 import { Inter } from 'next/font/google'
 import './globals.css'
+import { motionVariables } from '../lib/scene-motion'
 import { PlayerProvider } from '../components/player/PlayerProvider'
 import { PageViews } from '../components/PageViews'
 import { ServiceWorker } from '../components/ServiceWorker'
@@ -80,7 +81,7 @@ export default function RootLayout({
   children: React.ReactNode
 }) {
   return (
-    <html lang="en" className="dark">
+    <html lang="en" className="dark" style={motionVariables as React.CSSProperties}>
       <body className={`${inter.variable} font-body antialiased`}>
         <script
           type="application/ld+json"

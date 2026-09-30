@@ -41,7 +41,9 @@ export function ReleaseSheet({ project, isOpen, onClose, source = null }: { proj
       aria-labelledby={titleId}
       className="card-sheet sheet-dialog fixed inset-0 z-[100] flex items-end justify-center font-body sm:items-center sm:px-6 sm:pt-6"
     >
-      <div aria-hidden="true" onClick={requestClose} className="sheet-backdrop absolute inset-0 touch-none bg-black/60" />
+      <div aria-hidden="true" onClick={requestClose} className="sheet-backdrop absolute inset-0 touch-none bg-black/60">
+        <div className="card-scene-vignette" />
+      </div>
 
       <div
         ref={sheetRef}
@@ -85,7 +87,7 @@ export function ReleaseSheet({ project, isOpen, onClose, source = null }: { proj
           release={release}
           className="platform-fade absolute inset-x-0 bottom-0 pt-10"
           // Sits just above the mini player when music is playing.
-          style={{ paddingBottom: 'calc(max(1rem, env(safe-area-inset-bottom)) + var(--sheet-player-offset, 0px))', transition: 'padding-bottom 320ms cubic-bezier(0.32, 0.72, 0, 1)' }}
+          style={{ paddingBottom: 'calc(max(1rem, env(safe-area-inset-bottom)) + var(--sheet-player-offset, 0px))', transition: 'padding-bottom 320ms var(--motion-ease)' }}
         />
       </div>
     </div>,

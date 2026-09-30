@@ -56,7 +56,7 @@
   }
 
   .scene-button {
-    transition: filter 200ms ease, scale 160ms ease;
+    transition: filter 200ms var(--motion-ease), scale 200ms var(--motion-ease);
     -webkit-tap-highlight-color: transparent;
   }
 
@@ -104,7 +104,7 @@
 
   .tile-cover {
     box-shadow: 0 1px 2px rgba(0, 0, 0, 0.3), 0 8px 24px -8px rgba(0, 0, 0, 0.5);
-    transition: transform 300ms cubic-bezier(0.32, 0.72, 0, 1);
+    transition: transform 300ms var(--motion-ease);
   }
 
   .tile-cover::after {
@@ -147,15 +147,15 @@
     box-shadow:
       inset 0 0 0 0.5px rgba(255, 255, 255, 0.12),
       0 18px 50px rgba(0, 0, 0, 0.5);
-    animation: menuIn 180ms cubic-bezier(0.32, 0.72, 0, 1) both;
+    animation: menuIn 180ms var(--motion-ease) both;
   }
 
   .toast {
-    animation: toastIn 320ms cubic-bezier(0.32, 0.72, 0, 1) both;
+    animation: toastIn 320ms var(--motion-ease) both;
   }
 
   .toast.is-leaving {
-    animation: toastOut 220ms ease-in forwards;
+    animation: toastOut 220ms var(--motion-ease) forwards;
   }
 
   .admin-root {
@@ -171,11 +171,11 @@
   }
 
   .platform-scrim {
-    animation: listenFadeIn 260ms ease-out both;
+    animation: listenFadeIn var(--motion-control) var(--motion-ease) both;
   }
 
   .platform-row {
-    animation: platformRowIn 320ms cubic-bezier(0.32, 0.72, 0, 1) backwards;
+    animation: platformRowIn 320ms var(--motion-ease) backwards;
   }
 
   /* Next-release teaser: a cover that's still developing. Light drifts behind frosted glass; all
@@ -264,25 +264,25 @@
   }
 
   .sheet-backdrop {
-    animation: listenFadeIn 240ms ease-out backwards;
+    animation: listenFadeIn var(--motion-open) var(--motion-ease) backwards;
   }
 
   .sheet-panel {
-    animation: listenSheetIn 380ms cubic-bezier(0.32, 0.72, 0, 1) backwards;
+    animation: listenSheetIn var(--motion-open) var(--motion-ease) backwards;
   }
 
   .is-closing .sheet-backdrop {
-    animation: listenFadeOut 220ms ease-in forwards;
+    animation: listenFadeOut var(--motion-close) var(--motion-ease) forwards;
   }
 
   .is-closing .sheet-panel {
-    animation: listenSheetOut 220ms cubic-bezier(0.32, 0.72, 0, 1) forwards;
+    animation: listenSheetOut var(--motion-close) var(--motion-ease) forwards;
   }
 
   @media (min-width: 640px) {
     .sheet-panel {
       animation-name: listenCardIn;
-      animation-duration: 280ms;
+      animation-duration: var(--motion-open);
     }
 
     .is-closing .sheet-panel {
@@ -291,7 +291,7 @@
   }
 
   .mini-player {
-    animation: miniPlayerIn 380ms cubic-bezier(0.32, 0.72, 0, 1) backwards;
+    animation: miniPlayerIn 380ms var(--motion-ease) backwards;
   }
 
   .equalizer {
@@ -348,7 +348,7 @@
     border-radius: 999px;
     background: linear-gradient(to right, rgba(255, 255, 255, 0.85) var(--pct), rgba(255, 255, 255, 0.2) var(--pct));
     transform: scaleY(0.67);
-    transition: transform 200ms cubic-bezier(0.32, 0.72, 0, 1);
+    transition: transform 200ms var(--motion-ease);
   }
 
   .scrubber::-moz-range-track {
@@ -405,7 +405,7 @@
   }
 
   .np-swap {
-    animation: npSwap 220ms cubic-bezier(0.32, 0.72, 0, 1) both;
+    animation: npSwap var(--motion-control) var(--motion-ease) both;
   }
 
   .teaser-notify-glow {
@@ -624,6 +624,7 @@
 }
 
 @keyframes listenFadeOut {
+  from { opacity: var(--backdrop-from-opacity, 1); }
   to {
     opacity: 0;
   }
@@ -637,7 +638,7 @@
 
 @keyframes listenSheetOut {
   from {
-    transform: translateY(var(--drag-y, 0px));
+    transform: var(--sheet-from-transform, translateY(var(--drag-y, 0px)));
   }
   to {
     transform: translateY(100%);
@@ -652,6 +653,10 @@
 }
 
 @keyframes listenCardOut {
+  from {
+    opacity: var(--sheet-from-opacity, 1);
+    transform: var(--sheet-from-transform, none);
+  }
   to {
     opacity: 0;
     transform: translateY(8px) scale(0.97);
@@ -670,6 +675,16 @@
 .platform-panel { transform-origin: top left; }
 .card-is-moving { will-change: transform, opacity; }
 .card-is-dragging { will-change: translate, scale; }
+/* A single painted gradient: only its transform and the dimmer's opacity move. */
+.card-sheet .sheet-backdrop { overflow: hidden; }
+.card-scene-vignette {
+  position: absolute;
+  /* Overscan keeps the gradient's rectangle outside the viewport as it grows. */
+  inset: -28%;
+  pointer-events: none;
+  background: radial-gradient(ellipse at 50% 46%, transparent 18%, rgba(0, 0, 0, 0.18) 44%, rgba(0, 0, 0, 0.72) 70%);
+  transform-origin: center;
+}
 /* Covered decorations stay at their current frame and resume when the sheet closes. */
 .card-sheet-open .scene-wrap *,
 .card-sheet-open .scene-wrap *::before,
@@ -768,7 +783,7 @@ html {
   border-radius: var(--card-radius);
   text-align: left;
   color: #fff;
-  transition: transform 260ms cubic-bezier(0.22, 1, 0.36, 1);
+  transition: transform var(--motion-control) var(--motion-ease);
   -webkit-tap-highlight-color: transparent;
 }
 
@@ -997,7 +1012,7 @@ html {
 }
 
 .store-bag-button {
-  animation: storeBagIn 420ms cubic-bezier(0.34, 1.56, 0.64, 1) both;
+  animation: storeBagIn var(--motion-open) var(--motion-ease) both;
 }
 
 .store-bag-count {
@@ -1136,7 +1151,7 @@ html {
   border-radius: 999px;
   background: var(--swatch);
   box-shadow: inset 0 0 0 1px rgba(0, 0, 0, 0.15);
-  transition: transform 180ms cubic-bezier(0.34, 1.56, 0.64, 1);
+  transition: transform var(--motion-control) var(--motion-ease);
 }
 
 .merch-swatch::after {
@@ -1145,7 +1160,7 @@ html {
   inset: -4px;
   border-radius: inherit;
   box-shadow: 0 0 0 2px transparent;
-  transition: box-shadow 180ms;
+  transition: box-shadow var(--motion-control) var(--motion-ease);
 }
 
 .merch-swatch.is-selected::after {
@@ -1166,7 +1181,7 @@ html {
   font-weight: 600;
   color: #111;
   box-shadow: inset 0 0 0 1px rgba(0, 0, 0, 0.1);
-  transition: background-color 160ms, color 160ms, transform 120ms;
+  transition: background-color var(--motion-control) var(--motion-ease), color var(--motion-control) var(--motion-ease), transform 180ms var(--motion-ease);
 }
 
 .merch-size:hover {
@@ -1574,7 +1589,7 @@ html {
   font-size: 13px;
   font-weight: 500;
   white-space: nowrap;
-  transition: background-color 160ms ease, color 160ms ease, box-shadow 160ms ease;
+  transition: background-color var(--motion-control) var(--motion-ease), color var(--motion-control) var(--motion-ease), box-shadow var(--motion-control) var(--motion-ease);
 }
 
 .shop-chip:hover {
@@ -1681,7 +1696,7 @@ html {
   overflow: hidden;
   border-radius: 14px;
   background: #f4f4f4;
-  transition: transform 220ms cubic-bezier(0.22, 1, 0.36, 1);
+  transition: transform var(--motion-control) var(--motion-ease);
 }
 
 .shop-tile:active .shop-tile-photo {
@@ -1694,7 +1709,7 @@ html {
   height: 100%;
   width: 100%;
   object-fit: cover;
-  transition: opacity 260ms ease, transform 500ms cubic-bezier(0.22, 1, 0.36, 1);
+  transition: opacity var(--motion-control) var(--motion-ease), transform var(--motion-open) var(--motion-ease);
 }
 
 .shop-tile-img-alt {
@@ -1819,7 +1834,7 @@ html {
   font-size: 13px;
   font-weight: 600;
   letter-spacing: 0.01em;
-  transition: background-color 200ms ease, color 200ms ease;
+  transition: background-color var(--motion-control) var(--motion-ease), color var(--motion-control) var(--motion-ease);
 }
 
 .gallery-sides button[aria-pressed='true'] {
@@ -1884,7 +1899,7 @@ html {
 .merch-add {
   background: rgba(0, 0, 0, 0.07);
   color: #111;
-  transition: background-color 220ms ease, color 220ms ease, transform 160ms ease;
+  transition: background-color var(--motion-control) var(--motion-ease), color var(--motion-control) var(--motion-ease), transform 180ms var(--motion-ease);
 }
 
 .merch-add:hover {
@@ -1911,7 +1926,7 @@ html {
 }
 
 .merch-price-roll {
-  animation: merchPriceRoll 320ms cubic-bezier(0.22, 1, 0.36, 1);
+  animation: merchPriceRoll var(--motion-control) var(--motion-ease);
 }
 
 @keyframes merchPriceRoll {
@@ -2024,11 +2039,23 @@ html {
   inset: 0;
   z-index: 140;
   background: #0b0b0c;
-  animation: photoZoomIn 240ms ease-out;
+  animation: photoZoomIn var(--motion-open) var(--motion-ease);
 }
 
 @keyframes photoZoomIn {
-  from { opacity: 0; }
+  from { opacity: 0; transform: scale(0.96); }
+}
+
+.photo-zoom.is-closing {
+  animation: photoZoomOut var(--motion-close) var(--motion-ease) forwards;
+}
+
+@keyframes photoZoomOut {
+  from {
+    opacity: var(--sheet-from-opacity, 1);
+    transform: var(--sheet-from-transform, none);
+  }
+  to { opacity: 0; transform: scale(0.96); }
 }
 
 .photo-zoom-frame {
@@ -2188,4 +2215,11 @@ html {
   backdrop-filter: blur(28px) saturate(120%);
   -webkit-mask-image: linear-gradient(180deg, transparent 0, #000 30vh);
   mask-image: linear-gradient(180deg, transparent 0, #000 30vh);
+}
+
+button[class*="transition"], a[class*="transition"] {
+  transition-timing-function: var(--motion-ease);
+}
+@media (prefers-reduced-motion: reduce) {
+  .photo-zoom, .photo-zoom.is-closing { animation-duration: 1ms; }
 }

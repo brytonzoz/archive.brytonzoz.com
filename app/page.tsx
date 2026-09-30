@@ -1230,11 +1230,11 @@ const ScrapwrkScene = React.memo(function ScrapwrkScene({ loadImages }: { loadIm
 const nonparallelStickers = [
   { key: 'sweatpants', src: nonparallelAssets.sweatpants, x: 4, y: 16, size: 1.15, baseRotate: -18,
     movement: { x: -70, y: -110, rotate: -6, scale: 0.07, fadeRate: 0.96 }, float: { x: -7, y: -8, rotate: -2, duration: '8.4s', delay: '0.1s' }, intro: { x: -170, y: -130, rotate: -10, delay: '0.1s' } },
-  { key: 'blue', src: nonparallelAssets.tees.blue, x: 103, y: 32, size: 0.85, baseRotate: 14,
+  { key: 'blue', src: nonparallelAssets.tees.blue, x: 96, y: 26, size: 0.85, baseRotate: 14,
     movement: { x: 76, y: -118, rotate: 5, scale: 0.07, fadeRate: 0.96 }, float: { x: 8, y: -7, rotate: 2, duration: '8.9s', delay: '0.4s' }, intro: { x: 160, y: -140, rotate: 10, delay: '0.16s' } },
-  { key: 'red', src: nonparallelAssets.tees.red, x: -3, y: 74, size: 0.85, baseRotate: -9,
+  { key: 'red', src: nonparallelAssets.tees.red, x: 4, y: 76, size: 0.85, baseRotate: -9,
     movement: { x: -64, y: 112, rotate: 4, scale: 0.08, fadeRate: 1.02 }, float: { x: -7, y: -8, rotate: -1.4, duration: '8.2s', delay: '0.3s' }, intro: { x: -150, y: 160, rotate: 8, delay: '0.34s' } },
-  { key: 'yellow', src: nonparallelAssets.tees.yellow, x: 101, y: 95, size: 0.95, baseRotate: 17,
+  { key: 'yellow', src: nonparallelAssets.tees.yellow, x: 96, y: 95, size: 0.95, baseRotate: 17,
     movement: { x: 78, y: 124, rotate: -5, scale: 0.08, fadeRate: 1.04 }, float: { x: 9, y: -9, rotate: 1.6, duration: '8.6s', delay: '0.55s' }, intro: { x: 170, y: 164, rotate: -8, delay: '0.4s' } },
 ];
 

@@ -1372,9 +1372,11 @@ html {
   width: min(84vw, 540px, calc((100dvh - 250px) / (0.5 + var(--row-h, 0.66) * var(--rows, 1))));
 }
 
-/* Its background tees and logo stickers (app/page.tsx) are sized in --np-sticker. */
+/* Frame the grid without losing the product artwork beyond a wide viewport. */
 .np-scene-stickers {
-  --np-sticker: min(34vmin, 300px);
+  --np-sticker: min(30vmin, 260px);
+  max-width: 1120px;
+  margin-inline: auto;
 }
 
 .np-scene-header {

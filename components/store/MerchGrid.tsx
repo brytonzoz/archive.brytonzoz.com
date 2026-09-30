@@ -74,16 +74,16 @@ export function MerchGrid({
   /** The best sellers; null while the catalog is still loading (the cards show their logo side). */
   cards: MerchCard[] | null;
   active: boolean;
-  onOpen: (card: MerchCard) => void;
+  onOpen: (card: MerchCard, element: HTMLButtonElement) => void;
   sizes?: string;
 }) {
   const columns = 2;
-  const cards: { key: string; label: string; face: React.ReactNode; wide?: boolean; onClick: () => void }[] = merchCards
+  const cards: { key: string; label: string; face: React.ReactNode; wide?: boolean; onClick: (event: React.MouseEvent<HTMLButtonElement>) => void }[] = merchCards
     ? merchCards.map((card) => ({
       key: `${card.product.slug}-${card.color.slug}`,
       label: `${card.product.displayName}${card.perColor ? `, ${card.color.name}` : ''}, ${formatPrice(card.product.price)}`,
       face: <TeeCard card={card} sizes={sizes} />,
-      onClick: () => onOpen(card),
+      onClick: (event) => onOpen(card, event.currentTarget),
     }))
     : [0, 1, 2, 3].map((i) => ({ key: `loading-${i}`, label: 'Loading', face: <><span className="store-card-face store-card-front merch-card-front" /><Back number="" /></>, onClick: () => {} }));
   const count = cards.length;

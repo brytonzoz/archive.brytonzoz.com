@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useCallback, useEffect, useState } from 'react';
+import React, { useCallback, useEffect, useRef, useState } from 'react';
 import Link from 'next/link';
 import { ProjectCard } from '../components/ProjectCard';
 import { NotifySheet, hasSignedUp } from '../components/NotifySheet';
@@ -9,6 +9,7 @@ import { MerchExperience } from '../components/store/MerchExperience';
 import { MerchShop } from '../components/store/MerchShop';
 import { StoreExperience } from '../components/store/StoreExperience';
 import { ReleaseSheet } from '../components/release/ReleaseSheet';
+import { cardSource, transitionCard, type CardSource } from '../lib/card-motion';
 import { usePlayer } from '../components/player/context';
 import { ArrowUpRightIcon, ChevronDownIcon, EqualizerBars } from '../components/player/icons';
 import { ResponsiveImage, placeholderBackground } from '../components/ResponsiveImage';
@@ -375,6 +376,7 @@ function SceneCard({
   onModalStateChange?: (isOpen: boolean) => void;
 }) {
   const [isSheetOpen, setIsSheetOpen] = useState(false);
+  const source = useRef<CardSource | null>(null);
   const player = usePlayer();
   const colors = SCENE_TONES[tone];
   const PRIMARY_PILL = colors.primary;
@@ -383,9 +385,12 @@ function SceneCard({
   const services = getStreamingServices(project);
   const isPlayingThis = Boolean(release) && player.current?.release.id === release?.id && player.isPlaying;
 
-  const openSheet = () => {
-    setIsSheetOpen(true);
-    onModalStateChange?.(true);
+  const openSheet = (element: HTMLElement) => {
+    source.current = cardSource(element.closest<HTMLElement>('.scene-card') ?? element);
+    transitionCard(source.current, () => {
+      setIsSheetOpen(true);
+      onModalStateChange?.(true);
+    }, true);
   };
 
   // Once this scene has been on screen for a moment, fetch the start of its first song so Play
@@ -412,7 +417,7 @@ function SceneCard({
         onClick={(event) => {
           if (event.metaKey || event.ctrlKey || event.shiftKey || event.altKey || event.button !== 0) return;
           event.preventDefault();
-          openSheet();
+          openSheet(event.currentTarget);
         }}
         onPointerEnter={() => warmTrack(firstTrack)}
         onPointerDown={() => warmTrack(firstTrack)}
@@ -428,7 +433,7 @@ function SceneCard({
       <button
         type="button"
         className="scene-button"
-        onClick={openSheet}
+        onClick={(event) => openSheet(event.currentTarget)}
         aria-haspopup="dialog"
         style={PRIMARY_PILL}
       >
@@ -517,6 +522,7 @@ function SceneCard({
         <ReleaseSheet
           project={project}
           isOpen={isSheetOpen}
+          source={source.current}
           onClose={() => {
             setIsSheetOpen(false);
             onModalStateChange?.(false);

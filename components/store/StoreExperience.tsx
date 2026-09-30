@@ -1,6 +1,7 @@
 'use client';
 
-import React, { useCallback, useEffect, useState } from 'react';
+import React, { useCallback, useEffect, useRef, useState } from 'react';
+import { cardSource, transitionCard, type CardSource } from '../../lib/card-motion';
 import { getProduct, productPath, STORE_PATH, type Product } from '../../lib/store';
 import { refreshAvailability } from '../../lib/store-client';
 import { NotifySheet, hasSignedUp } from '../NotifySheet';
@@ -34,6 +35,7 @@ export function StoreExperience({
 }) {
   const { notify } = usePlayer();
   const [open, setOpen] = useState<Product | null>(null);
+  const source = useRef<CardSource | null>(null);
   const [bagOpen, setBagOpen] = useState(false);
   const [notifyOpen, setNotifyOpen] = useState(false);
   const { busy, buy } = useCheckout();
@@ -44,8 +46,9 @@ export function StoreExperience({
     if (initial) setOpen(initial);
   }, [initialProduct]);
 
-  const openProduct = useCallback((product: Product) => {
-    setOpen(product);
+  const openProduct = useCallback((product: Product, element: HTMLButtonElement) => {
+    source.current = cardSource(element);
+    transitionCard(source.current, () => setOpen(product), true);
     // Each piece has its own address, so the page can be shared or reloaded.
     if (window.location.pathname.startsWith(STORE_PATH)) window.history.replaceState(window.history.state, '', productPath(product));
   }, []);
@@ -74,7 +77,7 @@ export function StoreExperience({
         onOpen={openProduct}
         onNotify={() => (signedUp ? notify('You’re on the list for the next drop') : setNotifyOpen(true))}
       />
-      <ProductSheet product={open} onClose={closeProduct} onBuy={buy} onOpenBag={() => { setOpen(null); setBagOpen(true); }} busy={busy} />
+      <ProductSheet product={open} source={source.current} onClose={closeProduct} onBuy={buy} onOpenBag={() => { setOpen(null); setBagOpen(true); }} busy={busy} />
       <BagSheet isOpen={bagOpen} onClose={() => setBagOpen(false)} onBuy={buy} busy={busy} />
       <NotifySheet source="scrapwrk" isOpen={notifyOpen} onClose={() => setNotifyOpen(false)} onDone={() => setSignedUp(true)} />
     </>

@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useState } from 'react';
+import React, { useRef, useState } from 'react';
 import Link from 'next/link';
 import { Project, getProjectTypeLabel, isProjectReleased } from '../lib/utils';
 import { getStreamingServices } from '../lib/streaming';
@@ -8,6 +8,7 @@ import { getReleaseForProject } from '../lib/tracks';
 import { ReleaseSheet } from './release/ReleaseSheet';
 import { ArrowUpRightIcon } from './player/icons';
 import { ResponsiveImage, placeholderBackground } from './ResponsiveImage';
+import { cardSource, transitionCard, type CardSource } from '../lib/card-motion';
 
 interface ProjectCardProps {
   project: Project;
@@ -20,6 +21,7 @@ interface ProjectCardProps {
 // sheet; pages on this site open in place; everything else opens its site.
 export function ProjectCard({ project, className = '', style, onModalStateChange }: ProjectCardProps) {
   const [isSheetOpen, setIsSheetOpen] = useState(false);
+  const source = useRef<CardSource | null>(null);
   const hasSheet = getStreamingServices(project).length > 0 || (isProjectReleased(project) && Boolean(getReleaseForProject(project.name)));
   const isInternal = Boolean(project.url?.startsWith('/'));
   const isExternal = !hasSheet && !isInternal && Boolean(project.url);
@@ -56,9 +58,12 @@ export function ProjectCard({ project, className = '', style, onModalStateChange
           type="button"
           className={tileClassName}
           style={style}
-          onClick={() => {
-            setIsSheetOpen(true);
-            onModalStateChange?.(true);
+          onClick={(event) => {
+            source.current = cardSource(event.currentTarget);
+            transitionCard(source.current, () => {
+              setIsSheetOpen(true);
+              onModalStateChange?.(true);
+            }, true);
           }}
         >
           {content}
@@ -66,6 +71,7 @@ export function ProjectCard({ project, className = '', style, onModalStateChange
         <ReleaseSheet
           project={project}
           isOpen={isSheetOpen}
+          source={source.current}
           onClose={() => {
             setIsSheetOpen(false);
             onModalStateChange?.(false);

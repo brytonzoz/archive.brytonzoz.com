@@ -1,6 +1,7 @@
 'use client';
 
 import React, { useCallback, useDeferredValue, useEffect, useMemo, useRef, useState } from 'react';
+import { cardSource, transitionCard, type CardSource } from '../../lib/card-motion';
 import { useMerch } from '../../lib/merch-client';
 import { MERCH_PATH, merchPath, type MerchProduct } from '../../lib/merch-shared';
 import { formatPrice } from '../../lib/store';
@@ -79,6 +80,7 @@ function MerchShopView({
   const [sort, setSort] = useState<Sort>('featured');
   const [shown, setShown] = useState(PAGE);
   const [open, setOpen] = useState<MerchProduct | null>(null);
+  const source = useRef<CardSource | null>(null);
   const [bagOpen, setBagOpen] = useState(false);
   const { busy, buy } = useCheckout();
   const sentinel = useRef<HTMLDivElement>(null);
@@ -164,8 +166,9 @@ function MerchShopView({
     if (top && top.getBoundingClientRect().top < 0) top.scrollIntoView({ block: 'start', behavior: 'smooth' });
   };
 
-  const openProduct = useCallback((product: MerchProduct) => {
-    setOpen(product);
+  const openProduct = useCallback((product: MerchProduct, element: HTMLButtonElement) => {
+    source.current = cardSource(element);
+    transitionCard(source.current, () => setOpen(product), true);
     if (window.location.pathname.startsWith(MERCH_PATH)) window.history.replaceState(window.history.state, '', merchPath(product));
   }, []);
   const closeProduct = useCallback(() => {
@@ -266,13 +269,13 @@ function MerchShopView({
         Top
       </button>
 
-      <MerchSheet product={open} onClose={closeProduct} onBuy={buy} busy={busy} />
+      <MerchSheet product={open} source={source.current} onClose={closeProduct} onBuy={buy} busy={busy} />
       <BagSheet isOpen={bagOpen} onClose={() => setBagOpen(false)} onBuy={buy} busy={busy} />
     </section>
   );
 }
 
-const ShopTile = React.memo(function ShopTile({ product, onOpen }: { product: MerchProduct; onOpen: (product: MerchProduct) => void }) {
+const ShopTile = React.memo(function ShopTile({ product, onOpen }: { product: MerchProduct; onOpen: (product: MerchProduct, element: HTMLButtonElement) => void }) {
   const color = product.colors[0];
   const second = color.images[1];
   const view = color.views?.[0];
@@ -294,7 +297,7 @@ const ShopTile = React.memo(function ShopTile({ product, onOpen }: { product: Me
   return (
     <button
       type="button"
-      onClick={() => onOpen(product)}
+      onClick={(event) => onOpen(product, event.currentTarget)}
       onPointerEnter={(event) => { if (event.pointerType === 'mouse') setHovered(true); }}
       aria-label={`${product.displayName}, ${price}`}
       className={`shop-tile group ${altView && altView !== view ? 'has-alt' : ''}`}

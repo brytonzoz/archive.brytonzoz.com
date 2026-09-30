@@ -9,7 +9,8 @@ import { Project, isProjectReleased } from '../../lib/utils';
 import { placeholderBackground } from '../ResponsiveImage';
 import { usePlayer } from '../player/context';
 import { ChevronDownIcon, ShareIcon } from '../player/icons';
-import { useSheet } from '../useSheet';
+import { useCardSheet } from '../useCardSheet';
+import type { CardSource } from '../../lib/card-motion';
 import { PlatformBar } from './PlatformBar';
 import { ReleaseView, releaseKey } from './ReleaseView';
 
@@ -18,9 +19,9 @@ const iconButton =
 
 // "Listen Now": the whole release in a sheet, playable right here, with the streaming apps
 // floating at the bottom.
-export function ReleaseSheet({ project, isOpen, onClose }: { project: Project; isOpen: boolean; onClose: () => void }) {
+export function ReleaseSheet({ project, isOpen, onClose, source = null }: { project: Project; isOpen: boolean; onClose: () => void; source?: CardSource | null }) {
   const titleId = useId();
-  const { sheetRef, isClosing, requestClose, dragHandlers, sheetStyle } = useSheet(isOpen, onClose);
+  const { sheetRef, requestClose } = useCardSheet(isOpen, onClose, source);
   const { notify } = usePlayer();
   const release = isProjectReleased(project) ? getReleaseForProject(project.name) : undefined;
   const key = releaseKey(project, release);
@@ -38,7 +39,7 @@ export function ReleaseSheet({ project, isOpen, onClose }: { project: Project; i
       role="dialog"
       aria-modal="true"
       aria-labelledby={titleId}
-      className={`sheet-dialog fixed inset-0 z-[100] flex items-end justify-center font-body sm:items-center sm:px-6 sm:pt-6 ${isClosing ? 'is-closing' : ''}`}
+      className="card-sheet sheet-dialog fixed inset-0 z-[100] flex items-end justify-center font-body sm:items-center sm:px-6 sm:pt-6"
     >
       <div aria-hidden="true" onClick={requestClose} className="sheet-backdrop absolute inset-0 touch-none bg-black/60" />
 
@@ -46,13 +47,12 @@ export function ReleaseSheet({ project, isOpen, onClose }: { project: Project; i
         ref={sheetRef}
         tabIndex={-1}
         className="sheet-panel relative isolate sheet-dialog-height flex w-full max-w-[480px] flex-col overflow-hidden rounded-t-[32px] text-white outline-none sm:rounded-[32px]"
-        style={sheetStyle}
       >
         <div aria-hidden="true" className="absolute inset-0 -z-10 bg-[#111]" />
         {cover ? <div aria-hidden="true" className="absolute inset-[-20%] -z-10 opacity-80 blur-[60px] saturate-[1.5]" style={placeholderBackground(cover)} /> : null}
         <div aria-hidden="true" className="absolute inset-0 -z-10 bg-gradient-to-b from-black/30 via-black/60 to-black/85" />
 
-        <div {...dragHandlers} className="relative flex-none touch-none select-none px-3 pb-1 pt-2">
+        <div className="relative flex-none touch-none select-none px-3 pb-1 pt-2">
           <div aria-hidden="true" className="mx-auto h-[5px] w-9 rounded-full bg-white/30 sm:invisible" />
           <div className="-mt-1 flex items-center justify-between">
             <button type="button" onClick={requestClose} aria-label="Close" className={iconButton}>

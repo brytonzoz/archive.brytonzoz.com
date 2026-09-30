@@ -1,7 +1,7 @@
 'use client';
 
-import React, { useEffect, useId, useState } from 'react';
-import { flushSync } from 'react-dom';
+import React, { useEffect, useId, useRef, useState } from 'react';
+import { cancelControlMotion, transitionControls } from '../../lib/card-motion';
 import { track as trackMetric } from '../../lib/analytics';
 import { openInApp } from '../../lib/open-app';
 import { getStreamingServices, type StreamingService } from '../../lib/streaming';
@@ -10,15 +10,6 @@ import { Project, isProjectReleased } from '../../lib/utils';
 import { ResponsiveImage } from '../ResponsiveImage';
 import { ArrowUpRightIcon, ChevronDownIcon } from '../player/icons';
 import { releaseKey } from './ReleaseView';
-
-// Morphs between the small bar and the panel where the browser can (View Transitions);
-// elsewhere the panel animates in on its own.
-function transition(update: () => void) {
-  const doc = document as Document & { startViewTransition?: (callback: () => void) => unknown };
-  const reduced = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
-  if (doc.startViewTransition && !reduced) doc.startViewTransition(() => flushSync(update));
-  else update();
-}
 
 function AppIcon({ service, size }: { service: StreamingService; size: number }) {
   return (
@@ -37,12 +28,18 @@ function AppIcon({ service, size }: { service: StreamingService; size: number })
 export function PlatformBar({ project, release, className = '', style }: { project: Project; release?: Release; className?: string; style?: React.CSSProperties }) {
   const [expanded, setExpanded] = useState(false);
   const panelId = useId();
+  const controlRef = useRef<HTMLDivElement>(null);
   const services = getStreamingServices(project);
   const isReleased = isProjectReleased(project);
   const key = releaseKey(project, release);
   const label = isReleased ? 'Add to your library' : 'Pre-save';
 
-  const setOpen = (value: boolean) => transition(() => setExpanded(value));
+  useEffect(() => {
+    const control = controlRef.current;
+    return () => { if (control) cancelControlMotion(control); };
+  }, []);
+
+  const setOpen = (value: boolean) => transitionControls(controlRef.current, () => setExpanded(value), () => controlRef.current);
 
   // Escape closes the panel first (not the sheet behind it).
   useEffect(() => {
@@ -87,11 +84,12 @@ export function PlatformBar({ project, release, className = '', style }: { proje
       <div className={`pointer-events-none z-[2] flex justify-center px-3 ${className}`} style={style}>
         {expanded ? (
           <div
+            ref={controlRef}
             id={panelId}
             role="group"
             aria-label={label}
             className="platform-panel glass-capsule glass-solid pointer-events-auto w-full max-w-[440px] rounded-[20px] p-4 pb-3"
-            style={{ viewTransitionName: 'platform-bar', minHeight: 'min(34dvh, 320px)' } as React.CSSProperties}
+            style={{ minHeight: 'min(34dvh, 320px)' }}
           >
             <div className="flex items-start justify-between gap-3 px-1">
               <div>
@@ -137,8 +135,8 @@ export function PlatformBar({ project, release, className = '', style }: { proje
           </div>
         ) : (
           <div
+            ref={controlRef}
             className="platform-bar glass-capsule glass-solid pointer-events-auto flex items-center gap-1 rounded-full py-2 pl-2 pr-2"
-            style={{ viewTransitionName: 'platform-bar' } as React.CSSProperties}
           >
             <button
               type="button"

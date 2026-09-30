@@ -1,7 +1,7 @@
 'use client';
 
 import { useEffect } from 'react';
-import { cancelCardFallback, cardMotionActive, transitionCard, type CardSource } from '../lib/card-motion';
+import { beginCardDrag, cancelCardMotion, cancelControlMotion, moveCardTile, restoreCardSource, returnCardTile, cardMotionClosing, pauseCardScenes, transitionCard, type CardSource } from '../lib/card-motion';
 import { useSheet } from './useSheet';
 
 // Keep the site's scroll lock, focus and Escape handling. Product and release sheets
@@ -12,35 +12,38 @@ export function useCardSheet(isOpen: boolean, onClose: () => void, source: CardS
   useEffect(() => {
     const panel = sheetRef.current;
     if (!isOpen || !panel) return;
+    const resumeScenes = pauseCardScenes();
     const backdrop = panel.parentElement?.querySelector<HTMLElement>('.sheet-backdrop');
-    let gesture: { x: number; y: number; lastY: number; time: number; dy: number; velocity: number; claimed: boolean; scroller: HTMLElement | null } | null = null;
+    let gesture: { x: number; y: number; lastY: number; time: number; dy: number; velocity: number; claimed: boolean; height: number; width: number; baseX: number; baseY: number; baseScale: number; baseOpacity: number; scroller: HTMLElement | null } | null = null;
     let pointer: number | null = null;
     let suppressClick = false;
     let frame = 0;
     let settle: Animation | null = null;
     let fade: Animation | null = null;
+    let tileReturns: Animation[] = [];
     const reduced = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
 
     const start = (x: number, y: number, target: EventTarget | null) => {
-      if (cardMotionActive(panel) || (target as HTMLElement)?.closest('input, textarea, select, [contenteditable="true"]')) return;
-      settle?.cancel();
-      fade?.cancel();
-      panel.style.transform = '';
-      if (backdrop) backdrop.style.opacity = '';
+      const targetElement = target instanceof Element ? target : null;
+      if (cardMotionClosing(panel) || targetElement?.closest('input, textarea, select, [contenteditable="true"]')) return;
       suppressClick = false;
       let scroller: HTMLElement | null = null;
-      const targetElement = target instanceof HTMLElement ? target : target instanceof Element ? target.parentElement : null;
-      for (let node = targetElement; node && node !== panel; node = node.parentElement) {
+      for (let node = targetElement instanceof HTMLElement ? targetElement : targetElement?.parentElement; node && node !== panel; node = node.parentElement) {
         if (node.scrollHeight > node.clientHeight + 1 && /auto|scroll/.test(getComputedStyle(node).overflowY)) { scroller = node; break; }
       }
-      gesture = { x, y, lastY: y, time: performance.now(), dy: 0, velocity: 0, claimed: false, scroller };
+      gesture = { x, y, lastY: y, time: performance.now(), dy: 0, velocity: 0, claimed: false, height: panel.offsetHeight, width: panel.offsetWidth, baseX: 0, baseY: 0, baseScale: 1, baseOpacity: 1, scroller };
     };
     const paint = () => {
       if (!gesture?.claimed) return;
-      const progress = Math.min(1, gesture.dy / panel.offsetHeight);
+      const progress = Math.min(1, gesture.dy / gesture.height);
       const pull = gesture.dy * 0.72 / (1 + progress);
-      panel.style.transform = `translateY(${pull}px) scale(${1 - progress * 0.08})`;
-      if (backdrop) backdrop.style.opacity = `${1 - progress * 0.65}`;
+      const scale = gesture.baseScale * (1 - progress * 0.06);
+      const x = gesture.baseX + (gesture.baseScale - scale) * gesture.width / 2;
+      const y = gesture.baseY + pull;
+      panel.style.translate = `${x}px ${y}px`;
+      moveCardTile(panel, x, y, scale);
+      panel.style.scale = `${scale}`;
+      if (backdrop) backdrop.style.opacity = `${gesture.baseOpacity * (1 - progress * 0.65)}`;
     };
     const move = (x: number, y: number, event: Event) => {
       if (!gesture) return;
@@ -53,6 +56,19 @@ export function useCardSheet(isOpen: boolean, onClose: () => void, source: CardS
         // Reading back toward the photos scrolls the content. At its top, a pull
         // anywhere in the panel can dismiss, including the photo and the footer.
         if (gesture.scroller && gesture.scroller.scrollTop > 0) { gesture = null; return; }
+        // Independent translate/scale let a pull track the finger while an opener
+        // finishes. Re-grabbing a spring starts at its rendered position.
+        cancelControlMotion(panel);
+        const style = getComputedStyle(panel);
+        gesture.baseX = parseFloat(style.translate) || 0;
+        gesture.baseY = parseFloat(style.translate.split(' ')[1] ?? '0') || 0;
+        gesture.baseScale = parseFloat(style.scale) || 1;
+        gesture.baseOpacity = backdrop ? parseFloat(getComputedStyle(backdrop).opacity) : 1;
+        beginCardDrag(panel);
+        settle?.cancel();
+        fade?.cancel();
+        tileReturns.forEach(animation => animation.cancel());
+        panel.classList.add('card-is-dragging');
         gesture.claimed = true;
         suppressClick = true;
       }
@@ -75,13 +91,21 @@ export function useCardSheet(isOpen: boolean, onClose: () => void, source: CardS
       paint();
       gesture = null;
       if (dismiss) { requestClose(); return; }
-      const transform = panel.style.transform || 'none';
+      const translate = panel.style.translate || 'none';
+      const scale = panel.style.scale || '1';
       const opacity = backdrop?.style.opacity || '1';
-      panel.style.transform = '';
+      panel.style.translate = '';
+      panel.style.scale = '';
       if (backdrop) backdrop.style.opacity = '';
-      // A resisted pull returns with a small elastic overshoot instead of a hard reset.
-      settle = panel.animate([{ transform }, { transform: 'none' }], { duration: reduced ? 0 : 420, easing: 'cubic-bezier(0.22, 1.2, 0.36, 1)' });
-      fade = backdrop?.animate([{ opacity }, { opacity: 1 }], { duration: reduced ? 0 : 420 }) ?? null;
+      // A brief elastic return; all frames stay on the compositor.
+      const timing = { duration: reduced ? 0 : 280, easing: 'cubic-bezier(0.2, 1.15, 0.35, 1)' };
+      settle = panel.animate([{ translate, scale }, { translate: '0 0', scale: '1' }], timing);
+      tileReturns = returnCardTile(panel, timing);
+      fade = backdrop?.animate([{ opacity }, { opacity: 1 }], { duration: reduced ? 0 : 220 }) ?? null;
+      const current = settle;
+      void settle.finished.then(() => {
+        if (settle === current) panel.classList.remove('card-is-dragging');
+      }, () => {});
     };
     const touchStart = (event: TouchEvent) => {
       if (event.touches.length !== 1) { end(true); return; }
@@ -128,9 +152,11 @@ export function useCardSheet(isOpen: boolean, onClose: () => void, source: CardS
     panel.addEventListener('click', click, true);
     return () => {
       cancelAnimationFrame(frame);
-      cancelCardFallback(panel);
+      cancelCardMotion(panel);
+      resumeScenes();
       settle?.cancel();
       fade?.cancel();
+      tileReturns.forEach(animation => animation.cancel());
       panel.removeEventListener('touchstart', touchStart);
       panel.removeEventListener('touchmove', touchMove);
       panel.removeEventListener('touchend', touchEnd);
@@ -141,7 +167,7 @@ export function useCardSheet(isOpen: boolean, onClose: () => void, source: CardS
       window.removeEventListener('pointercancel', pointerCancel);
       panel.removeEventListener('lostpointercapture', pointerCancel);
       panel.removeEventListener('click', click, true);
-      if (source?.element.isConnected) source.element.style.visibility = source.visibility;
+      restoreCardSource(source);
     };
   }, [isOpen, sheetRef, requestClose, source]);
 

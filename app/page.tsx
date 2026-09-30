@@ -384,6 +384,8 @@ function SceneCard({
   const release = isReleased ? getReleaseForProject(project.name) : undefined;
   const services = getStreamingServices(project);
   const isPlayingThis = Boolean(release) && player.current?.release.id === release?.id && player.isPlaying;
+  const hasPlayer = Boolean(release || services.length);
+  const CoverElement = hasPlayer ? 'button' : 'div';
 
   const openSheet = (element: HTMLElement) => {
     source.current = cardSource(element.closest<HTMLElement>('.scene-card') ?? element);
@@ -465,8 +467,14 @@ function SceneCard({
             willChange: 'transform',
           }}
         >
-          <div
-            className="scene-cover relative w-full overflow-hidden"
+          <CoverElement
+            type={hasPlayer ? 'button' : undefined}
+            onClick={hasPlayer ? (event: React.MouseEvent<HTMLElement>) => openSheet(event.currentTarget) : undefined}
+            onPointerEnter={hasPlayer ? () => warmTrack(firstTrack) : undefined}
+            onPointerDown={hasPlayer ? () => warmTrack(firstTrack) : undefined}
+            aria-label={hasPlayer ? `Open ${project.name} player` : undefined}
+            aria-haspopup={hasPlayer ? 'dialog' : undefined}
+            className="scene-cover relative block w-full overflow-hidden"
             style={{ aspectRatio: '1 / 1', borderRadius: scaleValue(34), ...placeholderBackground(cover, coverPosition) }}
           >
             {loadImages ? (
@@ -480,7 +488,7 @@ function SceneCard({
                 style={{ objectPosition: coverPosition }}
               />
             ) : null}
-          </div>
+          </CoverElement>
 
           <h2
             className={`text-balance ${tone === 'light' ? 'scene-title' : ''}`}

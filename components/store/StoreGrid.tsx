@@ -90,16 +90,16 @@ export function StoreGrid({
   sizes = '(min-width: 640px) 280px, 46vw',
 }: {
   active: boolean;
-  onOpen: (product: Product) => void;
+  onOpen: (product: Product, element: HTMLButtonElement) => void;
   onNotify: () => void;
   sizes?: string;
 }) {
-  const cards: { key: string; label: string; face: React.ReactNode; onClick: () => void; warm?: () => void }[] = [
+  const cards: { key: string; label: string; face: React.ReactNode; onClick: (event: React.MouseEvent<HTMLButtonElement>) => void; warm?: () => void }[] = [
     ...products.slice(0, 3).map((product) => ({
       key: product.id,
       label: `${product.name}, ${formatPrice(product.price)}`,
       face: <ProductFace product={product} sizes={sizes} />,
-      onClick: () => onOpen(product),
+      onClick: (event: React.MouseEvent<HTMLButtonElement>) => onOpen(product, event.currentTarget),
       warm: () => warmProduct(product),
     })),
     { key: 'next-drop', label: 'Next drop: notify me', face: <NextDropFace />, onClick: onNotify },

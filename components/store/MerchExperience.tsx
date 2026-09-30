@@ -1,6 +1,7 @@
 'use client';
 
-import React, { useCallback, useEffect, useState } from 'react';
+import React, { useCallback, useEffect, useRef, useState } from 'react';
+import { cardSource, transitionCard, type CardSource } from '../../lib/card-motion';
 import { useMerch } from '../../lib/merch-client';
 import { MERCH_PATH, merchPath, type MerchCard, type MerchProduct } from '../../lib/merch-shared';
 import { BagButton, BagSheet, useCheckout } from './Bag';
@@ -29,6 +30,7 @@ export function MerchExperience({
   headerClassName?: string;
 }) {
   const [open, setOpen] = useState<{ product: MerchProduct; color?: string } | null>(null);
+  const source = useRef<CardSource | null>(null);
   const [bagOpen, setBagOpen] = useState(false);
   const { busy, buy } = useCheckout();
   // The homepage starts loading the catalog once it's up (app/page.tsx), not when this mounts.
@@ -39,8 +41,9 @@ export function MerchExperience({
     if (initial) setOpen({ product: initial });
   }, [merch, initialProduct]);
 
-  const openCard = useCallback(({ product, color, perColor }: MerchCard) => {
-    setOpen({ product, color: perColor ? color.slug : undefined });
+  const openCard = useCallback(({ product, color, perColor }: MerchCard, element: HTMLButtonElement) => {
+    source.current = cardSource(element);
+    transitionCard(source.current, () => setOpen({ product, color: perColor ? color.slug : undefined }), true);
     if (window.location.pathname.startsWith(MERCH_PATH)) window.history.replaceState(window.history.state, '', merchPath(product));
   }, []);
 
@@ -66,7 +69,7 @@ export function MerchExperience({
         onOpen={openCard}
       />
       {footer}
-      <MerchSheet product={open?.product ?? null} initialColor={open?.color} onClose={closeProduct} onBuy={buy} busy={busy} />
+      <MerchSheet product={open?.product ?? null} source={source.current} initialColor={open?.color} onClose={closeProduct} onBuy={buy} busy={busy} />
       <BagSheet isOpen={bagOpen} onClose={() => setBagOpen(false)} onBuy={buy} busy={busy} />
     </>
   );

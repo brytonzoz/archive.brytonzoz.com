@@ -9,7 +9,8 @@ import { formatPrice, shippingLabel } from '../../lib/store';
 import { addToBag } from '../../lib/store-client';
 import { usePlayer } from '../player/context';
 import { BagIcon, ChevronDownIcon, ShareIcon } from '../player/icons';
-import { useSheet } from '../useSheet';
+import { useCardSheet } from '../useCardSheet';
+import type { CardSource } from '../../lib/card-motion';
 import { ExpressPay } from './ExpressPay';
 import { Gallery } from './ProductSheet';
 
@@ -19,12 +20,14 @@ const iconButton =
 // A NonParallel piece: photos on white (Printify's mockups, then studio shots), color, size, then Buy now or bag it.
 export function MerchSheet({
   product,
+  source = null,
   initialColor,
   onClose,
   onBuy,
   busy,
 }: {
   product: MerchProduct | null;
+  source?: CardSource | null;
   /** The color whose card was tapped. */
   initialColor?: string;
   onClose: () => void;
@@ -33,7 +36,7 @@ export function MerchSheet({
 }) {
   const titleId = useId();
   const isOpen = Boolean(product);
-  const { sheetRef, isClosing, requestClose, dragHandlers, sheetStyle } = useSheet(isOpen, onClose);
+  const { sheetRef, requestClose } = useCardSheet(isOpen, onClose, source);
   const { notify } = usePlayer();
   const [colorIndex, setColorIndex] = useState(0);
   const [size, setSize] = useState<string | null>(null);
@@ -84,16 +87,15 @@ export function MerchSheet({
       role="dialog"
       aria-modal="true"
       aria-labelledby={titleId}
-      className={`sheet-dialog fixed inset-0 z-[100] flex items-end justify-center font-body sm:items-center sm:px-6 sm:pt-6 ${isClosing ? 'is-closing' : ''}`}
+      className="card-sheet sheet-dialog fixed inset-0 z-[100] flex items-end justify-center font-body sm:items-center sm:px-6 sm:pt-6"
     >
       <div aria-hidden="true" onClick={requestClose} className="sheet-backdrop absolute inset-0 touch-none bg-black/60" />
       <div
         ref={sheetRef}
         tabIndex={-1}
         className="sheet-panel sheet-dialog-height relative isolate flex w-full max-w-[480px] flex-col overflow-hidden rounded-t-[32px] bg-[#f5f5f7] text-[#111] outline-none sm:rounded-[32px]"
-        style={sheetStyle}
       >
-        <div {...dragHandlers} className="absolute inset-x-0 top-0 z-10 touch-none select-none px-3 pt-2">
+        <div className="absolute inset-x-0 top-0 z-10 touch-none select-none px-3 pt-2">
           <div aria-hidden="true" className="mx-auto h-[5px] w-9 rounded-full bg-black/20 sm:invisible" />
           <div className="-mt-1 flex items-center justify-between">
             <button type="button" onClick={requestClose} aria-label="Close" className={`${iconButton} bg-white/70 backdrop-blur-md`}>

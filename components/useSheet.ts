@@ -9,16 +9,26 @@ const DISMISS_DRAG_PX = 90;
 
 // Shared bottom-sheet behavior: scroll lock, focus handoff, Escape, swipe-down to dismiss,
 // and an exit animation (the `is-closing` class) before `onClose` runs.
-export function useSheet(isOpen: boolean, onClose: () => void) {
+export function useSheet(isOpen: boolean, onClose: () => void, onRequestClose?: () => void) {
   const sheetRef = useRef<HTMLDivElement>(null);
   const onCloseRef = useRef(onClose);
   onCloseRef.current = onClose;
+  const closeTransitionRef = useRef(onRequestClose);
+  closeTransitionRef.current = onRequestClose;
+  const closeRequested = useRef(false);
+  if (!isOpen) closeRequested.current = false;
   const dragStartY = useRef<number | null>(null);
   const [dragY, setDragY] = useState(0);
   const [isDragging, setIsDragging] = useState(false);
   const [isClosing, setIsClosing] = useState(false);
 
-  const requestClose = useCallback(() => setIsClosing(true), []);
+  const requestClose = useCallback(() => {
+    if (closeTransitionRef.current) {
+      if (closeRequested.current) return;
+      closeRequested.current = true;
+      closeTransitionRef.current();
+    } else setIsClosing(true);
+  }, []);
 
   useEffect(() => {
     if (!isClosing) return;

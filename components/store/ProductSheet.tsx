@@ -10,7 +10,8 @@ import { addToBag, useAvailability, useBag } from '../../lib/store-client';
 import { ResponsiveImage, placeholderBackground } from '../ResponsiveImage';
 import { usePlayer } from '../player/context';
 import { BagIcon, ChevronDownIcon, ShareIcon } from '../player/icons';
-import { useSheet } from '../useSheet';
+import { useCardSheet } from '../useCardSheet';
+import type { CardSource } from '../../lib/card-motion';
 import { PhotoZoom } from './PhotoZoom';
 
 const iconButton =
@@ -140,12 +141,14 @@ export function Gallery({
 
 export function ProductSheet({
   product,
+  source = null,
   onClose,
   onBuy,
   onOpenBag,
   busy,
 }: {
   product: Product | null;
+  source?: CardSource | null;
   onClose: () => void;
   onBuy: (ids: string[]) => void;
   onOpenBag: () => void;
@@ -153,7 +156,7 @@ export function ProductSheet({
 }) {
   const titleId = useId();
   const isOpen = Boolean(product);
-  const { sheetRef, isClosing, requestClose, dragHandlers, sheetStyle } = useSheet(isOpen, onClose);
+  const { sheetRef, requestClose } = useCardSheet(isOpen, onClose, source);
   const { notify } = usePlayer();
   const bag = useBag();
   const status = useAvailability(product?.id ?? '');
@@ -180,16 +183,15 @@ export function ProductSheet({
       role="dialog"
       aria-modal="true"
       aria-labelledby={titleId}
-      className={`sheet-dialog fixed inset-0 z-[100] flex items-end justify-center font-body sm:items-center sm:px-6 sm:pt-6 ${isClosing ? 'is-closing' : ''}`}
+      className="card-sheet sheet-dialog fixed inset-0 z-[100] flex items-end justify-center font-body sm:items-center sm:px-6 sm:pt-6"
     >
       <div aria-hidden="true" onClick={requestClose} className="sheet-backdrop absolute inset-0 touch-none bg-black/60" />
       <div
         ref={sheetRef}
         tabIndex={-1}
         className="sheet-panel sheet-dialog-height relative isolate flex w-full max-w-[480px] flex-col overflow-hidden rounded-t-[32px] bg-[#14161d] text-white outline-none sm:rounded-[32px]"
-        style={sheetStyle}
       >
-        <div {...dragHandlers} className="absolute inset-x-0 top-0 z-10 touch-none select-none px-3 pt-2">
+        <div className="absolute inset-x-0 top-0 z-10 touch-none select-none px-3 pt-2">
           <div aria-hidden="true" className="mx-auto h-[5px] w-9 rounded-full bg-white/40 sm:invisible" />
           <div className="-mt-1 flex items-center justify-between">
             <button type="button" onClick={requestClose} aria-label="Close" className={`${iconButton} bg-black/25 backdrop-blur-md`}>

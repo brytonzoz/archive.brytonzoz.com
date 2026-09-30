@@ -662,6 +662,57 @@
   }
 }
 
+/* Music and shop cards share the site's native transition, preserving both layouts. */
+.card-sheet .sheet-panel,
+.card-sheet .sheet-backdrop { animation: none; }
+.card-transition .card-sheet .sheet-panel { view-transition-name: expanded-card; }
+.card-transition .card-sheet .sheet-backdrop { view-transition-name: expanded-backdrop; }
+/* Include streaming controls in the whole-sheet snapshot during a card morph. */
+.card-transition .card-sheet .platform-bar,
+.card-transition .card-sheet .platform-panel { view-transition-name: none !important; }
+
+.card-transition .mini-player { view-transition-name: expanded-player; }
+.card-transition::view-transition-group(expanded-player) { z-index: 3; }
+
+.card-transition::view-transition-group(expanded-card) {
+  z-index: 2;
+  animation-duration: 360ms;
+  animation-timing-function: cubic-bezier(0.65, 0, 0.35, 1);
+  overflow: hidden;
+}
+
+.card-transition::view-transition-old(expanded-card),
+.card-transition::view-transition-new(expanded-card) {
+  height: 100%;
+  width: 100%;
+  mix-blend-mode: normal;
+  animation-duration: 360ms;
+  animation-timing-function: linear;
+  animation-fill-mode: both;
+}
+
+.card-transition::view-transition-old(expanded-card) { animation-name: cardSnapshotOut; }
+.card-transition::view-transition-new(expanded-card) { animation-name: cardSnapshotIn; }
+
+.card-transition::view-transition-group(expanded-backdrop) { z-index: 1; animation-duration: 360ms; }
+.card-transition::view-transition-old(expanded-backdrop) { animation: listenFadeOut 360ms ease-out both; }
+.card-transition::view-transition-new(expanded-backdrop) { animation: listenFadeIn 360ms ease-out both; }
+
+.card-transition::view-transition-old(root),
+.card-transition::view-transition-new(root),
+.card-transition::view-transition-group(expanded-player),
+.card-transition::view-transition-old(expanded-player),
+.card-transition::view-transition-new(expanded-player),
+.card-transition::view-transition-group(platform-bar),
+.card-transition::view-transition-old(platform-bar),
+.card-transition::view-transition-new(platform-bar) {
+  animation: none;
+  mix-blend-mode: normal;
+}
+
+@keyframes cardSnapshotOut { 0%, 42% { opacity: 1; } 58%, 100% { opacity: 0; } }
+@keyframes cardSnapshotIn { 0%, 42% { opacity: 0; } 58%, 100% { opacity: 1; } }
+
 @keyframes solenyaStickerFloat {
   0%, 100% {
     transform: translate3d(0, 0, 0) rotate(0deg);

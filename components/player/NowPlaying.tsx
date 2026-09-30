@@ -197,7 +197,7 @@ export function NowPlaying() {
         <div aria-hidden="true" className="absolute inset-[-20%] -z-10 opacity-90 blur-[60px] saturate-[1.6]" style={placeholderBackground(release.cover)} />
         <div aria-hidden="true" className="absolute inset-0 -z-10 bg-gradient-to-b from-black/20 via-black/40 to-black/70" />
 
-        <div {...dragHandlers} className="relative flex-none touch-none select-none px-3 pt-2">
+        <div {...dragHandlers} className="relative z-10 flex-none touch-none select-none px-3 pt-2">
           <div aria-hidden="true" className="mx-auto h-[5px] w-9 rounded-full bg-white/30 sm:invisible" />
           <button type="button" onClick={requestClose} aria-label="Close player" className={`${iconButton} absolute left-3 top-2 h-10 w-10 text-white/70 hover:bg-white/10 hover:text-white`}>
             <ChevronDownIcon size={22} />

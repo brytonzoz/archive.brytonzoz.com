@@ -104,7 +104,7 @@ export function BagSheet({ isOpen, onClose, onBuy, busy }: { isOpen: boolean; on
         className="sheet-panel relative w-full max-w-[440px] overflow-hidden rounded-t-[32px] bg-[#14161d] text-white outline-none sm:rounded-[32px]"
         style={{ ...sheetStyle, paddingBottom: 'calc(max(1.5rem, env(safe-area-inset-bottom)) + var(--sheet-player-offset, 0px))' }}
       >
-        <div {...dragHandlers} className="relative touch-none select-none px-3 pt-2">
+        <div {...dragHandlers} className="relative z-10 touch-none select-none px-3 pt-2">
           <div aria-hidden="true" className="mx-auto h-[5px] w-9 rounded-full bg-white/30 sm:invisible" />
           <button type="button" onClick={requestClose} aria-label="Close" className="absolute right-3 top-2 flex h-9 w-9 items-center justify-center rounded-full bg-white/10 text-white/75 hover:bg-white/15 hover:text-white focus-visible:outline focus-visible:outline-2 focus-visible:outline-white/70">
             <CloseIcon size={16} />

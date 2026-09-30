@@ -74,7 +74,7 @@ export function NotifySheet({ isOpen, onClose, onDone, source = 'teaser' }: { is
         style={{ ...sheetStyle, paddingBottom: 'calc(max(1.75rem, env(safe-area-inset-bottom)) + var(--sheet-player-offset, 0px))' }}
       >
         <div aria-hidden="true" className="teaser-notify-glow pointer-events-none absolute inset-x-0 top-0 h-40" />
-        <div {...dragHandlers} className="relative touch-none select-none px-3 pt-2">
+        <div {...dragHandlers} className="relative z-10 touch-none select-none px-3 pt-2">
           <div aria-hidden="true" className="mx-auto h-[5px] w-9 rounded-full bg-white/30 sm:invisible" />
           <button
             type="button"

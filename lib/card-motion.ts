@@ -1,6 +1,7 @@
 'use client';
 
 import { flushSync } from 'react-dom';
+import { animateCardDepth, restoreCardDepth } from './card-depth';
 
 export type CardSource = { element: HTMLElement; visibility: string };
 const sources = new WeakMap<HTMLElement, CardSource>();
@@ -26,6 +27,7 @@ export function cardSource(element: HTMLElement): CardSource {
 
 export function restoreCardSource(source: CardSource | null) {
   if (!source) return;
+  restoreCardDepth(source.element);
   source.element.style.visibility = source.visibility;
   sources.delete(source.element);
   tiles.delete(source);
@@ -121,7 +123,7 @@ export function transitionCard(source: CardSource | null, update: () => void, op
     if (origin) {
       origin.element.style.visibility = opening ? 'hidden' : origin.visibility;
       if (opening) sources.set(origin.element, origin);
-      else { sources.delete(origin.element); tiles.delete(origin); }
+      else { sources.delete(origin.element); tiles.delete(origin); restoreCardDepth(origin.element); }
     }
     flushSync(update);
     if (!opening) origin?.element.focus({ preventScroll: true });
@@ -139,6 +141,7 @@ export function transitionCard(source: CardSource | null, update: () => void, op
   const panel = document.querySelector<HTMLElement>('.card-sheet .sheet-panel');
   if (!panel) { resumeScenes(); if (!opening) commit(); return; }
   const backdrop = panel.parentElement?.querySelector<HTMLElement>('.sheet-backdrop');
+  const vignette = backdrop?.querySelector<HTMLElement>('.card-scene-vignette');
   const previous = motions.get(panel);
   // Read the rendered state before cancelling: close can reverse an unfinished open.
   cancelControlMotion(panel);
@@ -147,6 +150,7 @@ export function transitionCard(source: CardSource | null, update: () => void, op
   const tileOpacity = previous?.tile ? getComputedStyle(previous.tile).opacity : '0';
   const tileBox = previous?.tile?.getBoundingClientRect() ?? currentBox;
   const backdropOpacity = backdrop ? getComputedStyle(backdrop).opacity : '1';
+  const vignetteTransform = vignette ? getComputedStyle(vignette).transform : 'none';
   previous?.cancel();
   cached?.element.getAnimations().forEach(animation => animation.cancel());
   panel.getAnimations().forEach(animation => animation.cancel());
@@ -159,6 +163,7 @@ export function transitionCard(source: CardSource | null, update: () => void, op
   const tile = cached?.element ?? null;
   const duration = opening ? 260 : 220;
   const timing = { duration, easing, fill: 'both' as const };
+  if (origin) animateCardDepth(origin.element, opening, duration);
   panel.classList.add('card-is-moving');
   const motion = panel.animate([
     { transform: opening ? compact : transformTo(box, currentBox) },
@@ -171,6 +176,13 @@ export function transitionCard(source: CardSource | null, update: () => void, op
     { opacity: opening ? '0' : backdropOpacity }, { opacity: opening ? '1' : '0' },
   ], { duration, fill: 'both' });
   if (backdropAnimation) animations.push(backdropAnimation);
+  if (vignette) {
+    vignette.getAnimations().forEach(animation => animation.cancel());
+    animations.push(vignette.animate([
+      { transform: opening ? 'scale(1.16)' : vignetteTransform },
+      { transform: opening ? 'scale(1)' : 'scale(1.16)' },
+    ], timing));
+  }
   if (tile && cached && originBounds) {
     tile.style.translate = 'none';
     tile.style.scale = 'none';

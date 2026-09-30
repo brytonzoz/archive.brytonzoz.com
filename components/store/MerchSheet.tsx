@@ -89,7 +89,9 @@ export function MerchSheet({
       aria-labelledby={titleId}
       className="card-sheet sheet-dialog fixed inset-0 z-[100] flex items-end justify-center font-body sm:items-center sm:px-6 sm:pt-6"
     >
-      <div aria-hidden="true" onClick={requestClose} className="sheet-backdrop absolute inset-0 touch-none bg-black/60" />
+      <div aria-hidden="true" onClick={requestClose} className="sheet-backdrop absolute inset-0 touch-none bg-black/60">
+        <div className="card-scene-vignette" />
+      </div>
       <div
         ref={sheetRef}
         tabIndex={-1}

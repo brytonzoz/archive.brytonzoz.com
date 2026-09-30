@@ -43,6 +43,7 @@ export const streamingIconAssets = {
 
 export const nonparallelAssets = {
   logo: media['scenes/nonparallel/logo'],
+  sweatpants: media['scenes/nonparallel/sweatpants-purple'],
   // Bryton's own tee mockups (the NP merch folder), cut out, for the homepage scene's background.
   tees: {
     rainbow: media['scenes/nonparallel/tee-rainbow'],

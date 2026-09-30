@@ -670,6 +670,15 @@
 .platform-panel { transform-origin: top left; }
 .card-is-moving { will-change: transform, opacity; }
 .card-is-dragging { will-change: translate, scale; }
+/* A single painted gradient: only its transform and the dimmer's opacity move. */
+.card-sheet .sheet-backdrop { overflow: hidden; }
+.card-scene-vignette {
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  background: radial-gradient(ellipse at 50% 46%, transparent 28%, rgba(0, 0, 0, 0.18) 62%, rgba(0, 0, 0, 0.72) 100%);
+  transform-origin: center;
+}
 /* Covered decorations stay at their current frame and resume when the sheet closes. */
 .card-sheet-open .scene-wrap *,
 .card-sheet-open .scene-wrap *::before,

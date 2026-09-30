@@ -2,6 +2,7 @@
 
 import { useEffect } from 'react';
 import { beginCardDrag, cancelCardMotion, cancelControlMotion, moveCardTile, restoreCardSource, returnCardTile, cardMotionClosing, pauseCardScenes, transitionCard, type CardSource } from '../lib/card-motion';
+import { MOTION_EASING, CLOSE_MS } from '../lib/scene-motion';
 import { useSheet } from './useSheet';
 
 // Keep the site's scroll lock, focus and Escape handling. Product and release sheets
@@ -97,11 +98,11 @@ export function useCardSheet(isOpen: boolean, onClose: () => void, source: CardS
       panel.style.translate = '';
       panel.style.scale = '';
       if (backdrop) backdrop.style.opacity = '';
-      // A brief elastic return; all frames stay on the compositor.
-      const timing = { duration: reduced ? 0 : 280, easing: 'cubic-bezier(0.2, 1.15, 0.35, 1)' };
+      // The same soft settling curve as the scene scroll; all frames stay on the compositor.
+      const timing = { duration: reduced ? 0 : CLOSE_MS, easing: MOTION_EASING };
       settle = panel.animate([{ translate, scale }, { translate: '0 0', scale: '1' }], timing);
       tileReturns = returnCardTile(panel, timing);
-      fade = backdrop?.animate([{ opacity }, { opacity: 1 }], { duration: reduced ? 0 : 220 }) ?? null;
+      fade = backdrop?.animate([{ opacity }, { opacity: 1 }], timing) ?? null;
       const current = settle;
       void settle.finished.then(() => {
         if (settle === current) panel.classList.remove('card-is-dragging');

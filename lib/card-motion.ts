@@ -2,13 +2,14 @@
 
 import { flushSync } from 'react-dom';
 import { animateCardDepth, restoreCardDepth } from './card-depth';
+import { snapshotElement } from './motion-snapshot';
+import { MOTION_EASING, OPEN_MS, CLOSE_MS, CONTROL_MS } from './scene-motion';
 
 export type CardSource = { element: HTMLElement; visibility: string };
 const sources = new WeakMap<HTMLElement, CardSource>();
 const tiles = new WeakMap<CardSource, { element: HTMLElement; bounds: DOMRect }>();
 type Motion = { cancel: () => void; tile: HTMLElement | null; closing: boolean; box: DOMRect; tileBounds?: DOMRect; backdropAnimation?: Animation };
 const motions = new WeakMap<HTMLElement, Motion>();
-const easing = 'cubic-bezier(0.45, 0, 0.55, 1)';
 let sceneLocks = 0;
 
 export function pauseCardScenes() {
@@ -62,50 +63,6 @@ export function returnCardTile(panel: HTMLElement, timing: KeyframeAnimationOpti
   return [tile.animate([{ translate, scale }, { translate: '0 0', scale: '1' }], timing)];
 }
 
-// Only values that depend on the original container need freezing. Copying every
-// computed CSS property (hundreds per node) made the old fallback stall on tap.
-const frozenProperties = [
-  'display', 'position', 'inset', 'width', 'height', 'min-width', 'min-height', 'max-width', 'max-height',
-  'box-sizing', 'margin', 'padding', 'border', 'border-radius', 'background', 'box-shadow',
-  'flex', 'flex-direction', 'align-items', 'justify-content', 'gap', 'font', 'color',
-  'letter-spacing', 'text-transform', 'text-align', 'white-space', 'overflow',
-  'object-fit', 'object-position', 'opacity', 'transform', 'transform-origin',
-  'transform-style', 'backface-visibility', 'perspective', 'filter',
-];
-
-function freezeCard(element: HTMLElement, bounds: DOMRect) {
-  const clone = element.cloneNode(true) as HTMLElement;
-  const originals = [element, ...Array.from(element.querySelectorAll<HTMLElement>('*'))];
-  const copies = [clone, ...Array.from(clone.querySelectorAll<HTMLElement>('*'))];
-  originals.forEach((original, index) => {
-    const style = getComputedStyle(original);
-    const copy = copies[index];
-    for (const property of frozenProperties) copy.style.setProperty(property, style.getPropertyValue(property));
-    copy.style.animation = 'none';
-    copy.style.transition = 'none';
-    copy.style.viewTransitionName = 'none';
-    copy.removeAttribute('id');
-    copy.removeAttribute('name');
-    // Reuse the image already decoded for this card, without another responsive selection.
-    if (original instanceof HTMLImageElement && copy instanceof HTMLImageElement) {
-      copy.removeAttribute('srcset');
-      copy.removeAttribute('sizes');
-      copy.src = original.currentSrc || original.src;
-      copy.loading = 'eager';
-    }
-  });
-  clone.querySelectorAll('source').forEach(node => node.remove());
-  clone.setAttribute('aria-hidden', 'true');
-  clone.inert = true;
-  clone.classList.add('card-motion-tile');
-  Object.assign(clone.style, {
-    position: 'fixed', left: `${bounds.left}px`, top: `${bounds.top}px`, right: 'auto', bottom: 'auto',
-    width: `${bounds.width}px`, height: `${bounds.height}px`, margin: '0',
-    transform: 'none', translate: 'none', scale: 'none', transformOrigin: 'top left', visibility: 'visible',
-    pointerEvents: 'none', zIndex: '101', willChange: 'transform, opacity',
-  });
-  return clone;
-}
 
 const transformTo = (from: DOMRect, to: DOMRect) =>
   `translate3d(${to.left - from.left}px, ${to.top - from.top}px, 0) scale(${to.width / from.width}, ${to.height / from.height})`;
@@ -134,7 +91,7 @@ export function transitionCard(source: CardSource | null, update: () => void, op
   const originBounds = origin?.element.getBoundingClientRect();
   let cached = origin ? tiles.get(origin) : undefined;
   if (origin && originBounds && (!cached || Math.abs(cached.bounds.width - originBounds.width) > 1 || Math.abs(cached.bounds.height - originBounds.height) > 1)) {
-    cached = { element: freezeCard(origin.element, originBounds), bounds: originBounds };
+    cached = { element: snapshotElement(origin.element, originBounds), bounds: originBounds };
     tiles.set(origin, cached);
   }
   if (opening) commit();
@@ -161,8 +118,8 @@ export function transitionCard(source: CardSource | null, update: () => void, op
   const box = panel.getBoundingClientRect();
   const compact = originBounds ? transformTo(box, originBounds) : 'translate3d(0, 100%, 0) scale(0.96)';
   const tile = cached?.element ?? null;
-  const duration = opening ? 260 : 220;
-  const timing = { duration, easing, fill: 'both' as const };
+  const duration = opening ? OPEN_MS : CLOSE_MS;
+  const timing = { duration, easing: MOTION_EASING, fill: 'both' as const };
   if (origin) animateCardDepth(origin.element, opening, duration);
   panel.classList.add('card-is-moving');
   const motion = panel.animate([
@@ -171,26 +128,27 @@ export function transitionCard(source: CardSource | null, update: () => void, op
   ], timing);
   const animations = [motion, panel.animate(tile ? handoff(opening ? '0' : currentOpacity, opening ? '1' : '0') : [
     { opacity: opening ? '0' : currentOpacity }, { opacity: opening ? '1' : '0' },
-  ], { duration, fill: 'both' })];
+  ], timing)];
   const backdropAnimation = backdrop?.animate([
     { opacity: opening ? '0' : backdropOpacity }, { opacity: opening ? '1' : '0' },
-  ], { duration, fill: 'both' });
+  ], timing);
   if (backdropAnimation) animations.push(backdropAnimation);
   if (vignette) {
     vignette.getAnimations().forEach(animation => animation.cancel());
     animations.push(vignette.animate([
-      { transform: opening ? 'scale(1.16)' : vignetteTransform },
-      { transform: opening ? 'scale(1)' : 'scale(1.16)' },
+      { transform: opening ? 'scale(0.72)' : vignetteTransform },
+      { transform: opening ? 'scale(1)' : 'scale(0.72)' },
     ], timing));
   }
   if (tile && cached && originBounds) {
     tile.style.translate = 'none';
     tile.style.scale = 'none';
+    tile.classList.add('card-motion-tile');
     document.body.appendChild(tile);
     animations.push(tile.animate([
       { transform: transformTo(cached.bounds, opening ? originBounds : tileBox) },
       { transform: transformTo(cached.bounds, opening ? box : originBounds) },
-    ], timing), tile.animate(handoff(opening ? '1' : tileOpacity, opening ? '0' : '1'), { duration, fill: 'both' }));
+    ], timing), tile.animate(handoff(opening ? '1' : tileOpacity, opening ? '0' : '1'), timing));
   }
   const cancel = () => {
     if (motions.get(panel)?.cancel !== cancel) return;
@@ -227,22 +185,23 @@ export function transitionControls(before: HTMLElement | null, update: () => voi
   // A reversal can start at an intermediate scale. Keep natural layout sizes in
   // the clone and carry the rendered scale in its transform, including the text.
   const tileBounds = new DOMRect(from.left, from.top, visible.offsetWidth, visible.offsetHeight);
-  const tile = freezeCard(visible, tileBounds);
+  const tile = snapshotElement(visible, tileBounds);
   tile.style.opacity = '1';
   previous?.cancel();
   tile.style.zIndex = '104';
+  tile.classList.add('card-motion-tile');
   flushSync(update);
   const target = after();
   if (!target) return;
   const to = target.getBoundingClientRect();
   document.body.appendChild(tile);
   target.classList.add('card-is-moving');
-  const timing = { duration: 220, easing, fill: 'both' as const };
+  const timing = { duration: CONTROL_MS, easing: MOTION_EASING, fill: 'both' as const };
   const animations = [
     tile.animate([{ transform: transformTo(tileBounds, from) }, { transform: transformTo(tileBounds, to) }], timing),
-    tile.animate(handoff('1', '0'), { duration: 220, fill: 'both' }),
+    tile.animate(handoff('1', '0'), timing),
     target.animate([{ transform: transformTo(to, from) }, { transform: 'none' }], timing),
-    target.animate(handoff('0', '1'), { duration: 220, fill: 'both' }),
+    target.animate(handoff('0', '1'), timing),
   ];
   const cancel = () => {
     if (controlMotions.get(target)?.cancel !== cancel) return;

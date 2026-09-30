@@ -1,64 +1,83 @@
 'use client';
 
+import { snapshotElement } from './motion-snapshot';
+import { MOTION_EASING, stickerFlight } from './scene-motion';
+
 type Sticker = {
   element: HTMLElement;
-  away: string;
+  copy: HTMLElement;
+  visibility: string;
   opacity: string;
-  translate: string;
-  scale: string;
+  away: string;
   animation?: Animation;
 };
-type Depth = { stickers: Sticker[] };
+type Depth = { layer: HTMLElement; stickers: Sticker[] };
 const depths = new WeakMap<HTMLElement, Depth>();
 
-// The scroll and float transforms keep their own coordinates. These independent
-// translate/scale channels move only the decorations away from the scene centre.
+// Keep the foreground above the card for the entire flight. A frozen copy lets
+// it leave the scene's clipping/stacking context without moving React's nodes.
 export function animateCardDepth(source: HTMLElement, opening: boolean, duration: number) {
   let depth = depths.get(source);
   if (!depth && opening) {
     const scene = source.closest<HTMLElement>('.scene-wrap');
     if (!scene) return;
-    const centre = scene.getBoundingClientRect();
-    const stickers = Array.from(scene.querySelectorAll<HTMLElement>('.solenya-sticker-enter')).map(element => {
-      const box = element.getBoundingClientRect();
+    const layer = document.createElement('div');
+    layer.className = 'card-sticker-layer';
+    layer.setAttribute('aria-hidden', 'true');
+    layer.inert = true;
+    const viewport = { width: window.innerWidth, height: window.innerHeight };
+    // All reads/snapshots precede hiding the originals or attaching the layer.
+    const stickers = Array.from(scene.querySelectorAll<HTMLElement>('.solenya-sticker-enter')).map((element, order) => {
+      const bounds = element.getBoundingClientRect();
       const style = getComputedStyle(element);
-      const x = (box.left + box.width / 2 - centre.left - centre.width / 2) * 0.3;
-      const y = (box.top + box.height / 2 - centre.top - centre.height / 2) * 0.24;
+      const opacity = style.opacity;
+      const zIndex = style.zIndex;
+      const copy = snapshotElement(element, bounds);
+      copy.classList.add('card-sticker-copy');
+      copy.style.transformOrigin = 'center';
+      copy.style.zIndex = zIndex === 'auto' ? `${order}` : zIndex;
+      const flight = stickerFlight(bounds, viewport, order);
       return {
-        element, away: `${Math.max(-180, Math.min(180, x))}px ${Math.max(-150, Math.min(150, y))}px`,
-        opacity: style.opacity, translate: style.translate, scale: style.scale,
+        element, copy, visibility: element.style.visibility, opacity,
+        away: `translate3d(${flight.x}px, ${flight.y}px, 0) rotate(${flight.rotate}deg) scale(${flight.scale})`,
       };
     });
-    depth = { stickers };
+    stickers.forEach(sticker => {
+      sticker.element.style.visibility = 'hidden';
+      layer.appendChild(sticker.copy);
+    });
+    document.body.appendChild(layer);
+    depth = { layer, stickers };
     depths.set(source, depth);
   }
   if (!depth) return;
 
-  // Read every current frame before cancelling/writing, including a quick close
-  // halfway through opening. No layout reads or JS work happen during playback.
   const frames = depth.stickers.map(sticker => {
-    const style = getComputedStyle(sticker.element);
-    return { translate: style.translate, scale: style.scale, opacity: style.opacity };
+    const style = getComputedStyle(sticker.copy);
+    return { transform: style.transform, opacity: style.opacity };
   });
-  depth.stickers.forEach((sticker, index) => {
+  depth.stickers.forEach((sticker, order) => {
     sticker.animation?.cancel();
-    sticker.animation = sticker.element.animate([
-      frames[index],
+    // The scroll's 0.36–0.46 arrival spans become a small shuffle. Each flight
+    // ends with the card, so nothing is cut short when the sheet unmounts.
+    const delay = opening ? ((order * 3) % 5) * 8 : 36 + ((order * 3) % 5) * 8;
+    sticker.animation = sticker.copy.animate([
+      { ...frames[order], offset: 0 },
+      { opacity: opening ? frames[order].opacity : sticker.opacity, offset: opening ? 0.65 : 0.35 },
       opening
-        ? { translate: sticker.away, scale: '0.84', opacity: '0' }
-        : { translate: sticker.translate, scale: sticker.scale, opacity: sticker.opacity },
-    ], {
-      duration,
-      // Clear the card's path early; return gently behind it on the way out.
-      easing: opening ? 'cubic-bezier(0.2, 0.65, 0.3, 1)' : 'cubic-bezier(0.45, 0, 0.55, 1)',
-      fill: 'both',
-    });
+        ? { transform: sticker.away, opacity: '0', offset: 1 }
+        : { transform: 'none', opacity: sticker.opacity, offset: 1 },
+    ], { duration: duration - delay, delay, easing: MOTION_EASING, fill: 'both' });
   });
 }
 
 export function restoreCardDepth(source: HTMLElement) {
   const depth = depths.get(source);
   if (!depth) return;
-  depth.stickers.forEach(sticker => sticker.animation?.cancel());
+  depth.stickers.forEach(sticker => {
+    sticker.animation?.cancel();
+    sticker.element.style.visibility = sticker.visibility;
+  });
+  depth.layer.remove();
   depths.delete(source);
 }

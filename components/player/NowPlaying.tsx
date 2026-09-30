@@ -97,7 +97,7 @@ function QueueView() {
                 style={{
                   height: ROW_HEIGHT,
                   transform: `translateY(${isDragged ? drag.dy : shift}px)`,
-                  transition: isDragged ? 'none' : 'transform 200ms cubic-bezier(0.32, 0.72, 0, 1)',
+                  transition: isDragged ? 'none' : 'transform 200ms var(--motion-ease)',
                 }}
               >
                 <button
@@ -216,7 +216,7 @@ export function NowPlaying() {
                 style={{
                   ...placeholderBackground(release.cover),
                   transform: isPlaying ? 'scale(1)' : 'scale(0.86)',
-                  transitionTimingFunction: 'cubic-bezier(0.34, 1.3, 0.64, 1)',
+                  transitionTimingFunction: 'var(--motion-ease)',
                 }}
               >
                 <ResponsiveImage asset={release.cover} alt={`${release.title} cover`} sizes="380px" className="absolute inset-0 h-full w-full object-cover" />

@@ -10,6 +10,7 @@ import { MerchShop } from '../components/store/MerchShop';
 import { StoreExperience } from '../components/store/StoreExperience';
 import { ReleaseSheet } from '../components/release/ReleaseSheet';
 import { cardSource, transitionCard, type CardSource } from '../lib/card-motion';
+import { easeOutCubic } from '../lib/scene-motion';
 import { usePlayer } from '../components/player/context';
 import { ArrowUpRightIcon, ChevronDownIcon, EqualizerBars } from '../components/player/icons';
 import { ResponsiveImage, placeholderBackground } from '../components/ResponsiveImage';
@@ -23,7 +24,7 @@ import { getRelease, getReleaseForProject, releasePath, warmTrack } from '../lib
 import { Project, getProjectTypeLabel, isProjectReleased } from '../lib/utils';
 
 const clamp = (value: number, min: number, max: number) => Math.min(Math.max(value, min), max);
-const easeOutCubic = (value: number) => 1 - Math.pow(1 - value, 3);
+
 
 type SceneStickerMotion = {
   x: number;
@@ -934,7 +935,7 @@ const SolenyaScene = React.memo(function SolenyaScene({
               top: sceneTop(sticker.frame.top),
               width: scaleValue(sticker.frame.size),
               height: scaleValue(sticker.frame.size),
-              zIndex: Math.min(sticker.zIndex, 9),
+              zIndex: 20 + sticker.zIndex,
               '--intro-x': scaleValue(sticker.intro.x),
               '--intro-y': scaleValue(sticker.intro.y),
               '--intro-rotate': `${sticker.intro.rotate}deg`,
@@ -1013,7 +1014,7 @@ const CautionScene = React.memo(function CautionScene({
               top: sceneTop(sticker.frame.top),
               width: scaleValue(sticker.frame.size),
               height: scaleValue(sticker.frame.size),
-              zIndex: Math.min(sticker.zIndex, 9),
+              zIndex: 20 + sticker.zIndex,
               '--intro-x': scaleValue(sticker.intro.x),
               '--intro-y': scaleValue(sticker.intro.y),
               '--intro-rotate': `${sticker.intro.rotate}deg`,
@@ -1088,7 +1089,7 @@ const ReminderScene = React.memo(function ReminderScene({
               top: sceneTop(sticker.frame.top),
               width: scaleValue(sticker.frame.size),
               height: scaleValue(sticker.frame.size),
-              zIndex: Math.min(sticker.zIndex, 9),
+              zIndex: 20 + sticker.zIndex,
               '--intro-x': scaleValue(sticker.intro.x),
               '--intro-y': scaleValue(sticker.intro.y),
               '--intro-rotate': `${sticker.intro.rotate}deg`,
@@ -1150,8 +1151,8 @@ const ScrapwrkScene = React.memo(function ScrapwrkScene({ loadImages }: { loadIm
   // screen allows (phone to desktop) while the grid and the footer both fit.
   return (
     <div className="relative flex h-full w-full items-center justify-center overflow-hidden pb-[132px] pt-10">
-      {/* The pieces as cut-out stickers, drifting around the grid's corners (behind the cards). */}
-      <div aria-hidden="true" className="pointer-events-none absolute inset-0 z-0">
+      {/* The pieces as cut-out stickers, drifting around the grid's corners, above the artwork. */}
+      <div aria-hidden="true" className="pointer-events-none absolute inset-0 z-20">
         {scrapwrkStickers.map((sticker, order) => {
 
           return (
@@ -1163,7 +1164,7 @@ const ScrapwrkScene = React.memo(function ScrapwrkScene({ loadImages }: { loadIm
                 top: sceneTop(sticker.frame.top),
                 width: scaleValue(sticker.frame.size),
                 height: scaleValue(sticker.frame.size),
-                zIndex: Math.min(sticker.zIndex, 9),
+                zIndex: 20 + sticker.zIndex,
                 '--intro-x': scaleValue(sticker.intro.x),
                 '--intro-y': scaleValue(sticker.intro.y),
                 '--intro-rotate': `${sticker.intro.rotate}deg`,
@@ -1247,7 +1248,7 @@ const NonParallelScene = React.memo(function NonParallelScene({ onShop }: { onSh
 
   return (
     <div className="relative flex h-full w-full items-center justify-center overflow-hidden pb-[132px] pt-10">
-      <div aria-hidden="true" className="np-scene-stickers pointer-events-none absolute inset-0 z-0">
+      <div aria-hidden="true" className="np-scene-stickers pointer-events-none absolute inset-0 z-20">
         {nonparallelStickers.map((sticker, order) => {
           const size = `calc(var(--np-sticker) * ${sticker.size})`;
           return (

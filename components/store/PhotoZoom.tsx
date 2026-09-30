@@ -1,10 +1,12 @@
 'use client';
 
-import React, { useEffect, useRef, useState } from 'react';
+import React, { useEffect, useLayoutEffect, useRef, useState } from 'react';
 import { createPortal } from 'react-dom';
 import type { MediaAsset } from '../../lib/media';
 import { ResponsiveImage } from '../ResponsiveImage';
 import { ChevronDownIcon, CloseIcon } from '../player/icons';
+import { useSheet } from '../useSheet';
+import { MOTION_EASING, OPEN_MS } from '../../lib/scene-motion';
 
 // A product photo full screen, to look at the print up close: tap the photo to zoom in on that spot
 // (then drag around), tap again to zoom back out. Arrows or ← → move between photos; × or Escape
@@ -26,9 +28,15 @@ export function PhotoZoom({
 }) {
   const [zoomed, setZoomed] = useState(false);
   const frame = useRef<HTMLDivElement>(null);
+  const canvas = useRef<HTMLDivElement>(null);
+  const zoomMotion = useRef<Animation | null>(null);
+  const zoomFrom = useRef<{ bounds: DOMRect; x: number; y: number } | null>(null);
   const closeRef = useRef<HTMLButtonElement>(null);
+  const { sheetRef, isClosing, requestClose } = useSheet(true, onClose);
   const count = images.length;
   const go = (i: number) => {
+    zoomMotion.current?.cancel();
+    zoomFrom.current = null;
     setZoomed(false);
     onIndex((i + count) % count);
   };
@@ -37,7 +45,7 @@ export function PhotoZoom({
     closeRef.current?.focus();
     // Capture phase, so Escape closes this and not the sheet under it.
     const onKey = (event: KeyboardEvent) => {
-      if (event.key === 'Escape') { event.stopPropagation(); event.preventDefault(); onClose(); }
+      if (event.key === 'Escape') { event.stopPropagation(); event.preventDefault(); requestClose(); }
       if (event.key === 'ArrowRight') { event.stopPropagation(); go(index + 1); }
       if (event.key === 'ArrowLeft') { event.stopPropagation(); go(index - 1); }
     };
@@ -45,32 +53,45 @@ export function PhotoZoom({
     return () => window.removeEventListener('keydown', onKey, true);
   });
 
-  const toggleZoom = (event: React.MouseEvent<HTMLDivElement>) => {
+  useLayoutEffect(() => {
+    const from = zoomFrom.current;
     const box = frame.current;
-    if (!box) return;
+    const image = canvas.current;
+    if (!from || !box || !image) return;
+    zoomFrom.current = null;
+    zoomMotion.current?.cancel();
     if (zoomed) {
-      setZoomed(false);
-      return;
+      const rect = box.getBoundingClientRect();
+      box.scrollLeft = (from.x - from.bounds.left) / from.bounds.width * image.offsetWidth - (from.x - rect.left);
+      box.scrollTop = (from.y - from.bounds.top) / from.bounds.height * image.offsetHeight - (from.y - rect.top);
+    } else {
+      box.scrollLeft = 0;
+      box.scrollTop = 0;
     }
-    // Zoom toward where you tapped: after the image grows, scroll so that spot stays under your finger.
-    const rect = box.getBoundingClientRect();
-    const fx = (event.clientX - rect.left) / rect.width;
-    const fy = (event.clientY - rect.top) / rect.height;
-    setZoomed(true);
-    requestAnimationFrame(() => {
-      box.scrollLeft = fx * box.scrollWidth - (event.clientX - rect.left);
-      box.scrollTop = fy * box.scrollHeight - (event.clientY - rect.top);
-    });
+    const to = image.getBoundingClientRect();
+    if (window.matchMedia('(prefers-reduced-motion: reduce)').matches || !to.width) return;
+    zoomMotion.current = image.animate([
+      { transform: `translate3d(${from.bounds.left - to.left}px, ${from.bounds.top - to.top}px, 0) scale(${from.bounds.width / to.width})` },
+      { transform: 'none' },
+    ], { duration: OPEN_MS, easing: MOTION_EASING });
+  }, [zoomed]);
+
+  useEffect(() => () => zoomMotion.current?.cancel(), []);
+
+  const toggleZoom = (event: React.MouseEvent<HTMLDivElement>) => {
+    if (!canvas.current || isClosing) return;
+    zoomFrom.current = { bounds: canvas.current.getBoundingClientRect(), x: event.clientX, y: event.clientY };
+    setZoomed(value => !value);
   };
 
   return createPortal(
-    <div role="dialog" aria-modal="true" aria-label="Photo" className="photo-zoom">
+    <div ref={sheetRef} tabIndex={-1} role="dialog" aria-modal="true" aria-label="Photo" className={`photo-zoom${isClosing ? ' is-closing' : ''}`}>
       <div
         ref={frame}
         className={`photo-zoom-frame ${zoomed ? 'is-zoomed' : ''}`}
         onClick={toggleZoom}
       >
-        <div className="photo-zoom-canvas" style={{ width: zoomed ? `${ZOOM * 100}%` : '100%' }}>
+        <div ref={canvas} className="photo-zoom-canvas" style={{ width: zoomed ? `${ZOOM * 100}%` : '100%', transformOrigin: 'top left' }}>
           <ResponsiveImage
             key={images[index].src}
             asset={images[index]}
@@ -81,7 +102,7 @@ export function PhotoZoom({
           />
         </div>
       </div>
-      <button ref={closeRef} type="button" onClick={onClose} aria-label="Close photo" className="photo-zoom-button photo-zoom-close">
+      <button ref={closeRef} type="button" onClick={requestClose} aria-label="Close photo" className="photo-zoom-button photo-zoom-close">
         <CloseIcon size={20} />
       </button>
       {count > 1 ? (

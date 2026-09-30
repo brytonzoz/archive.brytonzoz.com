@@ -8,6 +8,7 @@ type Sticker = {
   copy: HTMLElement;
   visibility: string;
   opacity: string;
+  bounds: DOMRect;
   away: string;
   animation?: Animation;
 };
@@ -32,13 +33,36 @@ export function animateCardDepth(source: HTMLElement, opening: boolean, duration
       const style = getComputedStyle(element);
       const opacity = style.opacity;
       const zIndex = style.zIndex;
-      const copy = snapshotElement(element, bounds);
+      // Preserve an unfinished entrance's root rotation/scale inside the flight
+      // wrapper. The wrapper itself starts exactly at the visible bounding box.
+      const transform = style.transform;
+      const transformOrigin = style.transformOrigin;
+      const [ox, oy] = transformOrigin.split(' ').map(parseFloat);
+      const width = element.offsetWidth;
+      const height = element.offsetHeight;
+      const matrix = new DOMMatrixReadOnly(transform === 'none' ? undefined : transform);
+      const corners = [[0, 0], [width, 0], [0, height], [width, height]].map(([x, y]) =>
+        matrix.transformPoint({ x: x - ox, y: y - oy }));
+      const left = Math.min(...corners.map(point => point.x + ox));
+      const top = Math.min(...corners.map(point => point.y + oy));
+      const artwork = snapshotElement(element, bounds);
+      Object.assign(artwork.style, {
+        position: 'absolute', left: `${-left}px`, top: `${-top}px`,
+        width: `${width}px`, height: `${height}px`, transform, transformOrigin, opacity: '1',
+      });
+      const copy = document.createElement('div');
+      Object.assign(copy.style, {
+        position: 'fixed', left: `${bounds.left}px`, top: `${bounds.top}px`,
+        width: `${bounds.width}px`, height: `${bounds.height}px`, opacity,
+        willChange: 'transform, opacity',
+      });
+      copy.appendChild(artwork);
       copy.classList.add('card-sticker-copy');
       copy.style.transformOrigin = 'center';
       copy.style.zIndex = zIndex === 'auto' ? `${order}` : zIndex;
       const flight = stickerFlight(bounds, viewport, order);
       return {
-        element, copy, visibility: element.style.visibility, opacity,
+        element, copy, bounds, visibility: element.style.visibility, opacity,
         away: `translate3d(${flight.x}px, ${flight.y}px, 0) rotate(${flight.rotate}deg) scale(${flight.scale})`,
       };
     });
@@ -54,7 +78,13 @@ export function animateCardDepth(source: HTMLElement, opening: boolean, duration
 
   const frames = depth.stickers.map(sticker => {
     const style = getComputedStyle(sticker.copy);
-    return { transform: style.transform, opacity: style.opacity };
+    const bounds = sticker.element.getBoundingClientRect();
+    const x = bounds.left + bounds.width / 2 - sticker.bounds.left - sticker.bounds.width / 2;
+    const y = bounds.top + bounds.height / 2 - sticker.bounds.top - sticker.bounds.height / 2;
+    return {
+      current: { transform: style.transform, opacity: style.opacity },
+      home: `translate3d(${x}px, ${y}px, 0) scale(${bounds.width / sticker.bounds.width}, ${bounds.height / sticker.bounds.height})`,
+    };
   });
   depth.stickers.forEach((sticker, order) => {
     sticker.animation?.cancel();
@@ -62,11 +92,11 @@ export function animateCardDepth(source: HTMLElement, opening: boolean, duration
     // ends with the card, so nothing is cut short when the sheet unmounts.
     const delay = opening ? ((order * 3) % 5) * 8 : 36 + ((order * 3) % 5) * 8;
     sticker.animation = sticker.copy.animate([
-      { ...frames[order], offset: 0 },
-      { opacity: opening ? frames[order].opacity : sticker.opacity, offset: opening ? 0.65 : 0.35 },
+      { ...frames[order].current, offset: 0 },
+      { opacity: opening ? frames[order].current.opacity : sticker.opacity, offset: opening ? 0.65 : 0.35 },
       opening
         ? { transform: sticker.away, opacity: '0', offset: 1 }
-        : { transform: 'none', opacity: sticker.opacity, offset: 1 },
+        : { transform: frames[order].home, opacity: sticker.opacity, offset: 1 },
     ], { duration: duration - delay, delay, easing: MOTION_EASING, fill: 'both' });
   });
 }

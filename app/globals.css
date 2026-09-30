@@ -155,7 +155,7 @@
   }
 
   .toast.is-leaving {
-    animation: toastOut 220ms ease-in forwards;
+    animation: toastOut 220ms var(--motion-ease) forwards;
   }
 
   .admin-root {
@@ -171,7 +171,7 @@
   }
 
   .platform-scrim {
-    animation: listenFadeIn 260ms ease-out both;
+    animation: listenFadeIn var(--motion-control) var(--motion-ease) both;
   }
 
   .platform-row {
@@ -624,6 +624,7 @@
 }
 
 @keyframes listenFadeOut {
+  from { opacity: var(--backdrop-from-opacity, 1); }
   to {
     opacity: 0;
   }
@@ -637,7 +638,7 @@
 
 @keyframes listenSheetOut {
   from {
-    transform: translateY(var(--drag-y, 0px));
+    transform: var(--sheet-from-transform, translateY(var(--drag-y, 0px)));
   }
   to {
     transform: translateY(100%);
@@ -652,6 +653,10 @@
 }
 
 @keyframes listenCardOut {
+  from {
+    opacity: var(--sheet-from-opacity, 1);
+    transform: var(--sheet-from-transform, none);
+  }
   to {
     opacity: 0;
     transform: translateY(8px) scale(0.97);
@@ -1007,7 +1012,7 @@ html {
 }
 
 .store-bag-button {
-  animation: storeBagIn 420ms cubic-bezier(0.34, 1.56, 0.64, 1) both;
+  animation: storeBagIn var(--motion-open) var(--motion-ease) both;
 }
 
 .store-bag-count {
@@ -1146,7 +1151,7 @@ html {
   border-radius: 999px;
   background: var(--swatch);
   box-shadow: inset 0 0 0 1px rgba(0, 0, 0, 0.15);
-  transition: transform 180ms cubic-bezier(0.34, 1.56, 0.64, 1);
+  transition: transform var(--motion-control) var(--motion-ease);
 }
 
 .merch-swatch::after {
@@ -1155,7 +1160,7 @@ html {
   inset: -4px;
   border-radius: inherit;
   box-shadow: 0 0 0 2px transparent;
-  transition: box-shadow 180ms;
+  transition: box-shadow var(--motion-control) var(--motion-ease);
 }
 
 .merch-swatch.is-selected::after {
@@ -1176,7 +1181,7 @@ html {
   font-weight: 600;
   color: #111;
   box-shadow: inset 0 0 0 1px rgba(0, 0, 0, 0.1);
-  transition: background-color 160ms, color 160ms, transform 120ms;
+  transition: background-color var(--motion-control) var(--motion-ease), color var(--motion-control) var(--motion-ease), transform 180ms var(--motion-ease);
 }
 
 .merch-size:hover {
@@ -1586,7 +1591,7 @@ html {
   font-size: 13px;
   font-weight: 500;
   white-space: nowrap;
-  transition: background-color 160ms ease, color 160ms ease, box-shadow 160ms ease;
+  transition: background-color var(--motion-control) var(--motion-ease), color var(--motion-control) var(--motion-ease), box-shadow var(--motion-control) var(--motion-ease);
 }
 
 .shop-chip:hover {
@@ -1831,7 +1836,7 @@ html {
   font-size: 13px;
   font-weight: 600;
   letter-spacing: 0.01em;
-  transition: background-color 200ms ease, color 200ms ease;
+  transition: background-color var(--motion-control) var(--motion-ease), color var(--motion-control) var(--motion-ease);
 }
 
 .gallery-sides button[aria-pressed='true'] {
@@ -1896,7 +1901,7 @@ html {
 .merch-add {
   background: rgba(0, 0, 0, 0.07);
   color: #111;
-  transition: background-color 220ms ease, color 220ms ease, transform 160ms ease;
+  transition: background-color var(--motion-control) var(--motion-ease), color var(--motion-control) var(--motion-ease), transform 180ms var(--motion-ease);
 }
 
 .merch-add:hover {
@@ -1923,7 +1928,7 @@ html {
 }
 
 .merch-price-roll {
-  animation: merchPriceRoll 320ms cubic-bezier(0.22, 1, 0.36, 1);
+  animation: merchPriceRoll var(--motion-control) var(--motion-ease);
 }
 
 @keyframes merchPriceRoll {
@@ -2045,10 +2050,13 @@ html {
 
 .photo-zoom.is-closing {
   animation: photoZoomOut var(--motion-close) var(--motion-ease) forwards;
-  pointer-events: none;
 }
 
 @keyframes photoZoomOut {
+  from {
+    opacity: var(--sheet-from-opacity, 1);
+    transform: var(--sheet-from-transform, none);
+  }
   to { opacity: 0; transform: scale(0.96); }
 }
 

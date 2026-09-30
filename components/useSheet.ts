@@ -23,11 +23,25 @@ export function useSheet(isOpen: boolean, onClose: () => void, onRequestClose?: 
   const [isClosing, setIsClosing] = useState(false);
 
   const requestClose = useCallback(() => {
+    if (closeRequested.current) return;
+    closeRequested.current = true;
     if (closeTransitionRef.current) {
-      if (closeRequested.current) return;
-      closeRequested.current = true;
       closeTransitionRef.current();
-    } else setIsClosing(true);
+    } else {
+      // Exit from the rendered frame, including a quick reversal of the opener
+      // or a partially released drag. CSS must not jump back to its resting pose.
+      const panel = sheetRef.current;
+      const backdrop = panel?.classList.contains('sheet-panel')
+        ? panel.parentElement?.querySelector<HTMLElement>('.sheet-backdrop') : null;
+      const style = panel ? getComputedStyle(panel) : null;
+      const transform = style?.transform ?? 'none';
+      const opacity = style?.opacity ?? '1';
+      const backdropOpacity = backdrop ? getComputedStyle(backdrop).opacity : '1';
+      panel?.style.setProperty('--sheet-from-transform', transform);
+      panel?.style.setProperty('--sheet-from-opacity', opacity);
+      backdrop?.style.setProperty('--backdrop-from-opacity', backdropOpacity);
+      setIsClosing(true);
+    }
   }, []);
 
   useEffect(() => {

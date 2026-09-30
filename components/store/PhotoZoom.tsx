@@ -35,6 +35,7 @@ export function PhotoZoom({
   const { sheetRef, isClosing, requestClose } = useSheet(true, onClose);
   const count = images.length;
   const go = (i: number) => {
+    if (isClosing) return;
     zoomMotion.current?.cancel();
     zoomFrom.current = null;
     setZoomed(false);
@@ -102,15 +103,15 @@ export function PhotoZoom({
           />
         </div>
       </div>
-      <button ref={closeRef} type="button" onClick={requestClose} aria-label="Close photo" className="photo-zoom-button photo-zoom-close">
+      <button ref={closeRef} type="button" onClick={requestClose} disabled={isClosing} aria-label="Close photo" className="photo-zoom-button photo-zoom-close">
         <CloseIcon size={20} />
       </button>
       {count > 1 ? (
         <>
-          <button type="button" onClick={() => go(index - 1)} aria-label="Previous photo" className="photo-zoom-button photo-zoom-prev">
+          <button type="button" onClick={() => go(index - 1)} disabled={isClosing} aria-label="Previous photo" className="photo-zoom-button photo-zoom-prev">
             <ChevronDownIcon size={20} className="rotate-90" />
           </button>
-          <button type="button" onClick={() => go(index + 1)} aria-label="Next photo" className="photo-zoom-button photo-zoom-next">
+          <button type="button" onClick={() => go(index + 1)} disabled={isClosing} aria-label="Next photo" className="photo-zoom-button photo-zoom-next">
             <ChevronDownIcon size={20} className="-rotate-90" />
           </button>
           <p className="photo-zoom-count" aria-live="polite">{index + 1} / {count}</p>

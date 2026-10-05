@@ -4,6 +4,7 @@ import React, { useCallback, useEffect, useRef, useState } from 'react';
 import Link from 'next/link';
 import { ProjectCard } from '../components/ProjectCard';
 import { NotifySheet, hasSignedUp } from '../components/NotifySheet';
+import { ComingSoonNotification } from '../components/ComingSoonNotification';
 import { SiteFooter } from '../components/SiteFooter';
 import { MerchExperience } from '../components/store/MerchExperience';
 import { MerchShop } from '../components/store/MerchShop';
@@ -100,6 +101,7 @@ const MotionContext = React.createContext<MotionRegistry | null>(null);
 // Which scene a component belongs to, and which scene is on screen.
 const SceneIndexContext = React.createContext(0);
 const ActiveSceneContext = React.createContext(0);
+const EntrySceneContext = React.createContext(0);
 
 function applyMotion(element: HTMLElement, style: MotionStyle) {
   if (style.transform !== undefined) element.style.transform = style.transform;
@@ -107,9 +109,10 @@ function applyMotion(element: HTMLElement, style: MotionStyle) {
 }
 
 // motion.ref(key, fn) is a stable callback ref that keeps the element in step with the scroll;
-// motion.initial(fn) is its first-paint style (the page starts at the top).
+// motion.initial(fn) matches the entry scene before the scroll loop takes over.
 function useSceneMotion() {
   const index = React.useContext(SceneIndexContext);
+  const entryIndex = React.useContext(EntrySceneContext);
   const registry = React.useContext(MotionContext);
   const fns = React.useRef(new Map<string, MotionFn>());
   const refs = React.useRef(new Map<string, (element: HTMLElement | null) => void>());
@@ -128,7 +131,7 @@ function useSceneMotion() {
       }
       return callback;
     },
-    initial: (fn: MotionFn): React.CSSProperties => fn(clamp(-index, -1, 1)),
+    initial: (fn: MotionFn): React.CSSProperties => fn(clamp(entryIndex - index, -1, 1)),
   };
 }
 
@@ -572,7 +575,7 @@ function useReleaseStatus(date: string | null): string {
   return days > 0 ? `${days}d ${hours}h ${minutes}m` : `${hours}h ${minutes}m ${seconds}s`;
 }
 
-// Leads the homepage while the next release is being made: the same layout as every release,
+// Above the entry scene while the next release is being made: the same layout as every release,
 // but the cover is still developing, light moving behind frosted glass. Nothing given away.
 const ComingSoonScene = React.memo(function ComingSoonScene({ onNext }: { onNext: () => void }) {
   const status = useReleaseStatus(nextRelease.date);
@@ -1363,12 +1366,32 @@ export default function HomePage() {
 
       return safeLeftIndex - safeRightIndex;
     })];
-  const [activeIndex, setActiveIndex] = useState(0);
+  // Keep the teaser first in the sequence, but arrive on SOLENYA (project 02).
+  const initialIndex = Math.max(0, allProjects.findIndex((project) => project.name === 'SOLENYA'));
+  const [activeIndex, setActiveIndex] = useState(initialIndex);
+  const [entryPositioned, setEntryPositioned] = useState(false);
+  const scrollContainerRef = useRef<HTMLDivElement | null>(null);
+  const sceneStackRef = useRef<HTMLDivElement | null>(null);
+  const initializeScroll = useCallback((container: HTMLDivElement | null) => {
+    scrollContainerRef.current = container;
+    if (!container) return;
+    // The static HTML shows SOLENYA using a stack offset. Hand that view over to native scroll
+    // in the mount commit, before paint, so the teaser becomes reachable by scrolling up.
+    if (sceneStackRef.current) sceneStackRef.current.style.transform = 'none';
+    container.style.scrollBehavior = 'auto';
+    container.scrollTop = container.clientHeight * initialIndex;
+    container.style.scrollBehavior = '';
+    // Restore snapping on the next frame, after the stack offset has been removed. Otherwise
+    // the browser can preserve the old transformed snap target and jump an extra scene.
+    requestAnimationFrame(() => {
+      if (scrollContainerRef.current === container) setEntryPositioned(true);
+    });
+  }, [initialIndex]);
   // Scroll-linked motion: scenes register their moving elements here, and one frame loop (below)
   // drives them all from the scroll position.
   const motionUpdaters = React.useRef(new Map<number, Set<(distance: number) => void>>());
   const lastDistances = React.useRef(new Map<number, number>());
-  const progressRef = React.useRef(0);
+  const progressRef = React.useRef(initialIndex);
   const backgroundLayers = React.useRef<(HTMLDivElement | null)[]>([]);
   const motionRegistry = React.useMemo<MotionRegistry>(() => ({
     register(index, apply) {
@@ -1414,8 +1437,9 @@ export default function HomePage() {
   };
 
   const scrollToScene = useCallback((index: number) => {
-    const container = document.querySelector('.scroll-container');
-    container?.scrollTo({ top: container.clientHeight * index, behavior: 'smooth' });
+    const container = scrollContainerRef.current;
+    const reducedMotion = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+    container?.scrollTo({ top: container.clientHeight * index, behavior: reducedMotion ? 'instant' : 'smooth' });
   }, []);
   // The shop sits after the last scene.
   const scrollToShop = useCallback(() => scrollToScene(allProjects.length), [scrollToScene, allProjects.length]);
@@ -1431,7 +1455,7 @@ export default function HomePage() {
     return () => window.removeEventListener('resize', updateLayout);
   }, [isModalOpen]);
 
-  // Only the first scene's art is in the initial HTML; the rest starts downloading once that
+  // Only the entry scene's art is in the initial HTML; the rest starts downloading once that
   // has finished (window load) or as soon as the visitor starts scrolling.
   useEffect(() => {
     if (document.readyState === 'complete') {
@@ -1462,20 +1486,7 @@ export default function HomePage() {
   }, [activeIndex, allProjects.length]);
 
   useEffect(() => {
-    const initializeScroll = () => {
-      const container = document.querySelector('.scroll-container');
-      if (container) {
-        container.scrollTop = 0;
-        setActiveIndex(0);
-      }
-    };
-
-    const timer = setTimeout(initializeScroll, 100);
-    return () => clearTimeout(timer);
-  }, []);
-
-  useEffect(() => {
-    const container = document.querySelector<HTMLElement>('.scroll-container');
+    const container = scrollContainerRef.current;
     if (!container) return;
     const sceneCount = allProjects.length;
     let frame = 0;
@@ -1509,7 +1520,7 @@ export default function HomePage() {
       // re-snaps to the shop's top whenever the page bounces at the bottom or the grid grows.
       const shop = document.getElementById('shop');
       container.classList.toggle('is-free', Boolean(shop) && scrollTop >= (shop?.offsetTop ?? Infinity) - 2);
-      if (scrollTop > 0) setLoadDeferredScenes(true);
+      if (Math.abs(progress - initialIndex) > 0.01) setLoadDeferredScenes(true);
 
       // Anywhere in the shop counts as the shop (it's taller than a screen).
       const newIndex = Math.min(Math.round(scrollTop / containerHeight), sceneCount);
@@ -1534,7 +1545,7 @@ export default function HomePage() {
       container.removeEventListener('scroll', schedule);
       window.removeEventListener('resize', schedule);
     };
-  }, [allProjects.length]);
+  }, [allProjects.length, initialIndex]);
 
   // A scene more than one screen away holds still (globals.css .scene-still): its floating stickers,
   // drifting lights and shimmers would otherwise keep the phone redrawing things nobody can see.
@@ -1550,7 +1561,7 @@ export default function HomePage() {
         <BackgroundLayer
           key={project.name}
           background={getProjectBackground(project)}
-          visible={index === 0}
+          visible={index === initialIndex}
           layerRef={(element) => { backgroundLayers.current[index] = element; }}
         />
       ))}
@@ -1563,10 +1574,23 @@ export default function HomePage() {
         hidden={activeIndex >= allProjects.length}
       />
 
+      {teaser && entryPositioned && activeIndex === initialIndex && !isModalOpen ? (
+        <ComingSoonNotification onSelect={() => scrollToScene(0)} />
+      ) : null}
+
+      <EntrySceneContext.Provider value={initialIndex}>
       <MotionContext.Provider value={motionRegistry}>
       <ActiveSceneContext.Provider value={activeIndex}>
-      <div className="scroll-container relative z-10 h-screen overflow-y-auto snap-y snap-mandatory scroll-smooth">
-        <div className="w-full max-w-none">
+      <div
+        ref={initializeScroll}
+        className="scroll-container relative z-10 h-screen overflow-y-auto snap-y snap-mandatory scroll-smooth"
+        style={{ scrollSnapType: entryPositioned ? undefined : 'none' }}
+      >
+        <div
+          ref={sceneStackRef}
+          className="w-full max-w-none"
+          style={{ transform: entryPositioned ? undefined : `translateY(-${initialIndex * 100}vh)` }}
+        >
           {allProjects.map((project, index) => (
             <SceneIndexContext.Provider key={project.name} value={index}>{((): React.ReactNode => {
             const isActive = index === activeIndex;
@@ -1593,7 +1617,7 @@ export default function HomePage() {
                 <div key={project.name} className={sceneClass(index)}>
                   <SolenyaScene
                     project={project}
-                    loadImages={index === 0 || loadDeferredScenes}
+                    loadImages={index === initialIndex || loadDeferredScenes}
                     onModalStateChange={handleModalStateChange}
                   />
                 </div>
@@ -1605,7 +1629,7 @@ export default function HomePage() {
                 <div key={project.name} className={sceneClass(index)}>
                   <CautionScene
                     project={project}
-                    loadImages={index === 0 || loadDeferredScenes}
+                    loadImages={index === initialIndex || loadDeferredScenes}
                     onModalStateChange={handleModalStateChange}
                   />
                 </div>
@@ -1617,7 +1641,7 @@ export default function HomePage() {
                 <div key={project.name} className={sceneClass(index)}>
                   <ReminderScene
                     project={project}
-                    loadImages={index === 0 || loadDeferredScenes}
+                    loadImages={index === initialIndex || loadDeferredScenes}
                   />
                 </div>
               );
@@ -1634,7 +1658,7 @@ export default function HomePage() {
             if (isScrapwrk) {
               return (
                 <div key={project.name} className={sceneClass(index)}>
-                  <ScrapwrkScene loadImages={index === 0 || loadDeferredScenes} />
+                  <ScrapwrkScene loadImages={index === initialIndex || loadDeferredScenes} />
                 </div>
               );
             }
@@ -1691,6 +1715,7 @@ export default function HomePage() {
       </div>
       </ActiveSceneContext.Provider>
       </MotionContext.Provider>
+      </EntrySceneContext.Provider>
     </div>
   );
 }

@@ -2,8 +2,8 @@ import assert from 'node:assert/strict';
 import { test } from 'node:test';
 import fs from 'node:fs';
 import { SHIPPED_STATUSES, shippedCounts, toItems, yearGroups } from '../lib/shipped.ts';
-import { GITHUB_USERNAME, chargesTotal, printedCounts } from '../lib/shipped-receipt.ts';
-import { checkSponsorUrl, hasBlockedWord, priceCents, validateSponsor } from '../lib/shipped-sponsors.ts';
+import { isGithubLogin, itemDate, itemsShipped, readQuery, shareText, shippedYear, subjectKey, subjectLabel } from '../lib/shipped-year.ts';
+import { HOUSE_SPONSORS, SPONSOR_CONFIG, checkSponsorUrl, hasBlockedWord, houseLine, priceCents, validateSponsor, weightedPick } from '../lib/shipped-sponsors.ts';
 
 const read = (file) => JSON.parse(fs.readFileSync(new URL(file, import.meta.url), 'utf8'));
 const DATA = read('../data/shipped/businesses.json');
@@ -72,26 +72,66 @@ test('every logo in the data has a small dithered print in public/shipped/logos'
 });
 
 test('GitHub usernames follow GitHub rules', () => {
-  for (const ok of ['octocat', 'a', 'brytonzoz', 'a-b-c', 'X'.repeat(39)]) assert.ok(GITHUB_USERNAME.test(ok), ok);
-  for (const bad of ['', '-a', 'a-', 'a--b', 'a_b', 'a.b', '../etc', 'X'.repeat(40), 'a b', 'ünï']) assert.equal(GITHUB_USERNAME.test(bad), false, bad);
+  for (const ok of ['octocat', 'a', 'brytonzoz', 'a-b-c', 'X'.repeat(39)]) assert.ok(isGithubLogin(ok), ok);
+  for (const bad of ['', '-a', 'a-', 'a--b', 'a_b', 'a.b', '../etc', 'X'.repeat(40), 'a b', 'ünï']) assert.equal(isGithubLogin(bad), false, bad);
 });
 
-test('printed receipt tallies', () => {
-  const receipt = {
-    items: [{ status: 'SHIPPED' }, { status: 'SHIPPED' }, { status: 'ABANDONED' }, { status: 'IN PROGRESS' }],
-    charges: [{ cents: 450 }, { cents: 1299 }],
-  };
-  assert.deepEqual(printedCounts(receipt), { shipped: 2, inProgress: 1, abandoned: 1 });
-  assert.equal(chargesTotal(receipt), 1749);
+test('one field reads as a domain, a handle or a name', () => {
+  assert.deepEqual(readQuery('levelsio'), { kind: 'handle', value: 'levelsio' });
+  assert.deepEqual(readQuery('@rauchg'), { kind: 'handle', value: 'rauchg' });
+  assert.deepEqual(readQuery('https://x.com/levelsio'), { kind: 'handle', value: 'levelsio' });
+  assert.deepEqual(readQuery('twitter.com/@rauchg/'), { kind: 'handle', value: 'rauchg' });
+  assert.deepEqual(readQuery('github.com/torvalds'), { kind: 'handle', value: 'torvalds' });
+  assert.deepEqual(readQuery('https://www.Mopkin.app/about'), { kind: 'domain', value: 'mopkin.app' });
+  assert.deepEqual(readQuery('getpocketfactory.com'), { kind: 'domain', value: 'getpocketfactory.com' });
+  assert.deepEqual(readQuery('  Pieter   Levels '), { kind: 'name', value: 'Pieter Levels' });
+  assert.deepEqual(readQuery('José Martí'), { kind: 'name', value: 'José Martí' });
+  for (const bad of ['', 'a', 'x'.repeat(81), '<script>', 'a@b.com', 'rm -rf /']) assert.equal(readQuery(bad), null, bad);
 });
 
-test('sponsor prices step up per roll in whole dollars', () => {
-  assert.equal(priceCents('name', 1), 500);
-  assert.equal(priceCents('logo', 1), 2500);
-  assert.equal(priceCents('header', 1), 10000);
-  assert.equal(priceCents('name', 2), 600);
-  assert.ok(priceCents('name', 3) > priceCents('name', 2));
-  for (const roll of [1, 2, 5, 10]) assert.equal(priceCents('logo', roll) % 100, 0);
+test('subjects key the 7-day cache and takedowns whatever the case', () => {
+  assert.equal(subjectKey({ kind: 'github', id: 'RauchG' }), subjectKey({ kind: 'github', id: 'rauchg' }));
+  assert.notEqual(subjectKey({ kind: 'github', id: 'rauchg' }), subjectKey({ kind: 'x', id: 'rauchg' }));
+  assert.equal(subjectLabel({ kind: 'x', id: 'levelsio', display: 'Pieter' }), '@levelsio');
+  assert.equal(subjectLabel({ kind: 'domain', id: 'mopkin.app', display: 'mopkin.app' }), 'mopkin.app');
+});
+
+test('item dates and the share text', () => {
+  assert.equal(itemDate('2026-03-14'), 'MAR 14');
+  assert.equal(itemDate('2026-11'), 'NOV 2026');
+  assert.equal(itemDate(null), null);
+  assert.equal(itemDate('soon'), null);
+  const receipt = { year: 2026, potential: false, subject: { kind: 'x', id: 'levelsio', display: '@levelsio' }, items: [{}, {}, {}] };
+  assert.equal(shareText(receipt), '@levelsio shipped 3 things in 2026. Itemized receipt:');
+  assert.equal(itemsShipped({ ...receipt, potential: true, items: [{}] }), 1);
+  assert.match(shareText({ ...receipt, potential: true, items: [{}] }), /POTENTIAL/);
+});
+
+test('the year is configurable and falls back to this year', () => {
+  assert.equal(shippedYear('2025'), 2025);
+  assert.equal(shippedYear(undefined), new Date().getUTCFullYear());
+  assert.equal(shippedYear('banana'), new Date().getUTCFullYear());
+});
+
+test('sponsor tiers: $5 name, $25 logo, $100 presented-by, 7 days each, one presented-by at a time', () => {
+  assert.equal(priceCents('name'), 500);
+  assert.equal(priceCents('logo'), 2500);
+  assert.equal(priceCents('header'), 10000);
+  for (const tier of ['name', 'logo', 'header']) assert.equal(SPONSOR_CONFIG.tiers[tier].days, 7);
+  assert.equal(SPONSOR_CONFIG.tiers.header.slots, 1);
+});
+
+test('weighted rotation: deterministic per seed, no repeats, logos come up more often', () => {
+  const pool = [{ id: 1, tier: 'name' }, { id: 2, tier: 'name' }, { id: 3, tier: 'logo' }, { id: 4, tier: 'header' }];
+  assert.deepEqual(weightedPick(pool, 3, 42), weightedPick(pool, 3, 42));
+  const picked = weightedPick(pool, 3, 7);
+  assert.equal(new Set(picked.map((p) => p.id)).size, picked.length);
+  assert.equal(picked.some((p) => p.tier === 'header'), false, 'presented-by is its own slot');
+  let logoFirst = 0;
+  for (let seed = 0; seed < 600; seed++) if (weightedPick(pool, 1, seed)[0].tier === 'logo') logoFirst++;
+  assert.ok(logoFirst > 300 && logoFirst < 420, `logo first ${logoFirst}/600 (expected about 360)`);
+  assert.ok(HOUSE_SPONSORS.rotating.includes(houseLine(5)));
+  assert.equal(HOUSE_SPONSORS.main.text, 'BRYTONZOZ.COM');
 });
 
 test('name lines reject links and profanity, keep normal names', () => {

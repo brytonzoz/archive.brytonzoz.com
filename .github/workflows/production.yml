@@ -137,6 +137,12 @@ jobs:
           TURNSTILE_SITE_KEY: ${{ secrets.TURNSTILE_SITE_KEY }}
           TURNSTILE_SECRET_KEY: ${{ secrets.TURNSTILE_SECRET_KEY }}
           STRIPE_SHIPPED_WEBHOOK_SECRET: ${{ secrets.STRIPE_SHIPPED_WEBHOOK_SECRET }}
+          PRODUCTHUNT_TOKEN: ${{ secrets.PRODUCTHUNT_TOKEN }}
+          TINYFISH_API_KEY: ${{ secrets.TINYFISH_API_KEY }}
+          TAVILY_API_KEY: ${{ secrets.TAVILY_API_KEY }}
+          EXA_API_KEY: ${{ secrets.EXA_API_KEY }}
+          BRAVE_SEARCH_API_KEY: ${{ secrets.BRAVE_SEARCH_API_KEY }}
+          JINA_API_KEY: ${{ secrets.JINA_API_KEY }}
         run: |
           sync() {
             if [ -z "$2" ]; then echo "::notice::$3 is not set, so $4."; return 0; fi
@@ -147,6 +153,13 @@ jobs:
           sync GITHUB_TOKEN "$SHIPPED_GITHUB_TOKEN" SHIPPED_GITHUB_TOKEN "printing can fail with github-busy: anonymous GitHub lookups share Cloudflare's IPs and its 60-an-hour limit"
           sync TURNSTILE_SITE_KEY "$TURNSTILE_SITE_KEY" TURNSTILE_SITE_KEY "Print my receipt stays offline"
           sync TURNSTILE_SECRET_KEY "$TURNSTILE_SECRET_KEY" TURNSTILE_SECRET_KEY "Print my receipt stays offline"
+          # Optional extra sources for Shipped receipts (worker/shipped-sources.ts); each is skipped without its key.
+          sync PRODUCTHUNT_TOKEN "$PRODUCTHUNT_TOKEN" PRODUCTHUNT_TOKEN "receipts skip Product Hunt"
+          sync TINYFISH_API_KEY "$TINYFISH_API_KEY" TINYFISH_API_KEY "receipts skip the TinyFish crawler"
+          sync TAVILY_API_KEY "$TAVILY_API_KEY" TAVILY_API_KEY "receipts skip the Tavily crawler"
+          sync EXA_API_KEY "$EXA_API_KEY" EXA_API_KEY "receipts skip the Exa crawler"
+          sync BRAVE_SEARCH_API_KEY "$BRAVE_SEARCH_API_KEY" BRAVE_SEARCH_API_KEY "receipts skip the Brave Search crawler"
+          sync JINA_API_KEY "$JINA_API_KEY" JINA_API_KEY "receipts read sites as raw HTML instead of Jina Reader"
 
       - name: Deploy www/archive redirects
         env:

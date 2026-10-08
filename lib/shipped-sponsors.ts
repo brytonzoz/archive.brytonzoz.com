@@ -1,13 +1,18 @@
-// Supporter shout-outs on /shipped/: a buyer pays (Stripe, tax added at checkout) for a shout-out printed
-// on the receipt plus a downloadable receipt image, Bryton approves it in /admin, and only then does it print.
-// No traffic or impressions are promised. Prices, roll size and slots are all set here.
+// Sponsors on /shipped/: your name or logo in the "THIS RECEIPT PAID FOR BY" block on the Shipped receipts
+// people print and share (not on Bryton's own receipt page). Paid through Stripe (tax added at checkout),
+// approved by Bryton in /admin, then in the rotation for a fixed number of days. No impressions promised.
 
 export type SponsorTier = 'name' | 'logo' | 'header';
 
 export type TierConfig = {
   label: string;
-  /** Price on roll 1, in cents; later rolls step up by priceStepPercent. */
-  baseCents: number;
+  cents: number;
+  /** Days in the rotation from approval. */
+  days: number;
+  /** Share of the rotation relative to other tiers (a logo line comes up 3× as often as a name line). */
+  weight: number;
+  /** Most at once (null: no limit). */
+  slots: number | null;
   maxText: number;
   /** Takes a link (shown rel="sponsored nofollow"). */
   url: boolean;
@@ -16,41 +21,55 @@ export type TierConfig = {
 };
 
 export const SPONSOR_CONFIG = {
-  /** Every purchase is one numbered line on the current roll; a full roll is archived. */
-  rollSize: 500,
-  priceStepPercent: 20,
-  headerDays: 7,
-  headerSlots: 5,
-  /** Logo sponsors shown in a generated receipt's "PAID FOR BY" footer. */
-  footerRotation: 3,
-  /** Unpaid checkouts stop holding a line after this long. */
+  /** Lines in one receipt's PAID FOR BY block (the "presented by" slot is extra, at the top). */
+  footerLines: 3,
+  /** Unpaid checkouts stop holding a slot after this long. */
   checkoutHoldMinutes: 60,
   tiers: {
     name: {
       label: 'NAME LINE',
-      baseCents: 500,
+      cents: 500,
+      days: 7,
+      weight: 1,
+      slots: null,
       maxText: 32,
       url: false,
       logo: false,
-      blurb: 'Your name as a numbered shout-out line on the master receipt.',
+      blurb: 'Your name in the PAID FOR BY block on shared receipts, in rotation for 7 days.',
     },
     logo: {
       label: 'LOGO LINE',
-      baseCents: 2500,
+      cents: 2500,
+      days: 7,
+      weight: 3,
+      slots: null,
       maxText: 32,
       url: true,
       logo: true,
-      blurb: 'Your logo in 1-bit thermal print with a link, plus turns in the "paid for by" rotation on printed receipts.',
+      blurb: 'Your logo in 1-bit print with a link in the PAID FOR BY block, in rotation for 7 days.',
     },
     header: {
-      label: 'HEADER',
-      baseCents: 10000,
+      label: 'PRESENTED BY',
+      cents: 10000,
+      days: 7,
+      weight: 0,
+      slots: 1,
       maxText: 28,
       url: true,
       logo: false,
-      blurb: 'Your name under "Supported by" at the top of printed receipts for 7 days. 5 slots at a time.',
+      blurb: '"Presented by" at the top of every shared receipt\'s PAID FOR BY block for 7 days. One at a time.',
     },
   } satisfies Record<SponsorTier, TierConfig>,
+};
+
+/** Shown when no paid sponsor is running: BRYTONZOZ.COM always, plus one rotating house line. */
+export const HOUSE_SPONSORS = {
+  main: { key: 'house:brytonzoz', text: 'BRYTONZOZ.COM', url: 'https://brytonzoz.com/' },
+  rotating: [
+    { key: 'house:mopkin', text: 'MOPKIN', url: 'https://mopkin.app/' },
+    { key: 'house:habituize', text: 'HABITUIZE', url: 'https://habituize.app/' },
+    { key: 'house:pocketfactory', text: 'POCKET FACTORY', url: 'https://getpocketfactory.com/' },
+  ],
 };
 
 export const SPONSOR_TIERS = Object.keys(SPONSOR_CONFIG.tiers) as SponsorTier[];
@@ -58,12 +77,38 @@ export const SPONSOR_TIERS = Object.keys(SPONSOR_CONFIG.tiers) as SponsorTier[];
 export const isSponsorTier = (value: unknown): value is SponsorTier =>
   typeof value === 'string' && (SPONSOR_TIERS as string[]).includes(value);
 
-/** Whole dollars, stepping up per roll: $5 → $6 → $8 …, never below the base. */
-export function priceCents(tier: SponsorTier, roll: number): number {
-  const base = SPONSOR_CONFIG.tiers[tier].baseCents;
-  const factor = (1 + SPONSOR_CONFIG.priceStepPercent / 100) ** Math.max(0, roll - 1);
-  return Math.max(base, Math.ceil((base * factor) / 100) * 100);
+export const priceCents = (tier: SponsorTier) => SPONSOR_CONFIG.tiers[tier].cents;
+
+/** Deterministic 0..1 from a seed, so a receipt shows the same sponsors for a given hour. */
+function seeded(seed: number) {
+  let t = seed >>> 0;
+  return () => {
+    t = (t + 0x6d2b79f5) >>> 0;
+    let r = Math.imul(t ^ (t >>> 15), 1 | t);
+    r ^= r + Math.imul(r ^ (r >>> 7), 61 | r);
+    return ((r ^ (r >>> 14)) >>> 0) / 4294967296;
+  };
 }
+
+/** Weighted pick without replacement: each pick's chance is proportional to its tier weight. */
+export function weightedPick<T extends { tier: SponsorTier }>(pool: T[], count: number, seed: number): T[] {
+  const random = seeded(seed);
+  const left = pool.filter((item) => SPONSOR_CONFIG.tiers[item.tier].weight > 0);
+  const out: T[] = [];
+  while (out.length < count && left.length) {
+    const total = left.reduce((sum, item) => sum + SPONSOR_CONFIG.tiers[item.tier].weight, 0);
+    let roll = random() * total;
+    let index = 0;
+    for (; index < left.length - 1; index++) {
+      roll -= SPONSOR_CONFIG.tiers[left[index].tier].weight;
+      if (roll < 0) break;
+    }
+    out.push(left.splice(index, 1)[0]);
+  }
+  return out;
+}
+
+export const houseLine = (seed: number) => HOUSE_SPONSORS.rotating[Math.floor(seeded(seed)() * HOUSE_SPONSORS.rotating.length)];
 
 export const LOGO_LIMITS = { maxBytes: 64_000, maxWidth: 384, maxHeight: 160 };
 

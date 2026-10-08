@@ -112,8 +112,8 @@ export default {
     if (url.pathname.startsWith('/api/')) {
       return (await handleShipped(request, env, ctx)) ?? (await handleStore(request, env)) ?? handleApi(request, env);
     }
-    // Printed receipts' share pages and their preview images (worker/shipped.ts).
-    if (url.pathname.startsWith('/shipped/r/')) return handleShippedPage(request, env);
+    // Printed receipts: share pages and their share images (worker/shipped.ts).
+    if (url.pathname.startsWith('/shipped/r/')) return handleShippedPage(request, env, ctx);
     // Campaign links for posts and bios: brytonzoz.com/go/ig -> the homepage, tagged "ig" in /admin.
     if (url.pathname.startsWith('/go/')) {
       const code = url.pathname.slice(4).replace(/\/+$/, '').toLowerCase();

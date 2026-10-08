@@ -86,6 +86,12 @@ export async function fetchGithub(login: string, env: AiEnv): Promise<GithubProf
   ]);
   if (userRes.status === 404) throw new PrintError('no-such-user', 404);
   if (userRes.status === 403 || userRes.status === 429 || reposRes.status === 403 || reposRes.status === 429) {
+    console.warn('shipped: github refused', {
+      user: userRes.status,
+      repos: reposRes.status,
+      remaining: userRes.headers.get('x-ratelimit-remaining'),
+      authenticated: Boolean(env.GITHUB_TOKEN),
+    });
     throw new PrintError('github-busy', 503);
   }
   if (!userRes.ok || !reposRes.ok) throw new PrintError('github-error', 502);

@@ -3,7 +3,7 @@ import type { Metadata } from 'next';
 import { BrytonReceipt } from '../../components/shipped/BrytonReceipt';
 import { RecentStrip } from '../../components/shipped/RecentStrip';
 import { Receipt } from '../../components/shipped/Receipt';
-import { ShippedHero } from '../../components/shipped/ShippedHero';
+import { ShippedStage } from '../../components/shipped/ShippedStage';
 import { SponsorDesk } from '../../components/shipped/SponsorDesk';
 import { SHIPPED_OG_IMAGE } from '../../lib/shipped';
 import { SITE_YEAR } from '../../lib/shipped-year';
@@ -56,9 +56,7 @@ export const metadata: Metadata = {
 export default function ShippedPage() {
   return (
     <>
-      <ShippedHero duration={5200}>
-        <BrytonReceipt />
-      </ShippedHero>
+      <ShippedStage opening={{ kind: 'house', content: <BrytonReceipt /> }} title={`Shipped in ${SITE_YEAR}`} />
       <RecentStrip />
       <SponsorDesk />
       <Receipt />

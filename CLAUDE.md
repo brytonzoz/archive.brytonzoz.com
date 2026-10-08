@@ -109,7 +109,9 @@ push, and give the owner the staging link from the PR comment once the Staging w
   crawlers explicitly. Only state facts the owner has confirmed (no invented bio details or genres).
 - Shipped (`/shipped/`, hidden: noindex, never linked from nav, sitemap, llms.txt or JSON-LD): a receipt-printer machine
  prints Bryton's "SHIPPED IN <year>" receipt (`components/shipped/BrytonReceipt.tsx`, from `data/shipped/businesses.json`),
- then PRINT YOURS runs the same machine for any name, @handle, GitHub user or domain (`PrintYours.tsx`). The Worker
+ then PRINT YOURS runs the same machine for any name, @handle, GitHub user or domain (`ShippedStage.tsx`: the one
+ printer and the self-serve panel; `Machine.tsx` does the line-by-line feed and drag/tap/key tear, `physics.ts` the
+ seeded tears and springs, `sound.ts` the opt-in synthesized clicks; share images in `lib/receipt-svg.ts`). The Worker
  (`worker/shipped.ts`) gathers free sources (`worker/shipped-sources.ts`: GitHub, iTunes, HN, npm, Product Hunt with a
  token, their site) plus TinyFish search/fetch (`worker/shipped-tinyfish.ts`, secret `tinyfish`/`TINYFISH`; only the
  free endpoints, guarded in code and metered per day in D1, never any paid TinyFish product). Claude (`claude_key`/

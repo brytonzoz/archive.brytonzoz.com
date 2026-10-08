@@ -35,8 +35,16 @@ function loadTurnstile(): Promise<TurnstileApi> {
 
 export type TurnstileHandle = { reset: () => void };
 
-export const Turnstile = forwardRef<TurnstileHandle, { siteKey: string; onToken: (token: string | null) => void }>(function Turnstile(
-  { siteKey, onToken },
+type TurnstileProps = {
+  siteKey: string;
+  onToken: (token: string | null) => void;
+  theme?: 'light' | 'dark';
+  /** interaction-only: invisible unless Cloudflare actually needs the visitor to click. */
+  appearance?: 'always' | 'interaction-only';
+};
+
+export const Turnstile = forwardRef<TurnstileHandle, TurnstileProps>(function Turnstile(
+  { siteKey, onToken, theme = 'light', appearance = 'always' },
   ref,
 ) {
   const box = useRef<HTMLDivElement>(null);
@@ -61,7 +69,8 @@ export const Turnstile = forwardRef<TurnstileHandle, { siteKey: string; onToken:
           if (cancelled || widget.current) return;
           widget.current = api.render(el, {
             sitekey: siteKey,
-            theme: 'light',
+            theme,
+            appearance,
             size: 'flexible',
             callback: (token: string) => callback.current(token),
             'expired-callback': () => callback.current(null),
@@ -83,7 +92,7 @@ export const Turnstile = forwardRef<TurnstileHandle, { siteKey: string; onToken:
       if (widget.current && window.turnstile) window.turnstile.remove(widget.current);
       widget.current = null;
     };
-  }, [siteKey]);
+  }, [siteKey, theme, appearance]);
 
-  return <div ref={box} className="min-h-[65px]" />;
+  return <div ref={box} className={appearance === 'always' ? 'min-h-[65px]' : 'shipped-turnstile'} />;
 });

@@ -1,8 +1,8 @@
 // Copies the repository secrets Shipped needs into a Worker with one `wrangler secret bulk`, from the deploy
 // workflows. Empty secrets are skipped (a value set on the Worker earlier stays). Values are never printed:
-// the log lists names only. Turnstile: when the repo has no TURNSTILE_* secrets, the widget is created (or
-// reused) through the Cloudflare API with CLOUDFLARE_API_TOKEN; without Turnstile permission it's skipped
-// and printing relies on the rate limits and the daily spend cap.
+// the log lists names only. Turnstile: TURNSTILE_SITE_KEY (public; the Worker hands it to the page) and
+// TURNSTILE_SECRET_KEY (server-only, used for siteverify) come from Bryton's widget; without them printing
+// and checkout rely on the rate limits and the daily spend cap.
 //
 //   node scripts/sync-worker-secrets.mjs staging|production
 import { execFileSync } from 'node:child_process';
@@ -44,62 +44,6 @@ const WHY_SKIPPED = {
   TURNSTILE_SITE_KEY: target === 'staging' ? 'staging uses the Turnstile test keys' : 'printing relies on rate limits and the spend cap',
   TURNSTILE_SECRET_KEY: target === 'staging' ? 'staging uses the Turnstile test keys' : 'printing relies on rate limits and the spend cap',
 };
-
-const ACCOUNT = '480a4eebfef4c5ba2d0e225fde891ae8';
-const WIDGET_NAME = 'shipped';
-const WIDGET_DOMAINS = ['brytonzoz.com', 'shipped.brytonzoz.com', 'shipped-staging.brytonzoz.com', 'archive-staging.bryton-p-zoz.workers.dev'];
-
-async function cloudflare(method, route, body) {
-  const response = await fetch(`https://api.cloudflare.com/client/v4/accounts/${ACCOUNT}/${route}`, {
-    method,
-    headers: { authorization: `Bearer ${env.CLOUDFLARE_API_TOKEN}`, 'content-type': 'application/json' },
-    body: body ? JSON.stringify(body) : undefined,
-  });
-  const data = await response.json().catch(() => ({}));
-  if (!response.ok || data.success === false) {
-    const message = (data.errors ?? []).map((error) => `${error.code}: ${error.message}`).join('; ') || `HTTP ${response.status}`;
-    throw new Error(message);
-  }
-  return data.result;
-}
-
-/** The "shipped" Turnstile widget's keys: reused if it exists (its hostnames topped up), created if not. */
-async function turnstileKeys() {
-  const widgets = await cloudflare('GET', 'challenges/widgets?per_page=100');
-  let widget = (widgets ?? []).find((item) => item.name === WIDGET_NAME);
-  if (widget) {
-    const missing = WIDGET_DOMAINS.filter((domain) => !(widget.domains ?? []).includes(domain));
-    if (missing.length) {
-      widget = await cloudflare('PUT', `challenges/widgets/${widget.sitekey}`, {
-        name: WIDGET_NAME,
-        mode: widget.mode ?? 'managed',
-        domains: [...new Set([...(widget.domains ?? []), ...WIDGET_DOMAINS])],
-      });
-    }
-    if (!widget.secret) widget = await cloudflare('GET', `challenges/widgets/${widget.sitekey}`);
-    console.log(`Turnstile: reusing widget "${WIDGET_NAME}"${missing.length ? ` (added ${missing.join(', ')})` : ''}.`);
-  } else {
-    widget = await cloudflare('POST', 'challenges/widgets', { name: WIDGET_NAME, mode: 'managed', domains: WIDGET_DOMAINS });
-    console.log(`Turnstile: created widget "${WIDGET_NAME}" for ${WIDGET_DOMAINS.join(', ')}.`);
-  }
-  if (!widget?.sitekey || !widget?.secret) throw new Error('the API returned no keys');
-  return { site: widget.sitekey, secret: widget.secret };
-}
-
-if (!secrets.TURNSTILE_SITE_KEY || !secrets.TURNSTILE_SECRET_KEY) {
-  if (!env.CLOUDFLARE_API_TOKEN) {
-    console.log('::notice::Turnstile: no CLOUDFLARE_API_TOKEN, skipped.');
-  } else {
-    try {
-      const keys = await turnstileKeys();
-      console.log(`::add-mask::${keys.secret}`);
-      secrets.TURNSTILE_SITE_KEY = keys.site;
-      secrets.TURNSTILE_SECRET_KEY = keys.secret;
-    } catch (error) {
-      console.log(`::notice::Turnstile widget not set up (${error.message}). The API token likely lacks "Account: Turnstile: Edit"; printing relies on rate limits and the spend cap.`);
-    }
-  }
-}
 
 const set = Object.fromEntries(Object.entries(secrets).filter(([, value]) => value));
 for (const name of Object.keys(secrets).filter((name) => !set[name])) console.log(`::notice::${name} not set, so ${WHY_SKIPPED[name]}.`);

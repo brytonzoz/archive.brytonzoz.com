@@ -128,8 +128,8 @@ jobs:
           printf '%s' "$PRINTIFY_ACCESS" | npx wrangler secret put PRINTIFY_ACCESS --env=""
 
       # Shipped: every secret its Worker needs, copied from the repository secrets in one `wrangler secret bulk`
-      # (scripts/sync-worker-secrets.mjs maps the names, skips empty ones, prints names only, never values) and
-      # the Turnstile widget created through the Cloudflare API when the token is allowed to.
+      # (scripts/sync-worker-secrets.mjs maps the names, skips empty ones, prints names only, never values).
+      # TURNSTILE_SITE_KEY is public (the Worker hands it to the page); TURNSTILE_SECRET_KEY stays server-side.
       - name: Sync Shipped secrets
         env:
           CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}

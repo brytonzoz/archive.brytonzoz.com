@@ -24,7 +24,7 @@ import { DEFAULT_MODEL, PrintError, assembleReceipt, demoReceipt, maxSearches, t
 import { ICON_HASH, bytesDataUri, iconDataUri, iconKey, storeIcon } from './shipped-icons';
 import { renderPng, yearCardPng, yearTallPng, type LogoResolver } from './shipped-og';
 import { isProduction, sponsorProvider, type PayEnv, type SponsorEvent } from './shipped-pay';
-import { clean, faviconUrl, gather, githubUser, hostOf, readSite, searchGithubUsers, type SourceEnv } from './shipped-sources';
+import { clean, faviconUrl, gather, githubUser, hostOf, readSite, searchGithubUsers, tinyfishAccess, type SourceEnv } from './shipped-sources';
 import { TINYFISH_DAILY, type TinyfishKind, type TinyfishMeter } from './shipped-tinyfish';
 import { receiptBarcodeUnits, receiptDate } from '../lib/shipped';
 import { supporterReceiptSvg } from '../lib/receipt-svg';
@@ -73,6 +73,7 @@ export interface ShippedEnv extends AiEnv, PayEnv, SourceEnv {
   SHIPPED_DAILY_CAP_USD?: string;
   /** The year receipts itemize (default: the current year). */
   SHIPPED_YEAR?: string;
+  ANTHROPIC_WORKSPACE_DEFAULT?: string;
 }
 
 /**
@@ -89,7 +90,7 @@ export function withKeyAliases<T extends ShippedEnv>(env: T): T {
       .find((value): value is string => typeof value === 'string' && value.trim() !== '');
   const anthropic = pick('claude_key', 'CLAUDE_KEY', 'ANTHROPIC_API_KEY');
   const tinyfish = pick('tinyfish', 'TINYFISH', 'TINYFISH_API_KEY');
-  const workspace = pick('claude_workspace', 'CLAUDE_WORKSPACE', 'claude_workspace_id', 'ANTHROPIC_WORKSPACE_ID');
+  const workspace = pick('claude_workspace', 'CLAUDE_WORKSPACE', 'claude_workspace_id', 'ANTHROPIC_WORKSPACE_ID', 'ANTHROPIC_WORKSPACE_DEFAULT');
   if (anthropic === env.ANTHROPIC_API_KEY && tinyfish === env.TINYFISH_API_KEY && workspace === env.ANTHROPIC_WORKSPACE_ID) return env;
   // A prototype link keeps every binding (DB, R2, ASSETS) reachable without copying them.
   return Object.assign(Object.create(env) as T, { ANTHROPIC_API_KEY: anthropic, TINYFISH_API_KEY: tinyfish, ANTHROPIC_WORKSPACE_ID: workspace });
@@ -357,7 +358,7 @@ async function lookup(request: Request, env: ShippedEnv): Promise<Response> {
     let user = null;
     let unsure = false;
     try {
-      user = await githubUser(handle, env);
+      user = await githubUser(handle, env, tinyfishAccess(env, tinyfishMeter(db)));
     } catch {
       unsure = true;
     }
@@ -372,7 +373,7 @@ async function lookup(request: Request, env: ShippedEnv): Promise<Response> {
       candidates.push({ kind: 'x', id: handle, display: `@${handle}`, detail: 'X / Twitter handle' });
     }
   } else {
-    const people = await searchGithubUsers(query.value, env).catch(() => []);
+    const people = await searchGithubUsers(query.value, env, tinyfishAccess(env, tinyfishMeter(db))).catch(() => []);
     for (const person of people.slice(0, 3)) candidates.push({ kind: 'github', id: person.login, display: query.value, detail: `GitHub @${person.login}` });
     candidates.push({ kind: 'name', id: query.value, display: query.value, detail: people.length ? 'Search the web for this name' : 'Name or brand' });
   }

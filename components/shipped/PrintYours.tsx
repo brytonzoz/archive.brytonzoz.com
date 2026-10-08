@@ -17,14 +17,27 @@ const ERRORS: Record<string, string> = {
   turnstile: 'Couldn’t check you’re human. Try again.',
   'slow-down': 'The printer is hot. Try again in an hour.',
   'taken-down': 'That receipt was taken down at its owner’s request.',
-  'out-of-paper': 'Out of paper for today. Back tomorrow.',
+  'out-of-paper': 'Out of paper. That’s it for now.',
   'ai-busy': 'The printer is busy. Try again in a minute.',
   'ai-error': 'The printer jammed. Try again.',
   offline: 'The printer is offline. Check back soon.',
 };
-const OFFLINE: Record<string, string> = {
-  'out-of-paper': 'OUT OF PAPER FOR TODAY. BACK TOMORROW.',
-};
+const OFFLINE: Record<string, string> = {};
+
+function OutOfPaper() {
+  return (
+    <div className="shipped-out mx-auto mt-3 max-w-[260px] px-3 py-3 text-center text-[12px]" role="status">
+      <p className="text-[15px] font-semibold leading-tight tracking-[0.18em]">OUT OF PAPER</p>
+      <p className="mt-1 font-semibold tracking-[0.12em]">THAT’S IT FOR NOW</p>
+      <div className="mt-2 space-y-0.5 text-left">
+        <Line label="ROLLS LEFT" value="0" />
+        <Line label="RECEIPTS ALREADY OUT" value="STILL GOOD" />
+        <Line label="SHARING" value="STILL WORKS" />
+      </div>
+      <p className="mt-2 leading-snug text-[#1c1917]/70">The cashier went to find another roll. Check back later.</p>
+    </div>
+  );
+}
 
 const TICKER: Record<string, string> = {
   github: 'SEARCHING GITHUB…',
@@ -57,7 +70,7 @@ export function PrintYours({ ready = true }: { ready?: boolean }) {
   const busy = phase.name === 'looking' || phase.name === 'feeding';
 
   async function print(candidate: Candidate) {
-    if (!token) return setError('One second, checking you’re human…');
+    if (generator?.turnstileSiteKey && !token) return setError('One second, checking you’re human…');
     setError(null);
     setTorn(false);
     setPhase({ name: 'feeding', who: candidate.display });
@@ -79,8 +92,9 @@ export function PrintYours({ ready = true }: { ready?: boolean }) {
       refreshShippedState();
     } catch (failure) {
       const code = failure instanceof Error ? failure.message : 'jammed';
-      setError(ERRORS[code] ?? 'The printer jammed. Try again.');
+      setError(code === 'out-of-paper' ? null : ERRORS[code] ?? 'The printer jammed. Try again.');
       setPhase({ name: 'idle' });
+      if (code === 'out-of-paper') refreshShippedState();
     }
   }
 
@@ -126,7 +140,9 @@ export function PrintYours({ ready = true }: { ready?: boolean }) {
           <Rule />
         </div>
 
-        {generator && !generator.enabled ? (
+        {generator && !generator.enabled && generator.reason === 'out-of-paper' ? (
+          <OutOfPaper />
+        ) : generator && !generator.enabled ? (
           <p className="mt-3 text-center text-[12.5px] font-semibold tracking-[0.12em]" role="status">
             {OFFLINE[generator.reason ?? ''] ?? 'PRINTER OFFLINE. CHECK BACK SOON.'}
           </p>
@@ -159,7 +175,7 @@ export function PrintYours({ ready = true }: { ready?: boolean }) {
                 <ul className="mt-1.5 space-y-2">
                   {phase.candidates.map((candidate) => (
                     <li key={`${candidate.kind}:${candidate.id}`}>
-                      <button type="button" className="shipped-choice w-full text-left" onClick={() => print(candidate)} disabled={!token}>
+                      <button type="button" className="shipped-choice w-full text-left" onClick={() => print(candidate)} disabled={Boolean(generator?.turnstileSiteKey) && !token}>
                         <span className="block text-[13px] font-semibold tracking-[0.1em]">{candidate.kind === 'github' && candidate.display.startsWith('@') ? candidate.display : candidate.display.toUpperCase()}</span>
                         <span className="block text-[11.5px] opacity-75">{candidate.detail}</span>
                       </button>

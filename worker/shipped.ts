@@ -24,7 +24,8 @@ import { DEFAULT_MODEL, PrintError, assembleReceipt, demoReceipt, maxSearches, t
 import { ICON_HASH, bytesDataUri, iconDataUri, iconKey, storeIcon } from './shipped-icons';
 import { renderPng, yearCardPng, yearTallPng, type LogoResolver } from './shipped-og';
 import { isProduction, sponsorProvider, type PayEnv, type SponsorEvent } from './shipped-pay';
-import { clean, crawlerFor, faviconUrl, gather, githubUser, hostOf, searchGithubUsers, type SourceEnv } from './shipped-sources';
+import { clean, faviconUrl, gather, githubUser, hostOf, readSite, searchGithubUsers, type SourceEnv } from './shipped-sources';
+import { TINYFISH_DAILY, type TinyfishKind, type TinyfishMeter } from './shipped-tinyfish';
 import { receiptBarcodeUnits, receiptDate } from '../lib/shipped';
 import { supporterReceiptSvg } from '../lib/receipt-svg';
 import { money } from '../lib/shipped-receipt';
@@ -74,6 +75,20 @@ export interface ShippedEnv extends AiEnv, PayEnv, SourceEnv {
   SHIPPED_YEAR?: string;
 }
 
+/**
+ * Secret names as Bryton set them (claude_key, tinyfish), their uppercase GitHub forms, or the documented
+ * ones: whichever exists. Everything below reads ANTHROPIC_API_KEY and TINYFISH_API_KEY.
+ */
+export function withKeyAliases<T extends ShippedEnv>(env: T): T {
+  const raw = env as T & Record<string, unknown>;
+  const pick = (...names: string[]) => names.map((name) => raw[name]).find((value): value is string => typeof value === 'string' && value.trim() !== '');
+  const anthropic = pick('claude_key', 'CLAUDE_KEY', 'ANTHROPIC_API_KEY');
+  const tinyfish = pick('tinyfish', 'TINYFISH', 'TINYFISH_API_KEY');
+  if (anthropic === env.ANTHROPIC_API_KEY && tinyfish === env.TINYFISH_API_KEY) return env;
+  // A prototype link keeps every binding (DB, R2, ASSETS) reachable without copying them.
+  return Object.assign(Object.create(env) as T, { ANTHROPIC_API_KEY: anthropic, TINYFISH_API_KEY: tinyfish });
+}
+
 const HOUR = 3_600_000;
 const DAY = 86_400_000;
 const CACHE_DAYS = 7;
@@ -111,6 +126,10 @@ const SCHEMA = [
   'CREATE INDEX IF NOT EXISTS sponsor_lines_status ON sponsor_lines (status, tier)',
   'CREATE UNIQUE INDEX IF NOT EXISTS sponsor_lines_checkout ON sponsor_lines (checkout_id)',
   'CREATE INDEX IF NOT EXISTS sponsor_lines_order ON sponsor_lines (order_id)',
+  // Global switches, e.g. 'out-of-credit' (set when Anthropic says the prepaid credits are gone).
+  'CREATE TABLE IF NOT EXISTS shipped_flags (key TEXT PRIMARY KEY, value TEXT, set_at INTEGER NOT NULL)',
+  // TinyFish units used per UTC day, so we stay inside the free allowance.
+  'CREATE TABLE IF NOT EXISTS shipped_tinyfish (day TEXT NOT NULL, kind TEXT NOT NULL, n INTEGER NOT NULL DEFAULT 0, PRIMARY KEY (day, kind))',
 ];
 // Columns added after the tables first shipped; "duplicate column" means it's already there.
 const COLUMNS = [
@@ -179,9 +198,17 @@ function turnstileKeys(env: ShippedEnv): { site: string; secret: string; test: b
   return isProduction(env) ? null : { ...TEST_TURNSTILE, test: true };
 }
 
+let warnedTurnstile = false;
+
+/** Without Turnstile keys in production, printing relies on the per-IP limits and the daily spend cap. */
 async function verifyTurnstile(env: ShippedEnv, token: unknown, ip: string): Promise<boolean> {
   const keys = turnstileKeys(env);
-  if (!keys || typeof token !== 'string' || !token || token.length > 2048) return false;
+  if (!keys) {
+    if (!warnedTurnstile) console.warn('shipped: TURNSTILE_SITE_KEY / TURNSTILE_SECRET_KEY not set; relying on rate limits and the spend cap');
+    warnedTurnstile = true;
+    return true;
+  }
+  if (typeof token !== 'string' || !token || token.length > 2048) return false;
   const form = new FormData();
   form.set('secret', keys.secret);
   form.set('response', token);
@@ -229,9 +256,7 @@ type GeneratorState = { enabled: boolean; demo: boolean; reason: string | null; 
 function sourceNames(env: ShippedEnv): string[] {
   const names = ['github', 'appstore', 'hn', 'npm'];
   if (env.PRODUCTHUNT_TOKEN) names.push('producthunt');
-  const crawler = crawlerFor(env);
-  if (crawler) names.push(crawler.id);
-  if (env.ANTHROPIC_API_KEY && maxSearches(env)) names.push('web');
+  if (env.TINYFISH_API_KEY) names.push('tinyfish');
   return names;
 }
 
@@ -241,14 +266,47 @@ async function generatorState(env: ShippedEnv, db: D1Database | null): Promise<G
   const base = { turnstileSiteKey: keys?.site ?? null, year, sources: sourceNames(env) };
   const off = (reason: string): GeneratorState => ({ ...base, enabled: false, demo: false, reason });
   if (!db) return off('no-database');
-  if (!keys) return off('no-turnstile');
   const demo = !env.ANTHROPIC_API_KEY;
   if (demo && isProduction(env)) return off('no-ai');
   if (!demo) {
+    if (await outOfCredit(db)) return off('out-of-paper');
     const spend = await db.prepare('SELECT cost_micros FROM shipped_spend WHERE day = ?').bind(today()).first<{ cost_micros: number }>();
     if ((spend?.cost_micros ?? 0) >= capMicros(env)) return off('out-of-paper');
   }
   return { ...base, enabled: true, demo, reason: null };
+}
+
+// Out of Anthropic credit: the machine says OUT OF PAPER for everyone. After CREDIT_RECHECK one print may
+// try again (a failed call costs nothing); /admin's "Paper restocked" clears it at once.
+const CREDIT_RECHECK = 6 * HOUR;
+
+async function outOfCredit(db: D1Database): Promise<boolean> {
+  const flag = await db.prepare(`SELECT set_at FROM shipped_flags WHERE key = 'out-of-credit'`).first<{ set_at: number }>();
+  return Boolean(flag && Date.now() - flag.set_at < CREDIT_RECHECK);
+}
+
+const setOutOfCredit = (db: D1Database) =>
+  db.prepare(`INSERT INTO shipped_flags (key, value, set_at) VALUES ('out-of-credit', '1', ?) ON CONFLICT(key) DO UPDATE SET set_at = excluded.set_at`).bind(Date.now()).run();
+
+function tinyfishMeter(db: D1Database): TinyfishMeter {
+  return {
+    async take(kind: TinyfishKind, n: number) {
+      const row = await db
+        .prepare(
+          `INSERT INTO shipped_tinyfish (day, kind, n) VALUES (?, ?, ?)
+           ON CONFLICT(day, kind) DO UPDATE SET n = n + excluded.n RETURNING n`,
+        )
+        .bind(today(), kind, n)
+        .first<{ n: number }>();
+      return (row?.n ?? n) <= TINYFISH_DAILY[kind];
+    },
+    async exhausted(kind: TinyfishKind) {
+      await db
+        .prepare(`INSERT INTO shipped_tinyfish (day, kind, n) VALUES (?, ?, ?) ON CONFLICT(day, kind) DO UPDATE SET n = excluded.n`)
+        .bind(today(), kind, TINYFISH_DAILY[kind] + 1)
+        .run();
+    },
+  };
 }
 
 async function recordSpend(db: D1Database, ok: boolean, input: number, output: number, searches: number, cost: number) {
@@ -339,11 +397,14 @@ const PLAIN_HOSTS = new Set(['github.com', 'gist.github.com', 'npmjs.com', 'www.
 
 /** Each line's logo: its own icon if a source had one, else the favicon of its site. Slow ones are skipped. */
 async function withLogos(items: DraftItem[], env: ShippedEnv): Promise<YearItem[]> {
-  const late = new Promise<null>((resolve) => setTimeout(resolve, 6000, null));
+  const late = new Promise<null>((resolve) => setTimeout(resolve, 7000, null));
   return Promise.all(
     items.map(async (item) => {
       const host = hostOf(item.link);
-      const source = item.icon ?? (item.link && host && !PLAIN_HOSTS.has(host) ? faviconUrl(item.link) : null);
+      const own = !item.icon && item.link && host && !PLAIN_HOSTS.has(host);
+      // The page's apple-touch-icon or PNG icon beats the generic favicon service.
+      const page = own ? await Promise.race([readSite(item.link!).catch(() => null), late]) : null;
+      const source = item.icon ?? page?.icon ?? (own ? faviconUrl(item.link!) : null);
       const logo = source ? await Promise.race([storeIcon(source, env.SHIPPED).catch(() => null), late]) : null;
       return { name: item.name, description: item.description, date: item.date, status: item.status, link: item.link, logo, source: item.source };
     }),
@@ -368,26 +429,28 @@ async function print(request: Request, env: ShippedEnv, ctx: ExecutionContext): 
   const subject = readSubject(body.subject);
   if (!subject) return json({ error: 'invalid-query' }, 400);
 
-  const state = await generatorState(env, db);
-  if (!state.enabled || !db) return json({ error: state.reason ?? 'offline' }, 503);
+  if (!db) return json({ error: 'offline' }, 503);
   if (!(await verifyTurnstile(env, body.token, request.headers.get('cf-connecting-ip') ?? ''))) return json({ error: 'turnstile' }, 403);
   if (await limited(request, db, 'print', PRINT_LIMIT_PER_HOUR)) return json({ error: 'slow-down' }, 429);
   if (Math.random() < 0.02) ctx.waitUntil(db.prepare('DELETE FROM shipped_limits WHERE win < ?').bind(Math.floor(Date.now() / HOUR) - 48).run());
 
   const key = subjectKey(subject);
-  const year = state.year;
+  const year = yearOf(env);
   const mode = modeOf(year);
   if (await blocked(db, key)) return json({ error: 'taken-down' }, 410);
+  // Already printed this week: reprinted for free, even while the machine is out of paper.
   const cached = await db
     .prepare('SELECT id FROM shipped_receipts WHERE login_key = ? AND mode = ? AND demo = ? AND hidden = 0 AND created_at > ? ORDER BY id DESC LIMIT 1')
-    .bind(key, mode, state.demo ? 1 : 0, Date.now() - CACHE_DAYS * DAY)
+    .bind(key, mode, env.ANTHROPIC_API_KEY ? 0 : 1, Date.now() - CACHE_DAYS * DAY)
     .first<{ id: number }>();
   if (cached) return json({ id: cached.id, cached: true });
+  const state = await generatorState(env, db);
+  if (!state.enabled) return json({ error: state.reason ?? 'offline' }, 503);
 
   const seed = seedOf(key);
   const listed = body.listed === true;
   try {
-    const gathered = await gather(subject, env, year);
+    const gathered = await gather(subject, env, year, tinyfishMeter(db));
     if (subject.kind === 'github' && gathered.profile.name && !hasBlockedWord(gathered.profile.name)) subject.display = gathered.profile.name;
     let model: string | null = null;
     let usage = { input: 0, output: 0, searches: 0, cost: 0 };
@@ -403,6 +466,10 @@ async function print(request: Request, env: ShippedEnv, ctx: ExecutionContext): 
       } catch (error) {
         const spent = error as { costMicros?: number; inputTokens?: number; outputTokens?: number };
         ctx.waitUntil(recordSpend(db, false, spent.inputTokens ?? 0, spent.outputTokens ?? 0, 0, spent.costMicros ?? 0));
+        if (error instanceof PrintError && error.code === 'out-of-credit') {
+          await setOutOfCredit(db);
+          return json({ error: 'out-of-paper' }, 503);
+        }
         throw error;
       }
     }
@@ -909,6 +976,7 @@ async function sharePage(request: Request, env: ShippedEnv & { ASSETS: Fetcher }
 
 /** /shipped/r/<id>/, its og.png and receipt.png. Anything else under /shipped/r/ is the static shell. */
 export async function handleShippedPage(request: Request, env: ShippedEnv & { ASSETS: Fetcher }, ctx: ExecutionContext): Promise<Response> {
+  env = withKeyAliases(env);
   const url = new URL(request.url);
   const match = url.pathname.match(/^\/shipped\/r\/(\d{1,9})(\/(og\.png|receipt\.png)?)?$/);
   if (!match) return env.ASSETS.fetch(request);
@@ -920,6 +988,7 @@ export async function handleShippedPage(request: Request, env: ShippedEnv & { AS
 }
 
 export async function handleShipped(request: Request, env: ShippedEnv, ctx: ExecutionContext): Promise<Response | null> {
+  env = withKeyAliases(env);
   const url = new URL(request.url);
   const path = url.pathname;
   if (!path.startsWith('/api/shipped/')) return null;
@@ -960,6 +1029,7 @@ async function hideReceipts(db: D1Database, env: ShippedEnv, key: string) {
 }
 
 export async function adminShipped(request: Request, env: ShippedEnv): Promise<Response> {
+  env = withKeyAliases(env);
   const db = await database(env);
   if (!db) return json({ error: 'no-database' }, 503);
   const url = new URL(request.url);
@@ -994,6 +1064,11 @@ export async function adminShipped(request: Request, env: ShippedEnv): Promise<R
       await db.prepare('UPDATE shipped_takedowns SET status = ?, reviewed_at = ? WHERE id = ?').bind(removing ? 'removed' : 'dismissed', now, id).run();
       // Removing takes down every receipt for that name, handle or site, and stops new ones printing.
       if (removing) await hideReceipts(db, env, ask.subject_key);
+      return json({ ok: true });
+    }
+
+    if (body.action === 'restock') {
+      await db.prepare(`DELETE FROM shipped_flags WHERE key = 'out-of-credit'`).run();
       return json({ ok: true });
     }
 
@@ -1033,7 +1108,7 @@ export async function adminShipped(request: Request, env: ShippedEnv): Promise<R
 
   const since = new Date(Date.now() - 13 * DAY).toISOString().slice(0, 10);
   const month = new Date(Date.now() - 29 * DAY).toISOString().slice(0, 10);
-  const [pending, lines, receipts, spend, totals, takedowns, impressions] = await db.batch([
+  const [pending, lines, receipts, spend, totals, takedowns, impressions, credit, tinyfish] = await db.batch([
     db.prepare(`SELECT * FROM sponsor_lines WHERE status = 'paid_pending_review' ORDER BY paid_at`),
     db.prepare(`SELECT * FROM sponsor_lines WHERE status NOT IN ('checkout', 'paid_pending_review', 'failed') ORDER BY id DESC LIMIT 60`),
     db.prepare(
@@ -1049,6 +1124,8 @@ export async function adminShipped(request: Request, env: ShippedEnv): Promise<R
       `SELECT sponsor, SUM(CASE WHEN kind = 'card' THEN n ELSE 0 END) AS card, SUM(CASE WHEN kind = 'tall' THEN n ELSE 0 END) AS tall,
        SUM(CASE WHEN kind = 'page' THEN n ELSE 0 END) AS page FROM sponsor_impressions WHERE day >= ? GROUP BY sponsor ORDER BY SUM(n) DESC`,
     ).bind(month),
+    db.prepare(`SELECT set_at FROM shipped_flags WHERE key = 'out-of-credit'`),
+    db.prepare('SELECT kind, n FROM shipped_tinyfish WHERE day = ?').bind(today()),
   ]);
   const t = totals.results[0] as { printed: number; shared: number; views: number } | undefined;
   const lineText = new Map((lines.results as LineRow[]).map((line) => [`line:${line.id}`, `${line.text} (${SPONSOR_CONFIG.tiers[line.tier].label})`]));
@@ -1058,6 +1135,12 @@ export async function adminShipped(request: Request, env: ShippedEnv): Promise<R
     generator: await generatorState(env, db),
     model: env.SHIPPED_MODEL || DEFAULT_MODEL,
     maxSearches: maxSearches(env),
+    outOfCreditAt: (credit.results[0] as { set_at: number } | undefined)?.set_at ?? null,
+    tinyfish: {
+      enabled: Boolean(env.TINYFISH_API_KEY),
+      today: Object.fromEntries((tinyfish.results as { kind: string; n: number }[]).map((row) => [row.kind, row.n])),
+      daily: TINYFISH_DAILY,
+    },
     capUsd: capMicros(env) / 1_000_000,
     printed: t?.printed ?? 0,
     shared: t?.shared ?? 0,

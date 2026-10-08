@@ -224,13 +224,13 @@ function stripeProvider(env: PayEnv, live: boolean): SponsorProvider {
   };
 }
 
-/** Live keys only in production, test keys everywhere else: staging can never charge a real card. */
+/** The store's own key in each environment. Production must be live; staging takes whichever the store has. */
 function stripeMode(env: PayEnv): 'live' | 'test' | null {
   const key = env.STRIPE_SECRET_KEY ?? '';
   const live = /^(sk|rk)_live_/.test(key);
   const test = /^(sk|rk)_test_/.test(key);
   if (isProduction(env)) return live ? 'live' : null;
-  return test ? 'test' : null;
+  return test ? 'test' : live ? 'live' : null;
 }
 
 /** The configured provider, or null when sponsor checkout is closed. */

@@ -47,6 +47,8 @@ type Data = {
   model: string;
   maxSearches: number;
   capUsd: number;
+  outOfCreditAt: number | null;
+  tinyfish: { enabled: boolean; today: Record<string, number>; daily: { search: number; fetch: number } };
   printed: number;
   shared: number;
   views: number;
@@ -62,9 +64,8 @@ const usd = (micros: number) => `$${(micros / 1_000_000).toFixed(micros < 10_000
 const when = (ms: number | null) => (ms ? new Date(ms).toLocaleString(undefined, { month: 'short', day: 'numeric', hour: 'numeric', minute: '2-digit' }) : '—');
 
 const REASONS: Record<string, string> = {
-  'no-ai': 'off: add the ANTHROPIC_API_KEY secret',
-  'no-turnstile': 'off: add the TURNSTILE_SITE_KEY and TURNSTILE_SECRET_KEY secrets',
-  'out-of-paper': 'paused: today’s AI budget is used up',
+  'no-ai': 'off: add the claude_key secret',
+  'out-of-paper': 'paused: out of paper (daily budget used up, or the Anthropic credits ran out)',
   'no-database': 'off: no database',
 };
 
@@ -151,13 +152,26 @@ export function ShippedCard({ password }: { password: string }) {
     <section className="rounded-[20px] bg-[#1a1a1c] p-5 ring-1 ring-inset ring-white/[0.06]">
       <h2 className="text-[17px] font-semibold tracking-[-0.01em]">Shipped</h2>
       <p className="mt-0.5 text-[13px] text-white/45">
-        Shipped receipts: {generator} · up to {data.maxSearches} web searches each · {data.printed.toLocaleString()} printed ·{' '}
+        Shipped receipts: {generator} · paid web search only when free sources find under 2 (max {data.maxSearches}) · {data.printed.toLocaleString()} printed ·{' '}
         {data.shared.toLocaleString()} shared · {data.views.toLocaleString()} page views · today {usd(today?.cost_micros ?? 0)} of $
         {data.capUsd.toFixed(2)}
         {today?.receipts ? ` (${usd(Math.round(today.cost_micros / today.receipts))} a receipt)` : ''}
         <br />
+        TinyFish (free Search + Fetch only):{' '}
+        {data.tinyfish.enabled
+          ? `${data.tinyfish.today.search ?? 0}/${data.tinyfish.daily.search} searches, ${data.tinyfish.today.fetch ?? 0}/${data.tinyfish.daily.fetch} pages today`
+          : 'off (no tinyfish secret)'}
+        <br />
         Sponsor checkout: {data.provider ? `${data.provider.id}${data.provider.live ? '' : ' (test, no real money)'}` : 'closed (no payment provider)'}
       </p>
+      {data.outOfCreditAt ? (
+        <div className="mt-3 flex flex-wrap items-center justify-between gap-2 rounded-[10px] bg-[#ff9f0a]/15 px-3 py-2 text-[13px] text-[#ffb340]">
+          <span>Out of paper since {when(data.outOfCreditAt)}: Anthropic said the credits ran out. Top up, then restock.</span>
+          <button type="button" className="rounded-full bg-white/10 px-3 py-1 font-semibold text-white" onClick={() => act('restock', 0)} disabled={busy === 0}>
+            Paper restocked
+          </button>
+        </div>
+      ) : null}
       {message ? (
         <p className="mt-3 rounded-[10px] bg-[#ff453a]/15 px-3 py-2 text-[13px] text-[#ff6961]" role="alert">
           {message}

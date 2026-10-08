@@ -17,6 +17,7 @@ type Line = {
   roll: number;
   line_no: number | null;
   amount_cents: number;
+  total_cents?: number | null;
   provider: string;
   note: string | null;
   paid_at: number | null;
@@ -172,7 +173,7 @@ export function ShippedCard({ password }: { password: string }) {
                 <button
                   type="button"
                   disabled={busy === line.id}
-                  onClick={() => window.confirm(`Reject “${line.text}” and refund ${money(line.amount_cents)}?`) && act('reject', line.id)}
+                  onClick={() => window.confirm(`Reject “${line.text}” and refund ${money(line.total_cents ?? line.amount_cents)} (in full, tax included)?`) && act('reject', line.id)}
                   className="h-9 rounded-full bg-white/[0.08] px-4 text-[13px] font-semibold text-white/80 hover:bg-white/[0.12] disabled:opacity-50"
                 >
                   Reject and refund

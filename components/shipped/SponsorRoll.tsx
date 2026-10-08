@@ -46,10 +46,10 @@ export function SponsorRoll() {
   const archived = (state.sponsors.archived ?? []).map((n) => ({ roll: n, lines: state.lines.filter((line) => line.roll === n) }));
 
   return (
-    <section aria-label="Sponsor lines" className="mt-1">
+    <section aria-label="Supporter shout-outs" className="mt-1">
       <Rule />
       <p className="shipped-lead mt-2 text-[10px] tracking-[0.16em] text-[#1c1917]/55">
-        <span>SPONSOR LINES · ROLL {pad(roll)}</span>
+        <span>SUPPORTER SHOUT-OUTS · ROLL {pad(roll)}</span>
         <span className="shipped-lead-fill" aria-hidden="true" />
         <span>
           {state.sponsors.filled ?? current.length}/{state.sponsors.rollSize ?? SPONSOR_CONFIG.rollSize}

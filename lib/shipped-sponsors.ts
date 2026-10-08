@@ -1,5 +1,6 @@
-// Sponsor lines on /shipped/: a buyer pays for a printed line or placement, Bryton approves it in
-// /admin, and only then does it print. Prices, roll size and slots are all set here.
+// Supporter shout-outs on /shipped/: a buyer pays (Stripe, tax added at checkout) for a shout-out printed
+// on the receipt plus a downloadable receipt image, Bryton approves it in /admin, and only then does it print.
+// No traffic or impressions are promised. Prices, roll size and slots are all set here.
 
 export type SponsorTier = 'name' | 'logo' | 'header';
 
@@ -31,7 +32,7 @@ export const SPONSOR_CONFIG = {
       maxText: 32,
       url: false,
       logo: false,
-      blurb: 'A numbered line with your name, printed on the master receipt.',
+      blurb: 'Your name as a numbered shout-out line on the master receipt.',
     },
     logo: {
       label: 'LOGO LINE',
@@ -39,7 +40,7 @@ export const SPONSOR_CONFIG = {
       maxText: 32,
       url: true,
       logo: true,
-      blurb: 'Your logo in 1-bit thermal print with a link, plus a spot in the "paid for by" rotation on printed receipts.',
+      blurb: 'Your logo in 1-bit thermal print with a link, plus turns in the "paid for by" rotation on printed receipts.',
     },
     header: {
       label: 'HEADER',
@@ -47,7 +48,7 @@ export const SPONSOR_CONFIG = {
       maxText: 28,
       url: true,
       logo: false,
-      blurb: '"Sponsored by" at the top of every printed receipt for 7 days. 5 slots at a time.',
+      blurb: 'Your name under "Supported by" at the top of printed receipts for 7 days. 5 slots at a time.',
     },
   } satisfies Record<SponsorTier, TierConfig>,
 };

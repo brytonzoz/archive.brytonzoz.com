@@ -12,7 +12,7 @@ import { Turnstile, type TurnstileHandle } from './Turnstile';
 const TEXT_LABEL: Record<SponsorTier, string> = {
   name: 'NAME ON THE LINE',
   logo: 'NAME BESIDE THE LOGO',
-  header: 'SPONSORED BY',
+  header: 'SUPPORTED BY',
 };
 
 const ERRORS: Record<string, string> = {
@@ -23,6 +23,17 @@ const ERRORS: Record<string, string> = {
 };
 
 const pad = (n: number) => String(n).padStart(3, '0');
+
+type Bought = { status: string; text: string; totalCents: number | null; taxCents: number | null; receipt: string | null };
+
+const BOUGHT: Record<string, string> = {
+  pending: 'PAID. Your shout-out prints as soon as Bryton approves it. If it isn’t approved, you’re refunded in full automatically.',
+  printed: 'PAID AND PRINTED. Your shout-out is on the receipt.',
+  unpaid: 'Checkout didn’t finish, so nothing was charged.',
+  closed: 'That checkout closed before it was paid. Nothing was charged.',
+  refunded: 'This shout-out was refunded.',
+  refunding: 'This shout-out is being refunded.',
+};
 
 export function SponsorDesk() {
   const state = useShippedState();
@@ -35,13 +46,25 @@ export function SponsorDesk() {
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [notice, setNotice] = useState<string | null>(null);
+  const [bought, setBought] = useState<Bought | null>(null);
   const turnstile = useRef<TurnstileHandle>(null);
 
   useEffect(() => {
-    const result = new URLSearchParams(window.location.search).get('sponsor');
-    if (result === 'paid') setNotice('PAID. Your line prints as soon as Bryton approves it. If it isn’t approved, you’re refunded in full automatically.');
+    const query = new URLSearchParams(window.location.search);
+    const result = query.get('sponsor');
+    const checkout = query.get('checkout');
     if (result === 'cancelled') setNotice('Checkout cancelled. Nothing was charged.');
-    if (result) refreshShippedState();
+    if (result === 'paid' && checkout) {
+      setNotice('Checking your payment…');
+      fetch(`/api/shipped/sponsor/status?checkout=${encodeURIComponent(checkout)}`)
+        .then((response) => (response.ok ? (response.json() as Promise<Bought>) : null))
+        .then((line) => {
+          setBought(line);
+          setNotice(line ? (BOUGHT[line.status] ?? BOUGHT.closed) : 'Couldn’t find that checkout. If you paid, email the address on the refund policy.');
+          refreshShippedState();
+        })
+        .catch(() => setNotice('Couldn’t check your payment. Reload to try again.'));
+    } else if (result) refreshShippedState();
   }, []);
 
   useEffect(() => () => {
@@ -95,12 +118,12 @@ export function SponsorDesk() {
   }
 
   return (
-    <Ticket id="sponsor" label="Sponsor a line">
+    <Ticket id="sponsor" label="Buy a supporter shout-out">
       <header className="text-center">
-        <p className="text-[11px] font-semibold tracking-[0.32em] text-[#1c1917]/70">SPONSOR DESK</p>
-        <h2 className="mt-2 text-[20px] font-semibold leading-none tracking-[0.2em]">BUY A LINE</h2>
+        <p className="text-[11px] font-semibold tracking-[0.32em] text-[#1c1917]/70">SUPPORTER DESK</p>
+        <h2 className="mt-2 text-[20px] font-semibold leading-none tracking-[0.2em]">BUY A SHOUT-OUT</h2>
         <p className="mt-2 text-[12px] leading-relaxed text-[#1c1917]/75">
-          A printed line on this receipt, or a placement on every receipt people print here.
+          A supporter shout-out printed on the receipt, plus a downloadable receipt image.
         </p>
       </header>
       <div className="mt-3 space-y-1 text-[12px]">
@@ -112,9 +135,24 @@ export function SponsorDesk() {
       </div>
 
       {notice ? (
-        <p className="mt-3 border border-dashed border-[#1c1917]/50 p-2.5 text-[12px] font-semibold leading-relaxed" role="status">
-          {notice}
-        </p>
+        <div className="mt-3 border border-dashed border-[#1c1917]/50 p-2.5 text-[12px] leading-relaxed" role="status">
+          <p className="font-semibold">{notice}</p>
+          {bought?.receipt ? (
+            <>
+              {bought.totalCents !== null ? (
+                <p className="mt-1 opacity-75">
+                  Paid {money(bought.totalCents)}
+                  {bought.taxCents ? `, including ${money(bought.taxCents)} tax` : ''}. Stripe emails the payment receipt.
+                </p>
+              ) : null}
+              {/* eslint-disable-next-line @next/next/no-img-element */}
+              <img src={bought.receipt} alt={`Your supporter receipt for “${bought.text}”`} className="mx-auto mt-2 w-full max-w-[240px]" />
+              <a href={bought.receipt} download="shipped-supporter-receipt.png" className="shipped-button mt-2 block w-full text-center">
+                DOWNLOAD YOUR RECEIPT
+              </a>
+            </>
+          ) : null}
+        </div>
       ) : null}
 
       <form className="mt-3 space-y-3" onSubmit={submit} noValidate>
@@ -201,20 +239,28 @@ export function SponsorDesk() {
                 {error}
               </p>
             ) : null}
+            {sponsors?.taxAtCheckout ? (
+              <p className="text-center text-[11px] text-[#1c1917]/65">Plus sales tax where it applies, worked out at checkout. Paid securely with Stripe.</p>
+            ) : null}
+            {sponsors?.provider === 'stripe' && !sponsors.live ? (
+              <p className="text-center text-[11px] text-[#1c1917]/65">Stripe test mode: use card 4242 4242 4242 4242. No real money moves.</p>
+            ) : null}
             {sponsors?.provider === 'sandbox' ? (
               <p className="text-center text-[11px] text-[#1c1917]/65">Staging sandbox: checkout is a test page and no money moves.</p>
             ) : null}
           </>
         ) : (
           <p className="text-center text-[12.5px] font-semibold tracking-[0.12em]" role="status">
-            {state === undefined ? '' : 'SPONSOR LINES OPEN SOON.'}
+            {state === undefined ? '' : 'SHOUT-OUTS OPEN SOON.'}
           </p>
         )}
       </form>
 
       <p className="mt-4 text-center text-[10.5px] leading-relaxed text-[#1c1917]/60">
-        You’re buying a printed line or placement, not a donation. Nothing prints until Bryton approves it; if it isn’t approved
-        you’re refunded automatically. Prices step up with every roll of {SPONSOR_CONFIG.rollSize}.{' '}
+        You’re buying a supporter shout-out printed on the receipt plus a downloadable receipt image. It isn’t a donation or
+        advertising: no traffic, clicks or impressions are promised, and links are marked sponsored. Nothing prints until Bryton
+        approves it; if it isn’t approved you’re refunded in full automatically. Prices step up with every roll of{' '}
+        {SPONSOR_CONFIG.rollSize}.{' '}
         <Link href="/shipped/refunds/" className="shipped-link">
           Refund policy
         </Link>

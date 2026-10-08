@@ -40,7 +40,7 @@ function Body({ receipt, sponsors }: Loaded) {
     <article>
       {sponsors.header.length ? (
         <div className="mb-3 text-center text-[11px] leading-relaxed tracking-[0.14em]">
-          <p className="text-[#1c1917]/60">SPONSORED BY</p>
+          <p className="text-[#1c1917]/60">SUPPORTED BY</p>
           <p className="font-semibold">
             {sponsors.header.map((sponsor, i) => (
               <React.Fragment key={sponsor.id}>

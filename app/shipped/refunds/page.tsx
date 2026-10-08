@@ -9,8 +9,8 @@ import { SPONSOR_CONFIG, SPONSOR_TIERS } from '../../../lib/shipped-sponsors';
 export const dynamic = 'force-static';
 
 export const metadata: Metadata = {
-  title: { absolute: 'Refund policy: sponsor lines | Shipped' },
-  description: 'How refunds work for sponsor lines on brytonzoz.com/shipped.',
+  title: { absolute: 'Refund policy: supporter shout-outs | Shipped' },
+  description: 'How refunds work for supporter shout-outs on brytonzoz.com/shipped.',
 };
 
 function Section({ title, children }: { title: string; children: React.ReactNode }) {
@@ -27,7 +27,7 @@ export default function RefundsPage() {
     <Ticket label="Refund policy">
       <article>
         <header className="text-center">
-          <p className="text-[11px] font-semibold tracking-[0.32em] text-[#1c1917]/70">SPONSOR LINES</p>
+          <p className="text-[11px] font-semibold tracking-[0.32em] text-[#1c1917]/70">SUPPORTER SHOUT-OUTS</p>
           <h1 className="mt-2 text-[20px] font-semibold tracking-[0.2em]">REFUND POLICY</h1>
         </header>
         <div className="mt-3">
@@ -36,8 +36,9 @@ export default function RefundsPage() {
 
         <Section title="WHAT YOU’RE BUYING">
           <p>
-            A printed line or placement on brytonzoz.com/shipped. It isn’t a donation, there’s no goal it funds, and there are no
-            prizes. Roll 1 prices:
+            A supporter shout-out printed on the receipt at brytonzoz.com/shipped, plus a downloadable image of your supporter
+            receipt. It isn’t a donation or advertising: no traffic, clicks, impressions or search ranking are promised, and links are
+            marked sponsored. There’s no goal it funds and there are no prizes. Roll 1 prices, before tax:
           </p>
           <div className="space-y-1">
             {SPONSOR_TIERS.map((tier) => (
@@ -52,8 +53,9 @@ export default function RefundsPage() {
 
         <Section title="REVIEW FIRST">
           <p>
-            Every line is reviewed by hand before it prints. If it isn’t approved, you’re refunded in full automatically to the way you
-            paid. Nothing shows on the site until it’s approved.
+            Every shout-out is reviewed by hand before it prints. If it isn’t approved, you’re refunded in full (tax included)
+            automatically to the way you paid. Nothing shows on the site until it’s approved, and a refunded shout-out comes off the
+            receipt.
           </p>
         </Section>
 
@@ -66,7 +68,11 @@ export default function RefundsPage() {
         </Section>
 
         <Section title="PAYMENTS">
-          <p>Payments, sales tax and receipts are handled by the payment provider shown at checkout.</p>
+          <p>
+            Payments are one-time (no subscription) and handled by Stripe. Sales tax is worked out by Stripe at checkout from your
+            billing address and added where it applies. Stripe emails the payment receipt; your supporter receipt image is on the page
+            you land on after paying.
+          </p>
         </Section>
 
         <Section title="QUESTIONS">

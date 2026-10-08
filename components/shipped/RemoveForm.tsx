@@ -27,7 +27,7 @@ export function RemoveForm() {
   async function submit(event: React.FormEvent) {
     event.preventDefault();
     if (!id) return;
-    if (!token) return setError('One second, checking you’re human…');
+    if (state?.generator.turnstileSiteKey && !token) return setError('One second, checking you’re human…');
     setBusy(true);
     setError(null);
     const response = await fetch('/api/shipped/takedown', {

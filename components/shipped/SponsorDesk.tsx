@@ -93,14 +93,14 @@ export function SponsorDesk() {
     const check = validateSponsor({ tier, text, url: offer.url ? url : null });
     if (!check.ok) return setError(check.error);
     if (offer.logo && !logo) return setError('Add a logo.');
-    if (!token) return setError('One second, checking you’re human…');
+    if (state?.generator.turnstileSiteKey && !token) return setError('One second, checking you’re human…');
     setBusy(true);
     const form = new FormData();
     form.set('tier', tier);
     form.set('text', check.text);
     if (check.url) form.set('url', check.url);
     if (offer.logo && logo) form.set('logo', logo.blob, 'logo.png');
-    form.set('token', token);
+    form.set('token', token ?? '');
     try {
       const response = await fetch('/api/shipped/sponsor', { method: 'POST', body: form });
       const result = (await response.json().catch(() => ({}))) as { url?: string; error?: string; message?: string };

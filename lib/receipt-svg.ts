@@ -80,51 +80,60 @@ function paper(height: number, body: string, transform: string, open = false) {
 
 export type MasterOg = {
   date: string;
-  items: { name: string; status: string; years: string }[];
-  totals: OgLine[];
-  totalLive: number;
-  barcode: number[];
+  items: number;
+  /** "2020–2026" */
+  span: string | null;
+  counts: OgLine[];
+  groups: { label: string; items: { name: string; status: string }[] }[];
 };
 
-/** The /shipped/ card: Bryton's own receipt, centered. */
-export function masterReceiptSvg(data: MasterOg): string {
+function yearDivider(y: number, label: string) {
   const c = PAPER_W / 2;
-  let y = 36;
-  const parts: string[] = [
-    txt(c, y, 'STORE RECEIPT', 11, { weight: 600, anchor: 'middle', spacing: 4.5 }),
-    txt(c, y + 26, 'BRYTON ZOZ', 17, { weight: 600, anchor: 'middle', spacing: 3.2 }),
-    txt(c, y + 46, 'NEW YORK · ARTIST / BUILDER', 11, { anchor: 'middle', spacing: 1.8 }),
-    txt(c, y + 82, 'SHIPPED', 30, { weight: 600, anchor: 'middle', spacing: 7 }),
+  const half = (charW(12, 3.6) * label.length) / 2 + 12;
+  return [
+    `<line x1="28" y1="${y - 4}" x2="${c - half}" y2="${y - 4}" stroke="${INK}" stroke-width="1" stroke-dasharray="3 3" opacity="0.55"/>`,
+    txt(c, y, label, 12, { weight: 600, anchor: 'middle', spacing: 3.6 }),
+    `<line x1="${c + half}" y1="${y - 4}" x2="${PAPER_W - 28}" y2="${y - 4}" stroke="${INK}" stroke-width="1" stroke-dasharray="3 3" opacity="0.55"/>`,
+  ].join('');
+}
+
+/** The /shipped/ card: the totals on the left, Bryton's receipt running off the bottom on the right. */
+export function masterReceiptSvg(data: MasterOg): string {
+  const left: string[] = [
+    txt(72, 112, 'BRYTON ZOZ', 22, { weight: 600, spacing: 5, fill: PAPER, opacity: 0.7 }),
+    txt(72, 196, 'SHIPPED.', 76, { weight: 600, spacing: 4, fill: PAPER }),
+    txt(72, 246, `${data.items} ITEMS${data.span ? ` · ${data.span}` : ''}`, 26, { weight: 500, spacing: 2, fill: PAPER, opacity: 0.85 }),
   ];
-  y = 136;
-  parts.push(leader(y, 'DATE', data.date, 12), leader(y + 20, 'ORDER', '#BZ-SHIPPED', 12), rule(y + 36));
-  y = 188;
-  const rowSize = data.items.length > 9 ? 12 : 14;
-  for (const item of data.items.slice(0, 12)) {
-    parts.push(leader(y, `${item.years} ${item.name.toUpperCase()}`, item.status, rowSize));
-    y += rowSize + 10;
+  let y = 318;
+  for (const line of data.counts) {
+    left.push(txt(72, y, line.value.padStart(2, ' '), 30, { weight: 600, fill: PAPER }), txt(132, y, line.label, 24, { spacing: 2, fill: PAPER, opacity: 0.85 }));
+    y += 44;
   }
-  if (data.items.length > 12) {
-    parts.push(txt(28, y, `+ ${data.items.length - 12} MORE`, 12, { opacity: 0.7 }));
-    y += 22;
+  left.push(txt(72, 586, 'BRYTONZOZ.COM/SHIPPED', 18, { spacing: 1.5, fill: PAPER, opacity: 0.6 }));
+
+  const c = PAPER_W / 2;
+  const body: string[] = [
+    txt(c, 40, 'STORE RECEIPT', 11, { weight: 600, anchor: 'middle', spacing: 4.5 }),
+    txt(c, 66, 'BRYTON ZOZ', 17, { weight: 600, anchor: 'middle', spacing: 3.2 }),
+    txt(c, 100, 'SHIPPED', 26, { weight: 600, anchor: 'middle', spacing: 6 }),
+    leader(132, 'DATE', data.date, 12),
+    leader(152, 'ITEMS', String(data.items), 12),
+    rule(168),
+  ];
+  let py = 196;
+  // Fill the paper and let the rest run off the card, like a receipt still printing.
+  for (const group of data.groups) {
+    if (py > 660) break;
+    body.push(yearDivider(py, group.label));
+    py += 24;
+    for (const item of group.items) {
+      if (py > 660) break;
+      body.push(leader(py, item.name.toUpperCase(), item.status, 12));
+      py += 20;
+    }
+    py += 6;
   }
-  parts.push(rule(y + 6));
-  y += 28;
-  for (const line of data.totals) {
-    parts.push(leader(y, line.label, line.value, 13));
-    y += 20;
-  }
-  parts.push(rule(y - 4, true), leader(y + 22, 'TOTAL LIVE', String(data.totalLive), 16), rule(y + 36, true));
-  y += 64;
-  parts.push(
-    txt(c, y, 'THANK YOU FOR LOOKING', 12, { anchor: 'middle', spacing: 3.2 }),
-    barcode(64, y + 14, 272, 38, data.barcode),
-    txt(c, y + 70, 'BRYTONZOZ/SHIPPED', 10, { anchor: 'middle', spacing: 3.4 }),
-  );
-  const height = y + 84;
-  // Taller than the card: let it run off the bottom like a receipt still printing.
-  const open = height > 600;
-  return frame(paper(open ? 640 : height, parts.join(''), `translate(400 ${open ? 14 : Math.round((630 - height) / 2)}) rotate(-1.15 200 ${Math.min(height, 630) / 2})`, open));
+  return frame(`${left.join('')}${paper(680, body.join(''), 'translate(724 22) rotate(1.4 200 330)', true)}`);
 }
 
 export type PrintedOg = {

@@ -1,47 +1,72 @@
 import assert from 'node:assert/strict';
 import { test } from 'node:test';
-import { SHIPPED_ITEMS, SHIPPED_STATUSES, chronological, shippedCounts, yearSpan } from '../lib/shipped.ts';
+import fs from 'node:fs';
+import { SHIPPED_STATUSES, shippedCounts, toItems, yearGroups } from '../lib/shipped.ts';
 import { GITHUB_USERNAME, chargesTotal, printedCounts } from '../lib/shipped-receipt.ts';
 import { checkSponsorUrl, hasBlockedWord, priceCents, validateSponsor } from '../lib/shipped-sponsors.ts';
 
-test('shipped receipt counts only real line items', () => {
-  const counts = shippedCounts();
-  assert.equal(counts.items, SHIPPED_ITEMS.length);
+const read = (file) => JSON.parse(fs.readFileSync(new URL(file, import.meta.url), 'utf8'));
+const DATA = read('../data/shipped/businesses.json');
+const LOGOS = read('../lib/shipped-logos.json');
+const ITEMS = toItems(DATA, LOGOS);
+
+test('the master receipt prints every entry in the data, in its order', () => {
+  assert.equal(ITEMS.length, DATA.meta.count);
+  assert.equal(ITEMS.length, 35);
+  assert.deepEqual(ITEMS.map((item) => item.name), DATA.entries.map((entry) => entry.name));
+  assert.equal(new Set(ITEMS.map((item) => item.name)).size, ITEMS.length, 'names are unique (React keys)');
+  const years = ITEMS.map((item) => item.start);
+  const dated = years.filter((year) => year !== null);
+  assert.deepEqual(dated, [...dated].sort((a, b) => a - b), 'timeline order');
+  assert.ok(years.indexOf(null) === -1 || years.slice(years.indexOf(null)).every((year) => year === null), 'undated entries print last');
+});
+
+test('statuses match the data and the totals add up', () => {
+  assert.deepEqual([...DATA.meta.statuses].sort(), [...SHIPPED_STATUSES].sort());
+  const counts = shippedCounts(ITEMS);
   assert.equal(Object.values(counts.byStatus).reduce((a, b) => a + b, 0), counts.items);
-  assert.equal(counts.live, 5);
-  assert.equal(counts.byStatus.PROTOTYPE, 2);
+  assert.deepEqual(
+    { live: counts.byStatus.LIVE, active: counts.byStatus.ACTIVE, prototype: counts.byStatus.PROTOTYPE, hiatus: counts.byStatus.HIATUS, deceased: counts.byStatus.DECEASED },
+    { live: 7, active: 5, prototype: 8, hiatus: 2, deceased: 13 },
+  );
+  assert.equal(counts.running, 12);
+  assert.equal(counts.first, 2020);
+  assert.equal(counts.last, 2026);
+  assert.throws(() => toItems({ meta: DATA.meta, entries: [{ ...DATA.entries[0], status: 'RIP' }] }, LOGOS));
 });
 
-test('every item has a known status and a sane year span', () => {
-  for (const item of SHIPPED_ITEMS) {
-    assert.ok(SHIPPED_STATUSES.includes(item.status), item.name);
-    assert.ok(item.start >= 2000 && item.start <= 2100, item.name);
-    if (item.end !== undefined) assert.ok(item.end >= item.start, item.name);
+test('year dividers run 2020 to 2026, then UNDATED', () => {
+  const groups = yearGroups(ITEMS);
+  assert.deepEqual(groups.map((group) => group.label), ['2020', '2021', '2022', '2023', '2024', '2025', '2026', 'UNDATED']);
+  assert.equal(groups.reduce((sum, group) => sum + group.items.length, 0), ITEMS.length);
+});
+
+test('links only where the data has a url, never for DECEASED, never GitHub', () => {
+  DATA.entries.forEach((entry, index) => {
+    const item = ITEMS[index];
+    if (entry.status === 'DECEASED') {
+      assert.equal(item.link, null, entry.name);
+      assert.equal(item.appStore, null, entry.name);
+    } else {
+      assert.equal(Boolean(item.link), Boolean(entry.url), entry.name);
+    }
+    for (const href of [item.link?.href, item.appStore].filter(Boolean)) assert.equal(href.includes('github.com'), false, entry.name);
+  });
+  const site = ITEMS.find((item) => item.name === 'brytonzoz.com');
+  assert.deepEqual(site.link, { href: '/', internal: true });
+  assert.deepEqual(ITEMS.find((item) => item.name === 'NONPARALLEL v3').link, { href: '/nonparallel/', internal: true });
+});
+
+test('every logo in the data has a small dithered print in public/shipped/logos', () => {
+  for (const entry of DATA.entries.filter((e) => e.logo)) {
+    const logo = LOGOS[entry.logo];
+    assert.ok(logo, entry.logo);
+    assert.match(logo.src, /^\/shipped\/logos\/[a-z0-9-]+\.png$/);
+    const file = new URL(`../public${logo.src}`, import.meta.url);
+    assert.ok(fs.statSync(file).size < 4096, `${logo.src} stays tiny`);
+    assert.ok(logo.width <= 72 && logo.height <= 28, logo.src);
   }
-  assert.equal(yearSpan({ start: 2019, end: 2022 }), '2019–2022');
-  assert.equal(yearSpan({ start: 2024, end: 2024 }), '2024');
-  assert.equal(yearSpan({ start: 2025 }), '2025–');
-});
-
-test('the master receipt is chronological', () => {
-  const years = chronological().map((item) => item.start);
-  assert.deepEqual(years, [...years].sort((a, b) => a - b));
-});
-
-test('prototypes have no live links and are flagged for Bryton to confirm', () => {
-  const prototypes = SHIPPED_ITEMS.filter((item) => item.status === 'PROTOTYPE');
-  assert.deepEqual(prototypes.map((item) => item.name).sort(), ['LiveCaps', 'WellnessBuddy']);
-  for (const item of prototypes) {
-    assert.equal(item.links?.length ?? 0, 0);
-    assert.equal(item.confirmStatus, true);
-  }
-});
-
-test('live products point at public URLs, not GitHub', () => {
-  for (const item of SHIPPED_ITEMS.filter((entry) => entry.status === 'LIVE')) {
-    assert.ok(item.links?.length, `${item.name} needs a live link`);
-    for (const link of item.links) assert.equal(link.href.includes('github.com'), false, `${item.name} must not link GitHub`);
-  }
+  assert.equal(ITEMS.filter((item) => item.logo).length, 15);
 });
 
 test('GitHub usernames follow GitHub rules', () => {

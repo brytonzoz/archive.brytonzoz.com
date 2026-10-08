@@ -9,7 +9,7 @@ export const dynamic = 'force-static';
 
 const TITLE = 'Shipped';
 const DESCRIPTION =
-  'Receipts for software Bryton Zoz actually shipped: live apps and sites, App Store ratings, and the stack behind them.';
+  'Every business, app and site Bryton Zoz has started since 2020, itemized on one receipt: what is live, what is a prototype, and what died.';
 
 export const metadata: Metadata = {
   title: { absolute: `${TITLE} — Bryton Zoz` },
@@ -37,7 +37,7 @@ export const metadata: Metadata = {
         url: SHIPPED_OG_IMAGE,
         width: 1200,
         height: 630,
-        alt: 'A printed receipt listing software Bryton Zoz has shipped',
+        alt: 'A long printed receipt itemizing every business and app Bryton Zoz has started, by year',
       },
     ],
   },

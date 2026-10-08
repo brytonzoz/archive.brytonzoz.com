@@ -205,6 +205,24 @@
   height: auto;
 }
 
+/* Master-receipt logos are drawn at 2×; fixed size from lib/shipped-logos.json so nothing shifts. */
+.shipped-item-logo {
+  display: block;
+  max-width: 100%;
+}
+
+.shipped-year {
+  display: flex;
+  align-items: center;
+  gap: 0.6rem;
+  padding: 0.35rem 0 0.15rem;
+}
+
+.shipped-year-rule {
+  flex: 1 1 auto;
+  border-top: 1px dashed rgba(28, 25, 23, 0.5);
+}
+
 @media (prefers-reduced-motion: reduce) {
   .shipped-choice,
   .shipped-button {

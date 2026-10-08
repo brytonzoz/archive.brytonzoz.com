@@ -3,86 +3,86 @@ import Link from 'next/link';
 import {
   SHIPPED_BARCODE_VALUE,
   SHIPPED_STATUSES,
-  chronological,
   receiptDate,
   shippedCounts,
-  statusLabel,
-  yearSpan,
+  yearGroups,
   type ShippedItem,
 } from '../../lib/shipped';
+import { SHIPPED_ITEMS, SHIPPED_UPDATED } from '../../lib/shipped-data';
 import { Barcode, ExternalLink, Line, Rule, Ticket } from './paper';
 import { SponsorRoll } from './SponsorRoll';
 
-const ITEMS = chronological();
-const COUNTS = shippedCounts();
-const CHECKED = receiptDate();
+const GROUPS = yearGroups(SHIPPED_ITEMS);
+const COUNTS = shippedCounts(SHIPPED_ITEMS);
+const CHECKED = receiptDate(SHIPPED_UPDATED);
+const SPAN = COUNTS.first && COUNTS.last ? `${COUNTS.first}–${COUNTS.last}` : null;
 
-function ItemLink({ item }: { item: ShippedItem }) {
-  const primary = item.links?.[0];
-  if (!primary) return <span className="font-semibold">{item.name}</span>;
-  if (primary.internal) {
+function ItemName({ item }: { item: ShippedItem }) {
+  const { link } = item;
+  if (!link) return <>{item.name}</>;
+  if (link.internal) {
     return (
-      <Link href={primary.href} className="shipped-link font-semibold">
+      <Link href={link.href} className="shipped-link">
         {item.name}
       </Link>
     );
   }
-  return (
-    <ExternalLink href={primary.href} className="shipped-link font-semibold">
-      {item.name}
-    </ExternalLink>
-  );
+  return <ExternalLink href={link.href}>{item.name}</ExternalLink>;
 }
 
 function Item({ item }: { item: ShippedItem }) {
-  const links = item.links ?? [];
   return (
     <li className="border-b border-dashed border-[#1c1917]/20 py-2.5 last:border-b-0">
+      {item.logo ? (
+        // eslint-disable-next-line @next/next/no-img-element
+        <img
+          src={item.logo.src}
+          width={item.logo.width}
+          height={item.logo.height}
+          alt=""
+          loading="lazy"
+          decoding="async"
+          className="shipped-item-logo mb-1.5"
+        />
+      ) : null}
       <div className="shipped-lead">
-        <h2 className="min-w-0 text-[15px] font-semibold leading-snug">
-          <ItemLink item={item} />
-        </h2>
+        <h3 className="min-w-0 text-[15px] font-semibold leading-snug">
+          <ItemName item={item} />
+        </h3>
         <span className="shipped-lead-fill" aria-hidden="true" />
-        <p className="shrink-0 text-[13px] font-semibold tracking-[0.14em]">
+        <p className="shrink-0 text-[12.5px] font-semibold tracking-[0.12em]">
           <span className="sr-only">Status: </span>
-          {statusLabel(item.status)}
+          {item.status}
         </p>
       </div>
-      <p className="mt-0.5 text-[11px] tracking-[0.12em] text-[#1c1917]/60">
-        <span className="sr-only">Years: </span>
-        {yearSpan(item)}
-      </p>
-      <p className="mt-1 text-[12.5px] leading-relaxed text-[#1c1917]/80">{item.blurb}</p>
-      {item.version || item.rating ? (
-        <p className="mt-1 text-[12px] text-[#1c1917]/70">
-          {item.version ? `v${item.version}` : null}
-          {item.version && item.rating ? ' · ' : null}
-          {item.rating ? `${item.rating.average} stars from ${item.rating.count} rating${item.rating.count === 1 ? '' : 's'}` : null}
+      <p className="mt-1 text-[12.5px] leading-relaxed text-[#1c1917]/80">{item.description}</p>
+      {item.note ? <p className="mt-0.5 text-[11px] leading-relaxed text-[#1c1917]/60">* {item.note}</p> : null}
+      {item.stack || item.appStore ? (
+        <p className="mt-1 text-[10.5px] leading-relaxed tracking-[0.02em] text-[#1c1917]/55">
+          {item.stack}
+          {item.stack && item.appStore ? ' · ' : null}
+          {item.appStore ? <ExternalLink href={item.appStore}>App Store</ExternalLink> : null}
         </p>
-      ) : null}
-      {links.length > 1 ? (
-        <p className="mt-1 flex flex-wrap gap-x-3 gap-y-0.5 text-[12px]">
-          {links.map((link) =>
-            link.internal ? (
-              <Link key={link.href} href={link.href} className="shipped-link">
-                {link.label}
-              </Link>
-            ) : (
-              <ExternalLink key={link.href} href={link.href}>
-                {link.label}
-              </ExternalLink>
-            ),
-          )}
-        </p>
-      ) : null}
-      {item.stack?.length ? (
-        <p className="mt-1 text-[11.5px] leading-relaxed tracking-[0.01em] text-[#1c1917]/65">{item.stack.join(' · ')}</p>
       ) : null}
     </li>
   );
 }
 
-/** Bryton's master receipt: everything he started, oldest first, from lib/shipped.ts. */
+function YearDivider({ label, count }: { label: string; count: number }) {
+  return (
+    <h2 className="shipped-year">
+      <span className="shipped-year-rule" aria-hidden="true" />
+      <span className="text-[12px] font-semibold tracking-[0.3em]">{label}</span>
+      <span className="text-[10px] tracking-[0.16em] text-[#1c1917]/55">
+        ×{count}
+        <span className="sr-only"> {count === 1 ? 'item' : 'items'}</span>
+      </span>
+      <span className="shipped-year-rule" aria-hidden="true" />
+    </h2>
+  );
+}
+
+/** Bryton's master receipt: everything he started, in timeline order, from data/shipped/businesses.json. */
 export function Receipt() {
   return (
     <Ticket label="Shipped receipt">
@@ -109,11 +109,16 @@ export function Receipt() {
           <span>STATUS</span>
         </p>
 
-        <ol className="mt-1">
-          {ITEMS.map((item) => (
-            <Item key={item.name} item={item} />
-          ))}
-        </ol>
+        {GROUPS.map((group) => (
+          <section key={group.label} className="mt-3 first-of-type:mt-1" aria-label={group.label === 'UNDATED' ? 'Undated' : `Started in ${group.label}`}>
+            <YearDivider label={group.label} count={group.items.length} />
+            <ol>
+              {group.items.map((item) => (
+                <Item key={item.name} item={item} />
+              ))}
+            </ol>
+          </section>
+        ))}
 
         <SponsorRoll />
 
@@ -121,16 +126,22 @@ export function Receipt() {
           <Rule />
         </div>
         <div className="mt-2 space-y-1 text-[12.5px]">
-          <Line label="ITEMS" value={String(COUNTS.items)} />
           {SHIPPED_STATUSES.filter((status) => COUNTS.byStatus[status]).map((status) => (
-            <Line key={status} label={statusLabel(status)} value={String(COUNTS.byStatus[status])} />
+            <Line key={status} label={status} value={String(COUNTS.byStatus[status])} />
           ))}
+        </div>
+        <div className="mt-2">
+          <Rule />
+        </div>
+        <div className="mt-2 space-y-1 text-[12.5px]">
+          {SPAN ? <Line label="YEARS" value={SPAN} /> : null}
+          <Line label="STILL RUNNING" value={String(COUNTS.running)} />
         </div>
         <div className="mt-2">
           <Rule heavy />
         </div>
-        <div className="mt-2 text-[14px] font-semibold">
-          <Line label="TOTAL LIVE" value={String(COUNTS.live)} />
+        <div className="mt-2 text-[15px] font-semibold">
+          <Line label="ITEMS" value={String(COUNTS.items)} />
         </div>
         <div className="mt-2">
           <Rule heavy />
@@ -138,7 +149,7 @@ export function Receipt() {
 
         <footer className="mt-5 text-center text-[12px] leading-relaxed">
           <p className="tracking-[0.14em]">THANK YOU FOR LOOKING</p>
-          <p className="mt-1 text-[#1c1917]/70">Proof over hype. Ratings as of {CHECKED}.</p>
+          <p className="mt-1 text-[#1c1917]/70">Proof over hype. Checked {CHECKED}.</p>
           <p className="mt-3 text-[12.5px] leading-relaxed">
             An artist who builds his own tools.{' '}
             <Link href="/" className="shipped-link">

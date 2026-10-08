@@ -136,6 +136,59 @@ export function masterReceiptSvg(data: MasterOg): string {
   return frame(`${left.join('')}${paper(680, body.join(''), 'translate(724 22) rotate(1.4 200 330)', true)}`);
 }
 
+export type SupporterOg = {
+  number: string;
+  date: string;
+  text: string;
+  link: string | null;
+  details: OgLine[];
+  charges: OgLine[];
+  total: string;
+  status: string;
+  barcode: number[];
+};
+
+/** The supporter's own receipt (portrait, 2× for a sharp download): their shout-out, what they paid. */
+export function supporterReceiptSvg(data: SupporterOg): string {
+  const c = PAPER_W / 2;
+  const body: string[] = [
+    txt(c, 40, 'SUPPORTER RECEIPT', 11, { weight: 600, anchor: 'middle', spacing: 4.5 }),
+    txt(c, 66, 'BRYTON ZOZ', 17, { weight: 600, anchor: 'middle', spacing: 3.2 }),
+    txt(c, 100, 'SHIPPED', 26, { weight: 600, anchor: 'middle', spacing: 6 }),
+    leader(132, 'DATE', data.date, 12),
+    leader(152, 'RECEIPT', `#${data.number}`, 12),
+    rule(168),
+    txt(c, 196, 'YOUR SHOUT-OUT', 11, { anchor: 'middle', spacing: 3, opacity: 0.7 }),
+    txt(c, 226, fit(data.text, 32), 17, { weight: 600, anchor: 'middle' }),
+  ];
+  let y = 248;
+  if (data.link) {
+    body.push(txt(c, y, fit(data.link, 44), 11, { anchor: 'middle', opacity: 0.75 }));
+    y += 8;
+  }
+  y += 20;
+  for (const line of data.details) {
+    body.push(leader(y, line.label, line.value, 12));
+    y += 20;
+  }
+  body.push(rule(y - 4));
+  y += 22;
+  for (const line of data.charges) {
+    body.push(leader(y, line.label, line.value, 12));
+    y += 20;
+  }
+  body.push(rule(y - 4, true), leader(y + 20, 'TOTAL', data.total, 16), rule(y + 34, true));
+  y += 64;
+  body.push(txt(c, y, data.status, 11, { weight: 600, anchor: 'middle', spacing: 2 }));
+  body.push(txt(c, y + 20, 'THANK YOU FOR SUPPORTING.', 11, { anchor: 'middle', spacing: 2, opacity: 0.75 }));
+  body.push(barcode(64, y + 40, 272, 34, data.barcode));
+  body.push(txt(c, y + 96, 'BRYTONZOZ.COM/SHIPPED', 10, { anchor: 'middle', spacing: 2, opacity: 0.6 }));
+  const height = y + 126;
+  const w = PAPER_W + 80;
+  const h = height + 80;
+  return `<svg xmlns="http://www.w3.org/2000/svg" width="${w * 2}" height="${h * 2}" viewBox="0 0 ${w} ${h}"><rect width="${w}" height="${h}" fill="${NIGHT}"/>${paper(height, body.join(''), 'translate(40 40)')}</svg>`;
+}
+
 export type PrintedOg = {
   number: string;
   login: string;

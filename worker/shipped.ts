@@ -5,7 +5,9 @@
 //   POST /api/shipped/print            { login, mode, token } -> { id }
 //   GET  /api/shipped/receipts/<id>    a printed receipt + the sponsors shown on it
 //   POST /api/shipped/sponsor          multipart { tier, text, url?, logo?, token } -> { url } (checkout)
-//   POST /api/shipped/webhook/<id>     payment provider webhook (worker/shipped-pay.ts)
+//   GET  /api/shipped/sponsor/status?checkout=<id>        after checkout: confirms payment, where the line stands
+//   GET  /api/shipped/sponsor/receipt.png?checkout=<id>   the supporter's downloadable receipt image
+//   POST /api/shipped/webhook/<id>     payment provider webhook (worker/shipped-pay.ts; Stripe: /webhook/stripe)
 //   GET  /api/shipped/logo/<id>.png    an approved sponsor's 1-bit logo
 //   GET  /shipped/r/<id>/              share page: the static shell with this receipt's tags and data
 //   GET  /shipped/r/<id>/og.png        its link-preview image (rendered once, kept in R2)
@@ -14,10 +16,13 @@
 // Tables are created on first use (also listed in worker/schema.sql).
 import { DEFAULT_MODEL, PrintError, demoDraft, fetchGithub, writeReceipt, type AiEnv } from './shipped-ai';
 import { printedSvg, renderPng } from './shipped-og';
-import { isProduction, sponsorProvider, type PayEnv } from './shipped-pay';
+import { isProduction, sponsorProvider, type PayEnv, type SponsorEvent } from './shipped-pay';
+import { receiptBarcodeUnits, receiptDate } from '../lib/shipped';
+import { supporterReceiptSvg } from '../lib/receipt-svg';
 import {
   GITHUB_USERNAME,
   RECEIPT_PATH,
+  money,
   receiptNumber,
   shareText,
   type PrintMode,
@@ -63,17 +68,32 @@ const SCHEMA = [
     id INTEGER PRIMARY KEY AUTOINCREMENT, tier TEXT NOT NULL, text TEXT NOT NULL, url TEXT, logo_key TEXT,
     status TEXT NOT NULL, roll INTEGER NOT NULL, line_no INTEGER, amount_cents INTEGER NOT NULL, provider TEXT NOT NULL,
     checkout_id TEXT, order_id TEXT, note TEXT, created_at INTEGER NOT NULL, paid_at INTEGER, reviewed_at INTEGER,
-    starts_at INTEGER, ends_at INTEGER)`,
+    starts_at INTEGER, ends_at INTEGER, tax_cents INTEGER, total_cents INTEGER)`,
   'CREATE INDEX IF NOT EXISTS sponsor_lines_status ON sponsor_lines (status, tier)',
   'CREATE UNIQUE INDEX IF NOT EXISTS sponsor_lines_checkout ON sponsor_lines (checkout_id)',
+  'CREATE INDEX IF NOT EXISTS sponsor_lines_order ON sponsor_lines (order_id)',
 ];
+// Columns added after the table first shipped; "duplicate column" means it's already there.
+const COLUMNS = ['ALTER TABLE sponsor_lines ADD COLUMN tax_cents INTEGER', 'ALTER TABLE sponsor_lines ADD COLUMN total_cents INTEGER'];
+
+async function migrate(db: D1Database) {
+  await db.batch(SCHEMA.map((sql) => db.prepare(sql)));
+  for (const sql of COLUMNS) {
+    await db
+      .prepare(sql)
+      .run()
+      .catch((error: unknown) => {
+        if (!String(error).includes('duplicate column')) throw error;
+      });
+  }
+}
 
 let schemaReady: Promise<unknown> | null = null;
 
 async function database(env: ShippedEnv): Promise<D1Database | null> {
   const db = env.DB;
   if (!db) return null;
-  schemaReady ??= db.batch(SCHEMA.map((sql) => db.prepare(sql))).catch((error) => {
+  schemaReady ??= migrate(db).catch((error) => {
     schemaReady = null;
     throw error;
   });
@@ -273,6 +293,8 @@ type LineRow = {
   reviewed_at: number | null;
   starts_at: number | null;
   ends_at: number | null;
+  tax_cents: number | null;
+  total_cents: number | null;
 };
 
 const holding = () => Date.now() - SPONSOR_CONFIG.checkoutHoldMinutes * 60_000;
@@ -351,6 +373,7 @@ async function state(env: ShippedEnv): Promise<Response> {
         reason: open ? null : provider ? 'no-storage' : 'no-provider',
         provider: provider?.id ?? null,
         live: provider?.live ?? false,
+        taxAtCheckout: provider?.id === 'stripe',
         roll: rolls.roll,
         rollSize: SPONSOR_CONFIG.rollSize,
         filled: rolls.filled,
@@ -436,16 +459,61 @@ async function createSponsor(request: Request, env: ShippedEnv): Promise<Respons
   try {
     const checkout = await provider.createCheckout({
       lineId: line.id,
-      label: `${config.label} · ROLL ${String(rolls.roll).padStart(3, '0')}`,
+      tier,
+      label: `Supporter shout-out: ${config.label} · ROLL ${String(rolls.roll).padStart(3, '0')}`,
+      description: `"${check.text}" printed on the receipt at brytonzoz.com/shipped once approved, plus a downloadable receipt image. Refunded in full if not approved.`,
       amountCents: amount,
       origin: new URL(request.url).origin,
+      // Closes 5 minutes before the line stops being held (Stripe's minimum is 30 minutes).
+      expiresAt: Math.floor(Date.now() / 1000) + Math.max(30, SPONSOR_CONFIG.checkoutHoldMinutes - 5) * 60,
     });
     await db.prepare('UPDATE sponsor_lines SET checkout_id = ?, logo_key = ? WHERE id = ?').bind(checkout.checkoutId, logoKey, line.id).run();
     return json({ url: checkout.url });
   } catch (error) {
     console.error('shipped: checkout failed', error);
-    await db.prepare(`UPDATE sponsor_lines SET status = 'failed', logo_key = ? WHERE id = ?`).bind(logoKey, line.id).run();
+    const note = (error instanceof Error ? error.message : 'checkout failed').slice(0, 200);
+    await db.prepare(`UPDATE sponsor_lines SET status = 'failed', logo_key = ?, note = ? WHERE id = ?`).bind(logoKey, note, line.id).run();
     return json({ error: 'checkout-failed' }, 502);
+  }
+}
+
+/** One place where payments, expiries and refunds change a line, whether from a webhook or a confirm. */
+async function applyEvent(db: D1Database, env: ShippedEnv, event: SponsorEvent): Promise<void> {
+  const now = Date.now();
+  if (event.type === 'paid') {
+    const line = await db.prepare('SELECT * FROM sponsor_lines WHERE checkout_id = ?').bind(event.checkoutId).first<LineRow>();
+    if (!line || line.status !== 'checkout') return;
+    const note = event.amountCents === line.amount_cents ? null : `paid ${event.amountCents} for ${line.amount_cents}`;
+    await db
+      .prepare(
+        `UPDATE sponsor_lines SET status = 'paid_pending_review', order_id = ?, paid_at = ?, note = ?, tax_cents = ?, total_cents = ?
+         WHERE id = ? AND status = 'checkout'`,
+      )
+      .bind(event.orderId, now, note, event.taxCents, event.totalCents, line.id)
+      .run();
+  } else if (event.type === 'expired') {
+    await db
+      .prepare(`UPDATE sponsor_lines SET status = 'failed', note = 'checkout expired' WHERE checkout_id = ? AND status = 'checkout'`)
+      .bind(event.checkoutId)
+      .run();
+  } else if (event.type === 'refunded') {
+    // Any refund (from /admin or the Stripe dashboard) takes the line off the receipt.
+    const lines = await db
+      .prepare(`SELECT * FROM sponsor_lines WHERE order_id = ? AND status IN ('paid_pending_review', 'approved', 'refund_failed')`)
+      .bind(event.orderId)
+      .all<LineRow>();
+    for (const line of lines.results) {
+      await db
+        .prepare(`UPDATE sponsor_lines SET status = 'refunded', reviewed_at = COALESCE(reviewed_at, ?), note = 'refunded in Stripe' WHERE id = ?`)
+        .bind(now, line.id)
+        .run();
+      if (line.logo_key) await env.SHIPPED?.delete(line.logo_key);
+    }
+  } else if (event.type === 'refund_failed') {
+    await db
+      .prepare(`UPDATE sponsor_lines SET status = 'refund_failed', note = ? WHERE order_id = ? AND status = 'refunded'`)
+      .bind(event.reason.slice(0, 200), event.orderId)
+      .run();
   }
 }
 
@@ -453,18 +521,91 @@ async function webhook(request: Request, env: ShippedEnv, providerId: string): P
   const db = await database(env);
   const provider = sponsorProvider(env);
   if (!db || !provider || provider.id !== providerId) return json({ error: 'not-found' }, 404);
+  if (provider.id === 'stripe' && !env.STRIPE_SHIPPED_WEBHOOK_SECRET) return json({ error: 'not-configured' }, 503);
   const event = await provider.parseWebhook(request);
   if (!event) return json({ error: 'invalid-signature' }, 400);
-  const line = await db.prepare('SELECT * FROM sponsor_lines WHERE checkout_id = ?').bind(event.checkoutId).first<LineRow>();
-  if (!line) return json({ ok: true, ignored: true });
-  if (line.status === 'checkout') {
-    const note = event.amountCents === line.amount_cents ? null : `paid ${event.amountCents} for ${line.amount_cents}`;
-    await db
-      .prepare(`UPDATE sponsor_lines SET status = 'paid_pending_review', order_id = ?, paid_at = ?, note = ? WHERE id = ? AND status = 'checkout'`)
-      .bind(event.orderId, Date.now(), note, line.id)
-      .run();
+  await applyEvent(db, env, event);
+  return json({ received: true, ignored: event.type === 'ignored' || undefined });
+}
+
+const PUBLIC_STATUS: Record<string, string> = {
+  checkout: 'unpaid',
+  paid_pending_review: 'pending',
+  approved: 'printed',
+  refunded: 'refunded',
+  refund_failed: 'refunding',
+  failed: 'closed',
+};
+const PAID = new Set(['paid_pending_review', 'approved']);
+
+/** The buyer's line, by the checkout id only they have (it's in their return URL). */
+async function buyerLine(url: URL, env: ShippedEnv): Promise<{ db: D1Database; line: LineRow; checkoutId: string } | Response> {
+  const db = await database(env);
+  const provider = sponsorProvider(env);
+  if (!db || !provider) return json({ error: 'sponsors-closed' }, 503);
+  const checkoutId = url.searchParams.get('checkout') ?? '';
+  if (!provider.checkoutId.test(checkoutId)) return json({ error: 'bad-request' }, 400);
+  let line = await db.prepare('SELECT * FROM sponsor_lines WHERE checkout_id = ?').bind(checkoutId).first<LineRow>();
+  if (!line || line.provider !== provider.id) return json({ error: 'not-found' }, 404);
+  if (line.status === 'checkout' && provider.confirm) {
+    try {
+      await applyEvent(db, env, await provider.confirm(checkoutId));
+      line = (await db.prepare('SELECT * FROM sponsor_lines WHERE id = ?').bind(line.id).first<LineRow>()) ?? line;
+    } catch (error) {
+      console.error('shipped: confirm failed', error);
+    }
   }
-  return json({ ok: true });
+  return { db, line, checkoutId };
+}
+
+async function sponsorStatus(url: URL, env: ShippedEnv): Promise<Response> {
+  const found = await buyerLine(url, env);
+  if (found instanceof Response) return found;
+  const { line, checkoutId } = found;
+  return json({
+    status: PUBLIC_STATUS[line.status] ?? 'closed',
+    tier: line.tier,
+    text: line.text,
+    roll: line.roll,
+    lineNo: line.status === 'approved' ? line.line_no : null,
+    amountCents: line.amount_cents,
+    taxCents: line.tax_cents,
+    totalCents: line.total_cents,
+    receipt: PAID.has(line.status) ? `/api/shipped/sponsor/receipt.png?checkout=${encodeURIComponent(checkoutId)}` : null,
+  });
+}
+
+const pad3 = (n: number) => String(n).padStart(3, '0');
+
+async function supporterReceipt(url: URL, env: ShippedEnv): Promise<Response> {
+  const found = await buyerLine(url, env);
+  if (found instanceof Response) return found;
+  const { line } = found;
+  if (!PAID.has(line.status)) return json({ error: 'not-paid' }, 404);
+  const config = SPONSOR_CONFIG.tiers[line.tier];
+  const tax = line.tax_cents ?? 0;
+  const svg = supporterReceiptSvg({
+    number: `S${String(line.id).padStart(5, '0')}`,
+    date: receiptDate(new Date(line.paid_at ?? line.created_at).toISOString()),
+    text: line.text.toUpperCase(),
+    link: line.url ? new URL(line.url).hostname.replace(/^www\./, '') : null,
+    details: [
+      { label: 'SHOUT-OUT', value: config.label },
+      { label: 'ROLL', value: pad3(line.roll) },
+      { label: 'LINE', value: line.status === 'approved' && line.line_no ? `#${pad3(line.line_no)}` : 'IN REVIEW' },
+      ...(line.tier === 'header' && line.ends_at ? [{ label: 'RUNS UNTIL', value: receiptDate(new Date(line.ends_at).toISOString()) }] : []),
+    ],
+    charges: [
+      { label: 'SUPPORTER SHOUT-OUT', value: money(line.amount_cents) },
+      { label: 'TAX', value: money(tax) },
+    ],
+    total: money(line.total_cents ?? line.amount_cents + tax),
+    status: line.status === 'approved' ? 'PRINTED ON THE RECEIPT' : 'PAID · PRINTS ONCE APPROVED',
+    barcode: receiptBarcodeUnits(`BZS${line.id}${line.text}`),
+  });
+  return new Response(await renderPng(svg), {
+    headers: { 'content-type': 'image/png', 'cache-control': 'private, max-age=60', 'x-robots-tag': 'noindex' },
+  });
 }
 
 async function publicLogo(env: ShippedEnv, id: number): Promise<Response> {
@@ -561,6 +702,8 @@ export async function handleShipped(request: Request, env: ShippedEnv, ctx: Exec
   if (path === '/api/shipped/state' && method === 'GET') return state(env);
   if (path === '/api/shipped/print' && method === 'POST') return print(request, env, ctx);
   if (path === '/api/shipped/sponsor' && method === 'POST') return createSponsor(request, env);
+  if (path === '/api/shipped/sponsor/status' && method === 'GET') return sponsorStatus(url, env);
+  if (path === '/api/shipped/sponsor/receipt.png' && method === 'GET') return supporterReceipt(url, env);
 
   const receipt = path.match(/^\/api\/shipped\/receipts\/(\d{1,9})$/);
   if (receipt && method === 'GET') {

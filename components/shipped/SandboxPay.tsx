@@ -30,7 +30,7 @@ export function SandboxPay() {
       body: JSON.stringify({ checkout: params.checkout, amount: params.amount, sig: params.sig }),
     }).catch(() => null);
     if (response?.ok) {
-      window.location.assign('/shipped/?sponsor=paid#sponsor');
+      window.location.assign(`/shipped/?sponsor=paid&checkout=${encodeURIComponent(params.checkout)}#sponsor`);
       return;
     }
     setError('The sandbox didn’t accept that payment (it only runs on staging).');

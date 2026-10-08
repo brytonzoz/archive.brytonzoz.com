@@ -16,7 +16,7 @@
   },
   // Fonts for the receipts' preview images (worker/shipped-og.ts).
   "rules": [{ "type": "Data", "globs": ["**/*.ttf"], "fallthrough": true }],
-  // SITE_ENV gates staging-only behavior (sandbox sponsor payments, Turnstile test keys, AI-less demo prints).
+  // SITE_ENV gates staging-only behavior (Stripe test keys only for sponsors, Turnstile test keys, AI-less demo prints).
   "vars": { "SITE_ENV": "production", "SHIPPED_MODEL": "claude-haiku-5-5", "SHIPPED_DAILY_CAP_USD": "3" },
   "r2_buckets": [
     { "binding": "MUSIC", "bucket_name": "brytonzoz-media" },

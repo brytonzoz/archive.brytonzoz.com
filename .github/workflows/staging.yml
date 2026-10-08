@@ -135,11 +135,13 @@ jobs:
           SHIPPED_GITHUB_TOKEN: ${{ secrets.SHIPPED_GITHUB_TOKEN }}
           TURNSTILE_SITE_KEY: ${{ secrets.TURNSTILE_SITE_KEY }}
           TURNSTILE_SECRET_KEY: ${{ secrets.TURNSTILE_SECRET_KEY }}
+          STRIPE_TEST_SHIPPED_WEBHOOK_SECRET: ${{ secrets.STRIPE_TEST_SHIPPED_WEBHOOK_SECRET }}
         run: |
           sync() {
             if [ -z "$2" ]; then echo "::notice::$3 is not set, so $4."; return 0; fi
             printf '%s' "$2" | npx wrangler secret put "$1" --env staging
           }
+          sync STRIPE_SHIPPED_WEBHOOK_SECRET "$STRIPE_TEST_SHIPPED_WEBHOOK_SECRET" STRIPE_TEST_SHIPPED_WEBHOOK_SECRET "refunds made in the Stripe dashboard don't remove /shipped lines (rejecting in /admin still refunds and removes them)"
           sync ANTHROPIC_API_KEY "$ANTHROPIC_API_KEY" ANTHROPIC_API_KEY "receipts print as a demo without the AI"
           sync GITHUB_TOKEN "$SHIPPED_GITHUB_TOKEN" SHIPPED_GITHUB_TOKEN "printing can fail with github-busy: anonymous GitHub lookups share Cloudflare's IPs and its 60-an-hour limit"
           sync TURNSTILE_SITE_KEY "$TURNSTILE_SITE_KEY" TURNSTILE_SITE_KEY "staging uses Turnstile test keys"

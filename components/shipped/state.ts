@@ -14,6 +14,7 @@ export type ShippedState = {
     reason: string | null;
     provider?: string | null;
     live?: boolean;
+    taxAtCheckout?: boolean;
     roll?: number;
     rollSize?: number;
     filled?: number;

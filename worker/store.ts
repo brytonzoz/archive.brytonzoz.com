@@ -255,7 +255,7 @@ async function order(url: URL, env: MerchEnv & { DB: D1Database }): Promise<Resp
 }
 
 // Optional: Stripe webhook (checkout.session.completed / .expired) for instant updates.
-async function verifySignature(payload: string, header: string, secret: string): Promise<boolean> {
+export async function verifySignature(payload: string, header: string, secret: string): Promise<boolean> {
   const parts = Object.fromEntries(header.split(',').map((part) => part.split('=') as [string, string]));
   const timestamp = Number(parts.t);
   if (!parts.v1 || !Number.isFinite(timestamp) || Math.abs(Date.now() / 1000 - timestamp) > 300) return false;

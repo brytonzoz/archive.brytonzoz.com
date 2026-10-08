@@ -89,9 +89,10 @@ export function withKeyAliases<T extends ShippedEnv>(env: T): T {
       .find((value): value is string => typeof value === 'string' && value.trim() !== '');
   const anthropic = pick('claude_key', 'CLAUDE_KEY', 'ANTHROPIC_API_KEY');
   const tinyfish = pick('tinyfish', 'TINYFISH', 'TINYFISH_API_KEY');
-  if (anthropic === env.ANTHROPIC_API_KEY && tinyfish === env.TINYFISH_API_KEY) return env;
+  const workspace = pick('claude_workspace', 'CLAUDE_WORKSPACE', 'claude_workspace_id', 'ANTHROPIC_WORKSPACE_ID');
+  if (anthropic === env.ANTHROPIC_API_KEY && tinyfish === env.TINYFISH_API_KEY && workspace === env.ANTHROPIC_WORKSPACE_ID) return env;
   // A prototype link keeps every binding (DB, R2, ASSETS) reachable without copying them.
-  return Object.assign(Object.create(env) as T, { ANTHROPIC_API_KEY: anthropic, TINYFISH_API_KEY: tinyfish });
+  return Object.assign(Object.create(env) as T, { ANTHROPIC_API_KEY: anthropic, TINYFISH_API_KEY: tinyfish, ANTHROPIC_WORKSPACE_ID: workspace });
 }
 
 const HOUR = 3_600_000;

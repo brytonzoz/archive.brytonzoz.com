@@ -20,6 +20,7 @@ const ERRORS: Record<string, string> = {
   'out-of-paper': 'Out of paper. That’s it for now.',
   'ai-busy': 'The printer is busy. Try again in a minute.',
   'ai-error': 'The printer jammed. Try again.',
+  'ai-setup': 'The printer isn’t plugged in yet. Check back soon.',
   offline: 'The printer is offline. Check back soon.',
 };
 const OFFLINE: Record<string, string> = {};

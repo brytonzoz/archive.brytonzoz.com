@@ -10,6 +10,8 @@ import { clean, hostOf, inYearCount, publicUrl, type Found, type Gathered } from
 
 export interface AiEnv {
   ANTHROPIC_API_KEY?: string;
+  /** Needed when the key is a multi-workspace key (`wrkspc_…`); found automatically when the key may list workspaces. */
+  ANTHROPIC_WORKSPACE_ID?: string;
   /** For local tests against a mock (never set in the deploy workflows). */
   ANTHROPIC_API_BASE?: string;
   SHIPPED_MODEL?: string;
@@ -279,6 +281,24 @@ function normalize(raw: unknown, gathered: Gathered, allowed: Allowed, year: num
   return finish(items, ok(note) && !AI_VOICE.test(note) ? note : cannedNote(items.length, seed), seed);
 }
 
+const needsWorkspace = (status: number, text: string) => status === 400 && /anthropic-workspace-id|not scoped to a workspace/i.test(text);
+
+let foundWorkspace: string | null = null;
+
+/** One List Workspaces call (allowed for some multi-workspace keys); the Default workspace wins. */
+async function discoverWorkspace(base: string, key: string): Promise<{ id: string | null; why: string }> {
+  if (foundWorkspace) return { id: foundWorkspace, why: 'cached' };
+  const response = await fetch(`${base}/v1/organizations/workspaces?include_default=true&limit=50`, {
+    headers: { 'x-api-key': key, 'anthropic-version': '2023-06-01' },
+  }).catch(() => null);
+  if (!response?.ok) return { id: null, why: `list workspaces ${response?.status ?? 'failed'}` };
+  const body = (await response.json().catch(() => ({}))) as { data?: { id?: string; name?: string; archived_at?: string | null }[] };
+  const open = (body.data ?? []).filter((workspace) => workspace.id && !workspace.archived_at);
+  const pick = open.find((workspace) => workspace.name === 'Default') ?? (open.length === 1 ? open[0] : null);
+  foundWorkspace = pick?.id ?? null;
+  return { id: foundWorkspace, why: pick ? 'listed' : `${open.length} workspaces, none named Default` };
+}
+
 function upstreamError(text: string): string {
   try {
     const body = JSON.parse(text) as { error?: { type?: string; message?: string } };
@@ -311,12 +331,30 @@ export async function assembleReceipt(subject: Subject, gathered: Gathered, year
   const fail = (code: string) => Object.assign(new PrintError(code, 503), { costMicros: spent(), inputTokens: usage.input, outputTokens: usage.output });
   const base = (env.ANTHROPIC_API_BASE || 'https://api.anthropic.com').replace(/\/+$/, '');
 
-  const call = (body: unknown) =>
+  let workspace = env.ANTHROPIC_WORKSPACE_ID?.trim() || foundWorkspace;
+  const send = (body: unknown) =>
     fetch(`${base}/v1/messages`, {
       method: 'POST',
-      headers: { 'content-type': 'application/json', 'x-api-key': env.ANTHROPIC_API_KEY ?? '', 'anthropic-version': '2023-06-01' },
+      headers: {
+        'content-type': 'application/json',
+        'x-api-key': env.ANTHROPIC_API_KEY ?? '',
+        'anthropic-version': '2023-06-01',
+        ...(workspace ? { 'anthropic-workspace-id': workspace } : {}),
+      },
       body: JSON.stringify(body),
     });
+  const call = async (body: unknown) => {
+    const response = await send(body);
+    if (workspace || !needsWorkspace(response.status, await response.clone().text())) return response;
+    const found = await discoverWorkspace(base, env.ANTHROPIC_API_KEY ?? '');
+    if (!found.id) {
+      const error = fail('ai-setup');
+      error.detail = `the Anthropic key is a multi-workspace key: set the claude_workspace secret to a wrkspc_ id (${found.why})`;
+      throw error;
+    }
+    workspace = found.id;
+    return send(body);
+  };
 
   let tools = toolSets[0];
   let messages: unknown[] = [user];

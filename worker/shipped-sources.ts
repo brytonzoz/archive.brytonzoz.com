@@ -1,28 +1,21 @@
-// Where "Shipped in <year>" finds things: free public APIs first (GitHub, the App Store, Hacker News,
-// npm, Product Hunt with a token, the subject's own site), then at most one optional web-search
-// crawler if its key is set. Claude's own web search (worker/shipped-ai.ts) runs on top of this.
-// Every source is behind SourceProvider and returns plain Found items; nothing here is trusted text.
+// Where "Shipped in <year>" finds things, all free: public APIs (GitHub, the App Store, Hacker News, npm,
+// Product Hunt with a token), the subject's own site, and TinyFish's free Search + Fetch for launch pages
+// (worker/shipped-tinyfish.ts). Claude only assembles the receipt from this; its paid web search is a
+// last resort (worker/shipped-ai.ts). Every source returns plain Found items; nothing here is trusted text.
 //
 // Optional keys (each source is skipped without its key):
 //   GITHUB_TOKEN          GitHub API (higher rate limit; anonymous works but shares Cloudflare's IPs)
 //   PRODUCTHUNT_TOKEN     Product Hunt API v2 developer token: launches the subject made
-//   TINYFISH_API_KEY      TinyFish Search API        (first crawler found is the one used)
-//   TAVILY_API_KEY        Tavily search
-//   EXA_API_KEY           Exa search
-//   BRAVE_SEARCH_API_KEY  Brave Search API
-//   JINA_API_KEY          Jina Reader: reads the subject's site as clean text instead of raw HTML
+//   TINYFISH_API_KEY      TinyFish Search + Fetch (free endpoints only)
 import type { ItemSource, ItemStatus, Subject } from '../lib/shipped-year';
 import { isDomain, isGithubLogin, isXHandle } from '../lib/shipped-year';
 import { hasBlockedWord } from '../lib/shipped-sponsors';
+import { tinyfishFetch, tinyfishSearch, type TinyfishMeter, type TinyfishPage } from './shipped-tinyfish';
 
 export interface SourceEnv {
   GITHUB_TOKEN?: string;
   PRODUCTHUNT_TOKEN?: string;
   TINYFISH_API_KEY?: string;
-  TAVILY_API_KEY?: string;
-  EXA_API_KEY?: string;
-  BRAVE_SEARCH_API_KEY?: string;
-  JINA_API_KEY?: string;
 }
 
 export type Found = {
@@ -45,7 +38,10 @@ export type SiteInfo = { url: string; title: string; description: string; icon: 
 /** What the subject is, filled in as sources learn it (GitHub tells us their name, site and X handle). */
 export type Profile = { name: string; bio: string; site: string | null; x: string | null; github: string | null };
 
-export type Gathered = { found: Found[]; web: WebResult[]; site: SiteInfo | null; profile: Profile; ran: string[]; failed: string[] };
+/** A page TinyFish read for us (their site, a launch post), cut down for the prompt. */
+export type PageInfo = { url: string; title: string; description: string; published: string | null; text: string };
+
+export type Gathered = { found: Found[]; web: WebResult[]; pages: PageInfo[]; site: SiteInfo | null; profile: Profile; ran: string[]; failed: string[] };
 
 export type SourceContext = { subject: Subject; profile: Profile; year: number; env: SourceEnv };
 
@@ -321,7 +317,7 @@ export function faviconUrl(siteUrl: string): string | null {
 }
 
 /** Homepage title, description, icon, a text sample and its links (for Claude to read, never to obey). */
-export async function readSite(siteUrl: string, env: SourceEnv): Promise<SiteInfo | null> {
+export async function readSite(siteUrl: string): Promise<SiteInfo | null> {
   const url = publicUrl(siteUrl);
   if (!url) return null;
   const response = await fetch(url, { headers: { 'user-agent': UA, accept: 'text/html' }, redirect: 'follow', signal: AbortSignal.timeout(TIMEOUT) }).catch(() => null);
@@ -350,79 +346,36 @@ export async function readSite(siteUrl: string, env: SourceEnv): Promise<SiteInf
     if (href && text && !links.some((l) => l.url === href)) links.push({ text, url: href });
     if (links.length >= 40) break;
   }
-  let text = clean(decode(html.replace(/<(script|style|noscript|svg)[\s\S]*?<\/\1>/gi, ' ').replace(/<[^>]+>/g, ' ')), 2500);
-  if (env.JINA_API_KEY) {
-    const reader = await fetch(`https://r.jina.ai/${base}`, { headers: { authorization: `Bearer ${env.JINA_API_KEY}`, accept: 'text/plain' }, signal: AbortSignal.timeout(TIMEOUT) }).catch(() => null);
-    if (reader?.ok) text = clean((await reader.text()).replace(/\]\([^)]*\)/g, ']'), 4000) || text;
-  }
+  const text = clean(decode(html.replace(/<(script|style|noscript|svg)[\s\S]*?<\/\1>/gi, ' ').replace(/<[^>]+>/g, ' ')), 2500);
   return {
     url: base,
     title: clean(decode(html.match(/<title[^>]*>([\s\S]*?)<\/title>/i)?.[1] ?? ''), 100) || clean(meta('og:title'), 100),
     description: clean(meta('description') || meta('og:description'), 200),
-    icon: abs(attr(touch ?? png ?? '', 'href')) ?? abs(meta('og:image') || null) ?? faviconUrl(base),
+    // og:image is usually a wide banner, which dithers to mush at logo size.
+    icon: abs(attr(touch ?? png ?? '', 'href')) ?? faviconUrl(base),
     text,
     links,
   };
 }
 
-// ---- Optional crawlers (one at most, the first whose key is set) -------------------------------
+// ---- TinyFish: launch pages beyond the APIs -------------------------------------------------------
 
-type Crawler = { id: string; key: keyof SourceEnv; search(query: string, year: number, key: string): Promise<WebResult[]> };
-
-const pick = (raw: Record<string, unknown>, ...keys: string[]) => keys.map((k) => raw[k]).find((v) => typeof v === 'string' && v) as string | undefined;
-const toResults = (rows: unknown, map: (row: Record<string, unknown>) => WebResult | null): WebResult[] =>
-  (Array.isArray(rows) ? rows : []).map((row) => map((row ?? {}) as Record<string, unknown>)).filter((r): r is WebResult => Boolean(r)).slice(0, 8);
 const result = (title: unknown, url: unknown, snippet: unknown, date: unknown): WebResult | null => {
   const link = publicUrl(url);
   return link ? { title: clean(title, 120), url: link, snippet: clean(snippet, 300), date: day(date) } : null;
 };
 
-const CRAWLERS: Crawler[] = [
-  {
-    id: 'tinyfish',
-    key: 'TINYFISH_API_KEY',
-    async search(query, year, key) {
-      const data = await getJson<Record<string, unknown>>(`https://api.search.tinyfish.ai/?query=${encodeURIComponent(query)}&after_date=${year}-01-01`, { headers: { 'X-API-Key': key } });
-      return toResults(data.results ?? data.data, (r) => result(r.title, pick(r, 'url', 'link'), pick(r, 'snippet', 'description', 'content'), pick(r, 'date', 'published_date')));
-    },
-  },
-  {
-    id: 'tavily',
-    key: 'TAVILY_API_KEY',
-    async search(query, _year, key) {
-      const data = await getJson<{ results?: unknown }>('https://api.tavily.com/search', {
-        method: 'POST',
-        headers: { authorization: `Bearer ${key}`, 'content-type': 'application/json' },
-        body: JSON.stringify({ query, max_results: 8, search_depth: 'basic' }),
-      });
-      return toResults(data.results, (r) => result(r.title, r.url, r.content, r.published_date));
-    },
-  },
-  {
-    id: 'exa',
-    key: 'EXA_API_KEY',
-    async search(query, year, key) {
-      const data = await getJson<{ results?: unknown }>('https://api.exa.ai/search', {
-        method: 'POST',
-        headers: { 'x-api-key': key, 'content-type': 'application/json' },
-        body: JSON.stringify({ query, numResults: 8, startPublishedDate: `${year}-01-01T00:00:00.000Z`, contents: { text: { maxCharacters: 300 } } }),
-      });
-      return toResults(data.results, (r) => result(r.title, r.url, r.text, r.publishedDate));
-    },
-  },
-  {
-    id: 'brave',
-    key: 'BRAVE_SEARCH_API_KEY',
-    async search(query, _year, key) {
-      const data = await getJson<{ web?: { results?: unknown } }>(`https://api.search.brave.com/res/v1/web/search?q=${encodeURIComponent(query)}&count=8&freshness=py`, {
-        headers: { 'X-Subscription-Token': key },
-      });
-      return toResults(data.web?.results, (r) => result(r.title, r.url, r.description, r.page_age));
-    },
-  },
-];
+/** Hosts whose pages say little about one launch (feeds, profiles) or that TinyFish can't read anyway. */
+const SKIP_PAGES = /(^|\.)(x\.com|twitter\.com|linkedin\.com|facebook\.com|instagram\.com|tiktok\.com|youtube\.com|reddit\.com|threads\.net)$/;
 
-export const crawlerFor = (env: SourceEnv) => CRAWLERS.find((crawler) => env[crawler.key]) ?? null;
+const markdownText = (text: string, max: number) =>
+  clean(text.replace(/!\[[^\]]*\]\([^)]*\)/g, ' ').replace(/\[([^\]]*)\]\([^)]*\)/g, '$1').replace(/[#*_>|]+/g, ' '), max);
+
+function toPage(page: TinyfishPage): PageInfo | null {
+  const url = publicUrl(page.url);
+  if (!url) return null;
+  return { url, title: clean(page.title, 120), description: clean(page.description, 240), published: day(page.published), text: markdownText(page.text, 1400) };
+}
 
 // ---- Who is this? --------------------------------------------------------------------------------
 
@@ -458,13 +411,16 @@ export async function searchGithubUsers(name: string, env: SourceEnv): Promise<{
   return (data.items ?? []).filter((u) => typeof u.login === 'string' && isGithubLogin(u.login)).map((u) => ({ login: u.login as string }));
 }
 
-/** Everything the free sources and the crawler know, de-duplicated, best first. */
-export async function gather(subject: Subject, env: SourceEnv, year: number, extra: Partial<Profile> = {}): Promise<Gathered> {
-  const profile: Profile = { name: '', bio: '', site: null, x: null, github: null, ...extra };
+/** Under 2 of these and Claude may spend its 2 paid searches. */
+export const inYearCount = (gathered: Gathered, year: number) => gathered.found.filter((item) => inYear(item.date, year)).length;
+
+/** Everything the free sources and TinyFish know, de-duplicated, best first. */
+export async function gather(subject: Subject, env: SourceEnv, year: number, meter: TinyfishMeter | null = null): Promise<Gathered> {
+  const profile: Profile = { name: '', bio: '', site: null, x: null, github: null };
   if (subject.kind === 'github') profile.github = subject.id;
   if (subject.kind === 'x') profile.x = subject.id;
   if (subject.kind === 'domain' && isDomain(subject.id)) profile.site = `https://${subject.id}/`;
-  if (subject.kind === 'name' || subject.kind === 'domain') profile.name ||= subject.kind === 'name' ? subject.display : '';
+  if (subject.kind === 'name') profile.name = subject.display;
 
   const ran: string[] = [];
   const failed: string[] = [];
@@ -488,20 +444,48 @@ export async function gather(subject: Subject, env: SourceEnv, year: number, ext
   }
 
   const ctx: SourceContext = { subject, profile, year, env };
-  const crawler = crawlerFor(env);
+  const key = env.TINYFISH_API_KEY && meter ? env.TINYFISH_API_KEY : null;
   const who = profile.name || subject.display;
-  const [results, site, web] = await Promise.all([
+  const handle = profile.x ? ` OR "@${profile.x}"` : '';
+  const queries = key
+    ? [`"${who}"${handle} launched OR shipped OR released ${year}`, `"${who}" ${year} app OR "Show HN" OR "Product Hunt" OR open source`]
+    : [];
+  const [results, site, searched] = await Promise.all([
     Promise.allSettled(SOURCES.filter((source) => source.enabled(ctx)).map(async (source) => ({ id: source.id, found: await source.run(ctx) }))),
-    profile.site ? readSite(profile.site, env).catch(() => null) : Promise.resolve(null),
-    crawler
-      ? crawler.search(`"${who}"${profile.x ? ` OR @${profile.x}` : ''} launched OR shipped OR released ${year}`, year, env[crawler.key]!).catch(() => {
-          failed.push(crawler.id);
-          return [] as WebResult[];
-        })
-      : Promise.resolve([] as WebResult[]),
+    profile.site ? readSite(profile.site).catch(() => null) : Promise.resolve(null),
+    Promise.all(
+      queries.map((query) =>
+        tinyfishSearch(query, year, key!, meter!).catch((error) => {
+          failed.push(`tinyfish-search:${(error as Error).message}`);
+          return [];
+        }),
+      ),
+    ),
   ]);
-  if (crawler) ran.push(crawler.id);
   if (site) ran.push('site');
+
+  const web: WebResult[] = [];
+  for (const row of searched.flat()) {
+    const hit = result(row.title, row.url, row.snippet, row.date);
+    if (hit && !web.some((w) => w.url === hit.url)) web.push(hit);
+  }
+  if (queries.length) ran.push('tinyfish-search');
+
+  // TinyFish Fetch reads their site (rendered, so JS-only sites work) and the best launch pages.
+  let pages: PageInfo[] = [];
+  if (key) {
+    const targets = [profile.site, ...web.map((w) => w.url)]
+      .map((url) => publicUrl(url))
+      .filter((url): url is string => Boolean(url) && !SKIP_PAGES.test(hostOf(url) ?? ''))
+      .filter((url, i, all) => all.indexOf(url) === i)
+      .slice(0, 5);
+    try {
+      pages = (await tinyfishFetch(targets, key, meter!)).map(toPage).filter((page): page is PageInfo => Boolean(page));
+      if (targets.length) ran.push('tinyfish-fetch');
+    } catch (error) {
+      failed.push(`tinyfish-fetch:${(error as Error).message}`);
+    }
+  }
 
   const found: Found[] = [];
   for (const settled of results) {
@@ -521,5 +505,5 @@ export async function gather(subject: Subject, env: SourceEnv, year: number, ext
       return true;
     })
     .slice(0, 30);
-  return { found: unique, web, site, profile, ran, failed };
+  return { found: unique, web: web.slice(0, 12), pages, site, profile, ran, failed };
 }

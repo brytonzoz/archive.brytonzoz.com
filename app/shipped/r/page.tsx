@@ -2,33 +2,34 @@ import React from 'react';
 import type { Metadata } from 'next';
 import { PrintedReceiptView } from '../../../components/shipped/PrintedReceipt';
 import { SHIPPED_OG_IMAGE } from '../../../lib/shipped';
+import { SHIPPED_URL } from '../../../lib/shipped-year';
 
 export const dynamic = 'force-static';
 
-// The shell for every /shipped/r/<id>/ page. worker/shipped.ts serves it with this receipt's title,
+// The shell for every /r/<id>/ page. worker/shipped.ts serves it with this receipt's title,
 // description, preview image and data swapped in, so every tag below needs to exist to be rewritten.
 const TITLE = 'A printed receipt | Shipped';
-const DESCRIPTION = 'Everything they shipped this year, itemized. Printed at brytonzoz.com/shipped.';
+const DESCRIPTION = 'Everything they shipped this year, itemized. Printed at shipped.brytonzoz.com.';
 const ALT = 'A printed receipt: what someone shipped this year, one line per item';
 
 export const metadata: Metadata = {
   title: { absolute: TITLE },
   description: DESCRIPTION,
-  alternates: { canonical: '/shipped/r/' },
+  alternates: { canonical: `${SHIPPED_URL}/r/` },
   openGraph: {
     title: TITLE,
     description: DESCRIPTION,
-    url: '/shipped/r/',
+    url: `${SHIPPED_URL}/r/`,
     siteName: 'Bryton Zoz',
     type: 'website',
-    images: [{ url: SHIPPED_OG_IMAGE, width: 1200, height: 675, alt: ALT }],
+    images: [{ url: `${SHIPPED_URL}${SHIPPED_OG_IMAGE}`, width: 1200, height: 675, alt: ALT }],
   },
   twitter: {
     card: 'summary_large_image',
     site: '@BrytonZoz',
     title: TITLE,
     description: DESCRIPTION,
-    images: [{ url: SHIPPED_OG_IMAGE, alt: ALT }],
+    images: [{ url: `${SHIPPED_URL}${SHIPPED_OG_IMAGE}`, alt: ALT }],
   },
 };
 

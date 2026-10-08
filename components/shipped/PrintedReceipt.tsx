@@ -1,7 +1,6 @@
 'use client';
 
 import React, { useEffect, useMemo, useState } from 'react';
-import Link from 'next/link';
 import { ShippedStage, type Opening } from './ShippedStage';
 import type { Loaded } from './visitor';
 
@@ -16,11 +15,11 @@ function readInjected(): Loaded | null {
 }
 
 function idFromPath(): number | null {
-  const match = window.location.pathname.match(/^\/shipped\/r\/(\d{1,9})\/?$/);
+  const match = window.location.pathname.match(/^\/(?:shipped\/)?r\/(\d{1,9})\/?$/);
   return match ? Number(match[1]) : null;
 }
 
-/** /shipped/r/<id>/: the Worker injects the receipt into the page; fetched if it isn't there. */
+/** /r/<id>/: the Worker injects the receipt into the page; fetched if it isn't there. */
 export function PrintedReceiptView() {
   const [loaded, setLoaded] = useState<Loaded | null | undefined>(undefined);
 
@@ -41,9 +40,9 @@ export function PrintedReceiptView() {
     <>
       <ShippedStage opening={opening} title="Print your Shipped receipt" />
       <p className="text-center text-[12px] text-[#f3ead8]/60">
-        <Link href="/shipped/" className="underline underline-offset-4">
+        <a href="/" className="underline underline-offset-4">
           See Bryton’s receipt
-        </Link>
+        </a>
       </p>
     </>
   );

@@ -30,7 +30,7 @@ export function SandboxPay() {
       body: JSON.stringify({ checkout: params.checkout, amount: params.amount, sig: params.sig }),
     }).catch(() => null);
     if (response?.ok) {
-      window.location.assign(`/shipped/?sponsor=paid&checkout=${encodeURIComponent(params.checkout)}#sponsor`);
+      window.location.assign(`/?sponsor=paid&checkout=${encodeURIComponent(params.checkout)}#sponsor`);
       return;
     }
     setError('The sandbox didn’t accept that payment (it only runs on staging).');
@@ -67,7 +67,7 @@ export function SandboxPay() {
             <button type="button" className="shipped-button" onClick={pay} disabled={busy}>
               {busy ? 'PAYING…' : 'PAY (TEST)'}
             </button>
-            <a href="/shipped/?sponsor=cancelled#sponsor" className="shipped-button is-ghost">
+            <a href="/?sponsor=cancelled#sponsor" className="shipped-button is-ghost">
               CANCEL
             </a>
           </div>

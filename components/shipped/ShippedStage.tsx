@@ -7,7 +7,7 @@
 import React, { useEffect, useRef, useState } from 'react';
 import Link from 'next/link';
 import { track } from '../../lib/analytics';
-import { RECEIPT_PATH, readQuery, receiptNumber, type Candidate } from '../../lib/shipped-year';
+import { RECEIPT_PATH, SHIPPED_HOST, readQuery, receiptNumber, type Candidate } from '../../lib/shipped-year';
 import { Machine, type Job, type Tone } from './Machine';
 import { Line, Rule, Tall } from './paper';
 import { refreshShippedState, useShippedState } from './state';
@@ -340,9 +340,10 @@ export function ShippedStage({ opening, title }: { opening: Opening; title: Reac
             <ShareBar receipt={current.receipt} />
             <p className="mt-2 text-center text-[11px] text-[#f3ead8]/55">
               Its own page:{' '}
-              <Link href={RECEIPT_PATH(current.receipt.id)} className="underline">
-                brytonzoz.com{RECEIPT_PATH(current.receipt.id)}
-              </Link>
+              <a href={RECEIPT_PATH(current.receipt.id)} className="underline">
+                {SHIPPED_HOST}
+                {RECEIPT_PATH(current.receipt.id)}
+              </a>
             </p>
           </div>
         ) : job.key === 'house' && torn ? (

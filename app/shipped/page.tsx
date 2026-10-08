@@ -6,7 +6,7 @@ import { Receipt } from '../../components/shipped/Receipt';
 import { ShippedStage } from '../../components/shipped/ShippedStage';
 import { SponsorDesk } from '../../components/shipped/SponsorDesk';
 import { SHIPPED_OG_IMAGE } from '../../lib/shipped';
-import { SITE_YEAR } from '../../lib/shipped-year';
+import { SHIPPED_URL, SITE_YEAR } from '../../lib/shipped-year';
 
 export const dynamic = 'force-static';
 
@@ -26,17 +26,17 @@ export const metadata: Metadata = {
       noarchive: true,
     },
   },
-  alternates: { canonical: '/shipped/' },
+  alternates: { canonical: `${SHIPPED_URL}/` },
   openGraph: {
     title: `${TITLE} — Bryton Zoz`,
     description: DESCRIPTION,
-    url: '/shipped/',
+    url: `${SHIPPED_URL}/`,
     siteName: 'Bryton Zoz',
     type: 'website',
     locale: 'en_US',
     images: [
       {
-        url: SHIPPED_OG_IMAGE,
+        url: `${SHIPPED_URL}${SHIPPED_OG_IMAGE}`,
         width: 1200,
         height: 630,
         alt: 'A long printed receipt itemizing every business and app Bryton Zoz has started, by year',
@@ -49,7 +49,7 @@ export const metadata: Metadata = {
     site: '@BrytonZoz',
     title: `${TITLE} — Bryton Zoz`,
     description: DESCRIPTION,
-    images: [SHIPPED_OG_IMAGE],
+    images: [`${SHIPPED_URL}${SHIPPED_OG_IMAGE}`],
   },
 };
 

@@ -31,6 +31,7 @@ import { supporterReceiptSvg } from '../lib/receipt-svg';
 import { money } from '../lib/shipped-receipt';
 import {
   RECEIPT_PATH,
+  SHIPPED_HOST,
   CARD_PATH,
   isDomain,
   isGithubLogin,
@@ -66,6 +67,8 @@ import {
 
 export interface ShippedEnv extends AiEnv, PayEnv, SourceEnv {
   DB?: D1Database;
+  /** Shipped's own host (worker/shipped-host.ts). */
+  SHIPPED_HOST?: string;
   SHIPPED?: R2Bucket;
   TURNSTILE_SITE_KEY?: string;
   TURNSTILE_SECRET_KEY?: string;
@@ -94,6 +97,11 @@ export function withKeyAliases<T extends ShippedEnv>(env: T): T {
   if (anthropic === env.ANTHROPIC_API_KEY && tinyfish === env.TINYFISH_API_KEY && workspace === env.ANTHROPIC_WORKSPACE_ID) return env;
   // A prototype link keeps every binding (DB, R2, ASSETS) reachable without copying them.
   return Object.assign(Object.create(env) as T, { ANTHROPIC_API_KEY: anthropic, TINYFISH_API_KEY: tinyfish, ANTHROPIC_WORKSPACE_ID: workspace });
+}
+
+/** Where Shipped's Stripe return URLs point: this request's origin when it's already on the Shipped host. */
+function shippedOrigin(env: ShippedEnv, url: URL): string {
+  return !env.SHIPPED_HOST || url.host === env.SHIPPED_HOST ? url.origin : `https://${env.SHIPPED_HOST}`;
 }
 
 const HOUR = 3_600_000;
@@ -733,7 +741,7 @@ async function createSponsor(request: Request, env: ShippedEnv): Promise<Respons
       label: `Supporter shout-out: ${config.label}, ${config.days} days`,
       description: `"${check.text}" in the PAID FOR BY block on shared Shipped receipts for ${config.days} days once approved, plus a downloadable receipt image. Refunded in full if not approved.`,
       amountCents: amount,
-      origin: new URL(request.url).origin,
+      origin: shippedOrigin(env, new URL(request.url)),
       // Closes 5 minutes before the line stops being held (Stripe's minimum is 30 minutes).
       expiresAt: Math.floor(Date.now() / 1000) + Math.max(30, SPONSOR_CONFIG.checkoutHoldMinutes - 5) * 60,
     });
@@ -961,7 +969,7 @@ async function sharePage(request: Request, env: ShippedEnv & { ASSETS: Fetcher }
   const who = subjectLabel(receipt.subject);
   const n = itemsShipped(receipt);
   const title = receipt.potential ? `${who}: shipped in ${receipt.year} (potential) | Shipped` : `${who} shipped ${n} thing${n === 1 ? '' : 's'} in ${receipt.year} | Shipped`;
-  const description = `${shareText(receipt)} Printed at brytonzoz.com/shipped.`;
+  const description = `${shareText(receipt)} Printed at ${SHIPPED_HOST}.`;
   const page = new URL(RECEIPT_PATH(receipt.id), url).toString();
   const image = new URL(CARD_PATH(receipt.id), url).toString();
   const alt = `A printed receipt: what ${who} shipped in ${receipt.year}, one line per item`;

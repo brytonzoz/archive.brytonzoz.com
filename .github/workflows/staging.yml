@@ -179,6 +179,7 @@ jobs:
           script: |
             const marker = '<!-- staging-deploy -->';
             const body = `${marker}\n**Staging is live:** ${process.env.STAGING_URL}\n\n` +
+              'Shipped on staging: https://shipped-staging.brytonzoz.com/\n\n' +
               `Built from \`${context.payload.pull_request.head.sha.slice(0, 7)}\`. ` +
               'Review it there; merging this pull request publishes it to https://brytonzoz.com.';
             const { owner, repo } = context.repo;

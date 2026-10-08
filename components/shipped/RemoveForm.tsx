@@ -3,7 +3,6 @@
 // "Not you? Remove this receipt": sends a takedown request to /admin. Removing takes the receipt down
 // and stops that name, handle or site from being printed again.
 import React, { useEffect, useRef, useState } from 'react';
-import Link from 'next/link';
 import { receiptNumber } from '../../lib/shipped-year';
 import { Rule, Ticket } from './paper';
 import { useShippedState } from './state';
@@ -86,9 +85,9 @@ export function RemoveForm() {
         <p className="mt-4 text-center text-[12.5px]">Open this page from the “Not you?” link on the receipt.</p>
       )}
       <p className="mt-5 text-center text-[12px]">
-        <Link href="/shipped/" className="shipped-link font-semibold">
+        <a href="/" className="shipped-link font-semibold">
           Back to Shipped
-        </Link>
+        </a>
       </p>
     </Ticket>
   );

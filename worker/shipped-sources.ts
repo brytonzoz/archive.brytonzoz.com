@@ -53,7 +53,7 @@ export interface SourceProvider {
   run(ctx: SourceContext): Promise<Found[]>;
 }
 
-const UA = 'brytonzoz.com-shipped (+https://brytonzoz.com/shipped/)';
+const UA = 'brytonzoz.com-shipped (+https://shipped.brytonzoz.com/)';
 const TIMEOUT = 7000;
 
 export class SourceError extends Error {

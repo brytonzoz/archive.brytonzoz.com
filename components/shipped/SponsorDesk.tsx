@@ -1,7 +1,6 @@
 'use client';
 
 import React, { useEffect, useRef, useState } from 'react';
-import Link from 'next/link';
 import { ditherLogo, type DitheredLogo } from '../../lib/dither';
 import { money } from '../../lib/shipped-receipt';
 import { SPONSOR_CONFIG, SPONSOR_TIERS, priceCents, validateSponsor, type SponsorTier } from '../../lib/shipped-sponsors';
@@ -265,9 +264,9 @@ export function SponsorDesk({ initialTier = 'name' }: { initialTier?: SponsorTie
         images) for {SPONSOR_CONFIG.tiers.name.days} days, plus a downloadable receipt image. Not on Bryton’s own receipt. The counts above
         are what’s happened so far, not a promise: no traffic, clicks, views or impressions are guaranteed, and links are marked
         sponsored. Nothing runs until Bryton approves it; if it isn’t approved you’re refunded in full automatically.{' '}
-        <Link href="/shipped/refunds/" className="shipped-link">
+        <a href="/refunds/" className="shipped-link">
           Refund policy
-        </Link>
+        </a>
       </p>
     </Ticket>
   );

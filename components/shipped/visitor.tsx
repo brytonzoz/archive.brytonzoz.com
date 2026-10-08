@@ -2,7 +2,6 @@
 
 // A visitor's printed receipt on Bryton's template, and what to do next with it: share it.
 import React, { useState } from 'react';
-import Link from 'next/link';
 import { track } from '../../lib/analytics';
 import { receiptDate } from '../../lib/shipped';
 import {
@@ -58,12 +57,12 @@ export function VisitorReceipt({ receipt, paidFor }: Loaded) {
             {receipt.demo ? ' (demo print: no AI on this server)' : ', itemized by AI'}. Only public, professional work.
           </p>
           <p className="mt-2 space-x-3">
-            <Link href={`/shipped/remove/?id=${receipt.id}`} className="shipped-link">
+            <a href={`/remove/?id=${receipt.id}`} className="shipped-link">
               Not you? Remove this receipt
-            </Link>
-            <Link href="/shipped/#sponsor" className="shipped-link">
+            </a>
+            <a href="/#sponsor" className="shipped-link">
               Sponsor this receipt
-            </Link>
+            </a>
           </p>
         </>
       }

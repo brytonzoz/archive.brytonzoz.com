@@ -1,8 +1,9 @@
 {
   "$schema": "node_modules/wrangler/config-schema.json",
   // Static assets are served straight from Cloudflare's edge; the script in worker/ only runs for
-  // /audio/* (songs streamed from R2), /api/* (metrics, notify list, store, /shipped), /go/* (campaign
-  // links) and /shipped/r/* (printed receipts' share pages).
+  // /audio/* (songs streamed from R2), /api/* (metrics, notify list, store, Shipped), /go/* (campaign
+  // links), and Shipped's pages: at the root of SHIPPED_HOST, and /shipped/* redirecting there from
+  // every other host (worker/shipped-host.ts). On brytonzoz.com, / and /robots.txt just pass through.
   "name": "archive",
   "account_id": "480a4eebfef4c5ba2d0e225fde891ae8",
   "compatibility_date": "2026-09-01",
@@ -12,13 +13,17 @@
     "binding": "ASSETS",
     "html_handling": "auto-trailing-slash",
     "not_found_handling": "404-page",
-    "run_worker_first": ["/audio/*", "/api/*", "/go/*", "/shipped/r/*"]
+    "run_worker_first": [
+      "/audio/*", "/api/*", "/go/*",
+      "/", "/robots.txt", "/r/*", "/refunds", "/refunds/*", "/remove", "/remove/*", "/sandbox-pay", "/sandbox-pay/*",
+      "/shipped", "/shipped/*"
+    ]
   },
   // Fonts for the receipts' preview images (worker/shipped-og.ts).
   "rules": [{ "type": "Data", "globs": ["**/*.ttf"], "fallthrough": true }],
   // SITE_ENV gates staging-only behavior (Stripe test keys only for sponsors, Turnstile test keys, AI-less demo prints).
   // ANTHROPIC_WORKSPACE_DEFAULT: /shipped's Claude workspace (an id, not a secret); a claude_workspace secret overrides it.
-  "vars": { "SITE_ENV": "production", "SHIPPED_MODEL": "claude-haiku-5-5", "SHIPPED_DAILY_CAP_USD": "5", "SHIPPED_MAX_SEARCHES": "2", "ANTHROPIC_WORKSPACE_DEFAULT": "wrkspc_015V5D4e1of8jhCEbcx6eP6W" },
+  "vars": { "SITE_ENV": "production", "SHIPPED_MODEL": "claude-haiku-5-5", "SHIPPED_DAILY_CAP_USD": "5", "SHIPPED_MAX_SEARCHES": "2", "ANTHROPIC_WORKSPACE_DEFAULT": "wrkspc_015V5D4e1of8jhCEbcx6eP6W", "SHIPPED_HOST": "shipped.brytonzoz.com" },
   "r2_buckets": [
     { "binding": "MUSIC", "bucket_name": "brytonzoz-media" },
     // /shipped: printed receipts' preview images and sponsor logos (staged until approved).
@@ -28,20 +33,23 @@
   "d1_databases": [
     { "binding": "DB", "database_name": "brytonzoz-metrics", "database_id": "be9007bc-0a13-4a48-8b21-5dd731620cb8" }
   ],
-  // `npm run deploy` -> production on brytonzoz.com (www/archive redirect via workers/redirects).
+  // `npm run deploy` -> production on brytonzoz.com (www/archive redirect via workers/redirects), and
+  // Shipped on shipped.brytonzoz.com. Custom domains create their own DNS record and certificate.
   "routes": [
-    { "pattern": "brytonzoz.com", "custom_domain": true }
+    { "pattern": "brytonzoz.com", "custom_domain": true },
+    { "pattern": "shipped.brytonzoz.com", "custom_domain": true }
   ],
   "workers_dev": false,
   // NonParallel tees: every 10 minutes, paid orders that haven't reached Printify yet are sent (worker/merch.ts).
   "triggers": { "crons": ["*/10 * * * *"] },
   "env": {
-    // `npm run deploy:staging` -> Worker "archive-staging" on workers.dev, separate from production.
+    // `npm run deploy:staging` -> Worker "archive-staging" on workers.dev, separate from production,
+    // with Shipped on shipped-staging.brytonzoz.com.
     "staging": {
-      "routes": [],
+      "routes": [{ "pattern": "shipped-staging.brytonzoz.com", "custom_domain": true }],
       "workers_dev": true,
       "triggers": { "crons": [] },
-      "vars": { "SITE_ENV": "staging", "SHIPPED_MODEL": "claude-haiku-5-5", "SHIPPED_DAILY_CAP_USD": "1", "SHIPPED_MAX_SEARCHES": "2", "ANTHROPIC_WORKSPACE_DEFAULT": "wrkspc_015V5D4e1of8jhCEbcx6eP6W" },
+      "vars": { "SITE_ENV": "staging", "SHIPPED_MODEL": "claude-haiku-5-5", "SHIPPED_DAILY_CAP_USD": "1", "SHIPPED_MAX_SEARCHES": "2", "ANTHROPIC_WORKSPACE_DEFAULT": "wrkspc_015V5D4e1of8jhCEbcx6eP6W", "SHIPPED_HOST": "shipped-staging.brytonzoz.com" },
       "r2_buckets": [
         { "binding": "MUSIC", "bucket_name": "brytonzoz-media" },
         { "binding": "SHIPPED", "bucket_name": "brytonzoz-shipped-staging" }

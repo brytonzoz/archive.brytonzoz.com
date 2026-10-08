@@ -107,7 +107,11 @@ push, and give the owner the staging link from the PR comment once the Staging w
   both organizations, the albums), `/about/` (the plain-text bio AI answers quote), `/llms.txt` (app/llms.txt/route.ts)
   and the footer's one-line bio. Change the story there, never per page. `app/robots.ts` names the search and AI
   crawlers explicitly. Only state facts the owner has confirmed (no invented bio details or genres).
-- Shipped (`/shipped/`, hidden: noindex, never linked from nav, sitemap, llms.txt or JSON-LD): a receipt-printer machine
+- Shipped (https://shipped.brytonzoz.com, staging https://shipped-staging.brytonzoz.com; hidden: noindex meta + X-Robots-Tag,
+ a robots.txt that allows crawling so the noindex is seen, never linked from nav, sitemap, llms.txt or JSON-LD). The build
+ keeps it under `app/shipped/`; `worker/shipped-host.ts` serves it at the root of `SHIPPED_HOST` (wrangler vars, Workers
+ Custom Domains in `wrangler.jsonc`, so no DNS work) and 301s brytonzoz.com/shipped/* there. Inside it, link with plain
+ `<a>` to root paths (`/`, `/r/<id>/`), never `next/link` to `/shipped/...`. A receipt-printer machine
  prints Bryton's "SHIPPED IN <year>" receipt (`components/shipped/BrytonReceipt.tsx`, from `data/shipped/businesses.json`),
  then PRINT YOURS runs the same machine for any name, @handle, GitHub user or domain (`ShippedStage.tsx`: the one
  printer and the self-serve panel; `Machine.tsx` does the line-by-line feed and drag/tap/key tear, `physics.ts` the

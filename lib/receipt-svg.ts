@@ -203,7 +203,7 @@ export function masterReceiptSvg(data: MasterOg): string {
     left.push(txt(72, y, line.value.padStart(2, ' '), 28, { weight: 600, fill: CREAM }), txt(130, y, line.label, 22, { fill: CREAM, opacity: 0.7 }));
     y += 42;
   }
-  left.push(txt(72, 586, 'brytonzoz.com/shipped', 18, { fill: CREAM, opacity: 0.5 }));
+  left.push(txt(72, 586, 'shipped.brytonzoz.com', 18, { fill: CREAM, opacity: 0.5 }));
 
   const c = PAPER_W / 2;
   const body: string[] = [...header(c, data.date, 'BZ-SHIPPED'), inverse(c, 180, 'SHIPPED', 15), leader(212, 'ITEMS', String(data.items), 12)];
@@ -262,7 +262,7 @@ export function supporterReceiptSvg(data: SupporterOg): string {
   body.push(txt(c, y, data.status, 11, { weight: 600, anchor: 'middle' }));
   body.push(txt(c, y + 20, 'THANK YOU FOR SUPPORTING.', 11, { anchor: 'middle', opacity: 0.7 }));
   body.push(barcode(64, y + 40, 272, 34, data.barcode));
-  body.push(txt(c, y + 96, 'BRYTONZOZ.COM/SHIPPED', 10, { anchor: 'middle', opacity: 0.6 }));
+  body.push(txt(c, y + 96, 'SHIPPED.BRYTONZOZ.COM', 10, { anchor: 'middle', opacity: 0.6 }));
   const height = y + 126;
   return scene(PAPER_W + 120, height + 120, sheet(height, body.join(''), 'translate(60 50) rotate(-0.8 200 0)', `supporter:${data.number}`), 2);
 }
@@ -322,7 +322,7 @@ export function yearCardSvg(data: YearOg): string {
   left.push(txt(72, 536, 'This receipt was paid for by', 14, { fill: CREAM, opacity: 0.45 }));
   if (data.paidFor.presented) left.push(txt(72, 564, fit(`PRESENTED BY ${data.paidFor.presented.toUpperCase()}`, 40), 18, { weight: 600, fill: CREAM }));
   left.push(txt(72, data.paidFor.presented ? 590 : 566, fit(paidForText(data.paidFor).toUpperCase(), 46), 17, { weight: 600, fill: CREAM, opacity: 0.85 }));
-  left.push(txt(72, 632, 'Print yours: brytonzoz.com/shipped', 15, { fill: CREAM, opacity: 0.5 }));
+  left.push(txt(72, 632, 'Print yours: shipped.brytonzoz.com', 15, { fill: CREAM, opacity: 0.5 }));
 
   const c = PAPER_W / 2;
   const body: string[] = [...header(c, data.date, data.number), ...customer(c, 180, data.year, data.who), rule(258)];
@@ -380,7 +380,7 @@ export function yearTallSvg(data: YearOg): string {
   y += 24;
   body.push(barcode(64, y, 272, 34, data.barcode));
   y += 56;
-  body.push(txt(c, y, 'PRINTED AT BRYTONZOZ.COM/SHIPPED', 10.5, { weight: 600, anchor: 'middle' }));
+  body.push(txt(c, y, 'PRINTED AT SHIPPED.BRYTONZOZ.COM', 10.5, { weight: 600, anchor: 'middle' }));
   body.push(txt(c, y + 16, '*** CUSTOMER COPY ***', 10, { anchor: 'middle', opacity: 0.6 }));
   body.push(txt(c, y + 32, fit(data.url, 52), 9.5, { anchor: 'middle', opacity: 0.55 }));
   const height = y + 56;

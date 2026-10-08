@@ -68,9 +68,12 @@ export type PaidBy = {
 export type PaidFor = { presented: PaidBy | null; lines: PaidBy[] };
 
 export const receiptNumber = (id: number) => String(id).padStart(6, '0');
-export const RECEIPT_PATH = (id: number) => `/shipped/r/${id}/`;
-export const CARD_PATH = (id: number) => `/shipped/r/${id}/og.png`;
-export const TALL_PATH = (id: number) => `/shipped/r/${id}/receipt.png`;
+/** Shipped lives at the root of its own host; brytonzoz.com/shipped/* redirects there (worker/index.ts). */
+export const SHIPPED_HOST = 'shipped.brytonzoz.com';
+export const SHIPPED_URL = `https://${SHIPPED_HOST}`;
+export const RECEIPT_PATH = (id: number) => `/r/${id}/`;
+export const CARD_PATH = (id: number) => `/r/${id}/og.png`;
+export const TALL_PATH = (id: number) => `/r/${id}/receipt.png`;
 
 const MONTHS = ['JAN', 'FEB', 'MAR', 'APR', 'MAY', 'JUN', 'JUL', 'AUG', 'SEP', 'OCT', 'NOV', 'DEC'];
 

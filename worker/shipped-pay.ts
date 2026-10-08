@@ -84,7 +84,7 @@ function sandboxProvider(env: PayEnv): SponsorProvider {
     checkoutId: SANDBOX_ID,
     async createCheckout({ lineId, label, amountCents, origin }) {
       const checkoutId = `sbx_${crypto.randomUUID().replace(/-/g, '')}`;
-      const url = new URL('/shipped/sandbox-pay/', origin);
+      const url = new URL('/sandbox-pay/', origin);
       url.searchParams.set('checkout', checkoutId);
       url.searchParams.set('line', String(lineId));
       url.searchParams.set('amount', String(amountCents));
@@ -149,7 +149,7 @@ function stripeProvider(env: PayEnv, live: boolean): SponsorProvider {
     live,
     checkoutId: /^cs_(test|live)_[A-Za-z0-9]{10,200}$/,
     async createCheckout({ lineId, tier, label, description, amountCents, origin, expiresAt }) {
-      const metadata = { kind: SPONSOR_KIND, line_id: String(lineId), tier, source: 'brytonzoz.com/shipped' };
+      const metadata = { kind: SPONSOR_KIND, line_id: String(lineId), tier, source: 'shipped.brytonzoz.com' };
       const session = await stripe<SponsorSession>(env, 'POST', 'checkout/sessions', {
         mode: 'payment',
         submit_type: 'pay',
@@ -157,10 +157,10 @@ function stripeProvider(env: PayEnv, live: boolean): SponsorProvider {
         // Stripe Tax needs the buyer's location; for a digital good that's the billing address.
         billing_address_collection: 'required',
         expires_at: expiresAt,
-        success_url: `${origin}/shipped/?sponsor=paid&checkout={CHECKOUT_SESSION_ID}#sponsor`,
-        cancel_url: `${origin}/shipped/?sponsor=cancelled#sponsor`,
+        success_url: `${origin}/?sponsor=paid&checkout={CHECKOUT_SESSION_ID}#sponsor`,
+        cancel_url: `${origin}/?sponsor=cancelled#sponsor`,
         metadata,
-        payment_intent_data: { metadata, description: `brytonzoz.com/shipped: ${label}` },
+        payment_intent_data: { metadata, description: `shipped.brytonzoz.com: ${label}` },
         line_items: [
           {
             quantity: 1,

@@ -1,6 +1,5 @@
 import React from 'react';
 import type { Metadata } from 'next';
-import Link from 'next/link';
 import { Line, Rule, Ticket } from '../../../components/shipped/paper';
 import { ARTIST } from '../../../lib/artist';
 import { money } from '../../../lib/shipped-receipt';
@@ -10,7 +9,7 @@ export const dynamic = 'force-static';
 
 export const metadata: Metadata = {
   title: { absolute: 'Refund policy: supporter shout-outs | Shipped' },
-  description: 'How refunds work for supporter shout-outs on brytonzoz.com/shipped.',
+  description: 'How refunds work for supporter shout-outs on shipped.brytonzoz.com.',
 };
 
 function Section({ title, children }: { title: string; children: React.ReactNode }) {
@@ -37,7 +36,7 @@ export default function RefundsPage() {
         <Section title="WHAT YOU’RE BUYING">
           <p>
             A supporter shout-out: your name or logo in the THIS RECEIPT PAID FOR BY block on the Shipped receipts people print and
-            share at brytonzoz.com/shipped (their pages and share images), plus a downloadable image of your supporter receipt. Lines
+            share at shipped.brytonzoz.com (their pages and share images), plus a downloadable image of your supporter receipt. Lines
             rotate, so each receipt shows a few of the running lines at a time. It isn’t on Bryton’s own receipt. It isn’t a donation or
             advertising: no traffic, clicks, views, impressions or search ranking are promised, and links are marked sponsored. There’s
             no goal it funds and there are no prizes. Prices, before tax:
@@ -88,9 +87,9 @@ export default function RefundsPage() {
         </Section>
 
         <p className="mt-5 text-center text-[12px]">
-          <Link href="/shipped/#sponsor" className="shipped-link font-semibold">
+          <a href="/#sponsor" className="shipped-link font-semibold">
             Back to the sponsor desk
-          </Link>
+          </a>
         </p>
       </article>
     </Ticket>

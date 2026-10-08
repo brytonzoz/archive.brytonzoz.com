@@ -5,11 +5,14 @@
 import { handleApi, type MetricsEnv } from './metrics';
 import { placeManualOrders, reconcileMerch, type MerchEnv } from './merch';
 import { handleShipped, handleShippedPage } from './shipped';
+import { handleShippedHost } from './shipped-host';
 import { handleStore } from './store';
 
 interface Env extends MetricsEnv, MerchEnv {
   ASSETS: Fetcher;
   MUSIC: R2Bucket;
+  /** Shipped's own host (worker/shipped-host.ts); brytonzoz.com/shipped/* redirects there. */
+  SHIPPED_HOST?: string;
 }
 
 const AUDIO_PREFIX = '/audio/';
@@ -112,7 +115,10 @@ export default {
     if (url.pathname.startsWith('/api/')) {
       return (await handleShipped(request, env, ctx)) ?? (await handleStore(request, env)) ?? handleApi(request, env);
     }
-    // Printed receipts: share pages and their share images (worker/shipped.ts).
+    // Shipped at the root of its own host, and the redirects to it (worker/shipped-host.ts).
+    const shipped = await handleShippedHost(request, env, ctx);
+    if (shipped) return shipped;
+    // Without SHIPPED_HOST (local dev), receipts stay under /shipped/r/ (worker/shipped.ts).
     if (url.pathname.startsWith('/shipped/r/')) return handleShippedPage(request, env, ctx);
     // Campaign links for posts and bios: brytonzoz.com/go/ig -> the homepage, tagged "ig" in /admin.
     if (url.pathname.startsWith('/go/')) {

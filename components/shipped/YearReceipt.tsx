@@ -174,9 +174,9 @@ export function YearReceipt(props: YearReceiptProps) {
         <Barcode value={props.barcode} />
         <p className="mt-2">
           PRINTED AT{' '}
-          <Link href="/shipped/" className="shipped-link font-semibold">
-            BRYTONZOZ.COM/SHIPPED
-          </Link>
+          <a href="/" className="shipped-link font-semibold">
+            SHIPPED.BRYTONZOZ.COM
+          </a>
         </p>
         <p className="mt-1 opacity-60">*** CUSTOMER COPY ***</p>
         {props.fine ? <div className="mt-3 text-[10.5px] leading-relaxed opacity-70">{props.fine}</div> : null}

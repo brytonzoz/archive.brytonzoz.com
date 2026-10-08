@@ -12,9 +12,17 @@ import { Ticket } from './paper';
 import { feedFrames, rubber, spring, springStep, stubClip, tornEdge, type SpringConfig } from './physics';
 import { click, motorOff, motorOn, rip, tick, useSound } from './sound';
 
+type JobBase = {
+  key: string;
+  label: string;
+  /** The receipt before this one vanishes without sliding off: the page animates its own copy away. */
+  handoff?: boolean;
+};
+
 export type Job =
-  | { key: string; kind: 'print'; label: string; content: React.ReactNode; slip?: boolean; end?: boolean }
-  | { key: string; kind: 'feed'; label: string };
+  | (JobBase & { kind: 'print'; content: React.ReactNode; slip?: boolean; end?: boolean; fast?: boolean })
+  | (JobBase & { kind: 'feed' })
+  | (JobBase & { kind: 'idle' });
 
 export type Tone = 'ready' | 'busy' | 'error' | 'empty';
 
@@ -27,9 +35,13 @@ export type MachineProps = {
   onTorn?: (key: string) => void;
   /** Tear the hanging receipt now (another job is about to print). */
   tearSignal?: number;
+  /** Tallest the paper may hang (px) so the page never scrolls; a longer receipt scrolls inside once torn. */
+  paperMax?: number;
 };
 
-type Phase = 'feeding' | 'printing' | 'hanging' | 'tearing' | 'torn';
+type Phase = 'idle' | 'feeding' | 'printing' | 'hanging' | 'tearing' | 'torn';
+
+const phaseFor = (job: Job): Phase => (job.kind === 'feed' ? 'feeding' : job.kind === 'idle' ? 'idle' : 'printing');
 type Vec = { x: number; y: number; r: number };
 
 const REST_Y = 30;
@@ -80,8 +92,9 @@ function runSpring(el: HTMLElement, from: Vec, to: Vec, velocity: Vec, config: S
   return () => cancelAnimationFrame(frame);
 }
 
-export function Machine({ job, display, tone, onPrinted, onTorn, tearSignal = 0 }: MachineProps) {
-  const [phase, setPhase] = useState<Phase>(job.kind === 'feed' ? 'feeding' : 'printing');
+export function Machine({ job, display, tone, onPrinted, onTorn, tearSignal = 0, paperMax }: MachineProps) {
+  const [phase, setPhase] = useState<Phase>(phaseFor(job));
+  const [more, setMore] = useState(false);
   const [leaving, setLeaving] = useState<{ key: string; job: Job; transform: string } | null>(null);
   const [shown, setShown] = useState<Job>(job);
   const [stubSeed, setStubSeed] = useState<string | null>(null);
@@ -104,7 +117,7 @@ export function Machine({ job, display, tone, onPrinted, onTorn, tearSignal = 0 
       if (job !== shown) setShown(job);
       return;
     }
-    if (shown.kind === 'print' && pull.current && !reducedMotion()) {
+    if (shown.kind === 'print' && pull.current && !reducedMotion() && !job.handoff) {
       setLeaving({ key: shown.key, job: shown, transform: pull.current.style.transform });
     }
     stop.current?.();
@@ -112,7 +125,7 @@ export function Machine({ job, display, tone, onPrinted, onTorn, tearSignal = 0 
     if (shown.kind === 'print') setStubSeed(shown.key);
     setHint(false);
     setShown(job);
-    setPhase(job.kind === 'feed' ? 'feeding' : 'printing');
+    setPhase(phaseFor(job));
   }, [job, shown]);
 
   /** Rotation pivots at the tear bar, so a long receipt swings less or its foot would fly off the counter. */
@@ -170,7 +183,7 @@ export function Machine({ job, display, tone, onPrinted, onTorn, tearSignal = 0 
       return;
     }
     const height = el.offsetHeight;
-    const { frames, duration } = feedFrames(height, shown.key, shown.slip ? 0.45 : 0.8);
+    const { frames, duration } = feedFrames(height, shown.key, shown.slip ? 0.45 : shown.fast ? 0.9 : 0.36);
     const animation = el.animate(frames, { duration, fill: 'both' });
     const shiver = body.current?.animate(
       [{ transform: 'translateY(0)' }, { transform: 'translateY(0.7px)' }, { transform: 'translateY(-0.3px)' }, { transform: 'translateY(0)' }],
@@ -247,6 +260,7 @@ export function Machine({ job, display, tone, onPrinted, onTorn, tearSignal = 0 
       }
       d.moved = true;
       swallowClick.current = true;
+      window.getSelection()?.removeAllRanges();
       (event.currentTarget as HTMLElement).setPointerCapture(event.pointerId);
     }
     const now = performance.now();
@@ -328,6 +342,21 @@ export function Machine({ job, display, tone, onPrinted, onTorn, tearSignal = 0 
     };
   }, [phase]);
 
+  // A receipt taller than the window fades out at the bottom until it's scrolled to the end.
+  useEffect(() => {
+    const el = tilt.current;
+    if (!el) return;
+    const check = () => setMore(el.scrollHeight - el.scrollTop - el.clientHeight > 4);
+    check();
+    el.addEventListener('scroll', check, { passive: true });
+    const observer = new ResizeObserver(check);
+    observer.observe(el);
+    return () => {
+      el.removeEventListener('scroll', check);
+      observer.disconnect();
+    };
+  }, [shown.key, phase, paperMax]);
+
   // The receipt that just left slides off, then goes.
   const leavingEl = useRef<HTMLDivElement>(null);
   useEffect(() => {
@@ -346,10 +375,12 @@ export function Machine({ job, display, tone, onPrinted, onTorn, tearSignal = 0 
 
   const ownStub = shown.kind === 'print' && (phase === 'tearing' || phase === 'torn');
   const stubKey = ownStub ? shown.key : stubSeed;
-  const stubVisible = ownStub || phase === 'feeding';
+  const stubVisible = ownStub || phase === 'feeding' || (phase === 'idle' && stubKey !== null);
   const lead = shown.kind === 'feed';
   const status =
-    phase === 'feeding'
+    phase === 'idle'
+      ? ''
+      : phase === 'feeding'
       ? display
       : phase === 'printing'
         ? `Printing: ${shown.label}`
@@ -438,7 +469,13 @@ export function Machine({ job, display, tone, onPrinted, onTorn, tearSignal = 0 
               }}
             >
               {phase === 'hanging' ? <div className="shipped-grip" aria-hidden="true" style={{ height: GRIP }} /> : null}
-              <div className="shipped-tilt" ref={tilt}>
+              <div
+                className={`shipped-tilt${phase === 'torn' ? ' is-scroll' : ''}${more ? ' is-more' : ''}`}
+                ref={tilt}
+                style={paperMax ? { maxHeight: paperMax } : undefined}
+                tabIndex={phase === 'torn' && more ? 0 : undefined}
+                aria-label={phase === 'torn' && more ? `${shown.label}, scrollable` : undefined}
+              >
                 <Ticket seed={shown.key} label={shown.label} slip={shown.slip} className={shown.end ? 'is-end' : ''}>
                   {shown.content}
                 </Ticket>

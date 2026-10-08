@@ -35,6 +35,8 @@ export type YearReceiptProps = {
   after?: React.ReactNode;
   /** Small print under the barcode. */
   fine?: React.ReactNode;
+  /** Item names and statuses only (the opening example). */
+  compact?: boolean;
 };
 
 function ItemName({ item }: { item: ViewItem }) {
@@ -141,7 +143,7 @@ export function YearReceipt(props: YearReceiptProps) {
                 {item.status}
               </p>
             </div>
-            {item.date || item.description ? (
+            {!props.compact && (item.date || item.description) ? (
               <p className="mt-0.5 text-[11.5px] leading-[1.45] opacity-80">
                 {item.description}
                 {item.date ? <span className="whitespace-nowrap opacity-75">{item.description ? '  ' : ''}{item.date}</span> : null}

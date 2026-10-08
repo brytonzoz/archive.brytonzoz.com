@@ -659,6 +659,14 @@
   cursor: grab;
 }
 
+/* A drag is a pull, not a text selection; once it's torn off the text can be selected and copied. */
+.is-printing .shipped-pull,
+.is-hanging .shipped-pull,
+.is-tearing .shipped-pull {
+  -webkit-user-select: none;
+  user-select: none;
+}
+
 .is-hanging .shipped-pull:active {
   cursor: grabbing;
 }

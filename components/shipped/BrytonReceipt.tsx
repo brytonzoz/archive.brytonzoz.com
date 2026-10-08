@@ -1,16 +1,15 @@
-// Bryton's own "SHIPPED IN <year>" receipt: what he started this year (data/shipped/businesses.json),
-// then everything from earlier years in short, then the PAID FOR BY block (house lines only: sponsors buy
-// space on the receipts visitors print and share, not on this one). Rendered at build time.
+// Bryton's own "SHIPPED IN <year>" receipt, the example /shipped/ opens with: what he started this year
+// (data/shipped/businesses.json), then the PAID FOR BY block (house lines only: sponsors buy space on the
+// receipts visitors print and share, not on this one). Rendered at build time.
 import React from 'react';
-import { RUNNING_STATUSES, receiptDate, yearGroups } from '../../lib/shipped';
+import { RUNNING_STATUSES, receiptDate } from '../../lib/shipped';
 import { SHIPPED_ITEMS, SHIPPED_UPDATED } from '../../lib/shipped-data';
 import { HOUSE_SPONSORS, houseLine } from '../../lib/shipped-sponsors';
 import { SITE_YEAR, type PaidFor } from '../../lib/shipped-year';
-import { Line } from './paper';
 import { YearReceipt } from './YearReceipt';
 
 const THIS_YEAR = SHIPPED_ITEMS.filter((item) => item.start === SITE_YEAR);
-const EARLIER = yearGroups(SHIPPED_ITEMS.filter((item) => item.start !== SITE_YEAR));
+export const BRYTON_COUNT = THIS_YEAR.length;
 const RUNNING = THIS_YEAR.filter((item) => RUNNING_STATUSES.has(item.status)).length;
 const DECEASED = THIS_YEAR.filter((item) => item.status === 'DECEASED').length;
 
@@ -27,7 +26,7 @@ const house = (entry: { key: string; text: string; url: string }) => ({
   logo: null,
 });
 
-export function BrytonReceipt() {
+export function BrytonReceipt({ compact = false }: { compact?: boolean }) {
   const day = Math.floor(Date.parse(SHIPPED_UPDATED) / 86_400_000);
   const paidFor: PaidFor = {
     presented: null,
@@ -54,30 +53,7 @@ export function BrytonReceipt() {
       note={note()}
       paidFor={paidFor}
       barcode="BRYTONZOZ/SHIPPED"
-      after={
-        EARLIER.length ? (
-          <section className="mt-1 pb-2" aria-label="Shipped in earlier years">
-            <p className="text-center text-[10.5px] font-semibold opacity-60">ALSO SHIPPED, EARLIER</p>
-            {EARLIER.map((group) => (
-              <div key={group.label} className="mt-2">
-                <p className="text-[10.5px] font-semibold opacity-60">{group.label}</p>
-                <ul className="mt-0.5 space-y-0.5 text-[11.5px]">
-                  {group.items.map((item) => (
-                    <li key={item.name}>
-                      <Line label={item.name.toUpperCase()} value={item.status} />
-                    </li>
-                  ))}
-                </ul>
-              </div>
-            ))}
-            <p className="mt-2 text-center text-[11px]">
-              <a href="#archive" className="shipped-link">
-                The full archive, with notes ↓
-              </a>
-            </p>
-          </section>
-        ) : null
-      }
+      compact={compact}
     />
   );
 }

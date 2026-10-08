@@ -34,10 +34,10 @@ const BOUGHT: Record<string, string> = {
   refunding: 'This shout-out is being refunded.',
 };
 
-export function SponsorDesk() {
+export function SponsorDesk({ initialTier = 'name' }: { initialTier?: SponsorTier }) {
   const state = useShippedState();
   const sponsors = state?.sponsors;
-  const [tier, setTier] = useState<SponsorTier>('name');
+  const [tier, setTier] = useState<SponsorTier>(initialTier);
   const [text, setText] = useState('');
   const [url, setUrl] = useState('');
   const [logo, setLogo] = useState<DitheredLogo | null>(null);

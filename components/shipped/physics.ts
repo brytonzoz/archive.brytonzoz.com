@@ -100,6 +100,28 @@ export function springStep(x: number, v: number, target: number, config: SpringC
   return [x + next * dt, next];
 }
 
+/**
+ * The same spring as a CSS easing, for one-shot Web Animations (the receipt flying into the example, the ticker,
+ * sheets): a `linear()` curve sampled from 0 to 1, and how long it takes to settle.
+ */
+export function springEasing(duration: number, bounce = 0, samples = 48): { easing: string; ms: number } {
+  const config = spring(duration, bounce);
+  const dt = 1 / 240;
+  const xs: number[] = [0];
+  let x = 0;
+  let v = 0;
+  let t = 0;
+  while (t < 3) {
+    [x, v] = springStep(x, v, 1, config, dt);
+    t += dt;
+    xs.push(x);
+    if (Math.abs(1 - x) < 0.001 && Math.abs(v) < 0.01) break;
+  }
+  const points = Array.from({ length: samples + 1 }, (_, i) => +xs[Math.round((i / samples) * (xs.length - 1))].toFixed(4));
+  points[samples] = 1;
+  return { easing: `linear(${points.join(', ')})`, ms: Math.round(t * 1000) };
+}
+
 /** Rubber band past a boundary: the further it goes, the less it moves. */
 export function rubber(distance: number, limit: number): number {
   const sign = Math.sign(distance);

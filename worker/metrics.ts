@@ -1,6 +1,7 @@
 // Listening metrics: /api/e takes anonymous events from the site, /api/admin/* serves the
 // dashboard at /admin. Data lives in D1 (schema: worker/schema.sql).
 import catalog from '../lib/tracks.json';
+import { atLimit, overLimit } from './shipped-guard';
 import type { MerchEnv } from './merch';
 import { adminShipped, type ShippedEnv } from './shipped';
 import { adminStore } from './store';
@@ -289,7 +290,10 @@ export async function handleApi(request: Request, env: MetricsEnv): Promise<Resp
   if (url.pathname.startsWith('/api/admin/')) {
     if (!env.ADMIN_PASSWORD) return json({ error: 'not-configured' }, 503);
     if (!env.DB) return json({ error: 'no-database' }, 503);
+    // Failed logins are counted per IP and subnet (10 / 30 an hour); past that, even the right password waits.
+    if (await atLimit(env.DB, request, 'admin')) return json({ error: 'slow-down' }, 429);
     if (!(await isAuthorized(request, env))) {
+      await overLimit(env.DB, request, 'admin');
       await new Promise((resolve) => setTimeout(resolve, 400));
       return json({ error: 'unauthorized' }, 401);
     }

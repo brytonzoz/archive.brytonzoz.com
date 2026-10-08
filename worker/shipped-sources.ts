@@ -14,6 +14,7 @@ import type { ItemSource, ItemStatus, Subject } from '../lib/shipped-year';
 import { isDomain, isGithubLogin, isXHandle } from '../lib/shipped-year';
 import { hasBlockedWord } from '../lib/shipped-sponsors';
 import { tinyfishFetch, tinyfishSearch, type TinyfishMeter, type TinyfishPage } from './shipped-tinyfish';
+import { safeFetch } from './shipped-fetch';
 
 export interface SourceEnv {
   GITHUB_TOKEN?: string;
@@ -615,10 +616,10 @@ export async function brandIcon(siteUrl: string, env: SourceEnv): Promise<string
 export async function readSite(siteUrl: string): Promise<SiteInfo | null> {
   const url = publicUrl(siteUrl);
   if (!url) return null;
-  const response = await fetch(url, { headers: { 'user-agent': UA, accept: 'text/html' }, redirect: 'follow', signal: AbortSignal.timeout(TIMEOUT) }).catch(() => null);
-  if (!response?.ok || !(response.headers.get('content-type') ?? '').includes('html')) return null;
-  const html = (await response.text()).slice(0, 400_000);
-  const base = response.url || url;
+  const page = await safeFetch(url, { accept: 'text/html', maxBytes: 600_000, timeoutMs: TIMEOUT, types: ['text/html', 'application/xhtml'], userAgent: UA }).catch(() => null);
+  if (!page) return null;
+  const html = new TextDecoder().decode(page.bytes).slice(0, 400_000);
+  const base = page.url || url;
   const abs = (href: string | null) => {
     try {
       return href ? publicUrl(new URL(decode(href), base).toString()) : null;

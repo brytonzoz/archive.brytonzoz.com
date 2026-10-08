@@ -2,6 +2,7 @@
 // (PNG/JPEG/GIF/SVG), contrast-stretched, Atkinson-dithered to 1-bit ink and saved as a tiny PNG in R2
 // (icons/<hash>.png, served at /api/shipped/icon/<hash>.png). Same look as Bryton's own logos.
 import { decodePixels } from './shipped-og';
+import { MAX_IMAGE_SIDE, imageSize, safeFetch } from './shipped-fetch';
 
 const SIZE = 48;
 const MAX_BYTES = 1_500_000;
@@ -134,14 +135,18 @@ export async function storeIcon(source: string, bucket: R2Bucket | undefined): P
   if (!bucket) return null;
   const hash = await sha(source);
   if (await bucket.head(iconKey(hash))) return iconPath(hash);
-  const response = await fetch(source, { headers: { 'user-agent': 'brytonzoz.com-shipped', accept: 'image/*' }, signal: AbortSignal.timeout(5000) }).catch(() => null);
-  if (!response?.ok) return null;
-  const length = Number(response.headers.get('content-length') ?? 0);
-  if (length > MAX_BYTES) return null;
-  const bytes = new Uint8Array(await response.arrayBuffer());
-  if (bytes.length > MAX_BYTES || bytes.length < 60) return null;
-  const mime = sniff(bytes, response.headers.get('content-type') ?? '');
+  const fetched = await safeFetch(source, { accept: 'image/*', maxBytes: MAX_BYTES, timeoutMs: 5000 }).catch(() => null);
+  if (!fetched) return null;
+  const bytes = fetched.bytes;
+  if (bytes.length < 60) return null;
+  const mime = sniff(bytes, fetched.type);
   if (!mime) return null;
+  if (mime === MIME.svg) {
+    if (bytes.length > 200_000) return null;
+  } else {
+    const size = imageSize(bytes);
+    if (!size || size.width < 8 || size.height < 8 || size.width > MAX_IMAGE_SIDE || size.height > MAX_IMAGE_SIDE) return null;
+  }
   // Google's favicon service answers unknown sites with a 16px globe: not worth printing.
   if (source.includes('google.com/s2/favicons') && mime === MIME.png && new DataView(bytes.buffer, bytes.byteOffset).getUint32(16) <= 16) return null;
   try {
@@ -167,4 +172,27 @@ export async function iconDataUri(path: string | null, bucket: R2Bucket | undefi
 
 export async function bytesDataUri(bytes: ArrayBuffer, mime = 'image/png') {
   return `data:${mime};base64,${base64(new Uint8Array(bytes))}`;
+}
+
+/**
+ * An uploaded sponsor logo, redrawn as 1-bit ink: only PNG or JPEG within the size limits are read, and only our
+ * own freshly encoded PNG is kept, so nothing from the upload (metadata, EXIF, extra chunks, scripts) survives.
+ */
+export async function reencodeLogo(bytes: Uint8Array, maxWidth: number, maxHeight: number): Promise<{ png: Uint8Array; width: number; height: number } | null> {
+  const size = imageSize(bytes);
+  if (!size || (size.type !== 'png' && size.type !== 'jpeg')) return null;
+  if (size.width < 8 || size.height < 8 || size.width > MAX_IMAGE_SIDE || size.height > MAX_IMAGE_SIDE) return null;
+  const scale = Math.min(1, maxWidth / size.width, maxHeight / size.height);
+  const width = Math.max(8, Math.round(size.width * scale));
+  const height = Math.max(8, Math.round(size.height * scale));
+  const mime = size.type === 'png' ? MIME.png : MIME.jpeg;
+  try {
+    const svg = `<svg xmlns="http://www.w3.org/2000/svg" width="${width}" height="${height}"><image width="${width}" height="${height}" preserveAspectRatio="xMidYMid meet" href="data:${mime};base64,${base64(bytes)}"/></svg>`;
+    const decoded = await decodePixels(svg);
+    const mask = dither(decoded.pixels, decoded.width, decoded.height);
+    if (!mask.some(Boolean)) return null;
+    return { png: await encodeMask(mask, decoded.width, decoded.height), width: decoded.width, height: decoded.height };
+  } catch {
+    return null;
+  }
 }

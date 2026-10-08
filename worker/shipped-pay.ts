@@ -1,9 +1,10 @@
-// Payments for /shipped supporter shout-outs, behind one small interface so the provider can change
-// without touching the sponsor flow (worker/shipped.ts).
+// Payments for Shipped 2026 (sponsor bids and $5 mailed prints), behind one small interface so the provider
+// can change without touching the flows in worker/shipped.ts.
 //
 // stripe: the site's own Stripe account and key (STRIPE_SECRET_KEY, the same one the store uses), with
-//   Stripe Tax. Sessions carry metadata kind=shipped_sponsor; the store never acts on them and this
-//   code ignores everything else. Payment is confirmed when the buyer lands back on /shipped (pulled
+//   Stripe Tax. Sessions carry metadata kind=shipped_sponsor or kind=shipped_print plus ref (the bid or
+//   order id); the store never acts on them and this code ignores everything else. express: true makes an
+//   embedded session (ui_mode elements) for the Apple Pay / Google Pay button on our own page. Payment is confirmed when the buyer lands back on /shipped (pulled
 //   from Stripe, no webhook needed); the webhook (/api/shipped/webhook/stripe, signed with
 //   STRIPE_SHIPPED_WEBHOOK_SECRET) adds async payments, expiries and refunds made in the dashboard.
 // sandbox: staging-only stand-in that moves no money (/shipped/sandbox-pay/). Only when
@@ -11,22 +12,49 @@
 import { stripe, verifySignature } from './store';
 
 export const SPONSOR_KIND = 'shipped_sponsor';
-/** Stripe Tax product code: General - Electronically Supplied Services (a printed shout-out plus a receipt image). */
+export const PRINT_KIND = 'shipped_print';
+export type PayKind = typeof SPONSOR_KIND | typeof PRINT_KIND;
+/** Stripe Tax product codes: electronically supplied services (an ad slot) and printed matter (a mailed receipt). */
 export const SPONSOR_TAX_CODE = 'txcd_10000000';
+export const PRINT_TAX_CODE = 'txcd_99999999';
 
 export type CheckoutRequest = {
-  lineId: number;
-  tier: string;
+  kind: PayKind;
+  /** The bid or print order id, echoed back in metadata. */
+  ref: string;
   label: string;
   description: string;
   amountCents: number;
   origin: string;
-  /** Unix seconds; the checkout must close before the line stops being held. */
+  /** Where the buyer lands afterwards; {CHECKOUT_SESSION_ID} is filled in by Stripe. */
+  returnPath: string;
+  cancelPath: string;
+  /** Unix seconds. */
   expiresAt: number;
+  /** Embedded session for the wallet button (returns clientSecret instead of url). */
+  express?: boolean;
+  /** Collect a US shipping address (mailed prints). */
+  shipping?: boolean;
+  metadata?: Record<string, string>;
 };
 
+export type ShippingAddress = { name: string; line1: string; line2: string; city: string; state: string; postal: string; country: string };
+
 export type SponsorEvent =
-  | { type: 'paid'; checkoutId: string; orderId: string; amountCents: number; taxCents: number; totalCents: number }
+  | {
+      type: 'paid';
+      kind: PayKind;
+      checkoutId: string;
+      orderId: string;
+      /** The bid or print order id we put in metadata, and the currency: both checked against our own row. */
+      ref: string;
+      currency: string;
+      amountCents: number;
+      taxCents: number;
+      totalCents: number;
+      email: string | null;
+      shipping: ShippingAddress | null;
+    }
   | { type: 'unpaid'; checkoutId: string }
   | { type: 'expired'; checkoutId: string }
   | { type: 'refunded'; orderId: string }
@@ -37,13 +65,15 @@ export interface SponsorProvider {
   id: string;
   /** Moves real money (false: test mode or the sandbox). */
   live: boolean;
-  createCheckout(request: CheckoutRequest): Promise<{ checkoutId: string; url: string }>;
+  createCheckout(request: CheckoutRequest): Promise<{ checkoutId: string; url: string | null; clientSecret: string | null }>;
   /** Verifies the webhook's signature; null when it isn't genuine (or no secret is configured). */
   parseWebhook(request: Request): Promise<SponsorEvent | null>;
   /** Asks the provider where a checkout stands (the buyer's return from checkout). */
   confirm?(checkoutId: string): Promise<SponsorEvent>;
-  /** The full payment back, tax included. */
-  refund(orderId: string, amountCents: number): Promise<{ ok: boolean; error?: string }>;
+  /** Money back to the way they paid: the given amount (tax-inclusive cents), or everything when omitted. `key` makes a retry a no-op. */
+  refund(orderId: string, amountCents: number | undefined, key: string): Promise<{ ok: boolean; error?: string }>;
+  /** Closes an unpaid checkout early (a wallet sheet the buyer walked away from). */
+  expire?(checkoutId: string): Promise<void>;
   /** Shape of this provider's checkout ids, which double as the buyer's receipt token. */
   checkoutId: RegExp;
 }
@@ -82,28 +112,34 @@ function sandboxProvider(env: PayEnv): SponsorProvider {
     id: 'sandbox',
     live: false,
     checkoutId: SANDBOX_ID,
-    async createCheckout({ lineId, label, amountCents, origin }) {
+    async createCheckout({ kind, ref, label, amountCents, origin, returnPath }) {
       const checkoutId = `sbx_${crypto.randomUUID().replace(/-/g, '')}`;
       const url = new URL('/sandbox-pay/', origin);
       url.searchParams.set('checkout', checkoutId);
-      url.searchParams.set('line', String(lineId));
+      url.searchParams.set('kind', kind);
+      url.searchParams.set('ref', ref);
       url.searchParams.set('amount', String(amountCents));
       url.searchParams.set('label', label);
-      url.searchParams.set('sig', await hmac(secret, `${checkoutId}.${amountCents}`));
-      return { checkoutId, url: url.toString() };
+      url.searchParams.set('back', returnPath.replace('{CHECKOUT_SESSION_ID}', checkoutId));
+      url.searchParams.set('sig', await hmac(secret, `${checkoutId}.${kind}.${ref}.${amountCents}`));
+      return { checkoutId, url: url.toString(), clientSecret: null };
     },
     async parseWebhook(request) {
-      let body: { checkout?: unknown; amount?: unknown; sig?: unknown };
+      let body: { checkout?: unknown; kind?: unknown; ref?: unknown; amount?: unknown; sig?: unknown };
       try {
         body = await request.json();
       } catch {
         return null;
       }
       const checkoutId = typeof body.checkout === 'string' ? body.checkout : '';
+      const kind = body.kind === PRINT_KIND ? PRINT_KIND : SPONSOR_KIND;
+      const ref = typeof body.ref === 'string' && /^\d{1,9}$/.test(body.ref) ? body.ref : '';
       const amountCents = Number(body.amount);
-      if (!SANDBOX_ID.test(checkoutId) || !Number.isInteger(amountCents) || typeof body.sig !== 'string') return null;
-      if (!sameText(body.sig, await hmac(secret, `${checkoutId}.${amountCents}`))) return null;
-      return { type: 'paid', checkoutId, orderId: `sbx_order_${checkoutId.slice(4, 16)}`, amountCents, taxCents: 0, totalCents: amountCents };
+      if (!SANDBOX_ID.test(checkoutId) || !ref || !Number.isInteger(amountCents) || typeof body.sig !== 'string') return null;
+      if (!sameText(body.sig, await hmac(secret, `${checkoutId}.${kind}.${ref}.${amountCents}`))) return null;
+      const shipping =
+        kind === PRINT_KIND ? { name: 'SANDBOX BUYER', line1: '1 TEST ST', line2: '', city: 'NEW YORK', state: 'NY', postal: '10001', country: 'US' } : null;
+      return { type: 'paid', kind, checkoutId, orderId: `sbx_order_${checkoutId.slice(4, 16)}`, ref, currency: 'usd', amountCents, taxCents: 0, totalCents: amountCents, email: null, shipping };
     },
     async refund() {
       return { ok: true };
@@ -121,25 +157,55 @@ type SponsorSession = {
   total_details?: { amount_tax?: number | null } | null;
   payment_intent?: string | { id: string } | null;
   metadata?: Record<string, string> | null;
+  currency?: string | null;
+  client_secret?: string | null;
+  customer_details?: { email?: string | null; name?: string | null } | null;
+  collected_information?: { shipping_details?: StripeShipping | null } | null;
+  shipping_details?: StripeShipping | null;
+};
+type StripeShipping = {
+  name?: string | null;
+  address?: { line1?: string | null; line2?: string | null; city?: string | null; state?: string | null; postal_code?: string | null; country?: string | null } | null;
 };
 type StripeCharge = { payment_intent?: string | null; refunded?: boolean; amount_refunded?: number };
 type StripeRefund = { payment_intent?: string | null; status?: string; failure_reason?: string | null };
 
 const intentId = (value: SponsorSession['payment_intent']) => (typeof value === 'string' ? value : value?.id ?? '');
 
+function readShipping(session: SponsorSession): ShippingAddress | null {
+  const details = session.collected_information?.shipping_details ?? session.shipping_details;
+  const address = details?.address;
+  if (!address?.line1) return null;
+  return {
+    name: details?.name ?? session.customer_details?.name ?? '',
+    line1: address.line1 ?? '',
+    line2: address.line2 ?? '',
+    city: address.city ?? '',
+    state: address.state ?? '',
+    postal: address.postal_code ?? '',
+    country: address.country ?? '',
+  };
+}
+
 function sessionEvent(session: SponsorSession): SponsorEvent {
-  if (session.metadata?.kind !== SPONSOR_KIND) return { type: 'ignored' };
+  const kind = session.metadata?.kind;
+  if (kind !== SPONSOR_KIND && kind !== PRINT_KIND) return { type: 'ignored' };
   if (session.status === 'expired') return { type: 'expired', checkoutId: session.id };
   if (session.status !== 'complete' || session.payment_status !== 'paid') return { type: 'unpaid', checkoutId: session.id };
   const total = session.amount_total ?? 0;
   const tax = session.total_details?.amount_tax ?? 0;
   return {
     type: 'paid',
+    kind,
     checkoutId: session.id,
     orderId: intentId(session.payment_intent),
+    ref: session.metadata?.ref ?? '',
+    currency: (session.currency ?? '').toLowerCase(),
     amountCents: session.amount_subtotal ?? total - tax,
     taxCents: tax,
     totalCents: total,
+    email: session.customer_details?.email ?? null,
+    shipping: readShipping(session),
   };
 }
 
@@ -148,19 +214,25 @@ function stripeProvider(env: PayEnv, live: boolean): SponsorProvider {
     id: 'stripe',
     live,
     checkoutId: /^cs_(test|live)_[A-Za-z0-9]{10,200}$/,
-    async createCheckout({ lineId, tier, label, description, amountCents, origin, expiresAt }) {
-      const metadata = { kind: SPONSOR_KIND, line_id: String(lineId), tier, source: 'shipped.brytonzoz.com' };
+    async createCheckout(request) {
+      const { kind, ref, label, description, amountCents, origin, returnPath, cancelPath, expiresAt, express, shipping } = request;
+      const metadata = { ...request.metadata, kind, ref, source: new URL(origin).host };
+      const returnUrl = `${origin}${returnPath}`;
       const session = await stripe<SponsorSession>(env, 'POST', 'checkout/sessions', {
         mode: 'payment',
-        submit_type: 'pay',
+        ...(express ? { ui_mode: 'elements', return_url: returnUrl } : { success_url: returnUrl, cancel_url: `${origin}${cancelPath}`, submit_type: 'pay' }),
         automatic_tax: { enabled: true },
-        // Stripe Tax needs the buyer's location; for a digital good that's the billing address.
-        billing_address_collection: 'required',
+        // Stripe Tax needs the buyer's location: the shipping address for a print, the billing address otherwise.
+        billing_address_collection: shipping ? 'auto' : 'required',
+        ...(shipping
+          ? {
+              shipping_address_collection: { allowed_countries: ['US'] },
+              shipping_options: [{ shipping_rate_data: { type: 'fixed_amount', display_name: 'USPS First-Class, included', fixed_amount: { amount: 0, currency: 'usd' }, tax_behavior: 'exclusive' } }],
+            }
+          : {}),
         expires_at: expiresAt,
-        success_url: `${origin}/?sponsor=paid&checkout={CHECKOUT_SESSION_ID}#sponsor`,
-        cancel_url: `${origin}/?sponsor=cancelled#sponsor`,
         metadata,
-        payment_intent_data: { metadata, description: `shipped.brytonzoz.com: ${label}` },
+        payment_intent_data: { metadata, description: `${new URL(origin).host}: ${label}` },
         line_items: [
           {
             quantity: 1,
@@ -168,13 +240,13 @@ function stripeProvider(env: PayEnv, live: boolean): SponsorProvider {
               currency: 'usd',
               unit_amount: amountCents,
               tax_behavior: 'exclusive',
-              product_data: { name: label, description, tax_code: SPONSOR_TAX_CODE, metadata },
+              product_data: { name: label, description, tax_code: kind === PRINT_KIND ? PRINT_TAX_CODE : SPONSOR_TAX_CODE, metadata },
             },
           },
         ],
-      });
-      if (!session.url) throw new Error('Stripe returned no checkout URL');
-      return { checkoutId: session.id, url: session.url };
+      }, `shipped-${kind}-${ref}`);
+      if (express ? !session.client_secret : !session.url) throw new Error('Stripe returned no checkout');
+      return { checkoutId: session.id, url: session.url ?? null, clientSecret: express ? (session.client_secret ?? null) : null };
     },
     async parseWebhook(request) {
       const secret = env.STRIPE_SHIPPED_WEBHOOK_SECRET;
@@ -192,9 +264,10 @@ function stripeProvider(env: PayEnv, live: boolean): SponsorProvider {
             ? { type: 'expired', checkoutId: (event.data.object as SponsorSession).id }
             : result;
         }
+        // Only a full refund takes a bid down: outbid sponsors get partial (prorated) refunds and keep their history.
         case 'charge.refunded': {
           const charge = event.data.object as StripeCharge;
-          return charge.payment_intent ? { type: 'refunded', orderId: charge.payment_intent } : { type: 'ignored' };
+          return charge.payment_intent && charge.refunded ? { type: 'refunded', orderId: charge.payment_intent } : { type: 'ignored' };
         }
         case 'refund.created':
         case 'refund.updated':
@@ -204,7 +277,7 @@ function stripeProvider(env: PayEnv, live: boolean): SponsorProvider {
           if (refund.status === 'failed' || refund.status === 'canceled') {
             return { type: 'refund_failed', orderId: refund.payment_intent, reason: `refund ${refund.status}${refund.failure_reason ? `: ${refund.failure_reason}` : ''}` };
           }
-          return { type: 'refunded', orderId: refund.payment_intent };
+          return { type: 'ignored' };
         }
         default:
           return { type: 'ignored' };
@@ -213,9 +286,13 @@ function stripeProvider(env: PayEnv, live: boolean): SponsorProvider {
     async confirm(checkoutId) {
       return sessionEvent(await stripe<SponsorSession>(env, 'GET', `checkout/sessions/${checkoutId}`));
     },
-    async refund(orderId) {
+    async expire(checkoutId) {
+      await stripe(env, 'POST', `checkout/sessions/${checkoutId}/expire`, {}).catch(() => undefined);
+    },
+    async refund(orderId, amountCents, key) {
+      if (amountCents !== undefined && amountCents <= 0) return { ok: true };
       try {
-        await stripe(env, 'POST', 'refunds', { payment_intent: orderId, reason: 'requested_by_customer', metadata: { kind: SPONSOR_KIND } });
+        await stripe(env, 'POST', 'refunds', { payment_intent: orderId, amount: amountCents, reason: 'requested_by_customer', metadata: { source: 'shipped', key } }, `shipped-refund-${key}`);
         return { ok: true };
       } catch (error) {
         return { ok: false, error: error instanceof Error ? error.message : 'refund failed' };

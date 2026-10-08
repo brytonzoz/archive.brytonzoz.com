@@ -29,6 +29,8 @@ export type Found = {
   status: ItemStatus;
   /** Higher sorts first when there are too many. */
   score: number;
+  /** From this year even without a date (GitHub search said it was created this year). */
+  thisYear?: boolean;
 };
 
 export type WebResult = { title: string; url: string; snippet: string; date: string | null };
@@ -346,6 +348,7 @@ const github: SourceProvider = {
         source: 'github',
         status: row?.homepage ? 'LIVE' : 'SHIPPED',
         score: 2 + Math.log10(1 + (row?.stars ?? 0)) * 2 + (row?.homepage ? 1 : 0),
+        thisYear: true,
       });
     }
 
@@ -696,7 +699,7 @@ export async function searchGithubUsers(name: string, env: SourceEnv, tinyfish: 
 }
 
 /** Under 2 of these and Claude may spend its 2 paid searches. */
-export const inYearCount = (gathered: Gathered, year: number) => gathered.found.filter((item) => inYear(item.date, year)).length;
+export const inYearCount = (gathered: Gathered, year: number) => gathered.found.filter((item) => item.thisYear || inYear(item.date, year)).length;
 
 /** Everything the free sources and TinyFish know, de-duplicated, best first. */
 export async function gather(subject: Subject, env: SourceEnv, year: number, meter: TinyfishMeter | null = null): Promise<Gathered> {

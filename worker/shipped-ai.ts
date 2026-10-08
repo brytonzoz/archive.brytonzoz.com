@@ -190,7 +190,7 @@ function promptData(subject: Subject, gathered: Gathered, year: number) {
     subject: { typed_as: subject.kind, value: subject.id, display: subject.display },
     profile: gathered.profile,
     year,
-    found: gathered.found.map((item) => ({ name: item.name, description: item.description, date: item.date, link: item.link, source: item.source, status: item.status })),
+    found: gathered.found.map((item) => ({ name: item.name, description: item.description, date: item.date ?? (item.thisYear ? `created in ${year}, day unknown` : null), link: item.link, source: item.source, status: item.status })),
     search_results: gathered.web,
     pages: gathered.pages,
     own_site: gathered.site ? { url: gathered.site.url, title: gathered.site.title, description: gathered.site.description, text: gathered.site.text, links: gathered.site.links } : null,

@@ -127,39 +127,31 @@ jobs:
           fi
           printf '%s' "$PRINTIFY_ACCESS" | npx wrangler secret put PRINTIFY_ACCESS --env=""
 
-      # /shipped "Print my receipt": Claude (ANTHROPIC_API_KEY), GitHub's API (SHIPPED_GITHUB_TOKEN; GitHub
-      # doesn't allow repository secrets named GITHUB_*) and Turnstile. Printing needs all four.
+      # /shipped receipts. Bryton's names come first (CLAUDE_KEY, TINYFISH), then the documented ones. Empty values
+      # are skipped, so secrets set by hand on the Worker (claude_key, tinyfish) are never overwritten. Without
+      # Turnstile keys printing still works, behind the per-IP limits and the daily spend cap.
       - name: Sync /shipped secrets
         env:
           CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
-          ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}
+          ANTHROPIC_KEY: ${{ secrets.CLAUDE_KEY || secrets.ANTHROPIC_API_KEY }}
+          TINYFISH_KEY: ${{ secrets.TINYFISH || secrets.TINYFISH_API_KEY }}
           SHIPPED_GITHUB_TOKEN: ${{ secrets.SHIPPED_GITHUB_TOKEN }}
           TURNSTILE_SITE_KEY: ${{ secrets.TURNSTILE_SITE_KEY }}
           TURNSTILE_SECRET_KEY: ${{ secrets.TURNSTILE_SECRET_KEY }}
           STRIPE_SHIPPED_WEBHOOK_SECRET: ${{ secrets.STRIPE_SHIPPED_WEBHOOK_SECRET }}
           PRODUCTHUNT_TOKEN: ${{ secrets.PRODUCTHUNT_TOKEN }}
-          TINYFISH_API_KEY: ${{ secrets.TINYFISH_API_KEY }}
-          TAVILY_API_KEY: ${{ secrets.TAVILY_API_KEY }}
-          EXA_API_KEY: ${{ secrets.EXA_API_KEY }}
-          BRAVE_SEARCH_API_KEY: ${{ secrets.BRAVE_SEARCH_API_KEY }}
-          JINA_API_KEY: ${{ secrets.JINA_API_KEY }}
         run: |
           sync() {
             if [ -z "$2" ]; then echo "::notice::$3 is not set, so $4."; return 0; fi
             printf '%s' "$2" | npx wrangler secret put "$1" --env=""
           }
-          sync STRIPE_SHIPPED_WEBHOOK_SECRET "$STRIPE_SHIPPED_WEBHOOK_SECRET" STRIPE_SHIPPED_WEBHOOK_SECRET "refunds made in the Stripe dashboard don't remove /shipped lines (rejecting in /admin still refunds and removes them)"
-          sync ANTHROPIC_API_KEY "$ANTHROPIC_API_KEY" ANTHROPIC_API_KEY "Print my receipt stays offline"
-          sync GITHUB_TOKEN "$SHIPPED_GITHUB_TOKEN" SHIPPED_GITHUB_TOKEN "printing can fail with github-busy: anonymous GitHub lookups share Cloudflare's IPs and its 60-an-hour limit"
-          sync TURNSTILE_SITE_KEY "$TURNSTILE_SITE_KEY" TURNSTILE_SITE_KEY "Print my receipt stays offline"
-          sync TURNSTILE_SECRET_KEY "$TURNSTILE_SECRET_KEY" TURNSTILE_SECRET_KEY "Print my receipt stays offline"
-          # Optional extra sources for Shipped receipts (worker/shipped-sources.ts); each is skipped without its key.
+          sync ANTHROPIC_API_KEY "$ANTHROPIC_KEY" "CLAUDE_KEY (repo secret)" "the Worker uses its own claude_key if set, else printing stays offline"
+          sync TINYFISH_API_KEY "$TINYFISH_KEY" "TINYFISH (repo secret)" "the Worker uses its own tinyfish if set, else receipts skip TinyFish"
+          sync GITHUB_TOKEN "$SHIPPED_GITHUB_TOKEN" SHIPPED_GITHUB_TOKEN "anonymous GitHub lookups share Cloudflare's IPs and a 60-an-hour limit"
+          sync TURNSTILE_SITE_KEY "$TURNSTILE_SITE_KEY" TURNSTILE_SITE_KEY "printing relies on rate limits and the spend cap (no bot check)"
+          sync TURNSTILE_SECRET_KEY "$TURNSTILE_SECRET_KEY" TURNSTILE_SECRET_KEY "printing relies on rate limits and the spend cap (no bot check)"
+          sync STRIPE_SHIPPED_WEBHOOK_SECRET "$STRIPE_SHIPPED_WEBHOOK_SECRET" STRIPE_SHIPPED_WEBHOOK_SECRET "(optional) refunds made in the Stripe dashboard don't remove /shipped lines"
           sync PRODUCTHUNT_TOKEN "$PRODUCTHUNT_TOKEN" PRODUCTHUNT_TOKEN "receipts skip Product Hunt"
-          sync TINYFISH_API_KEY "$TINYFISH_API_KEY" TINYFISH_API_KEY "receipts skip the TinyFish crawler"
-          sync TAVILY_API_KEY "$TAVILY_API_KEY" TAVILY_API_KEY "receipts skip the Tavily crawler"
-          sync EXA_API_KEY "$EXA_API_KEY" EXA_API_KEY "receipts skip the Exa crawler"
-          sync BRAVE_SEARCH_API_KEY "$BRAVE_SEARCH_API_KEY" BRAVE_SEARCH_API_KEY "receipts skip the Brave Search crawler"
-          sync JINA_API_KEY "$JINA_API_KEY" JINA_API_KEY "receipts read sites as raw HTML instead of Jina Reader"
 
       - name: Deploy www/archive redirects
         env:

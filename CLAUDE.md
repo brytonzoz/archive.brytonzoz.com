@@ -111,11 +111,16 @@ push, and give the owner the staging link from the PR comment once the Staging w
  prints Bryton's "SHIPPED IN <year>" receipt (`components/shipped/BrytonReceipt.tsx`, from `data/shipped/businesses.json`),
  then PRINT YOURS runs the same machine for any name, @handle, GitHub user or domain (`PrintYours.tsx`). The Worker
  (`worker/shipped.ts`) gathers free sources (`worker/shipped-sources.ts`: GitHub, iTunes, HN, npm, Product Hunt with a
- token, their site, optional crawlers), has Claude search and itemize them (`worker/shipped-ai.ts`; demo receipts
- without `ANTHROPIC_API_KEY`), dithers logos into R2 and serves `/shipped/r/<id>/` with `og.png` and `receipt.png`.
- Guardrails: Turnstile, per-IP limits, `SHIPPED_DAILY_CAP_USD` spend cap in D1, 7-day cache, takedowns in `/admin`.
+ token, their site) plus TinyFish search/fetch (`worker/shipped-tinyfish.ts`, secret `tinyfish`/`TINYFISH`; only the
+ free endpoints, guarded in code and metered per day in D1, never any paid TinyFish product). Claude (`claude_key`/
+ `CLAUDE_KEY`, cheapest Haiku) only assembles the receipt (`worker/shipped-ai.ts`); its paid web search runs only when
+ the free sources find under 2 items, max 2 searches. Without a key, receipts print as demos. A credit/billing error from
+ Anthropic flips the machine to "OUT OF PAPER" globally (no retries; cached receipts and sharing keep working); clear it
+ with "Paper restocked" in `/admin` once credits are added. Logos are dithered into R2; `/shipped/r/<id>/` serves
+ `og.png` and `receipt.png`. Guardrails: Turnstile when its keys exist (otherwise printing relies on the limits),
+ per-IP limits, `SHIPPED_DAILY_CAP_USD` spend cap in D1, 7-day cache, takedowns in `/admin`.
  Year: `SHIPPED_YEAR` (Worker) / `NEXT_PUBLIC_SHIPPED_YEAR` (build), default the current year. "PAID FOR BY" sponsor
- lines (`lib/shipped-sponsors.ts`, Stripe test keys on staging) rotate on shared receipts; impressions are in `/admin`.
+ lines (`lib/shipped-sponsors.ts`, same Stripe key as the store) rotate on shared receipts; impressions are in `/admin`.
 - Metrics: `lib/analytics.ts` (anonymous, batched) -> `/api/e` in `worker/metrics.ts` -> D1 `brytonzoz-metrics`
   (`brytonzoz-metrics-staging` for staging; schema `worker/schema.sql`). The dashboard is `/admin`; its password is
   the `ADMIN_PASSWORD` repository secret, which both deploy workflows copy to the Worker. Never put it in code or chat.

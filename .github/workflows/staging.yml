@@ -91,79 +91,71 @@ jobs:
           fi
           printf '%s' "$ADMIN_PASSWORD" | npx wrangler secret put ADMIN_PASSWORD --env staging
 
-      # Scrapwrk checkout on staging uses a Stripe TEST key only (STRIPE_TEST_SECRET_KEY secret),
-      # so trying the store here never charges a real card.
-      - name: Sync Stripe test key
+      # Names only (never values) of the secrets already on the staging Worker, including any set by hand
+      # in the Cloudflare dashboard; the steps below never replace those with nothing.
+      - name: List staging Worker secrets
+        env:
+          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+        run: |
+          npx wrangler secret list --env staging > worker-secrets.json 2>/dev/null || echo '[]' > worker-secrets.json
+          node -e 'const s=JSON.parse(require("fs").readFileSync("worker-secrets.json","utf8")); console.log("Worker secrets:", s.map(x=>x.name).sort().join(", ") || "(none)")'
+
+      # Scrapwrk and /shipped sponsors share the store's Stripe settings. Staging prefers a test key
+      # (STRIPE_TEST_SECRET_KEY); without one it uses the store's own STRIPE_SECRET_KEY, unless the Worker
+      # already has a key set by hand. A live key on staging takes real payments: test with care.
+      - name: Sync Stripe key
         env:
           CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
           STRIPE_TEST_SECRET_KEY: ${{ secrets.STRIPE_TEST_SECRET_KEY }}
+          STRIPE_SECRET_KEY: ${{ secrets.STRIPE_SECRET_KEY }}
+          STRIPE_TEST_PUBLISHABLE_KEY: ${{ secrets.STRIPE_TEST_PUBLISHABLE_KEY }}
+          STRIPE_PUBLISHABLE_KEY: ${{ secrets.STRIPE_PUBLISHABLE_KEY }}
         run: |
-          if [ -z "$STRIPE_TEST_SECRET_KEY" ]; then
-            echo "::notice::STRIPE_TEST_SECRET_KEY is not set, so checkout on staging stays closed."
-            exit 0
+          has() { node -e 'process.exit(JSON.parse(require("fs").readFileSync("worker-secrets.json","utf8")).some(x=>x.name===process.argv[1])?0:1)' "$1"; }
+          if [ -n "$STRIPE_TEST_SECRET_KEY" ]; then
+            key="$STRIPE_TEST_SECRET_KEY"; pk="$STRIPE_TEST_PUBLISHABLE_KEY"; mode=test
+          elif has STRIPE_SECRET_KEY; then
+            echo "::notice::Keeping the STRIPE_SECRET_KEY already set on the staging Worker."; exit 0
+          elif [ -n "$STRIPE_SECRET_KEY" ]; then
+            key="$STRIPE_SECRET_KEY"; pk="$STRIPE_PUBLISHABLE_KEY"; mode=live
+          else
+            echo "::notice::No Stripe key (STRIPE_TEST_SECRET_KEY or STRIPE_SECRET_KEY), so checkout on staging stays closed."; exit 0
           fi
-          case "$STRIPE_TEST_SECRET_KEY" in
-            sk_test_*|rk_test_*) ;;
-            *) echo "::error::STRIPE_TEST_SECRET_KEY must be a test key (sk_test_...)."; exit 1 ;;
-          esac
-          printf '%s' "$STRIPE_TEST_SECRET_KEY" | npx wrangler secret put STRIPE_SECRET_KEY --env staging
+          case "$key" in sk_test_*|rk_test_*) mode=test ;; sk_live_*|rk_live_*) mode=live ;; *) echo "::error::The Stripe key doesn't look like sk_test_/sk_live_."; exit 1 ;; esac
+          [ "$mode" = live ] && echo "::warning::Staging is using the store's LIVE Stripe key: checkouts on staging charge real cards."
+          printf '%s' "$key" | npx wrangler secret put STRIPE_SECRET_KEY --env staging
+          if [ -n "$pk" ]; then printf '%s' "$pk" | npx wrangler secret put STRIPE_PUBLISHABLE_KEY --env staging; fi
 
-      # Public key for the Apple Pay / Google Pay buttons (STRIPE_TEST_PUBLISHABLE_KEY; not secret, but kept beside the others).
-      - name: Sync Stripe publishable key
-        env:
-          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
-          STRIPE_PUBLISHABLE_KEY: ${{ secrets.STRIPE_TEST_PUBLISHABLE_KEY }}
-        run: |
-          if [ -z "$STRIPE_PUBLISHABLE_KEY" ]; then
-            echo "::notice::STRIPE_TEST_PUBLISHABLE_KEY is not set, so there are no Apple Pay / Google Pay buttons (hosted checkout still works)."
-            exit 0
-          fi
-          case "$STRIPE_PUBLISHABLE_KEY" in
-            pk_test_*) ;;
-            *) echo "::error::STRIPE_TEST_PUBLISHABLE_KEY must look like pk_test_...."; exit 1 ;;
-          esac
-          printf '%s' "$STRIPE_PUBLISHABLE_KEY" | npx wrangler secret put STRIPE_PUBLISHABLE_KEY --env staging
-
-      # /shipped "Shipped in <year>" receipts. Set SHIPPED_GITHUB_TOKEN: anonymous GitHub lookups from Cloudflare are
-      # rate-limited now and then. The rest are optional on staging: without ANTHROPIC_API_KEY receipts print as a demo
-      # from the free sources (no AI, no web search), and without Turnstile keys staging uses Cloudflare's always-pass test keys.
+      # /shipped "Shipped in <year>" receipts. Bryton's names come first (CLAUDE_KEY, TINYFISH), then the documented
+      # ones. Without an Anthropic key receipts print as a demo; without Turnstile keys staging uses the test keys.
       - name: Sync /shipped secrets
         env:
           CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
-          ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}
+          ANTHROPIC_KEY: ${{ secrets.CLAUDE_KEY || secrets.ANTHROPIC_API_KEY }}
+          TINYFISH_KEY: ${{ secrets.TINYFISH || secrets.TINYFISH_API_KEY }}
           SHIPPED_GITHUB_TOKEN: ${{ secrets.SHIPPED_GITHUB_TOKEN }}
           TURNSTILE_SITE_KEY: ${{ secrets.TURNSTILE_SITE_KEY }}
           TURNSTILE_SECRET_KEY: ${{ secrets.TURNSTILE_SECRET_KEY }}
-          STRIPE_TEST_SHIPPED_WEBHOOK_SECRET: ${{ secrets.STRIPE_TEST_SHIPPED_WEBHOOK_SECRET }}
+          SHIPPED_WEBHOOK: ${{ secrets.STRIPE_TEST_SHIPPED_WEBHOOK_SECRET || secrets.STRIPE_SHIPPED_WEBHOOK_SECRET }}
           PRODUCTHUNT_TOKEN: ${{ secrets.PRODUCTHUNT_TOKEN }}
-          TINYFISH_API_KEY: ${{ secrets.TINYFISH_API_KEY }}
-          TAVILY_API_KEY: ${{ secrets.TAVILY_API_KEY }}
-          EXA_API_KEY: ${{ secrets.EXA_API_KEY }}
-          BRAVE_SEARCH_API_KEY: ${{ secrets.BRAVE_SEARCH_API_KEY }}
-          JINA_API_KEY: ${{ secrets.JINA_API_KEY }}
         run: |
           sync() {
             if [ -z "$2" ]; then echo "::notice::$3 is not set, so $4."; return 0; fi
             printf '%s' "$2" | npx wrangler secret put "$1" --env staging
           }
-          sync STRIPE_SHIPPED_WEBHOOK_SECRET "$STRIPE_TEST_SHIPPED_WEBHOOK_SECRET" STRIPE_TEST_SHIPPED_WEBHOOK_SECRET "refunds made in the Stripe dashboard don't remove /shipped lines (rejecting in /admin still refunds and removes them)"
-          sync ANTHROPIC_API_KEY "$ANTHROPIC_API_KEY" ANTHROPIC_API_KEY "receipts print as a demo without the AI"
-          sync GITHUB_TOKEN "$SHIPPED_GITHUB_TOKEN" SHIPPED_GITHUB_TOKEN "printing can fail with github-busy: anonymous GitHub lookups share Cloudflare's IPs and its 60-an-hour limit"
+          sync ANTHROPIC_API_KEY "$ANTHROPIC_KEY" "CLAUDE_KEY (repo secret)" "the Worker uses its own claude_key if set, else receipts print as a demo"
+          sync TINYFISH_API_KEY "$TINYFISH_KEY" "TINYFISH (repo secret)" "the Worker uses its own tinyfish if set, else receipts skip TinyFish"
+          sync GITHUB_TOKEN "$SHIPPED_GITHUB_TOKEN" SHIPPED_GITHUB_TOKEN "anonymous GitHub lookups share Cloudflare's IPs and a 60-an-hour limit"
           sync TURNSTILE_SITE_KEY "$TURNSTILE_SITE_KEY" TURNSTILE_SITE_KEY "staging uses Turnstile test keys"
           sync TURNSTILE_SECRET_KEY "$TURNSTILE_SECRET_KEY" TURNSTILE_SECRET_KEY "staging uses Turnstile test keys"
-          # Optional extra sources for Shipped receipts (worker/shipped-sources.ts); each is skipped without its key.
+          sync STRIPE_SHIPPED_WEBHOOK_SECRET "$SHIPPED_WEBHOOK" STRIPE_TEST_SHIPPED_WEBHOOK_SECRET "(optional) refunds made in the Stripe dashboard don't remove /shipped lines"
           sync PRODUCTHUNT_TOKEN "$PRODUCTHUNT_TOKEN" PRODUCTHUNT_TOKEN "receipts skip Product Hunt"
-          sync TINYFISH_API_KEY "$TINYFISH_API_KEY" TINYFISH_API_KEY "receipts skip the TinyFish crawler"
-          sync TAVILY_API_KEY "$TAVILY_API_KEY" TAVILY_API_KEY "receipts skip the Tavily crawler"
-          sync EXA_API_KEY "$EXA_API_KEY" EXA_API_KEY "receipts skip the Exa crawler"
-          sync BRAVE_SEARCH_API_KEY "$BRAVE_SEARCH_API_KEY" BRAVE_SEARCH_API_KEY "receipts skip the Brave Search crawler"
-          sync JINA_API_KEY "$JINA_API_KEY" JINA_API_KEY "receipts read sites as raw HTML instead of Jina Reader"
 
       # Apple Pay needs the domain registered with Stripe (its verification file is public/.well-known).
       # Never fails the deploy: a wallet button that can't register simply doesn't show.
       - name: Register domain for Apple Pay
         env:
-          STRIPE_KEY: ${{ secrets.STRIPE_TEST_SECRET_KEY }}
+          STRIPE_KEY: ${{ secrets.STRIPE_TEST_SECRET_KEY || secrets.STRIPE_SECRET_KEY }}
           DEPLOY_URL: ${{ steps.deploy.outputs.url }}
         run: |
           [ -n "$STRIPE_KEY" ] || exit 0

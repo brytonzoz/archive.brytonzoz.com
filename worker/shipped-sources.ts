@@ -4,9 +4,12 @@
 // last resort (worker/shipped-ai.ts). Every source returns plain Found items; nothing here is trusted text.
 //
 // Optional keys (each source is skipped without its key):
-//   GITHUB_TOKEN          GitHub API without the anonymous quota (optional; github.com's pages are read without it)
-//   PRODUCTHUNT_TOKEN     Product Hunt API v2 developer token: launches the subject made
+//   GITHUB_TOKEN          GitHub API without the anonymous quota (repo secret SHIPPED_GITHUB_TOKEN). Tried first;
+//                         when it's missing, rejected or rate-limited: the anonymous API, then github.com's pages
+//   PRODUCTHUNT_KEY       Product Hunt OAuth app client id + secret: a public-scope token from the
+//   PRODUCTHUNT_SECRET    client_credentials grant, cached until it expires (PRODUCTHUNT_TOKEN also works)
 //   TINYFISH_API_KEY      TinyFish Search + Fetch (free endpoints only)
+//   BRANDFETCH_API        Brandfetch Brand API: a brand's real icon before the site's own icon or favicon
 import type { ItemSource, ItemStatus, Subject } from '../lib/shipped-year';
 import { isDomain, isGithubLogin, isXHandle } from '../lib/shipped-year';
 import { hasBlockedWord } from '../lib/shipped-sponsors';
@@ -15,7 +18,10 @@ import { tinyfishFetch, tinyfishSearch, type TinyfishMeter, type TinyfishPage } 
 export interface SourceEnv {
   GITHUB_TOKEN?: string;
   PRODUCTHUNT_TOKEN?: string;
+  PRODUCTHUNT_KEY?: string;
+  PRODUCTHUNT_SECRET?: string;
   TINYFISH_API_KEY?: string;
+  BRANDFETCH_API?: string;
 }
 
 export type Found = {
@@ -156,18 +162,29 @@ async function cached<T>(key: string, ttl: number, load: () => Promise<T>): Prom
   return value;
 }
 
-/** What the API last said about its anonymous quota (per isolate, which is close enough). */
-const quota = { remaining: Infinity, reset: 0 };
-const apiOpen = (env: SourceEnv) => Boolean(env.GITHUB_TOKEN) || quota.remaining > 3 || Date.now() > quota.reset;
+/** What the API last said about each quota (per isolate, which is close enough): with the token and without. */
+const quotas = { token: { remaining: Infinity, reset: 0 }, anonymous: { remaining: Infinity, reset: 0 } };
+let tokenRejected = false;
+const open = (quota: { remaining: number; reset: number }) => quota.remaining > 3 || Date.now() > quota.reset;
+
+/** The token first; the anonymous API when there's no token, it was rejected, or its quota ran out. */
+function githubAuth(env: SourceEnv): 'token' | 'anonymous' | null {
+  if (env.GITHUB_TOKEN && !tokenRejected && open(quotas.token)) return 'token';
+  return open(quotas.anonymous) ? 'anonymous' : null;
+}
+
+const apiOpen = (env: SourceEnv) => githubAuth(env) !== null;
 
 async function githubApi<T>(path: string, env: SourceEnv): Promise<T> {
-  if (!apiOpen(env)) throw new SourceError('rate-limited');
+  const auth = githubAuth(env);
+  if (!auth) throw new SourceError('rate-limited');
+  const quota = quotas[auth];
   const response = await fetch(`https://api.github.com${path}`, {
     headers: {
       'user-agent': UA,
       accept: 'application/vnd.github+json',
       'x-github-api-version': '2022-11-28',
-      ...(env.GITHUB_TOKEN ? { authorization: `Bearer ${env.GITHUB_TOKEN}` } : {}),
+      ...(auth === 'token' ? { authorization: `Bearer ${env.GITHUB_TOKEN}` } : {}),
     },
     signal: AbortSignal.timeout(TIMEOUT),
   });
@@ -175,10 +192,16 @@ async function githubApi<T>(path: string, env: SourceEnv): Promise<T> {
   const reset = Number(response.headers.get('x-ratelimit-reset'));
   if (remaining !== null && Number.isFinite(Number(remaining))) quota.remaining = Number(remaining);
   if (reset) quota.reset = reset * 1000;
+  if (auth === 'token' && response.status === 401) {
+    tokenRejected = true;
+    console.warn('shipped: GITHUB_TOKEN was rejected; using the anonymous API and public pages');
+    return githubApi<T>(path, env);
+  }
   if (response.status === 404) throw new SourceError('not-found');
   if (response.status === 403 || response.status === 429) {
     quota.remaining = 0;
     quota.reset = Math.max(quota.reset, Date.now() + 10 * MIN * 1000);
+    if (auth === 'token') return githubApi<T>(path, env);
     throw new SourceError('rate-limited');
   }
   if (!response.ok) throw new SourceError(`http-${response.status}`);
@@ -499,15 +522,39 @@ const npm: SourceProvider = {
   },
 };
 
-/** Product Hunt launches the subject made (needs PRODUCTHUNT_TOKEN). */
+let productHuntToken: { value: string; until: number } | null = null;
+
+/** A developer token if one is set, else a public-scope token from the OAuth app (client_credentials), cached. */
+async function productHuntAuth(env: SourceEnv): Promise<string | null> {
+  if (env.PRODUCTHUNT_TOKEN) return env.PRODUCTHUNT_TOKEN;
+  if (!env.PRODUCTHUNT_KEY || !env.PRODUCTHUNT_SECRET) return null;
+  if (productHuntToken && productHuntToken.until > Date.now()) return productHuntToken.value;
+  const response = await fetch('https://api.producthunt.com/v2/oauth/token', {
+    method: 'POST',
+    headers: { 'content-type': 'application/json', accept: 'application/json' },
+    body: JSON.stringify({ client_id: env.PRODUCTHUNT_KEY, client_secret: env.PRODUCTHUNT_SECRET, grant_type: 'client_credentials' }),
+    signal: AbortSignal.timeout(TIMEOUT),
+  }).catch(() => null);
+  if (!response?.ok) return null;
+  const body = (await response.json().catch(() => null)) as { access_token?: string; expires_in?: number } | null;
+  if (!body?.access_token) return null;
+  // Client-credentials tokens don't expire unless revoked; re-fetch daily anyway.
+  const life = Math.min(Number(body.expires_in) || 86_400, 86_400) * 1000;
+  productHuntToken = { value: body.access_token, until: Date.now() + life - 60_000 };
+  return body.access_token;
+}
+
+/** Product Hunt launches the subject made (needs PRODUCTHUNT_KEY + PRODUCTHUNT_SECRET, or PRODUCTHUNT_TOKEN). */
 const productHunt: SourceProvider = {
   id: 'producthunt',
-  enabled: ({ env, profile }) => Boolean(env.PRODUCTHUNT_TOKEN && (profile.x || profile.github)),
+  enabled: ({ env, profile }) => Boolean((env.PRODUCTHUNT_TOKEN || (env.PRODUCTHUNT_KEY && env.PRODUCTHUNT_SECRET)) && (profile.x || profile.github)),
   async run({ env, profile, year }) {
     const username = (profile.x || profile.github)!;
+    const token = await productHuntAuth(env);
+    if (!token) throw new SourceError('no-token');
     const data = await getJson<{ data?: { user?: { madePosts?: { edges?: { node: Record<string, unknown> }[] } } } }>('https://api.producthunt.com/v2/api/graphql', {
       method: 'POST',
-      headers: { authorization: `Bearer ${env.PRODUCTHUNT_TOKEN}`, 'content-type': 'application/json' },
+      headers: { authorization: `Bearer ${token}`, 'content-type': 'application/json' },
       body: JSON.stringify({
         query: 'query($u:String!){user(username:$u){madePosts(first:20){edges{node{name tagline createdAt url website thumbnail{url}}}}}}',
         variables: { u: username },
@@ -540,6 +587,28 @@ const decode = (text: string) =>
 export function faviconUrl(siteUrl: string): string | null {
   const host = hostOf(siteUrl);
   return host ? `https://www.google.com/s2/favicons?domain=${encodeURIComponent(host)}&sz=128` : null;
+}
+
+type BrandfetchFormat = { src?: string; format?: string; width?: number };
+type BrandfetchBrand = { logos?: { type?: string; theme?: string; formats?: BrandfetchFormat[] }[] };
+
+/** A brand's raster icon (PNG/JPEG) from Brandfetch, or null without BRANDFETCH_API or a match. */
+export async function brandIcon(siteUrl: string, env: SourceEnv): Promise<string | null> {
+  const host = hostOf(siteUrl);
+  if (!env.BRANDFETCH_API || !host) return null;
+  const response = await fetch(`https://api.brandfetch.io/v2/brands/domain/${encodeURIComponent(host)}`, {
+    headers: { authorization: `Bearer ${env.BRANDFETCH_API}`, accept: 'application/json' },
+    signal: AbortSignal.timeout(TIMEOUT),
+  }).catch(() => null);
+  if (!response?.ok) return null;
+  const brand = (await response.json().catch(() => null)) as BrandfetchBrand | null;
+  const rank = (type?: string) => (type === 'icon' ? 0 : type === 'symbol' ? 1 : 2);
+  const logos = [...(brand?.logos ?? [])].sort((a, b) => rank(a.type) - rank(b.type));
+  for (const logo of logos) {
+    const raster = (logo.formats ?? []).filter((f) => f.src && (f.format === 'png' || f.format === 'jpeg')).sort((a, b) => (b.width ?? 0) - (a.width ?? 0));
+    if (raster[0]?.src) return raster[0].src;
+  }
+  return null;
 }
 
 /** Homepage title, description, icon, a text sample and its links (for Claude to read, never to obey). */

@@ -24,7 +24,7 @@ import { DEFAULT_MODEL, PrintError, assembleReceipt, demoReceipt, maxSearches, t
 import { ICON_HASH, bytesDataUri, iconDataUri, iconKey, storeIcon } from './shipped-icons';
 import { renderPng, yearCardPng, yearTallPng, type LogoResolver } from './shipped-og';
 import { isProduction, sponsorProvider, type PayEnv, type SponsorEvent } from './shipped-pay';
-import { clean, faviconUrl, gather, githubUser, hostOf, readSite, searchGithubUsers, tinyfishAccess, type SourceEnv } from './shipped-sources';
+import { brandIcon, clean, faviconUrl, gather, githubUser, hostOf, readSite, searchGithubUsers, tinyfishAccess, type SourceEnv } from './shipped-sources';
 import { TINYFISH_DAILY, type TinyfishKind, type TinyfishMeter } from './shipped-tinyfish';
 import { receiptBarcodeUnits, receiptDate } from '../lib/shipped';
 import { supporterReceiptSvg } from '../lib/receipt-svg';
@@ -270,7 +270,7 @@ type GeneratorState = { enabled: boolean; demo: boolean; reason: string | null; 
 
 function sourceNames(env: ShippedEnv): string[] {
   const names = ['github', 'appstore', 'hn', 'npm'];
-  if (env.PRODUCTHUNT_TOKEN) names.push('producthunt');
+  if (env.PRODUCTHUNT_TOKEN || (env.PRODUCTHUNT_KEY && env.PRODUCTHUNT_SECRET)) names.push('producthunt');
   if (env.TINYFISH_API_KEY) names.push('tinyfish');
   return names;
 }
@@ -418,8 +418,10 @@ async function withLogos(items: DraftItem[], env: ShippedEnv): Promise<YearItem[
       const host = hostOf(item.link);
       const own = !item.icon && item.link && host && !PLAIN_HOSTS.has(host);
       // The page's apple-touch-icon or PNG icon beats the generic favicon service.
-      const page = own ? await Promise.race([readSite(item.link!).catch(() => null), late]) : null;
-      const source = item.icon ?? page?.icon ?? (own ? faviconUrl(item.link!) : null);
+      const [brand, page] = own
+        ? await Promise.all([Promise.race([brandIcon(item.link!, env).catch(() => null), late]), Promise.race([readSite(item.link!).catch(() => null), late])])
+        : [null, null];
+      const source = item.icon ?? brand ?? page?.icon ?? (own ? faviconUrl(item.link!) : null);
       const logo = source ? await Promise.race([storeIcon(source, env.SHIPPED).catch(() => null), late]) : null;
       return { name: item.name, description: item.description, date: item.date, status: item.status, link: item.link, logo, source: item.source };
     }),

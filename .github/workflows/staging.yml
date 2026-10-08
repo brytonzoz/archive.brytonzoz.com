@@ -126,32 +126,28 @@ jobs:
           printf '%s' "$key" | npx wrangler secret put STRIPE_SECRET_KEY --env staging
           if [ -n "$pk" ]; then printf '%s' "$pk" | npx wrangler secret put STRIPE_PUBLISHABLE_KEY --env staging; fi
 
-      # /shipped "Shipped in <year>" receipts. Bryton's names come first (CLAUDE_KEY, TINYFISH), then the documented
-      # ones. Without an Anthropic key receipts print as a demo; without Turnstile keys staging uses the test keys.
-      - name: Sync /shipped secrets
+      # Shipped: every secret its Worker needs, copied from the repository secrets in one `wrangler secret bulk`
+      # (scripts/sync-worker-secrets.mjs maps the names, skips empty ones, prints names only, never values) and
+      # the Turnstile widget created through the Cloudflare API when the token is allowed to.
+      - name: Sync Shipped secrets
         env:
           CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
-          ANTHROPIC_KEY: ${{ secrets.CLAUDE_KEY || secrets.ANTHROPIC_API_KEY }}
-          TINYFISH_KEY: ${{ secrets.TINYFISH || secrets.TINYFISH_API_KEY }}
-          CLAUDE_WORKSPACE: ${{ secrets.CLAUDE_WORKSPACE || secrets.ANTHROPIC_WORKSPACE_ID }}
+          CLAUDE_KEY: ${{ secrets.CLAUDE_KEY }}
+          ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}
+          CLAUDE_WORKSPACE: ${{ secrets.CLAUDE_WORKSPACE }}
+          ANTHROPIC_WORKSPACE_ID: ${{ secrets.ANTHROPIC_WORKSPACE_ID }}
+          TINYFISH: ${{ secrets.TINYFISH }}
+          TINYFISH_API_KEY: ${{ secrets.TINYFISH_API_KEY }}
           SHIPPED_GITHUB_TOKEN: ${{ secrets.SHIPPED_GITHUB_TOKEN }}
+          PRODUCTHUNT_KEY: ${{ secrets.PRODUCTHUNT_KEY }}
+          PRODUCTHUNT_SECRET: ${{ secrets.PRODUCTHUNT_SECRET }}
+          PRODUCTHUNT_TOKEN: ${{ secrets.PRODUCTHUNT_TOKEN }}
+          BRANDFETCH_API: ${{ secrets.BRANDFETCH_API }}
           TURNSTILE_SITE_KEY: ${{ secrets.TURNSTILE_SITE_KEY }}
           TURNSTILE_SECRET_KEY: ${{ secrets.TURNSTILE_SECRET_KEY }}
-          SHIPPED_WEBHOOK: ${{ secrets.STRIPE_TEST_SHIPPED_WEBHOOK_SECRET || secrets.STRIPE_SHIPPED_WEBHOOK_SECRET }}
-          PRODUCTHUNT_TOKEN: ${{ secrets.PRODUCTHUNT_TOKEN }}
-        run: |
-          sync() {
-            if [ -z "$2" ]; then echo "::notice::$3 is not set, so $4."; return 0; fi
-            printf '%s' "$2" | npx wrangler secret put "$1" --env staging
-          }
-          sync ANTHROPIC_API_KEY "$ANTHROPIC_KEY" "CLAUDE_KEY (repo secret)" "the Worker uses its own claude_key if set, else receipts print as a demo"
-          sync TINYFISH_API_KEY "$TINYFISH_KEY" "TINYFISH (repo secret)" "the Worker uses its own tinyfish if set, else receipts skip TinyFish"
-          sync ANTHROPIC_WORKSPACE_ID "$CLAUDE_WORKSPACE" "CLAUDE_WORKSPACE (repo secret)" "the Worker uses ANTHROPIC_WORKSPACE_DEFAULT from wrangler.jsonc"
-          sync GITHUB_TOKEN "$SHIPPED_GITHUB_TOKEN" SHIPPED_GITHUB_TOKEN "GitHub is read from its public pages (no token needed)"
-          sync TURNSTILE_SITE_KEY "$TURNSTILE_SITE_KEY" TURNSTILE_SITE_KEY "staging uses Turnstile test keys"
-          sync TURNSTILE_SECRET_KEY "$TURNSTILE_SECRET_KEY" TURNSTILE_SECRET_KEY "staging uses Turnstile test keys"
-          sync STRIPE_SHIPPED_WEBHOOK_SECRET "$SHIPPED_WEBHOOK" STRIPE_TEST_SHIPPED_WEBHOOK_SECRET "(optional) refunds made in the Stripe dashboard don't remove /shipped lines"
-          sync PRODUCTHUNT_TOKEN "$PRODUCTHUNT_TOKEN" PRODUCTHUNT_TOKEN "receipts skip Product Hunt"
+          STRIPE_SHIPPED_WEBHOOK_SECRET: ${{ secrets.STRIPE_SHIPPED_WEBHOOK_SECRET }}
+          STRIPE_TEST_SHIPPED_WEBHOOK_SECRET: ${{ secrets.STRIPE_TEST_SHIPPED_WEBHOOK_SECRET }}
+        run: node scripts/sync-worker-secrets.mjs staging
 
       # Apple Pay needs the domain registered with Stripe (its verification file is public/.well-known).
       # Never fails the deploy: a wallet button that can't register simply doesn't show.

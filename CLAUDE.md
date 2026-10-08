@@ -128,6 +128,11 @@ push, and give the owner the staging link from the PR comment once the Staging w
  with "Paper restocked" in `/admin` once credits are added. Logos are dithered into R2; `/shipped/r/<id>/` serves
  `og.png` and `receipt.png`. Guardrails: Turnstile when its keys exist (otherwise printing relies on the limits),
  per-IP limits, `SHIPPED_DAILY_CAP_USD` spend cap in D1, 7-day cache, takedowns in `/admin`.
+ Secrets: both deploy workflows run `scripts/sync-worker-secrets.mjs`, which copies the repository secrets (Bryton's names:
+ `CLAUDE_KEY`, `SHIPPED_GITHUB_TOKEN` -> `GITHUB_TOKEN`, `PRODUCTHUNT_KEY` + `PRODUCTHUNT_SECRET` (OAuth client_credentials,
+ token cached), `BRANDFETCH_API`, `TINYFISH`, optional `TURNSTILE_*`) into the Worker in one `wrangler secret bulk`, skipping
+ empty ones and logging names only. Without Turnstile secrets it creates/reuses the "shipped" Turnstile widget through the
+ Cloudflare API when `CLOUDFLARE_API_TOKEN` may. Bryton never uses the Cloudflare dashboard: every secret goes through this.
  Year: `SHIPPED_YEAR` (Worker) / `NEXT_PUBLIC_SHIPPED_YEAR` (build), default the current year. "PAID FOR BY" sponsor
  lines (`lib/shipped-sponsors.ts`, same Stripe key as the store) rotate on shared receipts; impressions are in `/admin`.
 - Metrics: `lib/analytics.ts` (anonymous, batched) -> `/api/e` in `worker/metrics.ts` -> D1 `brytonzoz-metrics`

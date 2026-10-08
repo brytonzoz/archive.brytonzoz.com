@@ -104,7 +104,7 @@ const SPONSOR_LIMIT_PER_HOUR = 6;
 const TAKEDOWN_LIMIT_PER_HOUR = 5;
 const DEFAULT_CAP_USD = 5;
 /** Bump when the share images change, so cached ones are redrawn. */
-const IMAGE_VERSION = 1;
+const IMAGE_VERSION = 2;
 
 const SCHEMA = [
   `CREATE TABLE IF NOT EXISTS shipped_receipts (

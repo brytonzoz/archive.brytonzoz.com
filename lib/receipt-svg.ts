@@ -1,11 +1,14 @@
 // Thermal-receipt images as SVG, rendered by resvg with IBM Plex Mono (worker/fonts/): the master
 // /shipped/ card by scripts/build-shipped-og.mjs at build time; Shipped-in-<year> share images and
 // supporter receipts by the Worker. Self-contained (no imports) so Node can load it directly.
+// Drawn like a photo of the page: hand-torn paper with a soft shadow and curled edges on a dark counter
+// under one warm lamp, set like the receipt on the site (double-height store name, one inverse band).
 
 export const OG_FONT = 'IBM Plex Mono';
-const INK = '#1c1917';
-const PAPER = '#f3ead8';
-const NIGHT = '#0b0b0c';
+const INK = '#1d1b19';
+const PAPER = '#f2eee6';
+const COUNTER = '#121316';
+const CREAM = '#f3ead8';
 const PAPER_W = 400;
 /** IBM Plex Mono advances 0.6em per character. */
 const charW = (size: number, spacing = 0) => size * 0.6 + spacing;
@@ -20,9 +23,23 @@ function fit(text: string, max: number): string {
   return text.length <= max ? text : `${text.slice(0, Math.max(1, max - 1))}…`;
 }
 
-function txt(x: number, y: number, value: string, size: number, opts: { weight?: number; anchor?: string; spacing?: number; fill?: string; opacity?: number } = {}) {
+type TextOpts = { weight?: number; anchor?: string; spacing?: number; fill?: string; opacity?: number };
+
+function txt(x: number, y: number, value: string, size: number, opts: TextOpts = {}) {
   const { weight = 500, anchor = 'start', spacing = 0, fill = INK, opacity } = opts;
   return `<text x="${x}" y="${y}" font-family="${OG_FONT}" font-size="${size}" font-weight="${weight}" text-anchor="${anchor}" letter-spacing="${spacing}" fill="${fill}"${opacity === undefined ? '' : ` opacity="${opacity}"`}>${esc(value)}</text>`;
+}
+
+/** ESC/POS double height: the same glyphs stretched to twice the height, baseline at y. */
+function tall(x: number, y: number, value: string, size: number, opts: TextOpts = {}) {
+  return `<g transform="translate(${x} ${y}) scale(1 1.9)">${txt(0, 0, value, size, { weight: 600, ...opts })}</g>`;
+}
+
+/** One inverse-printed band (white on black), centred on c. */
+function inverse(c: number, y: number, value: string, size: number) {
+  const w = charW(size) * value.length + 22;
+  const h = size + 12;
+  return `<rect x="${(c - w / 2).toFixed(1)}" y="${(y - size - 3).toFixed(1)}" width="${w.toFixed(1)}" height="${h}" fill="${INK}"/>${txt(c, y, value, size, { weight: 600, anchor: 'middle', fill: PAPER })}`;
 }
 
 function leader(y: number, label: string, value: string, size: number, weight = 600, left = 28) {
@@ -34,24 +51,12 @@ function leader(y: number, label: string, value: string, size: number, weight = 
   return [
     txt(left, y, shown, size, { weight }),
     txt(right, y, value, size, { weight, anchor: 'end' }),
-    x2 > x1 ? `<line x1="${x1.toFixed(1)}" y1="${y - 3}" x2="${x2.toFixed(1)}" y2="${y - 3}" stroke="${INK}" stroke-width="1" stroke-dasharray="1 3" opacity="0.4"/>` : '',
+    x2 > x1 ? `<line x1="${x1.toFixed(1)}" y1="${y - 3}" x2="${x2.toFixed(1)}" y2="${y - 3}" stroke="${INK}" stroke-width="1" stroke-dasharray="1 3" opacity="0.45"/>` : '',
   ].join('');
 }
 
 function rule(y: number, heavy = false) {
-  return `<line x1="24" y1="${y}" x2="${PAPER_W - 24}" y2="${y}" stroke="${INK}" stroke-width="${heavy ? 2 : 1}"${heavy ? '' : ' stroke-dasharray="3 3" opacity="0.55"'}/>`;
-}
-
-function serration(y: number, flip: boolean) {
-  const teeth = 20;
-  const points: string[] = [];
-  for (let i = 0; i <= teeth; i += 1) {
-    const x = (i / teeth) * PAPER_W;
-    const yy = i % 2 === 0 ? (flip ? y : y + 10) : flip ? y + 10 : y;
-    points.push(`${x},${yy}`);
-  }
-  const base = flip ? y : y + 10;
-  return `<polygon points="0,${base} ${points.join(' ')} ${PAPER_W},${base}" fill="${PAPER}"/>`;
+  return `<line x1="28" y1="${y}" x2="${PAPER_W - 28}" y2="${y}" stroke="${INK}" stroke-width="${heavy ? 1.5 : 1}" stroke-dasharray="${heavy ? '5 2' : '3 3'}" opacity="${heavy ? 0.8 : 0.5}"/>`;
 }
 
 function barcode(x: number, y: number, width: number, height: number, units: number[]) {
@@ -68,14 +73,104 @@ function barcode(x: number, y: number, width: number, height: number, units: num
     .join('');
 }
 
-function frame(inner: string, height = 630) {
-  return `<svg xmlns="http://www.w3.org/2000/svg" width="1200" height="${height}" viewBox="0 0 1200 ${height}"><rect width="1200" height="${height}" fill="${NIGHT}"/>${inner}</svg>`;
+// ---- Paper and counter ------------------------------------------------------------------------------
+
+/** mulberry32, the same tear as components/shipped/physics.ts: one seed, one edge. */
+function prng(seed: string): () => number {
+  let h = 1779033703 ^ seed.length;
+  for (let i = 0; i < seed.length; i++) {
+    h = Math.imul(h ^ seed.charCodeAt(i), 3432918353);
+    h = (h << 13) | (h >>> 19);
+  }
+  let a = h >>> 0;
+  return () => {
+    a = (a + 0x6d2b79f5) | 0;
+    let t = Math.imul(a ^ (a >>> 15), 1 | a);
+    t = (t + Math.imul(t ^ (t >>> 7), 61 | t)) ^ t;
+    return ((t ^ (t >>> 14)) >>> 0) / 4294967296;
+  };
 }
 
-function paper(height: number, body: string, transform: string, open = false) {
-  // open: the paper runs off the bottom of the card (no bottom tear).
-  return `<g transform="${transform}">${serration(0, false)}<rect y="10" width="${PAPER_W}" height="${height - (open ? 10 : 20)}" fill="${PAPER}"/>${body}${open ? '' : serration(height - 10, true)}</g>`;
+function tear(seed: string, y: number, down: boolean, depth = 6): string[] {
+  const random = prng(seed);
+  const points: string[] = [];
+  let x = 0;
+  while (x < PAPER_W) {
+    const bite = random() < 0.08 ? 1 : 0.55;
+    const d = random() * depth * bite;
+    points.push(`${x.toFixed(1)},${(down ? y + d : y - d).toFixed(1)}`);
+    x += 4 + random() * 10;
+  }
+  points.push(`${PAPER_W},${(down ? y + random() * depth * 0.5 : y - random() * depth * 0.5).toFixed(1)}`);
+  return points;
 }
+
+/** A strip of paper torn at the top, and at the bottom unless it runs off the image. */
+function sheetPath(height: number, seed: string, open: boolean): string {
+  const top = tear(`${seed}:top`, 0, true);
+  const bottom = open ? [`${PAPER_W},${height}`, `0,${height}`] : tear(`${seed}:bottom`, height, false).reverse();
+  return `M${top.join(' L')} L${bottom.join(' L')} Z`;
+}
+
+const DEFS = `<defs>
+<filter id="shadow" x="-30%" y="-10%" width="160%" height="130%"><feGaussianBlur stdDeviation="14"/></filter>
+<filter id="contact" x="-10%" y="-10%" width="120%" height="120%"><feGaussianBlur stdDeviation="2"/></filter>
+<linearGradient id="curl" x1="0" x2="1" y1="0" y2="0">
+<stop offset="0" stop-color="#3a2c1e" stop-opacity="0.13"/><stop offset="0.1" stop-color="#3a2c1e" stop-opacity="0"/>
+<stop offset="0.88" stop-color="#3a2c1e" stop-opacity="0"/><stop offset="1" stop-color="#3a2c1e" stop-opacity="0.15"/>
+</linearGradient>
+<linearGradient id="sheen" x1="0" x2="0" y1="0" y2="1">
+<stop offset="0" stop-color="#fff" stop-opacity="0.18"/><stop offset="0.5" stop-color="#fff" stop-opacity="0"/>
+</linearGradient>
+<radialGradient id="lamp" cx="0.64" cy="-0.08" r="0.75"><stop offset="0" stop-color="#ffe4ba" stop-opacity="0.17"/><stop offset="1" stop-color="#ffe4ba" stop-opacity="0"/></radialGradient>
+<radialGradient id="vignette" cx="0.5" cy="0.45" r="0.8"><stop offset="0.55" stop-color="#000" stop-opacity="0"/><stop offset="1" stop-color="#000" stop-opacity="0.55"/></radialGradient>
+<linearGradient id="steel" x1="0" x2="0" y1="0" y2="1"><stop offset="0" stop-color="#e3e6ea"/><stop offset="0.45" stop-color="#a9afb7"/><stop offset="1" stop-color="#6e747c"/></linearGradient>
+<linearGradient id="chassis" x1="0" x2="0" y1="0" y2="1"><stop offset="0" stop-color="#2a2c31"/><stop offset="1" stop-color="#17181b"/></linearGradient>
+</defs>`;
+
+/** Counter, lamp and vignette around whatever is on it. The 2× downloads skip the lamp: full-size gradients
+ *  and blurs cost seconds of Worker CPU at that size. */
+function scene(width: number, height: number, inner: string, scale = 1) {
+  const light = scale === 1;
+  return `<svg xmlns="http://www.w3.org/2000/svg" width="${width * scale}" height="${height * scale}" viewBox="0 0 ${width} ${height}">${DEFS}<rect width="${width}" height="${height}" fill="${COUNTER}"/>${light ? `<rect width="${width}" height="${height}" fill="url(#lamp)"/>` : ''}${inner}${light ? `<rect width="${width}" height="${height}" fill="url(#vignette)"/>` : ''}</svg>`;
+}
+
+/** The paper itself: shadow on the counter, the sheet and its curled edges, then the print. */
+function sheet(height: number, body: string, transform: string, seed: string, opts: { open?: boolean; soft?: boolean } = {}) {
+  const d = sheetPath(height, seed, Boolean(opts.open));
+  const shadow = opts.soft
+    ? `<path d="${d}" transform="translate(10 22)" fill="#000" opacity="0.6" filter="url(#shadow)"/><path d="${d}" transform="translate(0 1.5)" fill="#000" opacity="0.5" filter="url(#contact)"/><path d="${d}" fill="${PAPER}"/><path d="${d}" fill="url(#curl)"/><path d="${d}" fill="url(#sheen)"/>`
+    : [[9, 16, 0.12], [6, 10, 0.16], [3, 5, 0.2], [0.5, 1.5, 0.35]].map(([x, y, o]) => `<path d="${d}" transform="translate(${x} ${y})" fill="#000" opacity="${o}"/>`).join('') +
+      `<path d="${d}" fill="${PAPER}"/><path d="${d}" fill="url(#curl)"/>`;
+  return `<g transform="${transform}">${shadow}${body}</g>`;
+}
+
+/** The front of the BZ-80 with its tear bar, so the receipt in a card hangs from the printer. */
+function printerLip(x: number, y: number, width: number) {
+  const teeth: string[] = [];
+  for (let tx = x + 14; tx < x + width - 14; tx += 6) teeth.push(`${tx},${y + 6} ${tx + 3},${y + 11} ${tx + 6},${y + 6}`);
+  return [
+    `<rect x="${x}" y="${y - 70}" width="${width}" height="76" rx="14" fill="url(#chassis)"/>`,
+    `<rect x="${x}" y="${y - 70}" width="${width}" height="76" rx="14" fill="none" stroke="#fff" stroke-opacity="0.08"/>`,
+    `<rect x="${x + 22}" y="${y - 12}" width="${width - 44}" height="5" rx="2.5" fill="#000"/>`,
+    `<rect x="${x + 14}" y="${y}" width="${width - 28}" height="6" fill="url(#steel)"/>`,
+    `<polygon points="${teeth.join(' ')}" fill="#8b9199"/>`,
+  ].join('');
+}
+
+/** Header every receipt shares: the store in double height, then date and number. */
+function header(c: number, date: string, number: string) {
+  return [
+    tall(c, 46, 'BRYTONZOZ.COM', 15, { anchor: 'middle' }),
+    txt(c, 74, 'SHIPPED DEPT. · NEW YORK, NY', 10.5, { anchor: 'middle', opacity: 0.7 }),
+    rule(90),
+    leader(112, 'DATE', date, 12, 500),
+    leader(130, 'RECEIPT', `#${number}`, 12, 500),
+    rule(146),
+  ];
+}
+
+// ---- The master /shipped/ card -------------------------------------------------------------------------
 
 export type MasterOg = {
   date: string;
@@ -88,52 +183,46 @@ export type MasterOg = {
 
 function yearDivider(y: number, label: string) {
   const c = PAPER_W / 2;
-  const half = (charW(12, 3.6) * label.length) / 2 + 12;
+  const half = (charW(12) * label.length) / 2 + 12;
   return [
-    `<line x1="28" y1="${y - 4}" x2="${c - half}" y2="${y - 4}" stroke="${INK}" stroke-width="1" stroke-dasharray="3 3" opacity="0.55"/>`,
-    txt(c, y, label, 12, { weight: 600, anchor: 'middle', spacing: 3.6 }),
-    `<line x1="${c + half}" y1="${y - 4}" x2="${PAPER_W - 28}" y2="${y - 4}" stroke="${INK}" stroke-width="1" stroke-dasharray="3 3" opacity="0.55"/>`,
+    `<line x1="28" y1="${y - 4}" x2="${c - half}" y2="${y - 4}" stroke="${INK}" stroke-width="1" stroke-dasharray="3 3" opacity="0.5"/>`,
+    txt(c, y, label, 12, { weight: 600, anchor: 'middle' }),
+    `<line x1="${c + half}" y1="${y - 4}" x2="${PAPER_W - 28}" y2="${y - 4}" stroke="${INK}" stroke-width="1" stroke-dasharray="3 3" opacity="0.5"/>`,
   ].join('');
 }
 
-/** The /shipped/ card: the totals on the left, Bryton's receipt running off the bottom on the right. */
+/** The /shipped/ card: the totals on the left, Bryton's receipt hanging from the printer on the right. */
 export function masterReceiptSvg(data: MasterOg): string {
   const left: string[] = [
-    txt(72, 112, 'BRYTON ZOZ', 22, { weight: 600, spacing: 5, fill: PAPER, opacity: 0.7 }),
-    txt(72, 196, 'SHIPPED.', 76, { weight: 600, spacing: 4, fill: PAPER }),
-    txt(72, 246, `${data.items} ITEMS${data.span ? ` · ${data.span}` : ''}`, 26, { weight: 500, spacing: 2, fill: PAPER, opacity: 0.85 }),
+    txt(72, 104, 'BZ-80 · BRYTON ZOZ', 18, { spacing: 2.5, fill: CREAM, opacity: 0.5 }),
+    txt(68, 196, 'Shipped.', 84, { spacing: -4, fill: CREAM }),
+    txt(72, 246, `${data.items} things${data.span ? `, ${data.span}` : ''}`, 26, { fill: CREAM, opacity: 0.75 }),
   ];
   let y = 318;
   for (const line of data.counts) {
-    left.push(txt(72, y, line.value.padStart(2, ' '), 30, { weight: 600, fill: PAPER }), txt(132, y, line.label, 24, { spacing: 2, fill: PAPER, opacity: 0.85 }));
-    y += 44;
+    left.push(txt(72, y, line.value.padStart(2, ' '), 28, { weight: 600, fill: CREAM }), txt(130, y, line.label, 22, { fill: CREAM, opacity: 0.7 }));
+    y += 42;
   }
-  left.push(txt(72, 586, 'BRYTONZOZ.COM/SHIPPED', 18, { spacing: 1.5, fill: PAPER, opacity: 0.6 }));
+  left.push(txt(72, 586, 'brytonzoz.com/shipped', 18, { fill: CREAM, opacity: 0.5 }));
 
   const c = PAPER_W / 2;
-  const body: string[] = [
-    txt(c, 40, 'STORE RECEIPT', 11, { weight: 600, anchor: 'middle', spacing: 4.5 }),
-    txt(c, 66, 'BRYTON ZOZ', 17, { weight: 600, anchor: 'middle', spacing: 3.2 }),
-    txt(c, 100, 'SHIPPED', 26, { weight: 600, anchor: 'middle', spacing: 6 }),
-    leader(132, 'DATE', data.date, 12),
-    leader(152, 'ITEMS', String(data.items), 12),
-    rule(168),
-  ];
-  let py = 196;
-  // Fill the paper and let the rest run off the card, like a receipt still printing.
+  const body: string[] = [...header(c, data.date, 'BZ-SHIPPED'), inverse(c, 180, 'SHIPPED', 15), leader(212, 'ITEMS', String(data.items), 12)];
+  let py = 244;
   for (const group of data.groups) {
-    if (py > 660) break;
+    if (py > 640) break;
     body.push(yearDivider(py, group.label));
     py += 24;
     for (const item of group.items) {
-      if (py > 660) break;
+      if (py > 640) break;
       body.push(leader(py, item.name.toUpperCase(), item.status, 12));
       py += 20;
     }
     py += 6;
   }
-  return frame(`${left.join('')}${paper(680, body.join(''), 'translate(724 22) rotate(1.4 200 330)', true)}`);
+  return scene(1200, 630, `${sheet(640, body.join(''), 'translate(736 40) rotate(0.6 200 0)', 'master', { open: true, soft: true })}${printerLip(706, 40, 460)}${left.join('')}`);
 }
+
+// ---- Supporter receipt ------------------------------------------------------------------------------------
 
 export type SupporterOg = {
   number: string;
@@ -150,42 +239,32 @@ export type SupporterOg = {
 /** The supporter's own receipt (portrait, 2× for a sharp download): their shout-out, what they paid. */
 export function supporterReceiptSvg(data: SupporterOg): string {
   const c = PAPER_W / 2;
-  const body: string[] = [
-    txt(c, 40, 'SUPPORTER RECEIPT', 11, { weight: 600, anchor: 'middle', spacing: 4.5 }),
-    txt(c, 66, 'BRYTON ZOZ', 17, { weight: 600, anchor: 'middle', spacing: 3.2 }),
-    txt(c, 100, 'SHIPPED', 26, { weight: 600, anchor: 'middle', spacing: 6 }),
-    leader(132, 'DATE', data.date, 12),
-    leader(152, 'RECEIPT', `#${data.number}`, 12),
-    rule(168),
-    txt(c, 196, 'YOUR SHOUT-OUT', 11, { anchor: 'middle', spacing: 3, opacity: 0.7 }),
-    txt(c, 226, fit(data.text, 32), 17, { weight: 600, anchor: 'middle' }),
-  ];
-  let y = 248;
+  const body: string[] = [...header(c, data.date, data.number), inverse(c, 180, 'SUPPORTER RECEIPT', 13), txt(c, 212, 'YOUR SHOUT-OUT', 10.5, { anchor: 'middle', opacity: 0.65 })];
+  body.push(tall(c, 244, fit(data.text, 30), 14, { anchor: 'middle' }));
+  let y = 270;
   if (data.link) {
-    body.push(txt(c, y, fit(data.link, 44), 11, { anchor: 'middle', opacity: 0.75 }));
+    body.push(txt(c, y, fit(data.link, 44), 11, { anchor: 'middle', opacity: 0.7 }));
     y += 8;
   }
   y += 20;
   for (const line of data.details) {
-    body.push(leader(y, line.label, line.value, 12));
+    body.push(leader(y, line.label, line.value, 12, 500));
     y += 20;
   }
   body.push(rule(y - 4));
   y += 22;
   for (const line of data.charges) {
-    body.push(leader(y, line.label, line.value, 12));
+    body.push(leader(y, line.label, line.value, 12, 500));
     y += 20;
   }
   body.push(rule(y - 4, true), leader(y + 20, 'TOTAL', data.total, 16), rule(y + 34, true));
   y += 64;
-  body.push(txt(c, y, data.status, 11, { weight: 600, anchor: 'middle', spacing: 2 }));
-  body.push(txt(c, y + 20, 'THANK YOU FOR SUPPORTING.', 11, { anchor: 'middle', spacing: 2, opacity: 0.75 }));
+  body.push(txt(c, y, data.status, 11, { weight: 600, anchor: 'middle' }));
+  body.push(txt(c, y + 20, 'THANK YOU FOR SUPPORTING.', 11, { anchor: 'middle', opacity: 0.7 }));
   body.push(barcode(64, y + 40, 272, 34, data.barcode));
-  body.push(txt(c, y + 96, 'BRYTONZOZ.COM/SHIPPED', 10, { anchor: 'middle', spacing: 2, opacity: 0.6 }));
+  body.push(txt(c, y + 96, 'BRYTONZOZ.COM/SHIPPED', 10, { anchor: 'middle', opacity: 0.6 }));
   const height = y + 126;
-  const w = PAPER_W + 80;
-  const h = height + 80;
-  return `<svg xmlns="http://www.w3.org/2000/svg" width="${w * 2}" height="${h * 2}" viewBox="0 0 ${w} ${h}"><rect width="${w}" height="${h}" fill="${NIGHT}"/>${paper(height, body.join(''), 'translate(40 40)')}</svg>`;
+  return scene(PAPER_W + 120, height + 120, sheet(height, body.join(''), 'translate(60 50) rotate(-0.8 200 0)', `supporter:${data.number}`), 2);
 }
 
 // ---- Shipped in <year> ---------------------------------------------------------------------------
@@ -225,89 +304,85 @@ const logoImage = (x: number, y: number, size: number, href: string) =>
 
 const paidForText = (paid: YearOgPaidFor) => paid.lines.map((line) => line.text).join(' · ');
 
-/** The X card (1200×675): who and the tally on the left, the receipt running off the bottom on the right. */
+function customer(c: number, y: number, year: number, who: string) {
+  return [inverse(c, y, `SHIPPED IN ${year}`, 14), txt(c, y + 30, 'CUSTOMER', 10.5, { anchor: 'middle', opacity: 0.6 }), tall(c, y + 56, fit(who.toUpperCase(), 26), 15, { anchor: 'middle' })];
+}
+
+/** The X card (1200×675): who and the tally on the left, their receipt hanging from the printer on the right. */
 export function yearCardSvg(data: YearOg): string {
+  const name = fit(data.who, 22);
   const left: string[] = [
-    txt(72, 96, `RECEIPT #${data.number}`, 18, { weight: 600, spacing: 4, fill: PAPER, opacity: 0.6 }),
-    txt(72, 178, 'SHIPPED', 72, { weight: 600, spacing: 4, fill: PAPER }),
-    txt(72, 256, `IN ${data.year}.`, 72, { weight: 600, spacing: 4, fill: PAPER }),
-    txt(72, 322, fit(data.who.toUpperCase(), 24), data.who.length > 18 ? 26 : 32, { weight: 600, spacing: 1.5, fill: PAPER, opacity: 0.92 }),
-    txt(72, 380, `ITEMS SHIPPED: ${data.count}`, 30, { weight: 600, spacing: 1.5, fill: PAPER }),
+    txt(72, 92, `RECEIPT #${data.number}`, 17, { spacing: 2.5, fill: CREAM, opacity: 0.5 }),
+    txt(68, 176, 'Shipped', 80, { spacing: -4, fill: CREAM }),
+    txt(68, 256, `in ${data.year}.`, 80, { spacing: -4, fill: CREAM }),
+    txt(72, 322, name, name.length > 16 ? 28 : 34, { weight: 600, spacing: -0.5, fill: CREAM }),
+    txt(72, 372, `${data.count} ${data.count === 1 ? 'thing' : 'things'} shipped`, 26, { fill: CREAM, opacity: 0.8 }),
   ];
-  wrap(`“${data.note}”`, 44, 2).forEach((line, i) => left.push(txt(72, 428 + i * 26, line, 18, { fill: PAPER, opacity: 0.75 })));
-  left.push(txt(72, 540, 'THIS RECEIPT PAID FOR BY:', 14, { weight: 600, spacing: 3, fill: PAPER, opacity: 0.55 }));
-  if (data.paidFor.presented) left.push(txt(72, 568, fit(`PRESENTED BY ${data.paidFor.presented.toUpperCase()}`, 40), 18, { weight: 600, spacing: 1.5, fill: PAPER }));
-  left.push(txt(72, data.paidFor.presented ? 594 : 572, fit(paidForText(data.paidFor).toUpperCase(), 46), 18, { weight: 600, spacing: 1.2, fill: PAPER, opacity: 0.9 }));
-  left.push(txt(72, 636, 'PRINT YOURS AT BRYTONZOZ.COM/SHIPPED', 15, { spacing: 1.5, fill: PAPER, opacity: 0.55 }));
+  wrap(`“${data.note}”`, 44, 2).forEach((line, i) => left.push(txt(72, 424 + i * 26, line, 18, { fill: CREAM, opacity: 0.6 })));
+  left.push(txt(72, 536, 'This receipt was paid for by', 14, { fill: CREAM, opacity: 0.45 }));
+  if (data.paidFor.presented) left.push(txt(72, 564, fit(`PRESENTED BY ${data.paidFor.presented.toUpperCase()}`, 40), 18, { weight: 600, fill: CREAM }));
+  left.push(txt(72, data.paidFor.presented ? 590 : 566, fit(paidForText(data.paidFor).toUpperCase(), 46), 17, { weight: 600, fill: CREAM, opacity: 0.85 }));
+  left.push(txt(72, 632, 'Print yours: brytonzoz.com/shipped', 15, { fill: CREAM, opacity: 0.5 }));
 
   const c = PAPER_W / 2;
-  const body: string[] = [
-    txt(c, 40, 'STORE RECEIPT', 11, { weight: 600, anchor: 'middle', spacing: 4.5 }),
-    txt(c, 70, `SHIPPED IN ${data.year}`, 20, { weight: 600, anchor: 'middle', spacing: 3 }),
-    txt(c, 94, fit(data.who.toUpperCase(), 30), 13, { weight: 600, anchor: 'middle', spacing: 1.6 }),
-    leader(124, 'DATE', data.date, 12),
-    leader(144, 'RECEIPT', `#${data.number}`, 12),
-    rule(160),
-  ];
-  let y = 190;
+  const body: string[] = [...header(c, data.date, data.number), ...customer(c, 180, data.year, data.who), rule(258)];
+  let y = 290;
   for (const item of data.items) {
     if (y > 700) break;
     if (item.logo) body.push(logoImage(28, y - 15, 20, item.logo));
     body.push(leader(y, item.name.toUpperCase(), item.status, 12.5, 600, item.logo ? 56 : 28));
     y += 26;
   }
-  return frame(`${left.join('')}${paper(720, body.join(''), 'translate(724 22) rotate(1.4 200 330)', true)}`, 675);
+  return scene(1200, 675, `${sheet(680, body.join(''), 'translate(736 40) rotate(0.6 200 0)', `card:${data.number}`, { open: true, soft: true })}${printerLip(706, 40, 460)}${left.join('')}`);
 }
 
 /** The whole receipt as one tall image (2×), PAID FOR BY block and all. */
 export function yearTallSvg(data: YearOg): string {
   const c = PAPER_W / 2;
-  const body: string[] = [
-    txt(c, 40, 'STORE RECEIPT', 11, { weight: 600, anchor: 'middle', spacing: 4.5 }),
-    txt(c, 74, `SHIPPED IN ${data.year}`, 24, { weight: 600, anchor: 'middle', spacing: 3.5 }),
-    txt(c, 100, fit(data.who.toUpperCase(), 30), 14, { weight: 600, anchor: 'middle', spacing: 1.8 }),
-    leader(132, 'DATE', data.date, 12),
-    leader(152, 'RECEIPT', `#${data.number}`, 12),
-    rule(168),
-  ];
-  let y = 196;
+  const body: string[] = [...header(c, data.date, data.number), ...customer(c, 180, data.year, data.who), rule(258)];
+  let y = 288;
   for (const item of data.items) {
     const indent = item.logo ? 64 : 28;
     if (item.logo) body.push(logoImage(28, y - 16, 28, item.logo));
     body.push(leader(y, item.name.toUpperCase(), item.status, 13, 600, indent));
-    const sub = [item.date, item.description].filter(Boolean).join(' · ');
+    const sub = [item.description, item.date].filter(Boolean).join('  ');
     const lines = wrap(sub, item.logo ? 50 : 56, 2);
     lines.forEach((line, i) => body.push(txt(indent, y + 17 + i * 14, line, 10.5, { opacity: 0.72 })));
     y += 22 + Math.max(lines.length, item.logo ? 1 : 0) * 14 + 10;
   }
-  body.push(rule(y - 4), leader(y + 22, 'ITEMS SHIPPED', String(data.count), 16), rule(y + 36, true));
+  body.push(rule(y - 4, true), txt(28, y + 22, 'ITEMS SHIPPED', 13, { weight: 600 }), tall(PAPER_W - 28, y + 24, String(data.count), 16, { anchor: 'end' }), rule(y + 38, true));
   y += 66;
-  for (const line of wrap(`“${data.note}”`, 46, 3)) {
-    body.push(txt(c, y, line, 12, { anchor: 'middle', opacity: 0.85 }));
+  body.push(txt(28, y, 'CASHIER’S NOTE', 10.5, { opacity: 0.6 }));
+  y += 18;
+  for (const line of wrap(data.note, 52, 3)) {
+    body.push(txt(28, y, line, 12));
     y += 17;
   }
-  y += 16;
-  body.push(txt(c, y, 'THIS RECEIPT PAID FOR BY:', 10.5, { weight: 600, anchor: 'middle', spacing: 2.4, opacity: 0.6 }));
+  y += 14;
+  const boxTop = y;
   y += 22;
+  body.push(txt(c, y, 'THIS RECEIPT WAS PAID FOR BY', 10.5, { weight: 600, anchor: 'middle' }));
+  y += 24;
   if (data.paidFor.presented) {
-    body.push(txt(c, y, fit(`PRESENTED BY ${data.paidFor.presented.toUpperCase()}`, 36), 13, { weight: 600, anchor: 'middle', spacing: 1.4 }));
-    y += 22;
+    body.push(txt(c, y, 'PRESENTED BY', 10.5, { anchor: 'middle' }));
+    body.push(tall(c, y + 24, fit(data.paidFor.presented.toUpperCase(), 30), 13, { anchor: 'middle' }));
+    y += 44;
   }
   for (const line of data.paidFor.lines) {
     if (line.logo) {
       body.push(logoImage(c - 20, y - 12, 40, line.logo));
       y += 38;
     }
-    body.push(txt(c, y, fit(line.text.toUpperCase(), 36), 12.5, { weight: 600, anchor: 'middle', spacing: 1 }));
+    body.push(txt(c, y, fit(line.text.toUpperCase(), 36), 12.5, { weight: 600, anchor: 'middle' }));
     y += 20;
   }
-  y += 8;
+  body.push(`<rect x="28" y="${boxTop}" width="${PAPER_W - 56}" height="${y - boxTop}" fill="none" stroke="${INK}" stroke-width="1.5"/>`);
+  y += 24;
   body.push(barcode(64, y, 272, 34, data.barcode));
   y += 56;
-  body.push(txt(c, y, 'PRINT YOURS AT BRYTONZOZ.COM/SHIPPED', 10.5, { weight: 600, anchor: 'middle', spacing: 1.6 }));
-  body.push(txt(c, y + 16, fit(data.url, 52), 9.5, { anchor: 'middle', opacity: 0.6 }));
-  const height = y + 46;
-  const w = PAPER_W + 80;
-  const h = height + 80;
-  return `<svg xmlns="http://www.w3.org/2000/svg" width="${w * 2}" height="${h * 2}" viewBox="0 0 ${w} ${h}"><rect width="${w}" height="${h}" fill="${NIGHT}"/>${paper(height, body.join(''), 'translate(40 40)')}</svg>`;
+  body.push(txt(c, y, 'PRINTED AT BRYTONZOZ.COM/SHIPPED', 10.5, { weight: 600, anchor: 'middle' }));
+  body.push(txt(c, y + 16, '*** CUSTOMER COPY ***', 10, { anchor: 'middle', opacity: 0.6 }));
+  body.push(txt(c, y + 32, fit(data.url, 52), 9.5, { anchor: 'middle', opacity: 0.55 }));
+  const height = y + 56;
+  return scene(PAPER_W + 120, height + 120, sheet(height, body.join(''), 'translate(60 50) rotate(-0.6 200 0)', `tall:${data.number}`), 2);
 }

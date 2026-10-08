@@ -1,4 +1,4 @@
-// Link-preview card for /shipped/: a 1200×630 JPEG of the master receipt (data/shipped/businesses.json),
+// Link-preview card for /shipped/: a 1200×630 JPEG of the master receipt hanging from the printer (data/shipped/businesses.json),
 // drawn by lib/receipt-svg.ts and rendered with resvg + IBM Plex Mono, the same way the Worker renders
 // printed receipts. Run with --experimental-strip-types (see package.json "media").
 import fs from 'node:fs/promises';

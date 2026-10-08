@@ -18,7 +18,7 @@ Readable copy of businesses.json, which is the source of truth for /shipped/.
 | 11 | RemiWeb | 2023 | DECEASED | Solo run at the same $99 AI-assisted local-business website offer. | Never landed a sale. |  |  |
 | 12 | NONPARALLEL v2 | 2023– | ACTIVE | Creative tech for artists: release links, online stores, and streaming platforms. | Now sells one-time builds from $195 at nonprllel.com. | https://nonprllel.com | nonparallel.webp |
 | 13 | Loopless / SCRPWRK (SCRPWRK / ScrapWRK) | 2024– | ACTIVE | Turns textile scraps into one-of-a-kind sustainable fashion pieces. |  | https://scrapwrk.com |  |
-| 14 | EntreLabz v2 | 2025– | ACTIVE | App studio shipping websites and apps in weeks, not months. | Home base for Habituize, Phyra, and local website sprints. | https://entrelabz.com | entrelabz.png |
+| 14 | EntreLabz v2 | 2025– | ACTIVE | App studio shipping websites and apps in weeks, not months. | Home base for Habituize, Physiquify, and local website sprints. | https://entrelabz.com | entrelabz.png |
 | 15 | Habituize (formerly DayONE, then Unifyr) | 2025– | LIVE | Habit-building iPhone app; version 2.0 was a complete ground-up rebuild. | DayONE grew into Unifyr, then got stripped back to the daily-reset habit core. | https://habituize.app | habituize.webp |
 | 16 | LiveCaps | 2025 | PROTOTYPE | Real-time captions overlay for any audio on your computer, powered by Whisper. | Desktop app plus a marketing site with Pro subscriptions. |  |  |
 | 17 | WellnessBuddy | 2025 | PROTOTYPE | Habit-building iPhone app with on-device AI, built in SwiftUI and CoreML. |  |  |  |

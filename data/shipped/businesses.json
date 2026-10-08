@@ -237,7 +237,7 @@
       "status": "ACTIVE",
       "status_source": "Bryton (Oct 8 2026)",
       "description": "App studio shipping websites and apps in weeks, not months.",
-      "note": "Home base for Habituize, Phyra, and local website sprints.",
+      "note": "Home base for Habituize, Physiquify, and local website sprints.",
       "url": "https://entrelabz.com",
       "app_store": null,
       "stack": "Vite single-page app; Stripe Payment Links",

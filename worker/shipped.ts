@@ -81,7 +81,12 @@ export interface ShippedEnv extends AiEnv, PayEnv, SourceEnv {
  */
 export function withKeyAliases<T extends ShippedEnv>(env: T): T {
   const raw = env as T & Record<string, unknown>;
-  const pick = (...names: string[]) => names.map((name) => raw[name]).find((value): value is string => typeof value === 'string' && value.trim() !== '');
+  // Secrets set by hand in the dashboard keep whatever casing they were typed with (e.g. "Claude_key").
+  const keys = Object.keys(raw);
+  const pick = (...names: string[]) =>
+    names
+      .map((name) => raw[keys.find((key) => key.toLowerCase() === name.toLowerCase()) ?? name])
+      .find((value): value is string => typeof value === 'string' && value.trim() !== '');
   const anthropic = pick('claude_key', 'CLAUDE_KEY', 'ANTHROPIC_API_KEY');
   const tinyfish = pick('tinyfish', 'TINYFISH', 'TINYFISH_API_KEY');
   if (anthropic === env.ANTHROPIC_API_KEY && tinyfish === env.TINYFISH_API_KEY) return env;

@@ -468,6 +468,11 @@ export async function gather(subject: Subject, env: SourceEnv, year: number, ext
 
   const ran: string[] = [];
   const failed: string[] = [];
+  // An X handle borrows the same-named GitHub account only when that account lists this handle.
+  if (subject.kind === 'x' && isGithubLogin(subject.id)) {
+    const user = await githubUser(subject.id, env).catch(() => null);
+    if (user?.x && user.x.toLowerCase() === subject.id.toLowerCase()) profile.github = subject.id;
+  }
   if (profile.github) {
     try {
       const user = await githubUser(profile.github, env);

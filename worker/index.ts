@@ -1,8 +1,10 @@
 // Serves songs from R2 at /audio/<key> on the site's own domain (seekable, edge-cached), and the
-// listening metrics API at /api/* (worker/metrics.ts) and the Scrapwrk checkout (worker/store.ts). Every other path is handled by static
+// listening metrics API at /api/* (worker/metrics.ts), the Scrapwrk checkout (worker/store.ts) and
+// /shipped's printed receipts and sponsor lines (worker/shipped.ts). Every other path is handled by static
 // assets before this script runs (see run_worker_first).
 import { handleApi, type MetricsEnv } from './metrics';
 import { placeManualOrders, reconcileMerch, type MerchEnv } from './merch';
+import { handleShipped, handleShippedPage } from './shipped';
 import { handleStore } from './store';
 
 interface Env extends MetricsEnv, MerchEnv {
@@ -107,7 +109,11 @@ export default {
   async fetch(request: Request, env: Env, ctx: ExecutionContext): Promise<Response> {
     const url = new URL(request.url);
     if (url.pathname.startsWith(AUDIO_PREFIX)) return serveAudio(request, env, ctx);
-    if (url.pathname.startsWith('/api/')) return (await handleStore(request, env)) ?? handleApi(request, env);
+    if (url.pathname.startsWith('/api/')) {
+      return (await handleShipped(request, env, ctx)) ?? (await handleStore(request, env)) ?? handleApi(request, env);
+    }
+    // Printed receipts' share pages and their preview images (worker/shipped.ts).
+    if (url.pathname.startsWith('/shipped/r/')) return handleShippedPage(request, env);
     // Campaign links for posts and bios: brytonzoz.com/go/ig -> the homepage, tagged "ig" in /admin.
     if (url.pathname.startsWith('/go/')) {
       const code = url.pathname.slice(4).replace(/\/+$/, '').toLowerCase();

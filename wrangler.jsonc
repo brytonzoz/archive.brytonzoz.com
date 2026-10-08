@@ -1,7 +1,8 @@
 {
   "$schema": "node_modules/wrangler/config-schema.json",
   // Static assets are served straight from Cloudflare's edge; the script in worker/ only runs for
-  // /audio/* (songs streamed from R2), /api/* (metrics, notify list) and /go/* (campaign links).
+  // /audio/* (songs streamed from R2), /api/* (metrics, notify list, store, /shipped), /go/* (campaign
+  // links) and /shipped/r/* (printed receipts' share pages).
   "name": "archive",
   "account_id": "480a4eebfef4c5ba2d0e225fde891ae8",
   "compatibility_date": "2026-09-01",
@@ -11,10 +12,16 @@
     "binding": "ASSETS",
     "html_handling": "auto-trailing-slash",
     "not_found_handling": "404-page",
-    "run_worker_first": ["/audio/*", "/api/*", "/go/*"]
+    "run_worker_first": ["/audio/*", "/api/*", "/go/*", "/shipped/r/*"]
   },
+  // Fonts for the receipts' preview images (worker/shipped-og.ts).
+  "rules": [{ "type": "Data", "globs": ["**/*.ttf"], "fallthrough": true }],
+  // SITE_ENV gates staging-only behavior (sandbox sponsor payments, Turnstile test keys, AI-less demo prints).
+  "vars": { "SITE_ENV": "production", "SHIPPED_MODEL": "claude-haiku-5-5", "SHIPPED_DAILY_CAP_USD": "3" },
   "r2_buckets": [
-    { "binding": "MUSIC", "bucket_name": "brytonzoz-media" }
+    { "binding": "MUSIC", "bucket_name": "brytonzoz-media" },
+    // /shipped: printed receipts' preview images and sponsor logos (staged until approved).
+    { "binding": "SHIPPED", "bucket_name": "brytonzoz-shipped" }
   ],
   // Listening metrics (schema: worker/schema.sql). ADMIN_PASSWORD is a Worker secret.
   "d1_databases": [
@@ -33,8 +40,10 @@
       "routes": [],
       "workers_dev": true,
       "triggers": { "crons": [] },
+      "vars": { "SITE_ENV": "staging", "SHIPPED_MODEL": "claude-haiku-5-5", "SHIPPED_DAILY_CAP_USD": "1" },
       "r2_buckets": [
-        { "binding": "MUSIC", "bucket_name": "brytonzoz-media" }
+        { "binding": "MUSIC", "bucket_name": "brytonzoz-media" },
+        { "binding": "SHIPPED", "bucket_name": "brytonzoz-shipped-staging" }
       ],
       // Separate database so tests on staging never touch real listening numbers.
       "d1_databases": [

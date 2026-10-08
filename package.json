@@ -3,7 +3,7 @@
   "version": "0.1.0",
   "private": true,
   "scripts": {
-    "media": "node scripts/build-media.mjs && node scripts/build-share-images.mjs && node scripts/build-shipped-og.mjs",
+    "media": "node scripts/build-media.mjs && node scripts/build-share-images.mjs && node --experimental-strip-types --no-warnings scripts/build-shipped-og.mjs",
     "predev": "npm run media",
     "dev": "next dev",
     "prebuild": "npm run media",
@@ -26,6 +26,7 @@
   },
   "devDependencies": {
     "@cloudflare/workers-types": "^5.20260928.1",
+    "@resvg/resvg-wasm": "^2.6.2",
     "@types/node": "^20",
     "@types/react": "^18",
     "@types/react-dom": "^18",

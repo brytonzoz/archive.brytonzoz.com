@@ -1,15 +1,9 @@
 import React from 'react';
 import type { Metadata } from 'next';
-import { IBM_Plex_Mono } from 'next/font/google';
+import { PrintForm } from '../../components/shipped/PrintForm';
 import { Receipt } from '../../components/shipped/Receipt';
+import { SponsorDesk } from '../../components/shipped/SponsorDesk';
 import { SHIPPED_OG_IMAGE } from '../../lib/shipped';
-import './receipt.css';
-
-const receiptMono = IBM_Plex_Mono({
-  subsets: ['latin'],
-  weight: ['400', '500', '600'],
-  display: 'swap',
-});
 
 export const dynamic = 'force-static';
 
@@ -59,8 +53,10 @@ export const metadata: Metadata = {
 
 export default function ShippedPage() {
   return (
-    <div className={receiptMono.className}>
+    <>
       <Receipt />
-    </div>
+      <PrintForm />
+      <SponsorDesk />
+    </>
   );
 }

@@ -90,7 +90,127 @@
   flex: none;
 }
 
+.shipped-stack {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 2.5rem;
+}
+
+.shipped-ticket {
+  scroll-margin-top: 1.5rem;
+}
+
+.shipped-field {
+  background: rgba(255, 255, 255, 0.45);
+  border: 1px solid rgba(28, 25, 23, 0.55);
+  border-radius: 2px;
+  color: #1c1917;
+}
+
+.shipped-field:focus-within,
+.shipped-field:focus {
+  outline: 2px solid #1c1917;
+  outline-offset: 1px;
+}
+
+.shipped-field::placeholder,
+.shipped-field input::placeholder {
+  color: rgba(28, 25, 23, 0.35);
+}
+
+.shipped-choice {
+  display: block;
+  cursor: pointer;
+  border: 1px dashed rgba(28, 25, 23, 0.55);
+  border-radius: 2px;
+  padding: 0.55rem 0.7rem;
+  transition: background-color 150ms ease-out, color 150ms ease-out;
+}
+
+.shipped-choice.is-on {
+  background: #1c1917;
+  border-style: solid;
+  color: #f3ead8;
+}
+
+.shipped-choice:focus-within {
+  outline: 2px solid #1c1917;
+  outline-offset: 2px;
+}
+
+.shipped-choice.is-on .shipped-lead-fill {
+  border-bottom-color: rgba(243, 234, 216, 0.55);
+}
+
+.shipped-button {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-height: 2.75rem;
+  border-radius: 2px;
+  background: #1c1917;
+  color: #f3ead8;
+  padding: 0.6rem 1rem;
+  font-size: 13px;
+  font-weight: 600;
+  letter-spacing: 0.2em;
+  text-decoration: none;
+  transition: transform 150ms ease-out, opacity 150ms ease-out;
+}
+
+.shipped-button:active {
+  transform: translateY(1px);
+}
+
+.shipped-button:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+.shipped-button:focus-visible {
+  outline: 2px solid #f3ead8;
+  outline-offset: 2px;
+  box-shadow: 0 0 0 4px #1c1917;
+}
+
+.shipped-button.is-ghost {
+  background: transparent;
+  color: inherit;
+  border: 1px solid currentColor;
+}
+
+.shipped-actions {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: center;
+  gap: 0.6rem;
+  width: min(26.5rem, 100%);
+  margin-top: -1.25rem;
+  color: #f3ead8;
+}
+
+.shipped-actions .shipped-button:not(.is-ghost) {
+  background: #f3ead8;
+  color: #1c1917;
+}
+
+.shipped-actions .shipped-button {
+  flex: 1 1 auto;
+}
+
+/* 1-bit sponsor logos stay crisp, like thermal print. */
+.shipped-logo {
+  image-rendering: pixelated;
+  height: auto;
+}
+
 @media (prefers-reduced-motion: reduce) {
+  .shipped-choice,
+  .shipped-button {
+    transition: none;
+  }
+
   .shipped-ticket {
     filter: drop-shadow(0 8px 16px rgba(0, 0, 0, 0.4));
   }

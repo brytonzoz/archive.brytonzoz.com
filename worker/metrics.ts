@@ -2,9 +2,10 @@
 // dashboard at /admin. Data lives in D1 (schema: worker/schema.sql).
 import catalog from '../lib/tracks.json';
 import type { MerchEnv } from './merch';
+import { adminShipped, type ShippedEnv } from './shipped';
 import { adminStore } from './store';
 
-export interface MetricsEnv extends MerchEnv {
+export interface MetricsEnv extends MerchEnv, ShippedEnv {
   DB?: D1Database;
   ADMIN_PASSWORD?: string;
 }
@@ -296,6 +297,7 @@ export async function handleApi(request: Request, env: MetricsEnv): Promise<Resp
     if (url.pathname === '/api/admin/export.csv') return exportCsv(url, env.DB);
     if (url.pathname === '/api/admin/subscribers.csv') return exportSubscribers(env.DB);
     if (url.pathname === '/api/admin/store') return adminStore(request, { ...env, DB: env.DB });
+    if (url.pathname.startsWith('/api/admin/shipped')) return adminShipped(request, env);
   }
 
   return json({ error: 'not-found' }, 404);

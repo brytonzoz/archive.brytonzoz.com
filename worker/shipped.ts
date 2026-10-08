@@ -1,38 +1,78 @@
-// /shipped/ backend: "Shipped in <year>" receipts (anyone's public shipped work, found by free APIs and
-// Claude's web search, see worker/shipped-sources.ts and worker/shipped-ai.ts) and the sponsor lines
-// printed in every shared receipt's PAID FOR BY block (paid, then approved by Bryton in /admin).
+// Shipped 2026 backend: receipts (anyone's public shipped work, found by free APIs and Claude, see
+// worker/shipped-sources.ts and worker/shipped-ai.ts), the pile, the 10-slot sponsor block (bid up, frozen when
+// the two-week event ends, lib/shipped-sponsors.ts) and $5 mailed prints. The event window is lib/shipped-event.ts.
 //
-//   GET  /api/shipped/state            counters, generator + sponsor status, the opt-in "recently printed" strip
+//   GET  /api/shipped/state            event window, counters, generator, payments, the sponsor block
 //   POST /api/shipped/lookup           { q } -> { candidates, auto } (who did they mean?)
-//   POST /api/shipped/print            { subject, token, listed } -> { id } (same subject within 7 days: cached)
+//   POST /api/shipped/print            { subject, token, listed } -> { id, pile } (same subject within 7 days: cached)
+//   GET  /api/shipped/pile             the pile (lib/shipped-pile.ts); POST { id, token } tosses a receipt on
 //   POST /api/shipped/shared           { id, how } share counter (sendBeacon)
-//   POST /api/shipped/takedown         { id, reason, token } "Not you? Remove this receipt" -> /admin
-//   GET  /api/shipped/receipts/<id>    a printed receipt + its PAID FOR BY block
+//   POST /api/shipped/takedown         { id, reason, token, pile? } report / remove: hidden at once, reviewed in /admin
+//   GET  /api/shipped/challenge        a proof-of-work puzzle (only when Turnstile isn't configured)
+//   GET  /api/shipped/receipts/<id>    a printed receipt + the sponsor block
 //   GET  /api/shipped/icon/<hash>.png  a receipt line's 1-bit logo (worker/shipped-icons.ts)
-//   POST /api/shipped/sponsor          multipart { tier, text, url?, logo?, token } -> { url } (checkout)
-//   GET  /api/shipped/sponsor/status?checkout=<id>        after checkout: confirms payment, where the line stands
-//   GET  /api/shipped/sponsor/receipt.png?checkout=<id>   the supporter's downloadable receipt image
+//   POST /api/shipped/bid              multipart { slot, name, cta, url, cents, terms, express, token, logo? } -> checkout at the posted price
+//   POST /api/shipped/print-order      { id, express, token } -> checkout for a mailed thermal print ($5, US)
+//   GET  /api/shipped/checkout?checkout=<id>   after paying: confirms with Stripe, says how it went
+//   POST /api/shipped/checkout/cancel  { checkout } the wallet sheet closed unpaid
 //   POST /api/shipped/webhook/<id>     payment provider webhook (worker/shipped-pay.ts; Stripe: /webhook/stripe)
-//   GET  /api/shipped/logo/<id>.png    an approved sponsor's 1-bit logo
+//   GET  /api/shipped/logo/<bid>.png   a sponsor's reviewed 1-bit logo
+//   GET  /q/<key>                      a printed QR code -> the slot's link (counts scans; worker/shipped-host.ts)
 //   GET  /shipped/r/<id>/              share page: the static shell with this receipt's tags and data
 //   GET  /shipped/r/<id>/og.png        the 1200×675 card for X        (?download=1 to save it)
 //   GET  /shipped/r/<id>/receipt.png   the whole receipt as one image (?download=1 to save it)
-//   /api/admin/shipped*                moderation, takedowns, impressions, spend; behind the /admin password
+//   /api/admin/shipped*                moderation, takedowns, bids, the print queue, spend; behind the /admin password
 //
+// Every guardrail (rate limits, locks, the budget, kill switches, the human check, headers) lives in
+// worker/shipped-guard.ts; the threat list is docs/shipped-security.md.
 // Tables are created (and new columns added) on first use; see SCHEMA below.
-import { DEFAULT_MODEL, PrintError, assembleReceipt, demoReceipt, maxSearches, type AiEnv, type DraftItem } from './shipped-ai';
-import { ICON_HASH, bytesDataUri, iconDataUri, iconKey, storeIcon } from './shipped-icons';
-import { renderPng, yearCardPng, yearTallPng, type LogoResolver } from './shipped-og';
-import { isProduction, sponsorProvider, type PayEnv, type SponsorEvent } from './shipped-pay';
+import { DEFAULT_MODEL, PrintError, assembleReceipt, demoReceipt, maxSearches, promptFor, worstCaseMicros, type AiEnv, type DraftItem } from './shipped-ai';
+import { ICON_HASH, bytesDataUri, iconDataUri, iconKey, reencodeLogo, storeIcon } from './shipped-icons';
+import { yearCardPng, yearTallPng, type LogoResolver } from './shipped-og';
+import { PRINT_KIND, SPONSOR_KIND, isProduction, sponsorProvider, type PayEnv, type SponsorEvent } from './shipped-pay';
 import { brandIcon, clean, faviconUrl, gather, githubUser, hostOf, readSite, searchGithubUsers, tinyfishAccess, type SourceEnv } from './shipped-sources';
 import { TINYFISH_DAILY, type TinyfishKind, type TinyfishMeter } from './shipped-tinyfish';
-import { receiptBarcodeUnits, receiptDate } from '../lib/shipped';
-import { supporterReceiptSvg } from '../lib/receipt-svg';
+import { finalUrl } from './shipped-fetch';
+import {
+  DAY,
+  HOUR,
+  MINUTE,
+  acquire,
+  budgetUsed,
+  capMicros,
+  clientIp,
+  concurrencySlot,
+  guardTables,
+  hashedKey,
+  humanCheck,
+  isSwitch,
+  issueChallenge,
+  overGlobalPrintLimit,
+  overLimit,
+  readJsonCapped,
+  refuseRequest,
+  release,
+  reserveBudget,
+  secure,
+  setSwitch,
+  settleBudget,
+  sweepLimits,
+  switchedOff,
+  today,
+  verifyHuman,
+  type GuardEnv,
+  type HumanCheck,
+  type Switch,
+} from './shipped-guard';
 import { money } from '../lib/shipped-receipt';
+import { EVENT_NAME, eventWindow } from '../lib/shipped-event';
+import type { PileReceipt, PileResponse } from '../lib/shipped-pile';
 import {
   RECEIPT_PATH,
   SHIPPED_HOST,
+  SHIPPED_URL,
   CARD_PATH,
+  TALL_PATH,
   isDomain,
   isGithubLogin,
   isXHandle,
@@ -44,28 +84,32 @@ import {
   subjectKey,
   subjectLabel,
   type Candidate,
-  type PaidBy,
-  type PaidFor,
+  type SponsorBlock,
+  type SponsorSlot,
   type Subject,
   type SubjectKind,
   type YearItem,
   type YearReceipt,
 } from '../lib/shipped-year';
 import {
-  HOUSE_SPONSORS,
+  BID_RULES,
+  HERO_SLOT,
+  HOUSE_SLOTS,
   LOGO_LIMITS,
-  SPONSOR_CONFIG,
-  SPONSOR_TIERS,
+  SLOT_COUNT,
+  checkSponsorUrl,
   hasBlockedWord,
-  houseLine,
-  isSponsorTier,
-  priceCents,
-  validateSponsor,
-  weightedPick,
-  type SponsorTier,
+  isSlot,
+  proratedRefund,
+  slotLabel,
+  slotPrice,
+  takeoversOpen,
+  validateBid,
 } from '../lib/shipped-sponsors';
 
-export interface ShippedEnv extends AiEnv, PayEnv, SourceEnv {
+export interface ShippedEnv extends AiEnv, PayEnv, SourceEnv, GuardEnv {
+  /** Google Safe Browsing API key: sponsor links are checked against it when set. */
+  SAFE_BROWSING_KEY?: string;
   DB?: D1Database;
   /** Shipped's own host (worker/shipped-host.ts). */
   SHIPPED_HOST?: string;
@@ -77,6 +121,11 @@ export interface ShippedEnv extends AiEnv, PayEnv, SourceEnv {
   /** The year receipts itemize (default: the current year). */
   SHIPPED_YEAR?: string;
   ANTHROPIC_WORKSPACE_DEFAULT?: string;
+  /** The event window (ISO dates); defaults in lib/shipped-event.ts. */
+  SHIPPED_OPENS_AT?: string;
+  SHIPPED_CLOSES_AT?: string;
+  /** Public Stripe key: shows Apple Pay / Google Pay on our own page. */
+  STRIPE_PUBLISHABLE_KEY?: string;
 }
 
 /**
@@ -104,16 +153,13 @@ function shippedOrigin(env: ShippedEnv, url: URL): string {
   return !env.SHIPPED_HOST || url.host === env.SHIPPED_HOST ? url.origin : `https://${env.SHIPPED_HOST}`;
 }
 
-const HOUR = 3_600_000;
-const DAY = 86_400_000;
 const CACHE_DAYS = 7;
-const PRINT_LIMIT_PER_HOUR = 10;
-const LOOKUP_LIMIT_PER_HOUR = 40;
-const SPONSOR_LIMIT_PER_HOUR = 6;
-const TAKEDOWN_LIMIT_PER_HOUR = 5;
-const DEFAULT_CAP_USD = 5;
+/** A subject whose print just failed isn't tried again for this long (no paying twice for the same failure). */
+const FAILED_FOR = 10 * MINUTE;
+/** Longest a print may hold its locks (gathering + up to three 40 s model calls). */
+const PRINT_LOCK = 3 * MINUTE;
 /** Bump when the share images change, so cached ones are redrawn. */
-const IMAGE_VERSION = 3;
+const IMAGE_VERSION = 4;
 
 const SCHEMA = [
   `CREATE TABLE IF NOT EXISTS shipped_receipts (
@@ -122,34 +168,33 @@ const SCHEMA = [
     model TEXT, input_tokens INTEGER, output_tokens INTEGER, cost_micros INTEGER, created_at INTEGER NOT NULL,
     searches INTEGER, listed INTEGER NOT NULL DEFAULT 0, shares INTEGER NOT NULL DEFAULT 0, views INTEGER NOT NULL DEFAULT 0)`,
   'CREATE UNIQUE INDEX IF NOT EXISTS shipped_receipts_daily ON shipped_receipts (login_key, day, mode)',
-  `CREATE TABLE IF NOT EXISTS shipped_spend (
-    day TEXT PRIMARY KEY, receipts INTEGER NOT NULL DEFAULT 0, failures INTEGER NOT NULL DEFAULT 0,
-    input_tokens INTEGER NOT NULL DEFAULT 0, output_tokens INTEGER NOT NULL DEFAULT 0, cost_micros INTEGER NOT NULL DEFAULT 0,
-    searches INTEGER NOT NULL DEFAULT 0)`,
-  'CREATE TABLE IF NOT EXISTS shipped_limits (key TEXT PRIMARY KEY, win INTEGER NOT NULL, count INTEGER NOT NULL)',
+  'CREATE INDEX IF NOT EXISTS shipped_receipts_key ON shipped_receipts (login_key, hidden)',
   `CREATE TABLE IF NOT EXISTS shipped_takedowns (
     id INTEGER PRIMARY KEY AUTOINCREMENT, receipt_id INTEGER NOT NULL, subject_key TEXT NOT NULL, reason TEXT,
     status TEXT NOT NULL, created_at INTEGER NOT NULL, reviewed_at INTEGER)`,
   'CREATE INDEX IF NOT EXISTS shipped_takedowns_key ON shipped_takedowns (subject_key, status)',
-  `CREATE TABLE IF NOT EXISTS sponsor_impressions (
-    sponsor TEXT NOT NULL, day TEXT NOT NULL, kind TEXT NOT NULL, n INTEGER NOT NULL DEFAULT 0, PRIMARY KEY (sponsor, day, kind))`,
-  `CREATE TABLE IF NOT EXISTS sponsor_lines (
-    id INTEGER PRIMARY KEY AUTOINCREMENT, tier TEXT NOT NULL, text TEXT NOT NULL, url TEXT, logo_key TEXT,
-    status TEXT NOT NULL, roll INTEGER NOT NULL, line_no INTEGER, amount_cents INTEGER NOT NULL, provider TEXT NOT NULL,
-    checkout_id TEXT, order_id TEXT, note TEXT, created_at INTEGER NOT NULL, paid_at INTEGER, reviewed_at INTEGER,
-    starts_at INTEGER, ends_at INTEGER, tax_cents INTEGER, total_cents INTEGER)`,
-  'CREATE INDEX IF NOT EXISTS sponsor_lines_status ON sponsor_lines (status, tier)',
-  'CREATE UNIQUE INDEX IF NOT EXISTS sponsor_lines_checkout ON sponsor_lines (checkout_id)',
-  'CREATE INDEX IF NOT EXISTS sponsor_lines_order ON sponsor_lines (order_id)',
-  // Global switches, e.g. 'out-of-credit' (set when Anthropic says the prepaid credits are gone).
-  'CREATE TABLE IF NOT EXISTS shipped_flags (key TEXT PRIMARY KEY, value TEXT, set_at INTEGER NOT NULL)',
   // TinyFish units used per UTC day, so we stay inside the free allowance.
   'CREATE TABLE IF NOT EXISTS shipped_tinyfish (day TEXT NOT NULL, kind TEXT NOT NULL, n INTEGER NOT NULL DEFAULT 0, PRIMARY KEY (day, kind))',
+  // Sponsor bids: one row per checkout; at most one 'live' per slot (the holder).
+  `CREATE TABLE IF NOT EXISTS shipped_bids (
+    id INTEGER PRIMARY KEY AUTOINCREMENT, slot INTEGER NOT NULL, name TEXT NOT NULL, cta TEXT NOT NULL, url TEXT NOT NULL,
+    logo_key TEXT, logo_ok INTEGER NOT NULL DEFAULT 0, amount_cents INTEGER NOT NULL, status TEXT NOT NULL, provider TEXT NOT NULL,
+    checkout_id TEXT, order_id TEXT, tax_cents INTEGER, total_cents INTEGER, refund_cents INTEGER, note TEXT, email TEXT,
+    scans INTEGER NOT NULL DEFAULT 0, created_at INTEGER NOT NULL, paid_at INTEGER, live_at INTEGER, ended_at INTEGER)`,
+  'CREATE INDEX IF NOT EXISTS shipped_bids_slot ON shipped_bids (slot, status)',
+  'CREATE UNIQUE INDEX IF NOT EXISTS shipped_bids_checkout ON shipped_bids (checkout_id)',
+  'CREATE INDEX IF NOT EXISTS shipped_bids_order ON shipped_bids (order_id)',
+  // $5 mailed prints: 'to_print' is the queue in /admin, 'shipped' once it's in the mail.
+  `CREATE TABLE IF NOT EXISTS print_orders (
+    id INTEGER PRIMARY KEY AUTOINCREMENT, receipt_id INTEGER NOT NULL, status TEXT NOT NULL, provider TEXT NOT NULL,
+    checkout_id TEXT, order_id TEXT, amount_cents INTEGER NOT NULL, tax_cents INTEGER, total_cents INTEGER, email TEXT,
+    ship_name TEXT, ship_line1 TEXT, ship_line2 TEXT, ship_city TEXT, ship_state TEXT, ship_postal TEXT, ship_country TEXT,
+    created_at INTEGER NOT NULL, paid_at INTEGER, shipped_at INTEGER, note TEXT)`,
+  'CREATE INDEX IF NOT EXISTS print_orders_status ON print_orders (status)',
+  'CREATE UNIQUE INDEX IF NOT EXISTS print_orders_checkout ON print_orders (checkout_id)',
 ];
 // Columns added after the tables first shipped; "duplicate column" means it's already there.
 const COLUMNS = [
-  'ALTER TABLE sponsor_lines ADD COLUMN tax_cents INTEGER',
-  'ALTER TABLE sponsor_lines ADD COLUMN total_cents INTEGER',
   'ALTER TABLE shipped_receipts ADD COLUMN searches INTEGER',
   'ALTER TABLE shipped_receipts ADD COLUMN listed INTEGER NOT NULL DEFAULT 0',
   'ALTER TABLE shipped_receipts ADD COLUMN shares INTEGER NOT NULL DEFAULT 0',
@@ -158,6 +203,7 @@ const COLUMNS = [
 ];
 
 async function migrate(db: D1Database) {
+  await guardTables(db);
   await db.batch(SCHEMA.map((sql) => db.prepare(sql)));
   for (const sql of COLUMNS) {
     await db
@@ -185,80 +231,16 @@ async function database(env: ShippedEnv): Promise<D1Database | null> {
 const NOINDEX = 'noindex, nofollow, noarchive';
 
 function json(data: unknown, status = 200, cache = 'no-store'): Response {
-  return new Response(JSON.stringify(data), {
-    status,
-    headers: { 'content-type': 'application/json', 'cache-control': cache, 'x-robots-tag': NOINDEX },
-  });
+  const headers = secure(new Headers({ 'content-type': 'application/json; charset=utf-8', 'cache-control': cache, 'x-robots-tag': NOINDEX }));
+  headers.set('content-security-policy', "default-src 'none'; frame-ancestors 'none'");
+  return new Response(JSON.stringify(data), { status, headers });
 }
 
-async function readJson(request: Request): Promise<Record<string, unknown> | null> {
-  try {
-    const body = await request.json();
-    return body && typeof body === 'object' ? (body as Record<string, unknown>) : null;
-  } catch {
-    return null;
-  }
-}
+const refused = (why: { status: number; error: string }) => json({ error: why.error }, why.status);
+const readJson = (request: Request) => readJsonCapped(request, 8192);
 
-const today = () => new Date().toISOString().slice(0, 10);
-const capMicros = (env: ShippedEnv) => Math.round((Number(env.SHIPPED_DAILY_CAP_USD) || DEFAULT_CAP_USD) * 1_000_000);
 const yearOf = (env: ShippedEnv) => shippedYear(env.SHIPPED_YEAR);
 const modeOf = (year: number) => `y${year}`;
-
-// Cloudflare's published always-pass test keys: staging works before real Turnstile keys exist.
-const TEST_TURNSTILE = { site: '1x00000000000000000000AA', secret: '1x0000000000000000000000000000000AA' };
-
-function turnstileKeys(env: ShippedEnv): { site: string; secret: string; test: boolean } | null {
-  if (env.TURNSTILE_SITE_KEY && env.TURNSTILE_SECRET_KEY) return { site: env.TURNSTILE_SITE_KEY, secret: env.TURNSTILE_SECRET_KEY, test: false };
-  return isProduction(env) ? null : { ...TEST_TURNSTILE, test: true };
-}
-
-let warnedTurnstile = false;
-
-/** Without Turnstile keys in production, printing relies on the per-IP limits and the daily spend cap. */
-async function verifyTurnstile(env: ShippedEnv, token: unknown, ip: string): Promise<boolean> {
-  const keys = turnstileKeys(env);
-  if (!keys) {
-    if (!warnedTurnstile) console.warn('shipped: TURNSTILE_SITE_KEY / TURNSTILE_SECRET_KEY not set; relying on rate limits and the spend cap');
-    warnedTurnstile = true;
-    return true;
-  }
-  if (typeof token !== 'string' || !token || token.length > 2048) return false;
-  const form = new FormData();
-  form.set('secret', keys.secret);
-  form.set('response', token);
-  if (ip) form.set('remoteip', ip);
-  try {
-    const response = await fetch('https://challenges.cloudflare.com/turnstile/v0/siteverify', { method: 'POST', body: form });
-    const result = (await response.json()) as { success?: boolean };
-    return result.success === true;
-  } catch {
-    return false;
-  }
-}
-
-/** Salted per day, so no IP address is ever stored. */
-async function ipKey(request: Request): Promise<string> {
-  const ip = request.headers.get('cf-connecting-ip') ?? 'unknown';
-  const digest = await crypto.subtle.digest('SHA-256', new TextEncoder().encode(`${ip}|${today()}|shipped`));
-  return [...new Uint8Array(digest).slice(0, 12)].map((byte) => byte.toString(16).padStart(2, '0')).join('');
-}
-
-/** Fixed-window counter; true while under the limit. */
-async function allow(db: D1Database, key: string, limit: number, windowMs: number): Promise<boolean> {
-  const win = Math.floor(Date.now() / windowMs);
-  const row = await db
-    .prepare(
-      `INSERT INTO shipped_limits (key, win, count) VALUES (?, ?, 1)
-       ON CONFLICT(key) DO UPDATE SET count = CASE WHEN win = excluded.win THEN count + 1 ELSE 1 END, win = excluded.win
-       RETURNING count`,
-    )
-    .bind(key, win)
-    .first<{ count: number }>();
-  return (row?.count ?? 1) <= limit;
-}
-
-const limited = async (request: Request, db: D1Database, name: string, limit: number) => !(await allow(db, `${name}:${await ipKey(request)}`, limit, HOUR));
 
 function seedOf(text: string): number {
   let hash = 2166136261;
@@ -266,7 +248,7 @@ function seedOf(text: string): number {
   return hash >>> 0;
 }
 
-type GeneratorState = { enabled: boolean; demo: boolean; reason: string | null; turnstileSiteKey: string | null; year: number; sources: string[] };
+type GeneratorState = { enabled: boolean; demo: boolean; reason: string | null; turnstileSiteKey: string | null; human: HumanCheck; year: number; sources: string[] };
 
 function sourceNames(env: ShippedEnv): string[] {
   const names = ['github', 'appstore', 'hn', 'npm'];
@@ -275,18 +257,20 @@ function sourceNames(env: ShippedEnv): string[] {
   return names;
 }
 
-async function generatorState(env: ShippedEnv, db: D1Database | null): Promise<GeneratorState> {
-  const keys = turnstileKeys(env);
+async function generatorState(env: ShippedEnv, db: D1Database | null, off?: Set<Switch>): Promise<GeneratorState> {
+  const human = humanCheck(env);
   const year = yearOf(env);
-  const base = { turnstileSiteKey: keys?.site ?? null, year, sources: sourceNames(env) };
-  const off = (reason: string): GeneratorState => ({ ...base, enabled: false, demo: false, reason });
-  if (!db) return off('no-database');
+  const base = { turnstileSiteKey: human.kind === 'turnstile' ? human.siteKey : null, human, year, sources: sourceNames(env) };
+  const stop = (reason: string): GeneratorState => ({ ...base, enabled: false, demo: false, reason });
+  if (!db) return stop('no-database');
+  if (isClosed(env)) return stop('closed');
+  if ((off ?? (await switchedOff(env, db))).has('generate')) return stop('out-of-paper');
   const demo = !env.ANTHROPIC_API_KEY;
-  if (demo && isProduction(env)) return off('no-ai');
+  if (demo && isProduction(env)) return stop('no-ai');
   if (!demo) {
-    if (await outOfCredit(db)) return off('out-of-paper');
-    const spend = await db.prepare('SELECT cost_micros FROM shipped_spend WHERE day = ?').bind(today()).first<{ cost_micros: number }>();
-    if ((spend?.cost_micros ?? 0) >= capMicros(env)) return off('out-of-paper');
+    if (await outOfCredit(db)) return stop('out-of-paper');
+    const used = await budgetUsed(db);
+    if (used.spent + used.reserved >= capMicros(env)) return stop('out-of-paper');
   }
   return { ...base, enabled: true, demo, reason: null };
 }
@@ -324,15 +308,16 @@ function tinyfishMeter(db: D1Database): TinyfishMeter {
   };
 }
 
-async function recordSpend(db: D1Database, ok: boolean, input: number, output: number, searches: number, cost: number) {
+/** Counts and tokens for /admin. The money itself moves through reserveBudget / settleBudget. */
+async function recordSpend(db: D1Database, ok: boolean, input: number, output: number, searches: number) {
   await db
     .prepare(
-      `INSERT INTO shipped_spend (day, receipts, failures, input_tokens, output_tokens, searches, cost_micros) VALUES (?, ?, ?, ?, ?, ?, ?)
+      `INSERT INTO shipped_spend (day, receipts, failures, input_tokens, output_tokens, searches) VALUES (?, ?, ?, ?, ?, ?)
        ON CONFLICT(day) DO UPDATE SET receipts = receipts + excluded.receipts, failures = failures + excluded.failures,
        input_tokens = input_tokens + excluded.input_tokens, output_tokens = output_tokens + excluded.output_tokens,
-       searches = searches + excluded.searches, cost_micros = cost_micros + excluded.cost_micros`,
+       searches = searches + excluded.searches`,
     )
-    .bind(today(), ok ? 1 : 0, ok ? 0 : 1, input, output, searches, cost)
+    .bind(today(), ok ? 1 : 0, ok ? 0 : 1, input, output, searches)
     .run();
 }
 
@@ -351,12 +336,16 @@ async function loadReceipt(db: D1Database, id: number): Promise<YearReceipt | nu
 // ---- Who did they mean? -------------------------------------------------------------------------------
 
 async function lookup(request: Request, env: ShippedEnv): Promise<Response> {
+  const why = refuseRequest(request, 2048);
+  if (why) return refused(why);
   const db = await database(env);
   if (!db) return json({ error: 'offline' }, 503);
   const body = await readJson(request);
-  const query = readQuery(String(body?.q ?? ''));
-  if (!query) return json({ error: 'invalid-query' }, 400);
-  if (await limited(request, db, 'lookup', LOOKUP_LIMIT_PER_HOUR)) return json({ error: 'slow-down' }, 429);
+  const query = typeof body?.q === 'string' && body.q.length <= 200 ? readQuery(body.q) : null;
+  if (!query || hasBlockedWord(query.value)) return json({ error: 'invalid-query' }, 400);
+  const off = await switchedOff(env, db);
+  if (off.has('generate') || isClosed(env)) return json({ error: isClosed(env) ? 'closed' : 'out-of-paper' }, 503);
+  if (await overLimit(db, request, 'lookup')) return json({ error: 'slow-down' }, 429);
 
   const candidates: Candidate[] = [];
   if (query.kind === 'domain') {
@@ -440,49 +429,100 @@ async function blocked(db: D1Database, key: string): Promise<boolean> {
 }
 
 async function print(request: Request, env: ShippedEnv, ctx: ExecutionContext): Promise<Response> {
-  const db = await database(env);
+  // Cheapest checks first: nothing below spends money until a request has passed every one of these.
+  const why = refuseRequest(request, 4096);
+  if (why) return refused(why);
   const body = await readJson(request);
   if (!body) return json({ error: 'bad-request' }, 400);
   const subject = readSubject(body.subject);
   if (!subject) return json({ error: 'invalid-query' }, 400);
-
+  const db = await database(env);
   if (!db) return json({ error: 'offline' }, 503);
-  if (!(await verifyTurnstile(env, body.token, request.headers.get('cf-connecting-ip') ?? ''))) return json({ error: 'turnstile' }, 403);
-  if (await limited(request, db, 'print', PRINT_LIMIT_PER_HOUR)) return json({ error: 'slow-down' }, 429);
-  if (Math.random() < 0.02) ctx.waitUntil(db.prepare('DELETE FROM shipped_limits WHERE win < ?').bind(Math.floor(Date.now() / HOUR) - 48).run());
+  if (isClosed(env)) return json({ error: 'closed' }, 410);
+  const off = await switchedOff(env, db);
+  if (off.has('generate')) return json({ error: 'out-of-paper' }, 503);
+  if (await overLimit(db, request, 'print')) return json({ error: 'slow-down' }, 429);
+  if (!(await verifyHuman(env, db, body.token, request))) return json({ error: 'turnstile' }, 403);
+  if (Math.random() < 0.02) ctx.waitUntil(sweepLimits(db).catch(() => undefined));
 
   const key = subjectKey(subject);
   const year = yearOf(env);
   const mode = modeOf(year);
   if (await blocked(db, key)) return json({ error: 'taken-down' }, 410);
-  // Already printed this week: reprinted for free, even while the machine is out of paper.
+  // Already printed this week: the same receipt again, free, even while the machine is out of paper.
   const cached = await db
     .prepare('SELECT id FROM shipped_receipts WHERE login_key = ? AND mode = ? AND demo = ? AND hidden = 0 AND created_at > ? ORDER BY id DESC LIMIT 1')
     .bind(key, mode, env.ANTHROPIC_API_KEY ? 0 : 1, Date.now() - CACHE_DAYS * DAY)
     .first<{ id: number }>();
-  if (cached) return json({ id: cached.id, cached: true });
-  const state = await generatorState(env, db);
+  if (cached) return json({ id: cached.id, cached: true, pile: await pileToken(env, cached.id) });
+  const recentFailure = await db.prepare('SELECT 1 AS x FROM shipped_locks WHERE key = ? AND until > ?').bind(`failed:${key}`, Date.now()).first();
+  if (recentFailure) return json({ error: 'jammed', retryAfter: Math.round(FAILED_FOR / 1000) }, 503);
+  const state = await generatorState(env, db, off);
   if (!state.enabled) return json({ error: state.reason ?? 'offline' }, 503);
+  const global = await overGlobalPrintLimit(db, env);
+  if (global) return json({ error: global === 'day' ? 'out-of-paper' : 'busy' }, 503);
 
+  // One print per subject, one per visitor and N everywhere at a time; all released in `finally`.
+  const subjectLock = `print:${key}`;
+  const ipLock = `print:ip:${await hashedKey(clientIp(request))}`;
+  if (!(await acquire(db, subjectLock, PRINT_LOCK))) return json({ error: 'printing', retryAfter: 15 }, 409);
+  const held = [subjectLock];
+  let reserved = 0;
+  try {
+    if (!(await acquire(db, ipLock, PRINT_LOCK))) return json({ error: 'slow-down' }, 429);
+    held.push(ipLock);
+    const slot = await concurrencySlot(db, env, PRINT_LOCK);
+    if (!slot) return json({ error: 'busy', retryAfter: 10 }, 503);
+    held.push(slot);
+    return await generate(request, env, ctx, db, subject, key, year, mode, state, body.listed === true, (micros) => {
+      reserved = micros;
+    });
+  } finally {
+    await Promise.all(held.map((lock) => release(db, lock).catch(() => undefined)));
+    if (reserved) ctx.waitUntil(settleBudget(db, reserved, 0).catch(() => undefined));
+  }
+}
+
+async function generate(
+  request: Request,
+  env: ShippedEnv,
+  ctx: ExecutionContext,
+  db: D1Database,
+  subject: Subject,
+  key: string,
+  year: number,
+  mode: string,
+  state: GeneratorState,
+  listed: boolean,
+  holdBudget: (micros: number) => void,
+): Promise<Response> {
   const seed = seedOf(key);
-  const listed = body.listed === true;
   try {
     const gathered = await gather(subject, env, year, tinyfishMeter(db));
-    if (subject.kind === 'github' && gathered.profile.name && !hasBlockedWord(gathered.profile.name)) subject.display = gathered.profile.name;
+    if (subject.kind === 'github' && gathered.profile.name && !hasBlockedWord(gathered.profile.name)) subject.display = clean(gathered.profile.name, 60);
     let model: string | null = null;
     let usage = { input: 0, output: 0, searches: 0, cost: 0 };
     let draft;
     if (state.demo) {
       draft = demoReceipt(gathered, year, seed);
     } else {
+      // The worst this print could cost is held against today's budget first, so a burst can't overspend it.
+      model = env.SHIPPED_MODEL || DEFAULT_MODEL;
+      const worst = worstCaseMicros(model, promptFor(subject, gathered, year).length, maxSearches(env));
+      if (!(await reserveBudget(db, capMicros(env), worst))) return json({ error: 'out-of-paper' }, 503);
+      holdBudget(worst);
       try {
-        const result = await assembleReceipt(subject, gathered, year, seed, env);
+        const result = await assembleReceipt(subject, gathered, year, seed, env, worst);
         draft = result;
-        model = result.model;
         usage = { input: result.inputTokens, output: result.outputTokens, searches: result.searches, cost: result.costMicros };
+        holdBudget(0);
+        await settleBudget(db, worst, usage.cost);
       } catch (error) {
         const spent = error as { costMicros?: number; inputTokens?: number; outputTokens?: number };
-        ctx.waitUntil(recordSpend(db, false, spent.inputTokens ?? 0, spent.outputTokens ?? 0, 0, spent.costMicros ?? 0));
+        holdBudget(0);
+        await settleBudget(db, worst, spent.costMicros ?? 0);
+        ctx.waitUntil(recordSpend(db, false, spent.inputTokens ?? 0, spent.outputTokens ?? 0, 0));
+        ctx.waitUntil(acquire(db, `failed:${key}`, FAILED_FOR).catch(() => undefined));
         if (error instanceof PrintError && error.code === 'out-of-credit') {
           await setOutOfCredit(db);
           return json({ error: 'out-of-paper' }, 503);
@@ -512,17 +552,19 @@ async function print(request: Request, env: ShippedEnv, ctx: ExecutionContext): 
          VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
          ON CONFLICT(login_key, day, mode) DO UPDATE SET data = excluded.data, demo = excluded.demo, model = excluded.model,
            input_tokens = excluded.input_tokens, output_tokens = excluded.output_tokens, searches = excluded.searches,
-           cost_micros = excluded.cost_micros, listed = excluded.listed, hidden = 0, created_at = excluded.created_at RETURNING id`,
+           cost_micros = excluded.cost_micros, listed = excluded.listed, created_at = excluded.created_at
+         WHERE shipped_receipts.hidden != 1 RETURNING id`,
       )
       .bind(subjectLabel(subject), key, day, mode, JSON.stringify(receipt), state.demo ? 1 : 0, model, usage.input, usage.output, usage.searches, usage.cost, listed ? 1 : 0, Date.now())
       .first<{ id: number }>();
-    if (!state.demo) ctx.waitUntil(recordSpend(db, true, usage.input, usage.output, usage.searches, usage.cost));
-    if (!inserted) return json({ error: 'jammed' }, 500);
+    if (!state.demo) ctx.waitUntil(recordSpend(db, true, usage.input, usage.output, usage.searches));
+    if (!inserted) return json({ error: 'taken-down' }, 410);
+    await db.prepare('UPDATE shipped_receipts SET hidden = 0 WHERE id = ? AND hidden = 2').bind(inserted.id).run();
     console.log(JSON.stringify({ shipped: 'print', id: inserted.id, kind: subject.kind, items: receipt.items.length, potential: receipt.potential, ran: gathered.ran, failed: gathered.failed, costMicros: usage.cost }));
-    return json({ id: inserted.id });
+    return json({ id: inserted.id, pile: await pileToken(env, inserted.id) });
   } catch (error) {
     if (error instanceof PrintError) return json({ error: error.code, ...(error.detail && !isProduction(env) ? { detail: error.detail } : {}) }, error.status);
-    console.error('shipped: print failed', error);
+    console.error('shipped: print failed', error instanceof Error ? error.message : 'unknown');
     return json({ error: 'jammed' }, 500);
   }
 }
@@ -532,268 +574,516 @@ async function shared(request: Request, env: ShippedEnv): Promise<Response> {
   const body = await readJson(request);
   const id = Number(body?.id);
   if (!db || !Number.isSafeInteger(id) || id < 1) return json({ ok: false }, 400);
-  if (await limited(request, db, 'shared', 60)) return json({ ok: false }, 429);
+  if (await overLimit(db, request, 'shared')) return json({ ok: false }, 429);
   await db.prepare('UPDATE shipped_receipts SET shares = shares + 1 WHERE id = ? AND hidden = 0').bind(id).run();
   return json({ ok: true });
 }
 
-async function takedown(request: Request, env: ShippedEnv): Promise<Response> {
+/**
+ * "Report / remove this receipt". The receipt comes down at once (hidden, share images and edge copies purged)
+ * and waits in /admin: dismissing puts it back, removing keeps that name, handle or site from printing again.
+ * The browser that printed it (it holds the pile token) removes it outright, without blocking the subject.
+ */
+async function takedown(request: Request, env: ShippedEnv, ctx: ExecutionContext): Promise<Response> {
+  const why = refuseRequest(request, 4096);
+  if (why) return refused(why);
   const db = await database(env);
   const body = await readJson(request);
   if (!db || !body) return json({ error: 'bad-request' }, 400);
-  if (!(await verifyTurnstile(env, body.token, request.headers.get('cf-connecting-ip') ?? ''))) return json({ error: 'turnstile' }, 403);
-  if (await limited(request, db, 'takedown', TAKEDOWN_LIMIT_PER_HOUR)) return json({ error: 'slow-down' }, 429);
   const id = Number(body.id);
-  const row = Number.isSafeInteger(id) && id > 0 ? await db.prepare('SELECT login_key FROM shipped_receipts WHERE id = ?').bind(id).first<{ login_key: string }>() : null;
+  const row = Number.isSafeInteger(id) && id > 0 ? await db.prepare('SELECT login_key, hidden FROM shipped_receipts WHERE id = ?').bind(id).first<{ login_key: string; hidden: number }>() : null;
   if (!row) return json({ error: 'not-found' }, 404);
-  const open = await db.prepare(`SELECT 1 AS x FROM shipped_takedowns WHERE receipt_id = ? AND status = 'open'`).bind(id).first();
-  if (!open) {
-    await db
-      .prepare(`INSERT INTO shipped_takedowns (receipt_id, subject_key, reason, status, created_at) VALUES (?, ?, ?, 'open', ?)`)
-      .bind(id, row.login_key, clean(body.reason, 300) || null, Date.now())
-      .run();
+  const mine = typeof body.pile === 'string' && body.pile === (await pileToken(env, id));
+  if (await overLimit(db, request, 'takedown')) return json({ error: 'slow-down' }, 429);
+  if (!mine && !(await verifyHuman(env, db, body.token, request))) return json({ error: 'turnstile' }, 403);
+  if (mine) {
+    await db.prepare('UPDATE shipped_receipts SET hidden = 2, listed = 0 WHERE id = ? AND hidden = 0').bind(id).run();
+  } else {
+    await db.prepare('UPDATE shipped_receipts SET hidden = 1, listed = 0 WHERE id = ?').bind(id).run();
+    const open = await db.prepare(`SELECT 1 AS x FROM shipped_takedowns WHERE receipt_id = ? AND status = 'open'`).bind(id).first();
+    if (!open) {
+      await db
+        .prepare(`INSERT INTO shipped_takedowns (receipt_id, subject_key, reason, status, created_at) VALUES (?, ?, ?, 'open', ?)`)
+        .bind(id, row.login_key, clean(body.reason, 300) || null, Date.now())
+        .run();
+    }
   }
-  return json({ ok: true });
+  ctx.waitUntil(purgeReceipt(env, id, new URL(request.url).origin));
+  return json({ ok: true, removed: true });
 }
 
-// ---- Sponsors ------------------------------------------------------------------------------------
+/** Everything cached about a receipt: its share images in R2 and every edge copy of its page, images and JSON. */
+async function purgeReceipt(env: ShippedEnv, id: number, origin?: string): Promise<void> {
+  await dropShareImages(env, id).catch(() => undefined);
+  const origins = new Set([origin, env.SHIPPED_HOST ? `https://${env.SHIPPED_HOST}` : null, SHIPPED_URL].filter((o): o is string => Boolean(o)));
+  const paths = [RECEIPT_PATH(id), CARD_PATH(id), TALL_PATH(id), `/shipped${RECEIPT_PATH(id)}`, `/shipped${CARD_PATH(id)}`, `/shipped${TALL_PATH(id)}`, `/api/shipped/receipts/${id}`, '/api/shipped/state', '/api/shipped/pile'];
+  const cache = edgeCache();
+  if (!cache) return;
+  await Promise.all([...origins].flatMap((o) => paths.map((path) => cache.delete(new Request(new URL(path, o))).catch(() => false))));
+}
 
-type LineRow = {
+/** The data center's cache (absent in tests and local dev). */
+const edgeCache = (): Cache | null => (typeof caches !== 'undefined' ? (caches as unknown as { default: Cache }).default : null);
+
+/** Serves a GET from this data center's cache, or makes it, keeps it `seconds`, and serves that. */
+async function cached(request: Request, ctx: ExecutionContext, seconds: number, make: () => Promise<Response>): Promise<Response> {
+  const cache = edgeCache();
+  const key = new Request(new URL(request.url).toString().replace(/\?.*$/, ''), { method: 'GET' });
+  const hit = cache ? await cache.match(key).catch(() => undefined) : undefined;
+  if (hit) return hit;
+  const response = await make();
+  if (cache && response.status === 200) {
+    const copy = new Response(response.clone().body, response);
+    copy.headers.set('cache-control', `public, max-age=${seconds}`);
+    ctx.waitUntil(cache.put(key, copy).catch(() => undefined));
+  }
+  return response;
+}
+
+// ---- The event, the pile ------------------------------------------------------------------------------
+
+const event = (env: ShippedEnv) => eventWindow(env);
+const isClosed = (env: ShippedEnv) => event(env).phase === 'closed';
+
+async function hmacHex(secret: string, message: string): Promise<string> {
+  const key = await crypto.subtle.importKey('raw', new TextEncoder().encode(secret), { name: 'HMAC', hash: 'SHA-256' }, false, ['sign']);
+  const signature = await crypto.subtle.sign('HMAC', key, new TextEncoder().encode(message));
+  return [...new Uint8Array(signature).slice(0, 16)].map((byte) => byte.toString(16).padStart(2, '0')).join('');
+}
+
+/** Proof the browser printed this receipt (handed out with the print), so only its printer can toss it on the pile. */
+const pileToken = (env: ShippedEnv, id: number) => hmacHex(env.ADMIN_PASSWORD || env.STRIPE_SECRET_KEY || 'shipped-pile', `pile:${id}`);
+
+type PileRow = { id: number; data: string; created_at: number };
+
+function pileEntry(row: PileRow): PileReceipt | null {
+  const receipt = JSON.parse(row.data) as YearReceipt;
+  if (receipt.version !== 2) return null;
+  return {
+    id: row.id,
+    who: subjectLabel(receipt.subject),
+    count: itemsShipped(receipt),
+    potential: receipt.potential,
+    items: receipt.items.slice(0, 6).map((item) => ({ name: item.name, status: item.status })),
+    printedAt: receipt.printedAt,
+  };
+}
+
+/** GET /api/shipped/pile?before=<id>&limit=<n>: the newest receipts their printers tossed on the pile. */
+async function pile(url: URL, env: ShippedEnv): Promise<Response> {
+  const db = await database(env);
+  const window = event(env);
+  if (!db) return json({ receipts: [], total: 0, frozen: window.phase === 'closed', next: null } satisfies PileResponse);
+  const before = Number(url.searchParams.get('before')) || Number.MAX_SAFE_INTEGER;
+  const limit = Math.min(200, Math.max(1, Number(url.searchParams.get('limit')) || 120));
+  const [rows, total] = await Promise.all([
+    db
+      .prepare('SELECT id, data, created_at FROM shipped_receipts WHERE listed = 1 AND hidden = 0 AND mode = ? AND id < ? ORDER BY id DESC LIMIT ?')
+      .bind(modeOf(yearOf(env)), before, limit)
+      .all<PileRow>(),
+    db.prepare('SELECT COUNT(*) AS n FROM shipped_receipts WHERE listed = 1 AND hidden = 0 AND mode = ?').bind(modeOf(yearOf(env))).first<{ n: number }>(),
+  ]);
+  const receipts = rows.results.flatMap((row) => pileEntry(row) ?? []);
+  const body: PileResponse = {
+    receipts,
+    total: total?.n ?? receipts.length,
+    frozen: window.phase === 'closed',
+    next: rows.results.length === limit ? rows.results[rows.results.length - 1].id : null,
+  };
+  return json(body, 200, window.phase === 'closed' ? 'public, max-age=3600' : 'public, max-age=15');
+}
+
+/** POST /api/shipped/pile { id, token }: toss your receipt on the pile (until the printer shuts off). */
+async function tossOnPile(request: Request, env: ShippedEnv): Promise<Response> {
+  const why = refuseRequest(request, 2048);
+  if (why) return refused(why);
+  const db = await database(env);
+  const body = await readJson(request);
+  const id = Number(body?.id);
+  if (!db || !body || !Number.isSafeInteger(id) || id < 1) return json({ error: 'bad-request' }, 400);
+  if (isClosed(env)) return json({ error: 'closed' }, 410);
+  if (await overLimit(db, request, 'toss')) return json({ error: 'slow-down' }, 429);
+  if (typeof body.token !== 'string' || body.token !== (await pileToken(env, id))) return json({ error: 'not-yours' }, 403);
+  const row = await db.prepare('SELECT data FROM shipped_receipts WHERE id = ? AND hidden = 0').bind(id).first<{ data: string }>();
+  if (!row) return json({ error: 'not-found' }, 404);
+  const listed = body.off !== true;
+  const data = { ...(JSON.parse(row.data) as YearReceipt), listed };
+  await db.prepare('UPDATE shipped_receipts SET listed = ?, data = ? WHERE id = ?').bind(listed ? 1 : 0, JSON.stringify(data), id).run();
+  return json({ ok: true, listed });
+}
+
+// ---- Sponsor block: 10 fixed-price slots, taken over at the next price, frozen when the printer shuts off ----
+
+type BidRow = {
   id: number;
-  tier: SponsorTier;
-  text: string;
-  url: string | null;
+  slot: number;
+  name: string;
+  cta: string;
+  url: string;
   logo_key: string | null;
-  status: string;
-  roll: number;
-  line_no: number | null;
+  logo_ok: number;
   amount_cents: number;
+  status: 'checkout' | 'live' | 'outbid' | 'lost' | 'removed' | 'refunded' | 'failed';
   provider: string;
   checkout_id: string | null;
   order_id: string | null;
-  note: string | null;
-  created_at: number;
-  paid_at: number | null;
-  reviewed_at: number | null;
-  starts_at: number | null;
-  ends_at: number | null;
   tax_cents: number | null;
   total_cents: number | null;
+  refund_cents: number | null;
+  note: string | null;
+  email: string | null;
+  scans: number;
+  created_at: number;
+  paid_at: number | null;
+  live_at: number | null;
+  ended_at: number | null;
 };
 
-const holding = () => Date.now() - SPONSOR_CONFIG.checkoutHoldMinutes * 60_000;
-const sponsorLogoPath = (id: number) => `/api/shipped/logo/${id}.png`;
+const bidLogoPath = (id: number) => `/api/shipped/logo/${id}.png`;
+const houseKey = (slot: number) => `h${slot}`;
 
-async function presentedTaken(db: D1Database): Promise<{ taken: number; nextOpen: number | null }> {
-  const row = await db
-    .prepare(
-      `SELECT COUNT(*) AS n, MIN(CASE WHEN status = 'approved' THEN ends_at END) AS next FROM sponsor_lines WHERE tier = 'header' AND (
-        (status = 'approved' AND ends_at > ?) OR status = 'paid_pending_review' OR (status = 'checkout' AND created_at > ?))`,
-    )
-    .bind(Date.now(), holding())
-    .first<{ n: number; next: number | null }>();
-  return { taken: row?.n ?? 0, nextOpen: row?.next ?? null };
+function houseSlot(slot: number): SponsorSlot {
+  const ad = HOUSE_SLOTS[slot];
+  return { slot, name: ad.name, cta: ad.cta, url: ad.url, qr: houseKey(slot), logo: null, house: true, cents: 0, next: slotPrice(0) };
 }
 
-const toPaidBy = (row: LineRow): PaidBy => ({
-  key: `line:${row.id}`,
-  tier: row.tier,
-  text: row.text,
-  url: row.url,
-  logo: row.tier === 'logo' && row.logo_key ? sponsorLogoPath(row.id) : null,
-});
-
-const house = (entry: { key: string; text: string; url: string }): PaidBy => ({ ...entry, tier: 'house', logo: null });
-
-/** Who paid for this receipt right now: the presented-by slot, then weighted picks from the running lines. */
-async function paidFor(db: D1Database | null, receiptId: number): Promise<PaidFor> {
-  const seed = receiptId * 7919 + Math.floor(Date.now() / HOUR);
-  const fallback: PaidFor = { presented: null, lines: [house(HOUSE_SPONSORS.main), house(houseLine(seed))] };
-  if (!db) return fallback;
-  const { results } = await db
-    .prepare(`SELECT * FROM sponsor_lines WHERE status = 'approved' AND ends_at > ? ORDER BY starts_at`)
-    .bind(Date.now())
-    .all<LineRow>();
-  const presented = results.find((row) => row.tier === 'header') ?? null;
-  const lines = weightedPick(results.filter((row) => row.tier !== 'header'), SPONSOR_CONFIG.footerLines, seed).map(toPaidBy);
-  return { presented: presented ? toPaidBy(presented) : null, lines: lines.length ? lines : fallback.lines };
+function slotFrom(slot: number, bid: BidRow | undefined): SponsorSlot {
+  if (!bid) return houseSlot(slot);
+  return {
+    slot,
+    name: bid.name,
+    cta: bid.cta,
+    url: bid.url,
+    qr: String(bid.id),
+    logo: bid.logo_key && bid.logo_ok ? bidLogoPath(bid.id) : null,
+    house: false,
+    cents: bid.amount_cents,
+    next: slotPrice(bid.amount_cents),
+  };
 }
 
-async function countImpressions(db: D1Database, paid: PaidFor, kind: 'card' | 'tall' | 'page') {
-  const keys = [paid.presented, ...paid.lines].filter((entry): entry is PaidBy => Boolean(entry)).map((entry) => entry.key);
-  if (!keys.length) return;
-  const day = today();
-  await db.batch(
-    keys.map((key) =>
-      db
-        .prepare('INSERT INTO sponsor_impressions (sponsor, day, kind, n) VALUES (?, ?, ?, 1) ON CONFLICT(sponsor, day, kind) DO UPDATE SET n = n + 1')
-        .bind(key, day, kind),
-    ),
-  );
+/** Who holds each slot right now (after close: forever). With sponsor-display switched off, the house ads. */
+async function sponsorBlock(db: D1Database | null, env: ShippedEnv, off?: Set<Switch>): Promise<SponsorBlock> {
+  const frozen = isClosed(env);
+  const hidden = (off ?? (await switchedOff(env, db))).has('sponsor-display');
+  const live = db && !hidden ? (await db.prepare(`SELECT * FROM shipped_bids WHERE status = 'live'`).all<BidRow>()).results : [];
+  const bySlot = new Map(live.map((bid) => [bid.slot, bid]));
+  return { slots: Array.from({ length: SLOT_COUNT }, (_, slot) => slotFrom(slot, bySlot.get(slot))), frozen };
 }
 
-async function state(env: ShippedEnv): Promise<Response> {
-  const db = await database(env);
-  const generator = await generatorState(env, db);
-  const provider = sponsorProvider(env);
-  if (!db) return json({ printed: 0, shared: 0, recent: [], generator, sponsors: { open: false, reason: 'no-database' } });
+const checkoutExpiry = () => Math.floor(Date.now() / 1000) + BID_RULES.checkoutMinutes * 60 + 60;
 
-  const [counts, recent, presented] = await Promise.all([
-    db.prepare('SELECT COUNT(*) AS printed, COALESCE(SUM(shares), 0) AS shared FROM shipped_receipts').first<{ printed: number; shared: number }>(),
-    db
-      .prepare(`SELECT id, data FROM shipped_receipts WHERE listed = 1 AND hidden = 0 AND mode = ? ORDER BY id DESC LIMIT 12`)
-      .bind(modeOf(generator.year))
-      .all<{ id: number; data: string }>(),
-    presentedTaken(db),
-  ]);
-  const open = Boolean(provider && env.SHIPPED);
-  const presentedLeft = Math.max(0, (SPONSOR_CONFIG.tiers.header.slots ?? 1) - presented.taken);
-  return json(
-    {
-      printed: counts?.printed ?? 0,
-      shared: counts?.shared ?? 0,
-      recent: recent.results.flatMap((row) => {
-        const receipt = JSON.parse(row.data) as YearReceipt;
-        return receipt.version === 2 ? [{ id: row.id, who: subjectLabel(receipt.subject), count: itemsShipped(receipt), potential: receipt.potential }] : [];
+/** Google Safe Browsing (when SAFE_BROWSING_KEY is set): true when the link is known malware, phishing or unwanted. */
+async function knownBad(env: ShippedEnv, url: string): Promise<boolean> {
+  if (!env.SAFE_BROWSING_KEY) return false;
+  try {
+    const response = await fetch(`https://safebrowsing.googleapis.com/v4/threatMatches:find?key=${encodeURIComponent(env.SAFE_BROWSING_KEY)}`, {
+      method: 'POST',
+      headers: { 'content-type': 'application/json' },
+      body: JSON.stringify({
+        client: { clientId: 'shipped', clientVersion: '1' },
+        threatInfo: {
+          threatTypes: ['MALWARE', 'SOCIAL_ENGINEERING', 'UNWANTED_SOFTWARE', 'POTENTIALLY_HARMFUL_APPLICATION'],
+          platformTypes: ['ANY_PLATFORM'],
+          threatEntryTypes: ['URL'],
+          threatEntries: [{ url }],
+        },
       }),
-      generator,
-      sponsors: {
-        open,
-        reason: open ? null : provider ? 'no-storage' : 'no-provider',
-        provider: provider?.id ?? null,
-        live: provider?.live ?? false,
-        taxAtCheckout: provider?.id === 'stripe',
-        presentedNextOpen: presentedLeft ? null : presented.nextOpen,
-        tiers: SPONSOR_TIERS.map((tier) => ({
-          tier,
-          ...SPONSOR_CONFIG.tiers[tier],
-          cents: priceCents(tier),
-          available: open && (tier !== 'header' || presentedLeft > 0),
-        })),
-      },
-    },
-    200,
-    'public, max-age=30',
-  );
+      signal: AbortSignal.timeout(4000),
+    });
+    if (!response.ok) return false;
+    const body = (await response.json()) as { matches?: unknown[] };
+    return Boolean(body.matches?.length);
+  } catch {
+    return false;
+  }
 }
 
-/** A PNG we accept as a logo: real PNG signature, small, within the print size. */
-function pngSize(bytes: Uint8Array): { width: number; height: number } | null {
-  const signature = [0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a];
-  if (bytes.length < 33 || signature.some((byte, i) => bytes[i] !== byte)) return null;
-  const view = new DataView(bytes.buffer, bytes.byteOffset, bytes.byteLength);
-  if (String.fromCharCode(...bytes.slice(12, 16)) !== 'IHDR') return null;
-  return { width: view.getUint32(16), height: view.getUint32(20) };
+/** The sponsor's link, followed: it must answer, stay on the same site (no hops to a shortener or elsewhere), and not be known-bad. */
+async function vetSponsorUrl(env: ShippedEnv, url: string): Promise<string | null> {
+  const start = new URL(url);
+  let landed: string;
+  try {
+    landed = await finalUrl(url, 5000);
+  } catch {
+    return 'We couldn\u2019t open that link. Use a public page that loads.';
+  }
+  const end = checkSponsorUrl(landed);
+  const site = (host: string) => host.replace(/^www\./, '');
+  if (!end || site(new URL(end).hostname) !== site(start.hostname)) return 'That link redirects to another site. Use the final address.';
+  if ((await knownBad(env, url)) || (end !== url && (await knownBad(env, end)))) return 'That link isn\u2019t accepted.';
+  return null;
 }
 
-async function createSponsor(request: Request, env: ShippedEnv): Promise<Response> {
+/** POST /api/shipped/bid (multipart: slot, name, cta, url, cents, terms, express, token, logo?) -> { url } or { clientSecret, id }. */
+async function createBid(request: Request, env: ShippedEnv): Promise<Response> {
+  const why = refuseRequest(request, LOGO_LIMITS.maxBytes * 4 + 16_384);
+  if (why) return refused(why);
   const db = await database(env);
   const provider = sponsorProvider(env);
-  if (!db || !provider || !env.SHIPPED) return json({ error: 'sponsors-closed' }, 503);
-
+  if (!db || !provider) return json({ error: 'sponsors-closed' }, 503);
+  if ((await switchedOff(env, db)).has('sponsors')) return json({ error: 'sponsors-closed' }, 503);
+  const window = event(env);
+  if (window.phase === 'closed') return json({ error: 'closed', message: 'The printer is off. The sponsor block is final.' }, 410);
+  if (!takeoversOpen(Date.now(), window.closesAt)) return json({ error: 'locked', message: 'Slots stopped changing hands an hour before close.' }, 410);
   let form: FormData;
   try {
     form = await request.formData();
   } catch {
     return json({ error: 'bad-request' }, 400);
   }
-  const tier = form.get('tier');
-  if (!isSponsorTier(tier)) return json({ error: 'bad-tier' }, 400);
-  if (!(await verifyTurnstile(env, form.get('token'), request.headers.get('cf-connecting-ip') ?? ''))) return json({ error: 'turnstile' }, 403);
-  if (await limited(request, db, 'sponsor', SPONSOR_LIMIT_PER_HOUR)) return json({ error: 'slow-down' }, 429);
+  const slot = Number(form.get('slot'));
+  if (!isSlot(slot)) return json({ error: 'bad-slot' }, 400);
+  if (form.get('terms') !== '1') return json({ error: 'invalid', field: 'terms', message: 'Please accept the sponsor terms.' }, 400);
+  if (await overLimit(db, request, 'bid')) return json({ error: 'slow-down' }, 429);
+  if (!(await verifyHuman(env, db, form.get('token'), request))) return json({ error: 'turnstile' }, 403);
+  const text = (name: string) => {
+    const value = form.get(name);
+    return typeof value === 'string' ? value.slice(0, 400) : '';
+  };
+  const check = validateBid({ slot, name: text('name'), cta: text('cta'), url: text('url') });
+  if (!check.ok) return json({ error: 'invalid', field: check.field, message: check.error }, 400);
 
-  const config = SPONSOR_CONFIG.tiers[tier];
-  const check = validateSponsor({ tier, text: String(form.get('text') ?? ''), url: String(form.get('url') ?? '') || null });
-  if (!check.ok) return json({ error: 'invalid', message: check.error }, 400);
+  // The price is ours: the holder's payment plus $1. A client that sends anything else is told the real price.
+  const holder = await db.prepare(`SELECT amount_cents FROM shipped_bids WHERE slot = ? AND status = 'live'`).bind(slot).first<{ amount_cents: number }>();
+  const price = slotPrice(holder?.amount_cents ?? 0);
+  if (price > BID_RULES.maxCents) return json({ error: 'sold-out', message: 'This slot is at its ceiling price and can\u2019t be taken over.' }, 409);
+  const cents = Number(form.get('cents'));
+  if (cents !== price) return json({ error: 'price-changed', message: `The price is now ${money(price)}.`, price }, 409);
 
+  const badUrl = await vetSponsorUrl(env, check.url);
+  if (badUrl) return json({ error: 'invalid', field: 'url', message: badUrl }, 400);
+
+  // Logos are redrawn by us (1-bit, metadata and anything else in the file dropped) and print only after review.
   let logo: Uint8Array | null = null;
-  if (config.logo) {
-    const file = form.get('logo');
-    if (!file || typeof file === 'string') return json({ error: 'invalid', message: 'Add a logo.' }, 400);
-    if (file.size > LOGO_LIMITS.maxBytes) return json({ error: 'invalid', message: 'That logo is too big.' }, 400);
-    logo = new Uint8Array(await file.arrayBuffer());
-    const size = pngSize(logo);
-    if (!size || size.width > LOGO_LIMITS.maxWidth || size.height > LOGO_LIMITS.maxHeight || size.width < 8 || size.height < 8) {
-      return json({ error: 'invalid', message: 'The logo must be a PNG up to 384×160.' }, 400);
-    }
+  const file = form.get('logo');
+  if (file && typeof file !== 'string' && file.size > 0) {
+    if (file.size > LOGO_LIMITS.maxBytes * 4) return json({ error: 'invalid', field: 'logo', message: 'That logo is too big (256 KB max).' }, 400);
+    const redrawn = await reencodeLogo(new Uint8Array(await file.arrayBuffer()), LOGO_LIMITS.maxWidth, LOGO_LIMITS.maxHeight).catch(() => null);
+    if (!redrawn) return json({ error: 'invalid', field: 'logo', message: 'The logo must be a PNG or JPEG.' }, 400);
+    logo = env.SHIPPED ? redrawn.png : null;
   }
 
-  if (config.slots !== null && (await presentedTaken(db)).taken >= config.slots) {
-    return json({ error: 'invalid', message: 'The presented-by slot is taken right now.' }, 409);
-  }
-  const amount = priceCents(tier);
-  const line = await db
-    .prepare(
-      `INSERT INTO sponsor_lines (tier, text, url, status, roll, amount_cents, provider, created_at)
-       VALUES (?, ?, ?, 'checkout', 1, ?, ?, ?) RETURNING id`,
-    )
-    .bind(tier, check.text, check.url, amount, provider.id, Date.now())
+  const bid = await db
+    .prepare(`INSERT INTO shipped_bids (slot, name, cta, url, amount_cents, status, provider, created_at) VALUES (?, ?, ?, ?, ?, 'checkout', ?, ?) RETURNING id`)
+    .bind(slot, check.name, check.cta, check.url, price, provider.id, Date.now())
     .first<{ id: number }>();
-  if (!line) return json({ error: 'jammed' }, 500);
-
+  if (!bid) return json({ error: 'jammed' }, 500);
   let logoKey: string | null = null;
-  if (logo) {
-    logoKey = `logos/${line.id}-${crypto.randomUUID()}.png`;
+  if (logo && env.SHIPPED) {
+    logoKey = `logos/bid-${bid.id}-${crypto.randomUUID()}.png`;
     await env.SHIPPED.put(logoKey, logo, { httpMetadata: { contentType: 'image/png' } });
   }
+  const express = form.get('express') === '1';
+  const label = `${EVENT_NAME} sponsor slot: ${slotLabel(slot)}`;
   try {
     const checkout = await provider.createCheckout({
-      lineId: line.id,
-      tier,
-      label: `Supporter shout-out: ${config.label}, ${config.days} days`,
-      description: `"${check.text}" in the PAID FOR BY block on shared Shipped receipts for ${config.days} days once approved, plus a downloadable receipt image. Refunded in full if not approved.`,
-      amountCents: amount,
+      kind: SPONSOR_KIND,
+      ref: String(bid.id),
+      label,
+      description: `"${check.name}" with your line and QR code in the ${slot === HERO_SLOT ? 'hero' : 'small'} slot of the sponsor block on Shipped 2026 receipts, share images and mailed prints. Fixed price ${money(price)}. If someone takes the slot at the next price, you are refunded for the time you lose; when the event ends the block freezes for good. Full terms: ${shippedOrigin(env, new URL(request.url))}/terms/`,
+      amountCents: price,
       origin: shippedOrigin(env, new URL(request.url)),
-      // Closes 5 minutes before the line stops being held (Stripe's minimum is 30 minutes).
-      expiresAt: Math.floor(Date.now() / 1000) + Math.max(30, SPONSOR_CONFIG.checkoutHoldMinutes - 5) * 60,
+      returnPath: '/?bid={CHECKOUT_SESSION_ID}#sponsor',
+      cancelPath: '/#sponsor',
+      expiresAt: checkoutExpiry(),
+      express,
+      metadata: { slot: String(slot) },
     });
-    await db.prepare('UPDATE sponsor_lines SET checkout_id = ?, logo_key = ? WHERE id = ?').bind(checkout.checkoutId, logoKey, line.id).run();
-    return json({ url: checkout.url });
+    await db.prepare('UPDATE shipped_bids SET checkout_id = ?, logo_key = ? WHERE id = ?').bind(checkout.checkoutId, logoKey, bid.id).run();
+    return json(checkout.clientSecret ? { clientSecret: checkout.clientSecret, id: checkout.checkoutId } : { url: checkout.url, id: checkout.checkoutId });
   } catch (error) {
-    console.error('shipped: checkout failed', error);
-    const note = (error instanceof Error ? error.message : 'checkout failed').slice(0, 200);
-    await db.prepare(`UPDATE sponsor_lines SET status = 'failed', logo_key = ?, note = ? WHERE id = ?`).bind(logoKey, note, line.id).run();
+    console.error('shipped: bid checkout failed', error instanceof Error ? error.message.slice(0, 200) : 'unknown');
+    await db.prepare(`UPDATE shipped_bids SET status = 'failed', logo_key = ?, note = ? WHERE id = ?`).bind(logoKey, String(error).slice(0, 200), bid.id).run();
     return json({ error: 'checkout-failed' }, 502);
   }
 }
 
-/** One place where payments, expiries and refunds change a line, whether from a webhook or a confirm. */
-async function applyEvent(db: D1Database, env: ShippedEnv, event: SponsorEvent): Promise<void> {
+/** A paid event we act on must be exactly what we asked for: our own row, in dollars, for the price we set. */
+function paidAsAsked(paid: Extract<SponsorEvent, { type: 'paid' }>, ref: number, cents: number): string | null {
+  if (paid.ref !== String(ref)) return `ref ${paid.ref} != ${ref}`;
+  if (paid.currency !== 'usd') return `currency ${paid.currency}`;
+  if (paid.amountCents !== cents) return `amount ${paid.amountCents} != ${cents}`;
+  return null;
+}
+
+/** A paid bid takes its slot if the price still holds (and takeovers are open); otherwise it's refunded in full. */
+async function settleBid(db: D1Database, env: ShippedEnv, bid: BidRow, paid: Extract<SponsorEvent, { type: 'paid' }>): Promise<void> {
+  // Webhook and the buyer's return can both arrive; only one settles.
+  if (!(await acquire(db, `settle:bid:${bid.id}`, 2 * MINUTE))) return;
   const now = Date.now();
-  if (event.type === 'paid') {
-    const line = await db.prepare('SELECT * FROM sponsor_lines WHERE checkout_id = ?').bind(event.checkoutId).first<LineRow>();
-    if (!line || line.status !== 'checkout') return;
-    const note = event.amountCents === line.amount_cents ? null : `paid ${event.amountCents} for ${line.amount_cents}`;
+  const window = event(env);
+  const provider = sponsorProvider(env);
+  const claimed = await db
+    .prepare(`UPDATE shipped_bids SET order_id = ?, paid_at = ?, tax_cents = ?, total_cents = ?, email = ? WHERE id = ? AND status = 'checkout' AND paid_at IS NULL RETURNING id`)
+    .bind(paid.orderId, now, paid.taxCents, paid.totalCents, paid.email, bid.id)
+    .first();
+  if (!claimed) return;
+  const refundAll = async (note: string) => {
+    const refund = provider && paid.orderId ? await provider.refund(paid.orderId, undefined, `bid-${bid.id}-full`) : { ok: false, error: 'no provider' };
     await db
+      .prepare(`UPDATE shipped_bids SET status = 'lost', ended_at = ?, refund_cents = ?, note = ? WHERE id = ?`)
+      .bind(now, refund.ok ? paid.totalCents : 0, refund.ok ? note : `${note}; refund failed: ${refund.error ?? ''}`.slice(0, 200), bid.id)
+      .run();
+  };
+  const mismatch = paidAsAsked(paid, bid.id, bid.amount_cents);
+  if (mismatch) {
+    console.error(JSON.stringify({ shipped: 'pay-mismatch', bid: bid.id, mismatch }));
+    return refundAll(`payment didn't match: ${mismatch}`);
+  }
+  if (now >= window.closesAt) return refundAll('paid after the printer shut off');
+  if (!takeoversOpen(now, window.closesAt)) return refundAll('paid after takeovers locked (one hour before close)');
+
+  // One transaction: the bid goes live only if the holder still paid less than this price; then it pushes them out.
+  const [promoted, pushed] = await db.batch([
+    db
       .prepare(
-        `UPDATE sponsor_lines SET status = 'paid_pending_review', order_id = ?, paid_at = ?, note = ?, tax_cents = ?, total_cents = ?
-         WHERE id = ? AND status = 'checkout'`,
+        `UPDATE shipped_bids SET status = 'live', live_at = ? WHERE id = ? AND status = 'checkout'
+         AND NOT EXISTS (SELECT 1 FROM shipped_bids WHERE slot = ? AND status = 'live' AND amount_cents >= ?)`,
       )
-      .bind(event.orderId, now, note, event.taxCents, event.totalCents, line.id)
-      .run();
-  } else if (event.type === 'expired') {
+      .bind(now, bid.id, bid.slot, bid.amount_cents),
+    db
+      .prepare(
+        `UPDATE shipped_bids SET status = 'outbid', ended_at = ? WHERE slot = ? AND status = 'live' AND id != ?
+         AND (SELECT status FROM shipped_bids WHERE id = ?) = 'live' RETURNING *`,
+      )
+      .bind(now, bid.slot, bid.id, bid.id),
+  ]);
+  if (!promoted.meta.changes) {
+    const current = await db.prepare('SELECT status FROM shipped_bids WHERE id = ?').bind(bid.id).first<{ status: string }>();
+    if (current?.status === 'checkout') await refundAll('someone else paid this price first');
+    return;
+  }
+  for (const previous of (pushed.results ?? []) as BidRow[]) {
+    const total = previous.total_cents ?? previous.amount_cents;
+    const owed = proratedRefund(total, previous.live_at ?? previous.paid_at ?? now, now, window.closesAt);
+    const refund =
+      owed > 0 && provider && previous.order_id && previous.provider === provider.id
+        ? await provider.refund(previous.order_id, owed, `bid-${previous.id}-outbid-${bid.id}`)
+        : { ok: owed === 0, error: 'no provider' };
     await db
-      .prepare(`UPDATE sponsor_lines SET status = 'failed', note = 'checkout expired' WHERE checkout_id = ? AND status = 'checkout'`)
-      .bind(event.checkoutId)
+      .prepare('UPDATE shipped_bids SET refund_cents = ?, note = ? WHERE id = ?')
+      .bind(refund.ok ? owed : 0, refund.ok ? `taken over by #${bid.id}` : `taken over by #${bid.id}; prorated refund of ${owed} failed: ${refund.error ?? ''}`.slice(0, 200), previous.id)
       .run();
-  } else if (event.type === 'refunded') {
-    // Any refund (from /admin or the Stripe dashboard) takes the line out of the rotation.
-    const lines = await db
-      .prepare(`SELECT * FROM sponsor_lines WHERE order_id = ? AND status IN ('paid_pending_review', 'approved', 'refund_failed')`)
-      .bind(event.orderId)
-      .all<LineRow>();
-    for (const line of lines.results) {
-      await db
-        .prepare(`UPDATE sponsor_lines SET status = 'refunded', reviewed_at = COALESCE(reviewed_at, ?), note = 'refunded in Stripe' WHERE id = ?`)
-        .bind(now, line.id)
-        .run();
-      if (line.logo_key) await env.SHIPPED?.delete(line.logo_key);
+  }
+}
+
+type OrderRow = {
+  id: number;
+  receipt_id: number;
+  status: 'checkout' | 'to_print' | 'shipped' | 'refunded' | 'failed';
+  provider: string;
+  checkout_id: string | null;
+  order_id: string | null;
+  amount_cents: number;
+  tax_cents: number | null;
+  total_cents: number | null;
+  email: string | null;
+  ship_name: string | null;
+  ship_line1: string | null;
+  ship_line2: string | null;
+  ship_city: string | null;
+  ship_state: string | null;
+  ship_postal: string | null;
+  ship_country: string | null;
+  created_at: number;
+  paid_at: number | null;
+  shipped_at: number | null;
+  note: string | null;
+};
+
+export const PRINT_PRICE_CENTS = 500;
+
+/** POST /api/shipped/print-order { id, express, token } -> { url } or { clientSecret, id }: the receipt on real thermal paper, mailed (US). */
+async function createPrintOrder(request: Request, env: ShippedEnv): Promise<Response> {
+  const why = refuseRequest(request, 4096);
+  if (why) return refused(why);
+  const db = await database(env);
+  const provider = sponsorProvider(env);
+  if (!db || !provider) return json({ error: 'orders-closed' }, 503);
+  if ((await switchedOff(env, db)).has('prints')) return json({ error: 'orders-closed' }, 503);
+  if (isClosed(env)) return json({ error: 'closed' }, 410);
+  const body = await readJson(request);
+  if (!body) return json({ error: 'bad-request' }, 400);
+  const id = Number(body.id);
+  const receipt = Number.isSafeInteger(id) && id > 0 ? await loadReceipt(db, id) : null;
+  if (!receipt) return json({ error: 'not-found' }, 404);
+  if (await overLimit(db, request, 'order')) return json({ error: 'slow-down' }, 429);
+  if (!(await verifyHuman(env, db, body.token, request))) return json({ error: 'turnstile' }, 403);
+  const order = await db
+    .prepare(`INSERT INTO print_orders (receipt_id, status, provider, amount_cents, created_at) VALUES (?, 'checkout', ?, ?, ?) RETURNING id`)
+    .bind(id, provider.id, PRINT_PRICE_CENTS, Date.now())
+    .first<{ id: number }>();
+  if (!order) return json({ error: 'jammed' }, 500);
+  try {
+    const origin = shippedOrigin(env, new URL(request.url));
+    const checkout = await provider.createCheckout({
+      kind: PRINT_KIND,
+      ref: String(order.id),
+      label: `${EVENT_NAME} receipt #${receiptNumber(id)}, printed and mailed`,
+      description: `${subjectLabel(receipt.subject)}'s receipt on 80mm thermal paper, mailed within the US. Shipping included, tax added at checkout. Terms and refunds: ${origin}/terms/`,
+      amountCents: PRINT_PRICE_CENTS,
+      origin,
+      returnPath: `/r/${id}/?order={CHECKOUT_SESSION_ID}`,
+      cancelPath: `/r/${id}/`,
+      expiresAt: checkoutExpiry(),
+      express: body?.express === true,
+      shipping: true,
+      metadata: { receipt_id: String(id) },
+    });
+    await db.prepare('UPDATE print_orders SET checkout_id = ? WHERE id = ?').bind(checkout.checkoutId, order.id).run();
+    return json(checkout.clientSecret ? { clientSecret: checkout.clientSecret, id: checkout.checkoutId } : { url: checkout.url, id: checkout.checkoutId });
+  } catch (error) {
+    console.error('shipped: print order checkout failed', error instanceof Error ? error.message.slice(0, 200) : 'unknown');
+    await db.prepare(`UPDATE print_orders SET status = 'failed', note = ? WHERE id = ?`).bind(String(error).slice(0, 200), order.id).run();
+    return json({ error: 'checkout-failed' }, 502);
+  }
+}
+
+async function settleOrder(db: D1Database, env: ShippedEnv, order: OrderRow, paid: Extract<SponsorEvent, { type: 'paid' }>): Promise<void> {
+  const ship = paid.shipping;
+  const mismatch = paidAsAsked(paid, order.id, order.amount_cents) ?? (ship && ship.country !== 'US' ? `ships to ${ship.country}` : null);
+  if (mismatch) {
+    console.error(JSON.stringify({ shipped: 'pay-mismatch', order: order.id, mismatch }));
+    const provider = sponsorProvider(env);
+    const refund = provider && paid.orderId ? await provider.refund(paid.orderId, undefined, `order-${order.id}-full`) : { ok: false, error: 'no provider' };
+    await db
+      .prepare(`UPDATE print_orders SET status = ?, order_id = ?, paid_at = ?, note = ? WHERE id = ? AND status = 'checkout'`)
+      .bind(refund.ok ? 'refunded' : 'failed', paid.orderId, Date.now(), `payment didn't match: ${mismatch}${refund.ok ? '' : `; refund failed: ${refund.error ?? ''}`}`.slice(0, 200), order.id)
+      .run();
+    return;
+  }
+  await db
+    .prepare(
+      `UPDATE print_orders SET status = 'to_print', order_id = ?, paid_at = ?, tax_cents = ?, total_cents = ?, email = ?, ship_name = ?, ship_line1 = ?,
+       ship_line2 = ?, ship_city = ?, ship_state = ?, ship_postal = ?, ship_country = ? WHERE id = ? AND status = 'checkout'`,
+    )
+    .bind(paid.orderId, Date.now(), paid.taxCents, paid.totalCents, paid.email, ship?.name ?? null, ship?.line1 ?? null, ship?.line2 ?? null, ship?.city ?? null, ship?.state ?? null, ship?.postal ?? null, ship?.country ?? null, order.id)
+    .run();
+}
+
+/** One place where payments, expiries and refunds land, from a webhook or the buyer's return. */
+async function applyEvent(db: D1Database, env: ShippedEnv, payEvent: SponsorEvent): Promise<void> {
+  const now = Date.now();
+  if (payEvent.type === 'paid') {
+    if (payEvent.kind === SPONSOR_KIND) {
+      const bid = await db.prepare('SELECT * FROM shipped_bids WHERE checkout_id = ?').bind(payEvent.checkoutId).first<BidRow>();
+      if (bid && bid.status === 'checkout') await settleBid(db, env, bid, payEvent);
+      return;
     }
-  } else if (event.type === 'refund_failed') {
-    await db
-      .prepare(`UPDATE sponsor_lines SET status = 'refund_failed', note = ? WHERE order_id = ? AND status = 'refunded'`)
-      .bind(event.reason.slice(0, 200), event.orderId)
-      .run();
+    const order = await db.prepare('SELECT * FROM print_orders WHERE checkout_id = ?').bind(payEvent.checkoutId).first<OrderRow>();
+    if (order && order.status === 'checkout') await settleOrder(db, env, order, payEvent);
+  } else if (payEvent.type === 'expired') {
+    await db.batch([
+      db.prepare(`UPDATE shipped_bids SET status = 'failed', note = 'checkout expired' WHERE checkout_id = ? AND status = 'checkout' AND paid_at IS NULL`).bind(payEvent.checkoutId),
+      db.prepare(`UPDATE print_orders SET status = 'failed', note = 'checkout expired' WHERE checkout_id = ? AND status = 'checkout'`).bind(payEvent.checkoutId),
+    ]);
+  } else if (payEvent.type === 'refunded') {
+    // A full refund (from /admin or Stripe's dashboard) takes a bid down; its slot goes back to the house ad.
+    await db.prepare(`UPDATE shipped_bids SET status = 'refunded', ended_at = COALESCE(ended_at, ?) WHERE order_id = ? AND status = 'live'`).bind(now, payEvent.orderId).run();
+    await db.prepare(`UPDATE print_orders SET status = 'refunded' WHERE order_id = ? AND status = 'to_print'`).bind(payEvent.orderId).run();
+  } else if (payEvent.type === 'refund_failed') {
+    await db.prepare(`UPDATE shipped_bids SET note = ? WHERE order_id = ?`).bind(payEvent.reason.slice(0, 200), payEvent.orderId).run();
   }
 }
 
@@ -802,110 +1092,154 @@ async function webhook(request: Request, env: ShippedEnv, providerId: string): P
   const provider = sponsorProvider(env);
   if (!db || !provider || provider.id !== providerId) return json({ error: 'not-found' }, 404);
   if (provider.id === 'stripe' && !env.STRIPE_SHIPPED_WEBHOOK_SECRET) return json({ error: 'not-configured' }, 503);
-  const event = await provider.parseWebhook(request);
-  if (!event) return json({ error: 'invalid-signature' }, 400);
-  await applyEvent(db, env, event);
-  return json({ received: true, ignored: event.type === 'ignored' || undefined });
+  if (Number(request.headers.get('content-length') ?? 0) > 512_000) return json({ error: 'too-big' }, 413);
+  const payEvent = await provider.parseWebhook(request).catch(() => null);
+  if (!payEvent) return json({ error: 'invalid-signature' }, 400);
+  await applyEvent(db, env, payEvent);
+  return json({ received: true, ignored: payEvent.type === 'ignored' || undefined });
 }
 
-const PUBLIC_STATUS: Record<string, string> = {
-  checkout: 'unpaid',
-  paid_pending_review: 'pending',
-  approved: 'printed',
-  refunded: 'refunded',
-  refund_failed: 'refunding',
-  failed: 'closed',
-};
-const PAID = new Set(['paid_pending_review', 'approved']);
-
-/** The buyer's line, by the checkout id only they have (it's in their return URL). */
-async function buyerLine(url: URL, env: ShippedEnv): Promise<{ db: D1Database; line: LineRow; checkoutId: string } | Response> {
+/** After checkout (or the wallet sheet): asks Stripe where it stands, applies it, and says how it went. */
+async function checkoutStatus(url: URL, env: ShippedEnv): Promise<Response> {
   const db = await database(env);
   const provider = sponsorProvider(env);
-  if (!db || !provider) return json({ error: 'sponsors-closed' }, 503);
+  if (!db || !provider) return json({ error: 'closed' }, 503);
   const checkoutId = url.searchParams.get('checkout') ?? '';
   if (!provider.checkoutId.test(checkoutId)) return json({ error: 'bad-request' }, 400);
-  let line = await db.prepare('SELECT * FROM sponsor_lines WHERE checkout_id = ?').bind(checkoutId).first<LineRow>();
-  if (!line || line.provider !== provider.id) return json({ error: 'not-found' }, 404);
-  if (line.status === 'checkout' && provider.confirm) {
+  const readBid = () => db.prepare('SELECT * FROM shipped_bids WHERE checkout_id = ?').bind(checkoutId).first<BidRow>();
+  const readOrder = () => db.prepare('SELECT * FROM print_orders WHERE checkout_id = ?').bind(checkoutId).first<OrderRow>();
+  let bid = await readBid();
+  let order = bid ? null : await readOrder();
+  if (!bid && !order) return json({ error: 'not-found' }, 404);
+  if ((bid?.status === 'checkout' || order?.status === 'checkout') && provider.confirm) {
     try {
       await applyEvent(db, env, await provider.confirm(checkoutId));
-      line = (await db.prepare('SELECT * FROM sponsor_lines WHERE id = ?').bind(line.id).first<LineRow>()) ?? line;
+      bid = bid ? await readBid() : null;
+      order = order ? await readOrder() : null;
     } catch (error) {
-      console.error('shipped: confirm failed', error);
+      console.error('shipped: confirm failed', error instanceof Error ? error.message.slice(0, 200) : 'unknown');
     }
   }
-  return { db, line, checkoutId };
+  if (bid) {
+    return json({
+      kind: 'bid',
+      status: bid.status,
+      slot: bid.slot,
+      name: bid.name,
+      cents: bid.amount_cents,
+      refundCents: bid.refund_cents,
+      logoPending: Boolean(bid.logo_key && !bid.logo_ok),
+    });
+  }
+  return json({ kind: 'print', status: order!.status, receiptId: order!.receipt_id, city: order!.ship_city, state: order!.ship_state });
 }
 
-async function sponsorStatus(url: URL, env: ShippedEnv): Promise<Response> {
-  const found = await buyerLine(url, env);
-  if (found instanceof Response) return found;
-  const { line, checkoutId } = found;
-  return json({
-    status: PUBLIC_STATUS[line.status] ?? 'closed',
-    tier: line.tier,
-    text: line.text,
-    endsAt: line.status === 'approved' ? line.ends_at : null,
-    amountCents: line.amount_cents,
-    taxCents: line.tax_cents,
-    totalCents: line.total_cents,
-    receipt: PAID.has(line.status) ? `/api/shipped/sponsor/receipt.png?checkout=${encodeURIComponent(checkoutId)}` : null,
-  });
+/** POST /api/shipped/checkout/cancel { checkout }: the wallet sheet closed without paying. */
+async function cancelCheckout(request: Request, env: ShippedEnv): Promise<Response> {
+  const why = refuseRequest(request, 1024);
+  if (why) return refused(why);
+  const db = await database(env);
+  const provider = sponsorProvider(env);
+  const body = await readJson(request);
+  const checkoutId = String(body?.checkout ?? '');
+  if (!db || !provider || !provider.checkoutId.test(checkoutId)) return json({ ok: false }, 400);
+  const ours = await db.prepare(`SELECT 1 AS x FROM shipped_bids WHERE checkout_id = ? AND status = 'checkout' UNION ALL SELECT 1 AS x FROM print_orders WHERE checkout_id = ? AND status = 'checkout'`).bind(checkoutId, checkoutId).first();
+  if (!ours) return json({ ok: false }, 404);
+  await provider.expire?.(checkoutId);
+  if (provider.confirm) await applyEvent(db, env, await provider.confirm(checkoutId)).catch(() => undefined);
+  return json({ ok: true });
 }
 
-async function supporterReceipt(url: URL, env: ShippedEnv): Promise<Response> {
-  const found = await buyerLine(url, env);
-  if (found instanceof Response) return found;
-  const { line } = found;
-  if (!PAID.has(line.status)) return json({ error: 'not-paid' }, 404);
-  const config = SPONSOR_CONFIG.tiers[line.tier];
-  const tax = line.tax_cents ?? 0;
-  const svg = supporterReceiptSvg({
-    number: `S${String(line.id).padStart(5, '0')}`,
-    date: receiptDate(new Date(line.paid_at ?? line.created_at).toISOString()),
-    text: line.text.toUpperCase(),
-    link: line.url ? new URL(line.url).hostname.replace(/^www\./, '') : null,
-    details: [
-      { label: 'SHOUT-OUT', value: config.label },
-      { label: 'PRINTS ON', value: 'SHARED RECEIPTS' },
-      line.status === 'approved' && line.ends_at
-        ? { label: 'RUNS UNTIL', value: receiptDate(new Date(line.ends_at).toISOString()) }
-        : { label: 'RUNS', value: `${config.days} DAYS FROM APPROVAL` },
-    ],
-    charges: [
-      { label: 'SUPPORTER SHOUT-OUT', value: money(line.amount_cents) },
-      { label: 'TAX', value: money(tax) },
-    ],
-    total: money(line.total_cents ?? line.amount_cents + tax),
-    status: line.status === 'approved' ? 'IN THE PAID FOR BY ROTATION' : 'PAID · PRINTS ONCE APPROVED',
-    barcode: receiptBarcodeUnits(`BZS${line.id}${line.text}`),
-  });
-  return new Response(await renderPng(svg), {
-    headers: { 'content-type': 'image/png', 'cache-control': 'private, max-age=60', 'x-robots-tag': 'noindex' },
-  });
+const redirect = (to: string) => {
+  const headers = secure(new Headers({ location: to, 'cache-control': 'no-store', 'referrer-policy': 'no-referrer', 'x-robots-tag': NOINDEX }));
+  return new Response(null, { status: 302, headers });
+};
+
+/**
+ * /q/<key>: a printed QR code. Counts the scan and sends it to that slot's link (house ads: h<slot>). The link is
+ * checked again on the way out, and a slot that was taken down, refunded or switched off goes to the home page.
+ */
+export async function qrRedirect(env: ShippedEnv, key: string, ctx: ExecutionContext): Promise<Response> {
+  env = withKeyAliases(env);
+  const home = env.SHIPPED_HOST ? `https://${env.SHIPPED_HOST}/` : `${SHIPPED_URL}/`;
+  const house = key.match(/^h(\d)$/);
+  if (house && isSlot(Number(house[1]))) return redirect(HOUSE_SLOTS[Number(house[1])].url);
+  const db = await database(env);
+  const id = /^\d{1,9}$/.test(key) ? Number(key) : 0;
+  if (!db || !id) return redirect(home);
+  if ((await switchedOff(env, db)).has('sponsor-display')) return redirect(home);
+  const bid = await db.prepare(`SELECT url, status FROM shipped_bids WHERE id = ?`).bind(id).first<{ url: string; status: string }>();
+  const url = bid && (bid.status === 'live' || bid.status === 'outbid') ? checkSponsorUrl(bid.url) : null;
+  if (!url) return redirect(home);
+  ctx.waitUntil(db.prepare('UPDATE shipped_bids SET scans = scans + 1 WHERE id = ?').bind(id).run().catch(() => undefined));
+  return redirect(url);
+}
+
+function png(body: BodyInit | null, cache: string): Response {
+  const headers = secure(new Headers({ 'content-type': 'image/png', 'cache-control': cache, 'x-robots-tag': 'noindex' }));
+  headers.set('content-security-policy', "default-src 'none'; sandbox");
+  return new Response(body, { headers });
 }
 
 async function publicLogo(env: ShippedEnv, id: number): Promise<Response> {
   const db = await database(env);
   if (!db || !env.SHIPPED) return new Response('Not found', { status: 404 });
-  const line = await db
-    .prepare(`SELECT logo_key FROM sponsor_lines WHERE id = ? AND tier = 'logo' AND status = 'approved'`)
-    .bind(id)
-    .first<{ logo_key: string | null }>();
-  const object = line?.logo_key ? await env.SHIPPED.get(line.logo_key) : null;
+  const bid = await db.prepare(`SELECT logo_key FROM shipped_bids WHERE id = ? AND logo_ok = 1 AND status IN ('live', 'outbid')`).bind(id).first<{ logo_key: string | null }>();
+  const object = bid?.logo_key ? await env.SHIPPED.get(bid.logo_key) : null;
   if (!object) return new Response('Not found', { status: 404 });
-  return new Response(object.body, {
-    headers: { 'content-type': 'image/png', 'cache-control': 'public, max-age=3600', 'x-robots-tag': 'noindex' },
-  });
+  return png(object.body, 'public, max-age=300');
+}
+
+async function state(env: ShippedEnv): Promise<Response> {
+  const db = await database(env);
+  const off = await switchedOff(env, db);
+  const generator = await generatorState(env, db, off);
+  const provider = sponsorProvider(env);
+  const window = event(env);
+  const open = Boolean(provider) && window.phase === 'open';
+  const payments = {
+    open: open && !off.has('sponsors') && takeoversOpen(window.now, window.closesAt),
+    prints: open && !off.has('prints'),
+    provider: provider?.id ?? null,
+    live: provider?.live ?? false,
+    wallet: Boolean(provider?.id === 'stripe' && env.STRIPE_PUBLISHABLE_KEY),
+    printCents: PRINT_PRICE_CENTS,
+    lockMinutes: BID_RULES.lockMinutes,
+  };
+  const base = { event: { name: EVENT_NAME, opensAt: window.opensAt, closesAt: window.closesAt, phase: window.phase, now: window.now }, payments };
+  if (!db) return json({ ...base, printed: 0, shared: 0, piled: 0, recent: [], generator, sponsors: await sponsorBlock(null, env, off) });
+
+  const [counts, recent, piled, sponsors] = await Promise.all([
+    db.prepare('SELECT COUNT(*) AS printed, COALESCE(SUM(shares), 0) AS shared FROM shipped_receipts').first<{ printed: number; shared: number }>(),
+    db
+      .prepare(`SELECT id, data FROM shipped_receipts WHERE listed = 1 AND hidden = 0 AND mode = ? ORDER BY id DESC LIMIT 12`)
+      .bind(modeOf(generator.year))
+      .all<{ id: number; data: string }>(),
+    db.prepare('SELECT COUNT(*) AS n FROM shipped_receipts WHERE listed = 1 AND hidden = 0 AND mode = ?').bind(modeOf(generator.year)).first<{ n: number }>(),
+    sponsorBlock(db, env, off),
+  ]);
+  return json(
+    {
+      ...base,
+      generator,
+      printed: counts?.printed ?? 0,
+      shared: counts?.shared ?? 0,
+      piled: piled?.n ?? 0,
+      recent: recent.results.flatMap((row) => {
+        const receipt = JSON.parse(row.data) as YearReceipt;
+        return receipt.version === 2 ? [{ id: row.id, who: subjectLabel(receipt.subject), count: itemsShipped(receipt), potential: receipt.potential }] : [];
+      }),
+      sponsors,
+    },
+    200,
+    'public, max-age=10',
+  );
 }
 
 async function icon(env: ShippedEnv, hash: string): Promise<Response> {
   const object = ICON_HASH.test(hash) ? await env.SHIPPED?.get(iconKey(hash)) : null;
   if (!object) return new Response('Not found', { status: 404 });
-  return new Response(object.body, {
-    headers: { 'content-type': 'image/png', 'cache-control': 'public, max-age=31536000, immutable', 'x-robots-tag': 'noindex' },
-  });
+  return png(object.body, 'public, max-age=31536000, immutable');
 }
 
 // ---- Share pages and images ------------------------------------------------------------------------
@@ -916,8 +1250,8 @@ function logoResolver(env: ShippedEnv, db: D1Database | null): LogoResolver {
     if (path.startsWith('/api/shipped/icon/')) return iconDataUri(path, env.SHIPPED);
     const id = path.match(/^\/api\/shipped\/logo\/(\d{1,9})\.png$/)?.[1];
     if (!id || !db || !env.SHIPPED) return null;
-    const line = await db.prepare('SELECT logo_key FROM sponsor_lines WHERE id = ?').bind(Number(id)).first<{ logo_key: string | null }>();
-    const object = line?.logo_key ? await env.SHIPPED.get(line.logo_key) : null;
+    const bid = await db.prepare('SELECT logo_key FROM shipped_bids WHERE id = ? AND logo_ok = 1').bind(Number(id)).first<{ logo_key: string | null }>();
+    const object = bid?.logo_key ? await env.SHIPPED.get(bid.logo_key) : null;
     return object ? bytesDataUri(await object.arrayBuffer()) : null;
   };
 }
@@ -929,20 +1263,21 @@ async function shareImage(request: Request, env: ShippedEnv, ctx: ExecutionConte
   const db = await database(env);
   const receipt = db ? await loadReceipt(db, id) : null;
   if (!receipt) return kind === 'card' ? Response.redirect(new URL('/og-shipped.jpg', url).toString(), 302) : new Response('Not found', { status: 404 });
-  const paid = await paidFor(db, id);
-  if (db) ctx.waitUntil(countImpressions(db, paid, kind).catch(() => undefined));
-  const sponsors = [paid.presented, ...paid.lines].map((entry) => entry?.key ?? '-').join(',');
+  const block = await sponsorBlock(db, env);
+  const sponsors = block.slots.map((slot) => `${slot.qr}:${slot.logo ? 1 : 0}`).join(',');
   const cacheKey = `share/${id}/${kind}-v${IMAGE_VERSION}-${seedOf(sponsors).toString(36)}.png`;
-  const headers: Record<string, string> = { 'content-type': 'image/png', 'cache-control': 'public, max-age=3600', 'x-robots-tag': 'noindex' };
-  if (url.searchParams.has('download')) {
-    headers['content-disposition'] = `attachment; filename="shipped-${receipt.year}-${receiptNumber(id)}${kind === 'tall' ? '-receipt' : ''}.png"`;
-  }
+  const download = url.searchParams.has('download');
+  const respond = (body: BodyInit) => {
+    const response = png(body, 'public, max-age=300');
+    if (download) response.headers.set('content-disposition', `attachment; filename="shipped-${receipt.year}-${receiptNumber(id)}${kind === 'tall' ? '-receipt' : ''}.png"`);
+    return response;
+  };
   const stored = await env.SHIPPED?.get(cacheKey);
-  if (stored) return new Response(stored.body, { headers });
+  if (stored) return respond(stored.body);
   const render = kind === 'card' ? yearCardPng : yearTallPng;
-  const png = await render(receipt, paid, url.origin, logoResolver(env, db));
-  ctx.waitUntil(env.SHIPPED?.put(cacheKey, png, { httpMetadata: { contentType: 'image/png' } }) ?? Promise.resolve());
-  return new Response(png, { headers });
+  const image = await render(receipt, block, shippedOrigin(env, url), logoResolver(env, db));
+  ctx.waitUntil(env.SHIPPED?.put(cacheKey, image, { httpMetadata: { contentType: 'image/png' } }) ?? Promise.resolve());
+  return respond(image);
 }
 
 async function dropShareImages(env: ShippedEnv, id: number) {
@@ -960,14 +1295,16 @@ async function sharePage(request: Request, env: ShippedEnv & { ASSETS: Fetcher }
   const receipt = db ? await loadReceipt(db, id) : null;
   const headers = new Headers(shell.headers);
   headers.set('x-robots-tag', NOINDEX);
-  headers.set('cache-control', 'private, no-store');
-  if (!receipt || !db) return new Response(shell.body, { status: 404, headers });
+  headers.set('cache-control', 'public, max-age=60');
+  if (!receipt || !db) {
+    headers.set('cache-control', 'no-store');
+    return new Response(shell.body, { status: 404, headers });
+  }
 
-  const paid = await paidFor(db, id);
-  ctx.waitUntil(
-    Promise.all([countImpressions(db, paid, 'page'), db.prepare('UPDATE shipped_receipts SET views = views + 1 WHERE id = ?').bind(id).run()]).catch(() => undefined),
-  );
-  const payload = JSON.stringify({ receipt, paidFor: paid }).replace(/</g, '\\u003c');
+  ctx.waitUntil(db.prepare('UPDATE shipped_receipts SET views = views + 1 WHERE id = ?').bind(id).run().catch(() => undefined));
+  const sponsors = await sponsorBlock(db, env);
+  // JSON inside a <script> data block: "<" escaped so nothing in a receipt can close the tag.
+  const payload = JSON.stringify({ receipt, sponsors }).replace(/</g, '\\u003c').replace(/\u2028/g, '\\u2028').replace(/\u2029/g, '\\u2029');
   const who = subjectLabel(receipt.subject);
   const n = itemsShipped(receipt);
   const title = receipt.potential ? `${who}: shipped in ${receipt.year} (potential) | Shipped` : `${who} shipped ${n} thing${n === 1 ? '' : 's'} in ${receipt.year} | Shipped`;
@@ -995,7 +1332,7 @@ async function sharePage(request: Request, env: ShippedEnv & { ASSETS: Fetcher }
     .transform(new Response(shell.body, { status: 200, headers }));
 }
 
-/** /shipped/r/<id>/, its og.png and receipt.png. Anything else under /shipped/r/ is the static shell. */
+/** /shipped/r/<id>/, its og.png and receipt.png. Anything else under /shipped/r/ is the static shell. Edge-cached briefly. */
 export async function handleShippedPage(request: Request, env: ShippedEnv & { ASSETS: Fetcher }, ctx: ExecutionContext): Promise<Response> {
   env = withKeyAliases(env);
   const url = new URL(request.url);
@@ -1003,9 +1340,23 @@ export async function handleShippedPage(request: Request, env: ShippedEnv & { AS
   if (!match) return env.ASSETS.fetch(request);
   const id = Number(match[1]);
   if (!match[2]) return Response.redirect(new URL(RECEIPT_PATH(id), url).toString(), 301);
-  if (match[3] === 'og.png') return shareImage(request, env, ctx, id, 'card');
-  if (match[3] === 'receipt.png') return shareImage(request, env, ctx, id, 'tall');
-  return sharePage(request, env, ctx, id);
+  if ((await switchedOff(env, env.DB ?? null)).has('site')) return outOfPaper();
+  if (match[3] === 'og.png' || match[3] === 'receipt.png') {
+    const kind = match[3] === 'og.png' ? 'card' : 'tall';
+    if (url.searchParams.has('download')) return shareImage(request, env, ctx, id, kind);
+    return cached(request, ctx, 300, () => shareImage(request, env, ctx, id, kind));
+  }
+  return cached(request, ctx, 60, () => sharePage(request, env, ctx, id));
+}
+
+/** The whole site switched off: one plain page, no app, no data. */
+export function outOfPaper(): Response {
+  const headers = secure(new Headers({ 'content-type': 'text/html; charset=utf-8', 'cache-control': 'no-store', 'x-robots-tag': NOINDEX }));
+  headers.set('content-security-policy', "default-src 'none'; style-src 'unsafe-inline'; frame-ancestors 'none'");
+  return new Response(
+    '<!doctype html><meta charset="utf-8"><meta name="viewport" content="width=device-width"><title>Shipped 2026: out of paper</title><body style="font:16px ui-monospace,monospace;background:#121316;color:#f3ead8;display:grid;place-items:center;height:100vh;margin:0"><p>OUT OF PAPER. Back soon.</p></body>',
+    { status: 503, headers },
+  );
 }
 
 export async function handleShipped(request: Request, env: ShippedEnv, ctx: ExecutionContext): Promise<Response | null> {
@@ -1014,39 +1365,80 @@ export async function handleShipped(request: Request, env: ShippedEnv, ctx: Exec
   const path = url.pathname;
   if (!path.startsWith('/api/shipped/')) return null;
   const method = request.method;
+  const hook = path.match(/^\/api\/shipped\/webhook\/([a-z0-9-]{1,20})$/);
+  // Payment webhooks always land (refunds and expiries must be recorded even with the site switched off).
+  if (hook && method === 'POST') return webhook(request, env, hook[1]);
+  if (method === 'OPTIONS') return new Response(null, { status: 405, headers: secure(new Headers({ allow: 'GET, POST' })) });
+  if ((await switchedOff(env, env.DB ?? null)).has('site') && path !== '/api/shipped/checkout') return json({ error: 'out-of-paper' }, 503);
 
-  if (path === '/api/shipped/state' && method === 'GET') return state(env);
+  if (path === '/api/shipped/state' && method === 'GET') return cached(request, ctx, 10, () => state(env));
+  if (path === '/api/shipped/challenge' && method === 'GET') return challenge(request, env);
   if (path === '/api/shipped/lookup' && method === 'POST') return lookup(request, env);
   if (path === '/api/shipped/print' && method === 'POST') return print(request, env, ctx);
+  if (path === '/api/shipped/pile' && method === 'GET') return cached(request, ctx, 15, () => pile(url, env));
+  if (path === '/api/shipped/pile' && method === 'POST') return tossOnPile(request, env);
   if (path === '/api/shipped/shared' && method === 'POST') return shared(request, env);
-  if (path === '/api/shipped/takedown' && method === 'POST') return takedown(request, env);
-  if (path === '/api/shipped/sponsor' && method === 'POST') return createSponsor(request, env);
-  if (path === '/api/shipped/sponsor/status' && method === 'GET') return sponsorStatus(url, env);
-  if (path === '/api/shipped/sponsor/receipt.png' && method === 'GET') return supporterReceipt(url, env);
+  if (path === '/api/shipped/takedown' && method === 'POST') return takedown(request, env, ctx);
+  if (path === '/api/shipped/bid' && method === 'POST') return createBid(request, env);
+  if (path === '/api/shipped/print-order' && method === 'POST') return createPrintOrder(request, env);
+  if (path === '/api/shipped/checkout' && method === 'GET') return checkoutStatus(url, env);
+  if (path === '/api/shipped/checkout/cancel' && method === 'POST') return cancelCheckout(request, env);
 
   const receipt = path.match(/^\/api\/shipped\/receipts\/(\d{1,9})$/);
   if (receipt && method === 'GET') {
-    const db = await database(env);
-    const found = db ? await loadReceipt(db, Number(receipt[1])) : null;
-    if (!found || !db) return json({ error: 'not-found' }, 404);
-    return json({ receipt: found, paidFor: await paidFor(db, found.id) }, 200, 'public, max-age=60');
+    return cached(request, ctx, 60, async () => {
+      const db = await database(env);
+      const found = db ? await loadReceipt(db, Number(receipt[1])) : null;
+      if (!found || !db) return json({ error: 'not-found' }, 404);
+      return json({ receipt: found, sponsors: await sponsorBlock(db, env) }, 200, 'public, max-age=60');
+    });
   }
   const iconMatch = path.match(/^\/api\/shipped\/icon\/([a-f0-9]{24})\.png$/);
   if (iconMatch && method === 'GET') return icon(env, iconMatch[1]);
-  const hook = path.match(/^\/api\/shipped\/webhook\/([a-z0-9-]{1,20})$/);
-  if (hook && method === 'POST') return webhook(request, env, hook[1]);
   const logo = path.match(/^\/api\/shipped\/logo\/(\d{1,9})\.png$/);
   if (logo && method === 'GET') return publicLogo(env, Number(logo[1]));
 
   return json({ error: 'not-found' }, 404);
 }
 
+/** GET /api/shipped/challenge: a proof-of-work puzzle for browsers when Turnstile isn't configured. */
+async function challenge(request: Request, env: ShippedEnv): Promise<Response> {
+  const human = humanCheck(env);
+  if (human.kind !== 'pow') return json({ kind: 'turnstile' });
+  const db = await database(env);
+  if (db && (await overLimit(db, request, 'challenge'))) return json({ error: 'slow-down' }, 429);
+  return json({ kind: 'pow', ...(await issueChallenge(env)) });
+}
+
+// ---- Scheduled: retention ------------------------------------------------------------------------------
+
+/**
+ * Keeps only what's needed: shipping addresses go 30 days after a print ships (or 60 after a refund/failure),
+ * buyer emails 120 days after payment, old rate-limit windows and locks daily.
+ */
+export async function shippedCron(env: ShippedEnv): Promise<void> {
+  const db = await database(env);
+  if (!db) return;
+  const now = Date.now();
+  await db.batch([
+    db
+      .prepare(
+        `UPDATE print_orders SET ship_name = NULL, ship_line1 = NULL, ship_line2 = NULL, ship_postal = NULL, email = NULL
+         WHERE ship_line1 IS NOT NULL AND ((status = 'shipped' AND shipped_at < ?) OR (status IN ('refunded', 'failed') AND created_at < ?))`,
+      )
+      .bind(now - 30 * DAY, now - 60 * DAY),
+    db.prepare('UPDATE shipped_bids SET email = NULL WHERE email IS NOT NULL AND paid_at < ?').bind(now - 120 * DAY),
+    db.prepare(`UPDATE shipped_bids SET status = 'failed', note = 'checkout abandoned' WHERE status = 'checkout' AND paid_at IS NULL AND created_at < ?`).bind(now - DAY),
+  ]);
+  await sweepLimits(db, now);
+}
+
 // ---- Admin (/admin, behind the password check in worker/metrics.ts) --------------------------------
 
 async function hideReceipts(db: D1Database, env: ShippedEnv, key: string) {
   const { results } = await db.prepare('SELECT id FROM shipped_receipts WHERE login_key = ?').bind(key).all<{ id: number }>();
-  await db.prepare('UPDATE shipped_receipts SET hidden = 1 WHERE login_key = ?').bind(key).run();
-  await Promise.all(results.map((row) => dropShareImages(env, row.id)));
+  await db.prepare('UPDATE shipped_receipts SET hidden = 1, listed = 0 WHERE login_key = ?').bind(key).run();
+  await Promise.all(results.map((row) => purgeReceipt(env, row.id)));
 }
 
 export async function adminShipped(request: Request, env: ShippedEnv): Promise<Response> {
@@ -1057,10 +1449,10 @@ export async function adminShipped(request: Request, env: ShippedEnv): Promise<R
 
   const logo = url.pathname.match(/^\/api\/admin\/shipped\/logo\/(\d{1,9})$/);
   if (logo) {
-    const line = await db.prepare('SELECT logo_key FROM sponsor_lines WHERE id = ?').bind(Number(logo[1])).first<{ logo_key: string | null }>();
-    const object = line?.logo_key && env.SHIPPED ? await env.SHIPPED.get(line.logo_key) : null;
+    const bid = await db.prepare('SELECT logo_key FROM shipped_bids WHERE id = ?').bind(Number(logo[1])).first<{ logo_key: string | null }>();
+    const object = bid?.logo_key && env.SHIPPED ? await env.SHIPPED.get(bid.logo_key) : null;
     if (!object) return new Response('Not found', { status: 404 });
-    return new Response(object.body, { headers: { 'content-type': 'image/png', 'cache-control': 'no-store' } });
+    return png(object.body, 'no-store');
   }
   if (url.pathname !== '/api/admin/shipped') return json({ error: 'not-found' }, 404);
 
@@ -1071,89 +1463,97 @@ export async function adminShipped(request: Request, env: ShippedEnv): Promise<R
     const id = Number(body.id);
     const now = Date.now();
 
+    if (body.action === 'switch') {
+      if (!isSwitch(body.name)) return json({ error: 'bad-switch' }, 400);
+      await setSwitch(db, body.name, body.off === true);
+      return json({ ok: true });
+    }
     if (body.action === 'hide-receipt' || body.action === 'show-receipt') {
       const hidden = body.action === 'hide-receipt' ? 1 : 0;
       await db.prepare('UPDATE shipped_receipts SET hidden = ? WHERE id = ?').bind(hidden, id).run();
-      if (hidden) await dropShareImages(env, id);
+      if (hidden) await purgeReceipt(env, id);
       return json({ ok: true });
     }
-
     if (body.action === 'remove-takedown' || body.action === 'dismiss-takedown') {
-      const ask = await db.prepare(`SELECT * FROM shipped_takedowns WHERE id = ?`).bind(id).first<{ subject_key: string; status: string }>();
+      const ask = await db.prepare(`SELECT * FROM shipped_takedowns WHERE id = ?`).bind(id).first<{ receipt_id: number; subject_key: string; status: string }>();
       if (!ask) return json({ error: 'not-found' }, 404);
       const removing = body.action === 'remove-takedown';
       await db.prepare('UPDATE shipped_takedowns SET status = ?, reviewed_at = ? WHERE id = ?').bind(removing ? 'removed' : 'dismissed', now, id).run();
-      // Removing takes down every receipt for that name, handle or site, and stops new ones printing.
+      // Removing takes down every receipt for that name, handle or site, and stops new ones printing (the opt-out list).
       if (removing) await hideReceipts(db, env, ask.subject_key);
+      else await db.prepare('UPDATE shipped_receipts SET hidden = 0 WHERE id = ? AND hidden = 1').bind(ask.receipt_id).run();
       return json({ ok: true });
     }
-
+    if (body.action === 'block-subject') {
+      const key = typeof body.key === 'string' ? body.key.trim().toLowerCase().slice(0, 120) : '';
+      if (!/^(github|x|domain|name):.+$/.test(key)) return json({ error: 'bad-key' }, 400);
+      await db.prepare(`INSERT INTO shipped_takedowns (receipt_id, subject_key, reason, status, created_at, reviewed_at) VALUES (0, ?, 'blocked from /admin', 'removed', ?, ?)`).bind(key, now, now).run();
+      await hideReceipts(db, env, key);
+      return json({ ok: true });
+    }
     if (body.action === 'restock') {
-      await db.prepare(`DELETE FROM shipped_flags WHERE key = 'out-of-credit'`).run();
+      await db.batch([db.prepare(`DELETE FROM shipped_flags WHERE key = 'out-of-credit'`), db.prepare('UPDATE shipped_spend SET reserved_micros = 0 WHERE day = ?').bind(today())]);
       return json({ ok: true });
     }
 
-    const line = await db.prepare('SELECT * FROM sponsor_lines WHERE id = ?').bind(id).first<LineRow>();
-    if (!line) return json({ error: 'not-found' }, 404);
-
-    if (body.action === 'approve') {
-      if (line.status !== 'paid_pending_review') return json({ error: 'not-pending' }, 409);
-      const next = await db.prepare(`SELECT COALESCE(MAX(line_no), 0) + 1 AS n FROM sponsor_lines WHERE status = 'approved'`).first<{ n: number }>();
-      const days = SPONSOR_CONFIG.tiers[line.tier].days;
-      // The presented-by slot starts when the current one ends, so two never run at once.
-      const after = line.tier === 'header' ? (await presentedTaken(db)).nextOpen : null;
-      const starts = Math.max(now, after ?? 0);
-      await db
-        .prepare(`UPDATE sponsor_lines SET status = 'approved', line_no = ?, reviewed_at = ?, starts_at = ?, ends_at = ? WHERE id = ?`)
-        .bind(next?.n ?? 1, now, starts, starts + days * DAY, id)
-        .run();
+    if (body.action === 'order-shipped') {
+      await db.prepare(`UPDATE print_orders SET status = 'shipped', shipped_at = ? WHERE id = ? AND status = 'to_print'`).bind(now, id).run();
       return json({ ok: true });
     }
+    if (body.action === 'order-refund') {
+      const order = await db.prepare('SELECT * FROM print_orders WHERE id = ?').bind(id).first<OrderRow>();
+      if (!order?.order_id || !provider || order.provider !== provider.id) return json({ error: 'not-refundable' }, 409);
+      const refund = await provider.refund(order.order_id, undefined, `order-${order.id}-full`);
+      if (refund.ok) await db.prepare(`UPDATE print_orders SET status = 'refunded' WHERE id = ?`).bind(id).run();
+      return json({ ok: refund.ok, error: refund.ok ? undefined : refund.error });
+    }
 
-    if (body.action === 'reject') {
-      if (line.status !== 'paid_pending_review') return json({ error: 'not-pending' }, 409);
+    const bid = await db.prepare('SELECT * FROM shipped_bids WHERE id = ?').bind(id).first<BidRow>();
+    if (!bid) return json({ error: 'not-found' }, 404);
+    if (body.action === 'logo-approve' || body.action === 'logo-reject') {
+      const approve = body.action === 'logo-approve';
+      await db.prepare('UPDATE shipped_bids SET logo_ok = ? WHERE id = ?').bind(approve ? 1 : 0, id).run();
+      if (!approve && bid.logo_key) {
+        await env.SHIPPED?.delete(bid.logo_key);
+        await db.prepare('UPDATE shipped_bids SET logo_key = NULL WHERE id = ?').bind(id).run();
+      }
+      return json({ ok: true });
+    }
+    if (body.action === 'remove-bid') {
+      // Instant kill: the slot goes back to the house ad at once and the sponsor gets everything back.
       const refund =
-        provider && provider.id === line.provider && line.order_id
-          ? await provider.refund(line.order_id, line.amount_cents)
-          : { ok: false, error: `provider ${line.provider} not available` };
+        bid.order_id && provider && provider.id === bid.provider ? await provider.refund(bid.order_id, undefined, `bid-${bid.id}-removed`) : { ok: !bid.order_id, error: `provider ${bid.provider} not available` };
       await db
-        .prepare(`UPDATE sponsor_lines SET status = ?, reviewed_at = ?, note = ? WHERE id = ?`)
-        .bind(refund.ok ? 'refunded' : 'refund_failed', now, refund.ok ? null : (refund.error ?? 'refund failed').slice(0, 200), id)
+        .prepare(`UPDATE shipped_bids SET status = 'removed', ended_at = ?, refund_cents = ?, note = ? WHERE id = ?`)
+        .bind(now, refund.ok ? (bid.total_cents ?? bid.amount_cents) : 0, refund.ok ? 'removed in review' : `removed; refund failed: ${refund.error ?? ''}`.slice(0, 200), id)
         .run();
-      if (line.logo_key) await env.SHIPPED?.delete(line.logo_key);
-      return json({ ok: true, error: refund.ok ? undefined : refund.error });
+      if (bid.logo_key) await env.SHIPPED?.delete(bid.logo_key);
+      return json({ ok: refund.ok, error: refund.ok ? undefined : refund.error });
     }
-
     return json({ error: 'bad-action' }, 400);
   }
 
   const since = new Date(Date.now() - 13 * DAY).toISOString().slice(0, 10);
-  const month = new Date(Date.now() - 29 * DAY).toISOString().slice(0, 10);
-  const [pending, lines, receipts, spend, totals, takedowns, impressions, credit, tinyfish] = await db.batch([
-    db.prepare(`SELECT * FROM sponsor_lines WHERE status = 'paid_pending_review' ORDER BY paid_at`),
-    db.prepare(`SELECT * FROM sponsor_lines WHERE status NOT IN ('checkout', 'paid_pending_review', 'failed') ORDER BY id DESC LIMIT 60`),
-    db.prepare(
-      'SELECT id, login, mode, demo, hidden, listed, shares, views, model, searches, input_tokens, output_tokens, cost_micros, created_at FROM shipped_receipts ORDER BY id DESC LIMIT 40',
-    ),
+  const off = await switchedOff(env, db);
+  const [bids, orders, receipts, spend, totals, takedowns, credit, tinyfish] = await db.batch([
+    db.prepare(`SELECT * FROM shipped_bids WHERE status NOT IN ('checkout', 'failed') ORDER BY id DESC LIMIT 80`),
+    db.prepare(`SELECT id, receipt_id, status, amount_cents, total_cents, ship_name, ship_line1, ship_line2, ship_city, ship_state, ship_postal, paid_at, shipped_at, note FROM print_orders WHERE status IN ('to_print', 'shipped', 'refunded') ORDER BY CASE status WHEN 'to_print' THEN 0 ELSE 1 END, id DESC LIMIT 80`),
+    db.prepare('SELECT id, login, login_key, mode, demo, hidden, listed, shares, views, model, searches, input_tokens, output_tokens, cost_micros, created_at FROM shipped_receipts ORDER BY id DESC LIMIT 40'),
     db.prepare('SELECT * FROM shipped_spend WHERE day >= ? ORDER BY day DESC').bind(since),
     db.prepare('SELECT COUNT(*) AS printed, COALESCE(SUM(shares), 0) AS shared, COALESCE(SUM(views), 0) AS views FROM shipped_receipts'),
     db.prepare(
       `SELECT t.id, t.receipt_id, t.subject_key, t.reason, t.created_at, r.login FROM shipped_takedowns t
        LEFT JOIN shipped_receipts r ON r.id = t.receipt_id WHERE t.status = 'open' ORDER BY t.id`,
     ),
-    db.prepare(
-      `SELECT sponsor, SUM(CASE WHEN kind = 'card' THEN n ELSE 0 END) AS card, SUM(CASE WHEN kind = 'tall' THEN n ELSE 0 END) AS tall,
-       SUM(CASE WHEN kind = 'page' THEN n ELSE 0 END) AS page FROM sponsor_impressions WHERE day >= ? GROUP BY sponsor ORDER BY SUM(n) DESC`,
-    ).bind(month),
     db.prepare(`SELECT set_at FROM shipped_flags WHERE key = 'out-of-credit'`),
     db.prepare('SELECT kind, n FROM shipped_tinyfish WHERE day = ?').bind(today()),
   ]);
   const t = totals.results[0] as { printed: number; shared: number; views: number } | undefined;
-  const lineText = new Map((lines.results as LineRow[]).map((line) => [`line:${line.id}`, `${line.text} (${SPONSOR_CONFIG.tiers[line.tier].label})`]));
-  const houseText = new Map([HOUSE_SPONSORS.main, ...HOUSE_SPONSORS.rotating].map((entry) => [entry.key, `${entry.text} (house)`]));
   return json({
     provider: provider ? { id: provider.id, live: provider.live } : null,
-    generator: await generatorState(env, db),
+    generator: await generatorState(env, db, off),
+    switches: Object.fromEntries((['site', 'generate', 'sponsors', 'prints', 'sponsor-display'] as Switch[]).map((name) => [name, off.has(name)])),
+    forced: (env.SHIPPED_OFF ?? '').split(',').map((s) => s.trim()).filter(isSwitch),
     model: env.SHIPPED_MODEL || DEFAULT_MODEL,
     maxSearches: maxSearches(env),
     outOfCreditAt: (credit.results[0] as { set_at: number } | undefined)?.set_at ?? null,
@@ -1163,18 +1563,15 @@ export async function adminShipped(request: Request, env: ShippedEnv): Promise<R
       daily: TINYFISH_DAILY,
     },
     capUsd: capMicros(env) / 1_000_000,
+    budget: await budgetUsed(db),
     printed: t?.printed ?? 0,
     shared: t?.shared ?? 0,
     views: t?.views ?? 0,
-    pending: pending.results,
-    lines: lines.results,
+    bids: bids.results,
+    orders: orders.results,
     receipts: receipts.results,
     spend: spend.results,
     takedowns: takedowns.results,
-    impressions: (impressions.results as { sponsor: string; card: number; tall: number; page: number }[]).map((row) => ({
-      ...row,
-      label: lineText.get(row.sponsor) ?? houseText.get(row.sponsor) ?? row.sponsor,
-    })),
+    sponsors: await sponsorBlock(db, env, new Set()),
   });
 }
-

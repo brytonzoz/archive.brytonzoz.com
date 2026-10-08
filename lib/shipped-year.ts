@@ -1,6 +1,6 @@
-// "Shipped in <year>": one receipt per person or brand, one line per thing they shipped this year.
+// "Shipped 2026": one receipt per person or brand, one line per thing they shipped this year.
 // Shared by the Worker (worker/shipped.ts builds and stores receipts, worker/shipped-og.ts draws the
-// share images) and the pages (components/shipped/). Bryton's own receipt on /shipped is the template.
+// share images) and the pages (components/shipped/).
 
 /** The year being itemized: SHIPPED_YEAR (Worker) / NEXT_PUBLIC_SHIPPED_YEAR (build), else this year. */
 export function shippedYear(value?: string | number | null): number {
@@ -57,15 +57,25 @@ export type YearReceipt = {
 
 export type Candidate = Subject & { detail: string };
 
-/** An approved sponsor (or a house line) as printed in a receipt's PAID FOR BY block. */
-export type PaidBy = {
-  key: string;
-  tier: 'name' | 'logo' | 'header' | 'house';
-  text: string;
-  url: string | null;
+/** One slot of the sponsor block as printed on a receipt: the paying holder, or the house ad. */
+export type SponsorSlot = {
+  slot: number;
+  name: string;
+  cta: string;
+  /** Destination of the slot's link and QR code. */
+  url: string;
+  /** Key of the short QR link, printed as <origin>/q/<key> (counts scans, then redirects to url). */
+  qr: string;
+  /** Same-origin URL of an approved 1-bit logo, or null. */
   logo: string | null;
+  house: boolean;
+  /** What the holder bid (0 for a house ad). */
+  cents: number;
+  /** The least the next bid can be. */
+  next: number;
 };
-export type PaidFor = { presented: PaidBy | null; lines: PaidBy[] };
+/** The 10-slot block (hero first). frozen: the event is over and these holders keep their slots forever. */
+export type SponsorBlock = { slots: SponsorSlot[]; frozen: boolean };
 
 export const receiptNumber = (id: number) => String(id).padStart(6, '0');
 /** Shipped lives at the root of its own host; brytonzoz.com/shipped/* redirects there (worker/index.ts). */
@@ -73,6 +83,7 @@ export const SHIPPED_HOST = 'shipped.brytonzoz.com';
 export const SHIPPED_URL = `https://${SHIPPED_HOST}`;
 export const RECEIPT_PATH = (id: number) => `/r/${id}/`;
 export const CARD_PATH = (id: number) => `/r/${id}/og.png`;
+export const QR_PATH = (key: string) => `/q/${key}`;
 export const TALL_PATH = (id: number) => `/r/${id}/receipt.png`;
 
 const MONTHS = ['JAN', 'FEB', 'MAR', 'APR', 'MAY', 'JUN', 'JUL', 'AUG', 'SEP', 'OCT', 'NOV', 'DEC'];
@@ -88,17 +99,18 @@ export function itemDate(date: string | null): string | null {
 
 export const itemsShipped = (receipt: Pick<YearReceipt, 'items' | 'potential'>) => (receipt.potential ? 1 : receipt.items.length);
 
+/** The name a receipt is made out to: the real name when a source gave one, else the @handle. */
 export function subjectLabel(subject: Subject): string {
-  if (subject.kind === 'github' || subject.kind === 'x') return `@${subject.id}`;
+  if (subject.kind === 'x') return `@${subject.id}`;
+  if (subject.kind === 'github') return subject.display && subject.display !== `@${subject.id}` ? subject.display : `@${subject.id}`;
   return subject.display;
 }
 
-/** What "Post to X" prefills. */
+/** What "Post to X" prefills: the receipt image carries the post; the text is the hook plus the deadline. */
 export function shareText(receipt: Pick<YearReceipt, 'items' | 'potential' | 'subject' | 'year'>): string {
-  const who = receipt.subject.kind === 'x' ? `@${receipt.subject.id}` : receipt.subject.display;
-  if (receipt.potential) return `${who}'s ${receipt.year} receipt: ITEMS SHIPPED: 1 (POTENTIAL). Print yours:`;
+  if (receipt.potential) return `Shipped ${receipt.year}: nothing public yet. The receipt itemized my potential instead. Print yours before the printer shuts off:`;
   const n = receipt.items.length;
-  return `${who} shipped ${n} thing${n === 1 ? '' : 's'} in ${receipt.year}. Itemized receipt:`;
+  return `Shipped ${receipt.year}: ${n} thing${n === 1 ? '' : 's'}, itemized on one receipt. Print yours before the printer shuts off:`;
 }
 
 const GITHUB_LOGIN = /^[a-z\d](?:[a-z\d]|-(?=[a-z\d])){0,38}$/i;

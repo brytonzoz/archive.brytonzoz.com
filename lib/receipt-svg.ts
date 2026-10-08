@@ -161,8 +161,8 @@ function printerLip(x: number, y: number, width: number) {
 /** Header every receipt shares: the store in double height, then date and number. */
 function header(c: number, date: string, number: string) {
   return [
-    tall(c, 46, 'BRYTONZOZ.COM', 15, { anchor: 'middle' }),
-    txt(c, 74, 'SHIPPED DEPT. · NEW YORK, NY', 10.5, { anchor: 'middle', opacity: 0.7 }),
+    tall(c, 46, 'SHIPPED 2026', 15, { anchor: 'middle' }),
+    txt(c, 74, 'THE PUBLIC RECEIPT PRINTER', 10.5, { anchor: 'middle', opacity: 0.7 }),
     rule(90),
     leader(112, 'DATE', date, 12, 500),
     leader(130, 'RECEIPT', `#${number}`, 12, 500),
@@ -270,7 +270,8 @@ export function supporterReceiptSvg(data: SupporterOg): string {
 // ---- Shipped in <year> ---------------------------------------------------------------------------
 
 export type YearOgItem = { name: string; status: string; date: string | null; description: string; logo: string | null };
-export type YearOgPaidFor = { presented: string | null; lines: { text: string; logo: string | null }[] };
+/** One sponsor slot as drawn: its QR is a path in module units (lib/shipped-qr.ts), passed in so this file stays import-free. */
+export type YearOgSlot = { name: string; cta: string; logo: string | null; qr: { size: number; path: string } };
 export type YearOg = {
   number: string;
   year: number;
@@ -279,10 +280,52 @@ export type YearOg = {
   items: YearOgItem[];
   count: number;
   note: string;
-  paidFor: YearOgPaidFor;
+  /** Hero first, then the nine small slots. */
+  sponsors: YearOgSlot[];
   url: string;
   barcode: number[];
 };
+
+function qrMark(x: number, y: number, width: number, code: { size: number; path: string }) {
+  const scale = width / (code.size + 4);
+  return `<rect x="${x}" y="${y}" width="${width}" height="${width}" fill="${PAPER}"/><g transform="translate(${(x + 2 * scale).toFixed(2)} ${(y + 2 * scale).toFixed(2)}) scale(${scale.toFixed(4)})"><path d="${code.path}" fill="${INK}" shape-rendering="crispEdges"/></g>`;
+}
+
+/** The sponsor block: the hero slot across the top, then a 3×3 grid, each with its QR code. Returns the new y. */
+function sponsorBlock(body: string[], c: number, top: number, slots: YearOgSlot[]): number {
+  let y = top + 20;
+  body.push(txt(c, y, 'THIS RECEIPT IS SPONSORED BY', 10.5, { weight: 600, anchor: 'middle' }));
+  y += 14;
+  const [hero, ...grid] = slots;
+  if (hero) {
+    const qrSize = 74;
+    body.push(qrMark(PAPER_W - 28 - qrSize - 6, y + 2, qrSize, hero.qr));
+    let ty = y + 26;
+    if (hero.logo) {
+      body.push(`<image x="40" y="${y + 6}" width="150" height="40" preserveAspectRatio="xMinYMid meet" image-rendering="optimizeSpeed" href="${hero.logo}"/>`);
+      ty = y + 64;
+    } else body.push(tall(40, ty, fit(hero.name.toUpperCase(), 20), 13));
+    wrap(hero.cta, 30, 2).forEach((line, i) => body.push(txt(40, ty + 20 + i * 14, line, 10.5, { opacity: 0.8 })));
+    y += qrSize + 14;
+    body.push(rule(y));
+    y += 12;
+  }
+  const cellW = (PAPER_W - 56) / 3;
+  for (let row = 0; row < Math.ceil(grid.length / 3); row++) {
+    for (let col = 0; col < 3; col++) {
+      const slot = grid[row * 3 + col];
+      if (!slot) continue;
+      const cx = 28 + cellW * col + cellW / 2;
+      body.push(qrMark(cx - 26, y, 52, slot.qr));
+      if (slot.logo) body.push(`<image x="${(cx - 50).toFixed(1)}" y="${y + 56}" width="100" height="18" preserveAspectRatio="xMidYMid meet" image-rendering="optimizeSpeed" href="${slot.logo}"/>`);
+      else body.push(txt(cx, y + 68, fit(slot.name.toUpperCase(), 16), 9, { weight: 600, anchor: 'middle' }));
+      wrap(slot.cta, 20, 2).forEach((line, i) => body.push(txt(cx, y + 81 + i * 10, line, 7.5, { anchor: 'middle', opacity: 0.75 })));
+    }
+    y += 104;
+  }
+  body.push(`<rect x="28" y="${top}" width="${PAPER_W - 56}" height="${y - top}" fill="none" stroke="${INK}" stroke-width="1.5"/>`);
+  return y;
+}
 
 function wrap(text: string, max: number, lines: number): string[] {
   const out: string[] = [];
@@ -302,8 +345,6 @@ function wrap(text: string, max: number, lines: number): string[] {
 const logoImage = (x: number, y: number, size: number, href: string) =>
   `<image x="${x}" y="${y}" width="${size}" height="${size}" preserveAspectRatio="xMidYMid meet" image-rendering="optimizeSpeed" href="${href}"/>`;
 
-const paidForText = (paid: YearOgPaidFor) => paid.lines.map((line) => line.text).join(' · ');
-
 function customer(c: number, y: number, year: number, who: string) {
   return [inverse(c, y, `SHIPPED IN ${year}`, 14), txt(c, y + 30, 'CUSTOMER', 10.5, { anchor: 'middle', opacity: 0.6 }), tall(c, y + 56, fit(who.toUpperCase(), 26), 15, { anchor: 'middle' })];
 }
@@ -319,10 +360,13 @@ export function yearCardSvg(data: YearOg): string {
     txt(72, 372, `${data.count} ${data.count === 1 ? 'thing' : 'things'} shipped`, 26, { fill: CREAM, opacity: 0.8 }),
   ];
   wrap(`“${data.note}”`, 44, 2).forEach((line, i) => left.push(txt(72, 424 + i * 26, line, 18, { fill: CREAM, opacity: 0.6 })));
-  left.push(txt(72, 536, 'This receipt was paid for by', 14, { fill: CREAM, opacity: 0.45 }));
-  if (data.paidFor.presented) left.push(txt(72, 564, fit(`PRESENTED BY ${data.paidFor.presented.toUpperCase()}`, 40), 18, { weight: 600, fill: CREAM }));
-  left.push(txt(72, data.paidFor.presented ? 590 : 566, fit(paidForText(data.paidFor).toUpperCase(), 46), 17, { weight: 600, fill: CREAM, opacity: 0.85 }));
-  left.push(txt(72, 632, 'Print yours: shipped.brytonzoz.com', 15, { fill: CREAM, opacity: 0.5 }));
+  const hero = data.sponsors[0];
+  if (hero) {
+    left.push(txt(72, 540, 'Sponsored by', 14, { fill: CREAM, opacity: 0.45 }));
+    left.push(txt(72, 568, fit(hero.name.toUpperCase(), 32), 18, { weight: 600, fill: CREAM }));
+    left.push(txt(72, 594, fit(`and ${data.sponsors.length - 1} more on the receipt`, 46), 15, { fill: CREAM, opacity: 0.6 }));
+  }
+  left.push(txt(72, 636, 'Print yours: shipped.brytonzoz.com', 15, { fill: CREAM, opacity: 0.5 }));
 
   const c = PAPER_W / 2;
   const body: string[] = [...header(c, data.date, data.number), ...customer(c, 180, data.year, data.who), rule(258)];
@@ -359,24 +403,7 @@ export function yearTallSvg(data: YearOg): string {
     y += 17;
   }
   y += 14;
-  const boxTop = y;
-  y += 22;
-  body.push(txt(c, y, 'THIS RECEIPT WAS PAID FOR BY', 10.5, { weight: 600, anchor: 'middle' }));
-  y += 24;
-  if (data.paidFor.presented) {
-    body.push(txt(c, y, 'PRESENTED BY', 10.5, { anchor: 'middle' }));
-    body.push(tall(c, y + 24, fit(data.paidFor.presented.toUpperCase(), 30), 13, { anchor: 'middle' }));
-    y += 44;
-  }
-  for (const line of data.paidFor.lines) {
-    if (line.logo) {
-      body.push(logoImage(c - 20, y - 12, 40, line.logo));
-      y += 38;
-    }
-    body.push(txt(c, y, fit(line.text.toUpperCase(), 36), 12.5, { weight: 600, anchor: 'middle' }));
-    y += 20;
-  }
-  body.push(`<rect x="28" y="${boxTop}" width="${PAPER_W - 56}" height="${y - boxTop}" fill="none" stroke="${INK}" stroke-width="1.5"/>`);
+  y = sponsorBlock(body, c, y, data.sponsors);
   y += 24;
   body.push(barcode(64, y, 272, 34, data.barcode));
   y += 56;

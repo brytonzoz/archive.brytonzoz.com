@@ -1,118 +1,71 @@
-// Sponsors on /shipped/: your name or logo in the "THIS RECEIPT PAID FOR BY" block on the Shipped receipts
-// people print and share (not on Bryton's own receipt page). Paid through Stripe (tax added at checkout),
-// approved by Bryton in /admin, then in the rotation for a fixed number of days. No impressions promised.
+// The sponsor block at the foot of every Shipped 2026 receipt, share image and mailed print: one hero slot on
+// top and a 3×3 grid of nine small slots. Each slot has a name (or 1-bit logo), a one-line call to action and
+// its own QR code to the sponsor's link.
+//
+// Fixed price, not an auction: every slot has one posted price, set by the server: $1 for a house ad, else
+// what the current holder paid plus $1. Paying it takes the slot. The holder keeps it until someone pays the
+// next price or the event ends; when the printer shuts off, whoever holds each slot keeps it forever in the
+// frozen archive. A sponsor who is taken over is refunded automatically for the time they lose: their payment
+// times (time left until close) / (time from going live until close). Takeovers stop an hour before close so
+// nobody can be sniped in the last seconds; a payment that arrives after that, or for a price that has since
+// moved, is refunded in full. Logos print only after a review; a slot taken down in review is refunded in full.
 
-export type SponsorTier = 'name' | 'logo' | 'header';
+export const SLOT_COUNT = 10;
+export const HERO_SLOT = 0;
 
-export type TierConfig = {
-  label: string;
-  cents: number;
-  /** Days in the rotation from approval. */
-  days: number;
-  /** Share of the rotation relative to other tiers (a logo line comes up 3× as often as a name line). */
-  weight: number;
-  /** Most at once (null: no limit). */
-  slots: number | null;
-  maxText: number;
-  /** Takes a link (shown rel="sponsored nofollow"). */
-  url: boolean;
-  logo: boolean;
-  blurb: string;
+export const BID_RULES = {
+  minCents: 100,
+  incrementCents: 100,
+  maxCents: 500_000,
+  /** Stripe's shortest checkout; checkouts in progress don't hold the slot. */
+  checkoutMinutes: 30,
+  /** No takeovers in the last hour before close. */
+  lockMinutes: 60,
 };
 
-export const SPONSOR_CONFIG = {
-  /** Lines in one receipt's PAID FOR BY block (the "presented by" slot is extra, at the top). */
-  footerLines: 3,
-  /** Unpaid checkouts stop holding a slot after this long. */
-  checkoutHoldMinutes: 60,
-  tiers: {
-    name: {
-      label: 'NAME LINE',
-      cents: 500,
-      days: 7,
-      weight: 1,
-      slots: null,
-      maxText: 32,
-      url: false,
-      logo: false,
-      blurb: 'Your name in the PAID FOR BY block on shared receipts, in rotation for 7 days.',
-    },
-    logo: {
-      label: 'LOGO LINE',
-      cents: 2500,
-      days: 7,
-      weight: 3,
-      slots: null,
-      maxText: 32,
-      url: true,
-      logo: true,
-      blurb: 'Your logo in 1-bit print with a link in the PAID FOR BY block, in rotation for 7 days.',
-    },
-    header: {
-      label: 'PRESENTED BY',
-      cents: 10000,
-      days: 7,
-      weight: 0,
-      slots: 1,
-      maxText: 28,
-      url: true,
-      logo: false,
-      blurb: '"Presented by" at the top of every shared receipt\'s PAID FOR BY block for 7 days. One at a time.',
-    },
-  } satisfies Record<SponsorTier, TierConfig>,
+/** Whether slots can still change hands at `now`. */
+export const takeoversOpen = (now: number, closesAt: number) => now < closesAt - BID_RULES.lockMinutes * 60_000;
+
+export const SLOT_LIMITS = {
+  hero: { name: 26, cta: 48 },
+  small: { name: 16, cta: 30 },
 };
 
-/** Shown when no paid sponsor is running: BRYTONZOZ.COM always, plus one rotating house line. */
-export const HOUSE_SPONSORS = {
-  main: { key: 'house:brytonzoz', text: 'BRYTONZOZ.COM', url: 'https://brytonzoz.com/' },
-  rotating: [
-    { key: 'house:mopkin', text: 'MOPKIN', url: 'https://mopkin.app/' },
-    { key: 'house:habituize', text: 'HABITUIZE', url: 'https://habituize.app/' },
-    { key: 'house:pocketfactory', text: 'POCKET FACTORY', url: 'https://getpocketfactory.com/' },
-  ],
-};
+export type HouseSlot = { slot: number; name: string; cta: string; url: string };
 
-export const SPONSOR_TIERS = Object.keys(SPONSOR_CONFIG.tiers) as SponsorTier[];
+/** Live and active work from data/shipped/businesses.json (never the maker's own site). */
+export const HOUSE_SLOTS: HouseSlot[] = [
+  { slot: 0, name: 'POCKET FACTORY', cta: 'Custom NFC tap cards for your business.', url: 'https://getpocketfactory.com/' },
+  { slot: 1, name: 'MOPKIN', cta: 'Snap your mess. Get one step.', url: 'https://mopkin.app/' },
+  { slot: 2, name: 'HABITUIZE', cta: 'Habits that survive missed days.', url: 'https://habituize.app/' },
+  { slot: 3, name: 'NONPARALLEL', cta: 'Music, merch, artist sites.', url: 'https://nonprllel.com/' },
+  { slot: 4, name: 'COVER ART', cta: 'Album covers, made to order.', url: 'https://nonprllel.com/' },
+  { slot: 5, name: 'PROFITSCANNER', cta: 'Scan thrift. Spot the flip.', url: 'https://getprofitscanner.com/' },
+  { slot: 6, name: 'ENTRELABZ', cta: 'Apps and sites in weeks.', url: 'https://entrelabz.com/' },
+  { slot: 7, name: 'EMBODY ELEGANCE', cta: 'Color analysis and styling.', url: 'https://embody-elegance.com/' },
+  { slot: 8, name: 'ZONOVA', cta: 'Med spa. Book online.', url: 'https://www.zonovaaesthetics.com/' },
+  { slot: 9, name: 'BEARADISE', cta: 'Smoky Mountain cabin. Book direct.', url: 'https://absolutebearadise.com/' },
+];
 
-export const isSponsorTier = (value: unknown): value is SponsorTier =>
-  typeof value === 'string' && (SPONSOR_TIERS as string[]).includes(value);
+export const isSlot = (value: unknown): value is number => Number.isInteger(value) && (value as number) >= 0 && (value as number) < SLOT_COUNT;
+export const slotLabel = (slot: number) => (slot === HERO_SLOT ? 'HERO' : `SLOT ${slot}`);
+export const limitsFor = (slot: number) => (slot === HERO_SLOT ? SLOT_LIMITS.hero : SLOT_LIMITS.small);
 
-export const priceCents = (tier: SponsorTier) => SPONSOR_CONFIG.tiers[tier].cents;
+/** The slot's posted price when its holder paid `currentCents` (0 for a house ad). */
+export const minimumBid = (currentCents: number) => Math.max(BID_RULES.minCents, currentCents + BID_RULES.incrementCents);
+export const slotPrice = minimumBid;
 
-/** Deterministic 0..1 from a seed, so a receipt shows the same sponsors for a given hour. */
-function seeded(seed: number) {
-  let t = seed >>> 0;
-  return () => {
-    t = (t + 0x6d2b79f5) >>> 0;
-    let r = Math.imul(t ^ (t >>> 15), 1 | t);
-    r ^= r + Math.imul(r ^ (r >>> 7), 61 | r);
-    return ((r ^ (r >>> 14)) >>> 0) / 4294967296;
-  };
+/** What an outbid sponsor gets back: their payment for the share of the run they lose, in whole cents. */
+export function proratedRefund(paidCents: number, liveAt: number, outbidAt: number, closesAt: number): number {
+  const run = closesAt - liveAt;
+  if (run <= 0 || outbidAt >= closesAt) return 0;
+  const left = Math.min(run, Math.max(0, closesAt - outbidAt));
+  return Math.max(0, Math.min(paidCents, Math.floor((paidCents * left) / run)));
 }
-
-/** Weighted pick without replacement: each pick's chance is proportional to its tier weight. */
-export function weightedPick<T extends { tier: SponsorTier }>(pool: T[], count: number, seed: number): T[] {
-  const random = seeded(seed);
-  const left = pool.filter((item) => SPONSOR_CONFIG.tiers[item.tier].weight > 0);
-  const out: T[] = [];
-  while (out.length < count && left.length) {
-    const total = left.reduce((sum, item) => sum + SPONSOR_CONFIG.tiers[item.tier].weight, 0);
-    let roll = random() * total;
-    let index = 0;
-    for (; index < left.length - 1; index++) {
-      roll -= SPONSOR_CONFIG.tiers[left[index].tier].weight;
-      if (roll < 0) break;
-    }
-    out.push(left.splice(index, 1)[0]);
-  }
-  return out;
-}
-
-export const houseLine = (seed: number) => HOUSE_SPONSORS.rotating[Math.floor(seeded(seed)() * HOUSE_SPONSORS.rotating.length)];
 
 export const LOGO_LIMITS = { maxBytes: 64_000, maxWidth: 384, maxHeight: 160 };
 
-// A short list on purpose: Bryton reviews every line before it prints.
+// A short list on purpose: every bid can be taken down from /admin.
 // Matched anywhere (even s-p-a-c-e-d out); short ones only as whole words so "Hitchcock" and "spice" pass.
 const BLOCKED_ANYWHERE = ['fuck', 'shit', 'cunt', 'nigg', 'faggot', 'retard', 'whore', 'porn', 'onlyfans', 'hitler'];
 const BLOCKED_WORDS = new Set([
@@ -129,9 +82,7 @@ export function hasBlockedWord(text: string): boolean {
 }
 
 const URL_LIKE = /(https?:|www\.|:\/\/|\b[a-z0-9-]+(\.|\(dot\)|\[dot\])(com|net|org|io|co|app|dev|xyz|gg|me|ai|so|sh|ly|to|us|uk|tv|link|site|shop|store)\b)/i;
-
-export type SponsorInput = { tier: SponsorTier; text: string; url?: string | null };
-export type SponsorCheck = { ok: true; text: string; url: string | null } | { ok: false; error: string };
+const PRINTABLE = /^[A-Za-z0-9\u00C0-\u024F .,'&!?+#@()\-_/:$%]+$/;
 
 export function cleanSponsorText(raw: string): string {
   return raw
@@ -141,35 +92,90 @@ export function cleanSponsorText(raw: string): string {
     .trim();
 }
 
-export function validateSponsor(input: SponsorInput): SponsorCheck {
-  const tier = SPONSOR_CONFIG.tiers[input.tier];
-  const text = cleanSponsorText(input.text ?? '');
-  if (text.length < 2) return { ok: false, error: 'Add at least 2 characters.' };
-  if (text.length > tier.maxText) return { ok: false, error: `Keep it to ${tier.maxText} characters.` };
-  if (!/^[A-Za-z0-9\u00C0-\u024F .,'&!?+#@()\-_/:]+$/.test(text)) return { ok: false, error: 'Letters, numbers and basic punctuation only.' };
-  if (URL_LIKE.test(text)) {
-    return { ok: false, error: tier.url ? 'Put the link in the link field, not the text.' : 'Name lines can’t include links or web addresses.' };
-  }
-  if (hasBlockedWord(text)) return { ok: false, error: 'That line won’t get approved. Try different words.' };
+// Scam and impersonation wording: a sponsor line on a stranger's receipt must never look like a giveaway,
+// a wallet prompt or a message from a payment company.
+const SCAM = /\b(air ?drops?|giveaways?|free (money|crypto|btc|eth|nft)|seed ?phrase|private ?key|recovery ?phrase|wallet ?connect|connect (your )?wallet|claim (your|now|free)|double your|verify (your )?(account|identity|wallet)|account (suspended|locked)|urgent|stripe|paypal|apple pay|google pay|cash ?app|venmo|zelle|irs|login|log in|sign in to|password|bitcoin|crypto|nft|forex|betting|casino|gambl\w*|loan|payday|viagra|cialis|escort)\b/i;
 
-  if (!tier.url || !input.url) return { ok: true, text, url: null };
-  const url = checkSponsorUrl(input.url);
-  if (!url) return { ok: false, error: 'Use a full https:// link to a public site.' };
-  if (hasBlockedWord(url)) return { ok: false, error: 'That link won’t get approved.' };
-  return { ok: true, text, url };
-}
+/** Link shorteners and redirectors hide where a QR code really goes. */
+const SHORTENERS = new Set([
+  'bit.ly', 'tinyurl.com', 't.co', 'goo.gl', 'ow.ly', 'is.gd', 'buff.ly', 'rebrand.ly', 'cutt.ly', 'shorturl.at', 'tiny.cc',
+  'rb.gy', 'lnkd.in', 'bl.ink', 'short.io', 'v.gd', 'qrco.de', 'linktr.ee', 'beacons.ai', 'l.ead.me', 'urlz.fr', 's.id',
+  'trib.al', 'dub.sh', 'shorturl.com', 'x.gd', 'clck.ru', 'adf.ly', 'bitly.com', 'tr.ee', 'msha.ke', 'snip.ly',
+]);
+/** TLDs that are mostly abuse in practice, and anonymous hosting/tunnels. */
+const RISKY_TLDS = new Set(['zip', 'mov', 'top', 'xyz', 'tk', 'ml', 'ga', 'cf', 'gq', 'click', 'country', 'kim', 'work', 'rest', 'fit', 'loan', 'win', 'bid', 'icu', 'cam', 'monster', 'support', 'onion', 'su', 'ru', 'cn']);
+const RISKY_HOST = /(^|\.)(ngrok(-free)?\.(io|app|dev)|trycloudflare\.com|workers\.dev|pages\.dev|vercel\.app|netlify\.app|glitch\.me|repl\.co|000webhostapp\.com|duckdns\.org|no-ip\.\w+|ddns\.net|blogspot\.com|weebly\.com|wixsite\.com|firebaseapp\.com|web\.app|herokuapp\.com|github\.io|gitlab\.io|sites\.google\.com|forms\.gle|docs\.google\.com|drive\.google\.com|dropbox\.com|mega\.nz|t\.me|telegram\.(me|org)|wa\.me|discord\.(gg|com))$/;
+/** Brand names that aren't the brand's own domain are impersonation. */
+const IMPERSONATED = /(paypal|stripe|apple|google|microsoft|metamask|coinbase|binance|amazon|chase|wellsfargo|bankofamerica|venmo|cashapp|irs|usps|fedex|ups|dhl|github|openai|anthropic|brytonzoz)/;
 
-export function checkSponsorUrl(raw: string): string | null {
-  const value = raw.trim();
-  if (value.length > 200) return null;
+export type UrlProblem = 'format' | 'https' | 'host' | 'shortener' | 'risky' | 'lookalike';
+
+export function sponsorUrlProblem(raw: string): { url: string } | { problem: UrlProblem } {
+  let value = raw.trim();
+  if (value.length > 200 || /[\s<>"'`\\]/.test(value)) return { problem: 'format' };
+  if (value && !/^[a-z][a-z0-9+.-]*:/i.test(value)) value = `https://${value}`;
   let url: URL;
   try {
     url = new URL(value);
   } catch {
-    return null;
+    return { problem: 'format' };
   }
-  if (url.protocol !== 'https:' || url.username || url.password || url.port) return null;
-  const host = url.hostname.toLowerCase();
-  if (!host.includes('.') || /^[\d.]+$/.test(host) || host.endsWith('.local') || host === 'localhost') return null;
-  return url.toString();
+  if (url.protocol !== 'https:') return { problem: 'https' };
+  if (url.username || url.password || url.port) return { problem: 'format' };
+  const host = url.hostname.toLowerCase().replace(/\.$/, '');
+  const labels = host.split('.');
+  const tld = labels[labels.length - 1];
+  if (labels.length < 2 || /^[\d.]+$/.test(host) || host.includes(':') || /^\[/.test(host) || /\.(local|localhost|internal|lan|home|arpa|test|invalid|example)$/.test(host) || host === 'localhost') {
+    return { problem: 'host' };
+  }
+  if (!/^[a-z]{2,24}$/.test(tld) || labels.some((label) => !/^[a-z0-9]([a-z0-9-]{0,61}[a-z0-9])?$/.test(label))) return { problem: 'host' };
+  if (labels.some((label) => label.startsWith('xn--'))) return { problem: 'lookalike' };
+  if (SHORTENERS.has(host) || SHORTENERS.has(labels.slice(-2).join('.'))) return { problem: 'shortener' };
+  if (RISKY_TLDS.has(tld) || RISKY_HOST.test(host)) return { problem: 'risky' };
+  const registrable = labels.slice(-2)[0];
+  const brand = host.match(IMPERSONATED)?.[1];
+  if (brand && registrable !== brand) return { problem: 'lookalike' };
+  if (/[?&](url|redirect|redirect_uri|next|dest|destination|goto|continue|return|returnto|r|u)=/i.test(url.search)) return { problem: 'risky' };
+  url.hash = '';
+  return { url: url.toString() };
+}
+
+export function checkSponsorUrl(raw: string): string | null {
+  const result = sponsorUrlProblem(raw);
+  return 'url' in result ? result.url : null;
+}
+
+export const hasScamWording = (text: string) => SCAM.test(text.normalize('NFKC'));
+
+const URL_MESSAGES: Record<UrlProblem, string> = {
+  format: 'A public https:// link.',
+  https: 'Links have to start with https://.',
+  host: 'A public website, please.',
+  shortener: 'Use the real link, not a shortener.',
+  risky: 'That host isn\u2019t accepted. Use your own domain.',
+  lookalike: 'That domain looks like another brand.',
+};
+
+export type BidInput = { slot: number; name: string; cta: string; url: string };
+export type BidCheck = { ok: true; name: string; cta: string; url: string } | { ok: false; field: 'name' | 'cta' | 'url'; error: string };
+
+/** The same checks in the sheet (as you type) and in the Worker (before checkout). */
+export function validateBid(input: BidInput): BidCheck {
+  const limits = limitsFor(input.slot);
+  const name = cleanSponsorText(input.name ?? '');
+  const cta = cleanSponsorText(input.cta ?? '');
+  if (name.length < 2) return { ok: false, field: 'name', error: 'Name it (2+ characters).' };
+  if (name.length > limits.name) return { ok: false, field: 'name', error: `${limits.name} characters max.` };
+  if (!PRINTABLE.test(name)) return { ok: false, field: 'name', error: 'Letters, numbers, basic punctuation.' };
+  if (URL_LIKE.test(name)) return { ok: false, field: 'name', error: 'The link goes in the link field.' };
+  if (hasBlockedWord(name) || hasScamWording(name)) return { ok: false, field: 'name', error: 'Try different words.' };
+  if (cta.length < 2) return { ok: false, field: 'cta', error: 'One line. What should people do?' };
+  if (cta.length > limits.cta) return { ok: false, field: 'cta', error: `${limits.cta} characters max.` };
+  if (!PRINTABLE.test(cta)) return { ok: false, field: 'cta', error: 'Letters, numbers, basic punctuation.' };
+  if (URL_LIKE.test(cta)) return { ok: false, field: 'cta', error: 'The QR code carries the link.' };
+  if (hasBlockedWord(cta) || hasScamWording(cta)) return { ok: false, field: 'cta', error: 'Try different words.' };
+  const checked = sponsorUrlProblem(input.url ?? '');
+  if (!('url' in checked)) return { ok: false, field: 'url', error: URL_MESSAGES[checked.problem] };
+  if (hasBlockedWord(checked.url) || hasScamWording(new URL(checked.url).hostname.replace(/[.-]/g, ' '))) return { ok: false, field: 'url', error: 'Try a different link.' };
+  return { ok: true, name, cta, url: checked.url };
 }

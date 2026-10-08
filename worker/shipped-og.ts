@@ -6,7 +6,8 @@ import plexRegular from './fonts/IBMPlexMono-Regular.ttf';
 import plexSemiBold from './fonts/IBMPlexMono-SemiBold.ttf';
 import { yearCardSvg, yearTallSvg, type YearOg } from '../lib/receipt-svg';
 import { receiptBarcodeUnits, receiptDate } from '../lib/shipped';
-import { itemDate, itemsShipped, receiptNumber, subjectLabel, RECEIPT_PATH, type PaidFor, type YearReceipt } from '../lib/shipped-year';
+import { qr } from '../lib/shipped-qr';
+import { itemDate, itemsShipped, receiptNumber, subjectLabel, QR_PATH, RECEIPT_PATH, type SponsorBlock, type YearReceipt } from '../lib/shipped-year';
 
 let ready: Promise<void> | null = null;
 
@@ -47,10 +48,10 @@ export async function decodePixels(svg: string): Promise<{ pixels: Uint8Array; w
 /** Turns a same-origin logo path into a data: URI the renderer can embed (null: leave the logo out). */
 export type LogoResolver = (path: string | null) => Promise<string | null>;
 
-async function yearOg(receipt: YearReceipt, paidFor: PaidFor, origin: string, logo: LogoResolver, maxItems: number): Promise<YearOg> {
+async function yearOg(receipt: YearReceipt, block: SponsorBlock, origin: string, logo: LogoResolver, maxItems: number): Promise<YearOg> {
   const items = receipt.items.slice(0, maxItems);
   const logos = await Promise.all(items.map((item) => logo(item.logo).catch(() => null)));
-  const sponsorLogos = await Promise.all(paidFor.lines.map((line) => logo(line.logo).catch(() => null)));
+  const sponsorLogos = await Promise.all(block.slots.map((slot) => logo(slot.logo).catch(() => null)));
   return {
     number: receiptNumber(receipt.id),
     year: receipt.year,
@@ -65,21 +66,19 @@ async function yearOg(receipt: YearReceipt, paidFor: PaidFor, origin: string, lo
     })),
     count: itemsShipped(receipt),
     note: receipt.note,
-    paidFor: {
-      presented: paidFor.presented?.text ?? null,
-      lines: paidFor.lines.map((line, i) => ({ text: line.text, logo: sponsorLogos[i] })),
-    },
+    // QR codes only ever point at our own /q/<key>, which checks the slot again before redirecting.
+    sponsors: block.slots.map((slot, i) => ({ name: slot.name, cta: slot.cta, logo: sponsorLogos[i], qr: qr(new URL(QR_PATH(slot.qr), origin).toString()) })),
     url: new URL(RECEIPT_PATH(receipt.id), origin).toString().replace(/^https?:\/\//, ''),
     barcode: receiptBarcodeUnits(`BZ${receiptNumber(receipt.id)}${receipt.year}`),
   };
 }
 
 /** The 1200×675 card for X. */
-export async function yearCardPng(receipt: YearReceipt, paidFor: PaidFor, origin: string, logo: LogoResolver) {
-  return renderPng(yearCardSvg(await yearOg(receipt, paidFor, origin, logo, 20)));
+export async function yearCardPng(receipt: YearReceipt, block: SponsorBlock, origin: string, logo: LogoResolver) {
+  return renderPng(yearCardSvg(await yearOg(receipt, block, origin, logo, 20)));
 }
 
 /** The whole receipt, tall, for downloading. */
-export async function yearTallPng(receipt: YearReceipt, paidFor: PaidFor, origin: string, logo: LogoResolver) {
-  return renderPng(yearTallSvg(await yearOg(receipt, paidFor, origin, logo, 30)));
+export async function yearTallPng(receipt: YearReceipt, block: SponsorBlock, origin: string, logo: LogoResolver) {
+  return renderPng(yearTallSvg(await yearOg(receipt, block, origin, logo, 30)));
 }

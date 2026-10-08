@@ -4,7 +4,7 @@
 // assets before this script runs (see run_worker_first).
 import { handleApi, type MetricsEnv } from './metrics';
 import { placeManualOrders, reconcileMerch, type MerchEnv } from './merch';
-import { handleShipped, handleShippedPage } from './shipped';
+import { handleShipped, handleShippedPage, shippedCron } from './shipped';
 import { handleShippedHost } from './shipped-host';
 import { handleStore } from './store';
 
@@ -137,5 +137,7 @@ export default {
     const db = { ...env, DB: env.DB };
     ctx.waitUntil(reconcileMerch(db).catch((error) => console.error('reconcile failed', error)));
     ctx.waitUntil(placeManualOrders(db).catch((error) => console.error('manual orders failed', error)));
+    // Once an hour: Shipped's retention (shipping addresses, emails) and old rate-limit rows.
+    if (new Date(_controller.scheduledTime).getUTCMinutes() < 10) ctx.waitUntil(shippedCron(env).catch((error) => console.error('shipped cron failed', error)));
   },
 } satisfies ExportedHandler<Env>;

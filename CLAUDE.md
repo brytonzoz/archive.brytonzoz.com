@@ -107,6 +107,15 @@ push, and give the owner the staging link from the PR comment once the Staging w
   both organizations, the albums), `/about/` (the plain-text bio AI answers quote), `/llms.txt` (app/llms.txt/route.ts)
   and the footer's one-line bio. Change the story there, never per page. `app/robots.ts` names the search and AI
   crawlers explicitly. Only state facts the owner has confirmed (no invented bio details or genres).
+- Shipped (`/shipped/`, hidden: noindex, never linked from nav, sitemap, llms.txt or JSON-LD): a receipt-printer machine
+ prints Bryton's "SHIPPED IN <year>" receipt (`components/shipped/BrytonReceipt.tsx`, from `data/shipped/businesses.json`),
+ then PRINT YOURS runs the same machine for any name, @handle, GitHub user or domain (`PrintYours.tsx`). The Worker
+ (`worker/shipped.ts`) gathers free sources (`worker/shipped-sources.ts`: GitHub, iTunes, HN, npm, Product Hunt with a
+ token, their site, optional crawlers), has Claude search and itemize them (`worker/shipped-ai.ts`; demo receipts
+ without `ANTHROPIC_API_KEY`), dithers logos into R2 and serves `/shipped/r/<id>/` with `og.png` and `receipt.png`.
+ Guardrails: Turnstile, per-IP limits, `SHIPPED_DAILY_CAP_USD` spend cap in D1, 7-day cache, takedowns in `/admin`.
+ Year: `SHIPPED_YEAR` (Worker) / `NEXT_PUBLIC_SHIPPED_YEAR` (build), default the current year. "PAID FOR BY" sponsor
+ lines (`lib/shipped-sponsors.ts`, Stripe test keys on staging) rotate on shared receipts; impressions are in `/admin`.
 - Metrics: `lib/analytics.ts` (anonymous, batched) -> `/api/e` in `worker/metrics.ts` -> D1 `brytonzoz-metrics`
   (`brytonzoz-metrics-staging` for staging; schema `worker/schema.sql`). The dashboard is `/admin`; its password is
   the `ADMIN_PASSWORD` repository secret, which both deploy workflows copy to the Worker. Never put it in code or chat.

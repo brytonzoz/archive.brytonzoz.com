@@ -3,7 +3,7 @@
   "version": "0.1.0",
   "private": true,
   "scripts": {
-    "media": "node scripts/build-media.mjs && node scripts/build-share-images.mjs && node --experimental-strip-types --no-warnings scripts/build-shipped-og.mjs",
+    "media": "node scripts/build-media.mjs && node scripts/build-share-images.mjs && node scripts/build-shipped-logos.mjs && node --experimental-strip-types --no-warnings scripts/build-shipped-og.mjs",
     "predev": "npm run media",
     "dev": "next dev",
     "prebuild": "npm run media",

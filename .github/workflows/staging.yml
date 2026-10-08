@@ -124,8 +124,8 @@ jobs:
           esac
           printf '%s' "$STRIPE_PUBLISHABLE_KEY" | npx wrangler secret put STRIPE_PUBLISHABLE_KEY --env staging
 
-      # /shipped "Print my receipt". SHIPPED_GITHUB_TOKEN is required (anonymous GitHub lookups from Cloudflare
-      # are rate-limited). The rest are optional on staging: without ANTHROPIC_API_KEY receipts print as a demo
+      # /shipped "Print my receipt". Set SHIPPED_GITHUB_TOKEN: anonymous GitHub lookups from Cloudflare are
+      # rate-limited now and then. The rest are optional on staging: without ANTHROPIC_API_KEY receipts print as a demo
       # (no AI), and without Turnstile keys staging uses Cloudflare's always-pass test keys.
       # Sponsor lines use the built-in sandbox here (no real money), so no payment secrets are needed.
       - name: Sync /shipped secrets
@@ -141,7 +141,7 @@ jobs:
             printf '%s' "$2" | npx wrangler secret put "$1" --env staging
           }
           sync ANTHROPIC_API_KEY "$ANTHROPIC_API_KEY" ANTHROPIC_API_KEY "receipts print as a demo without the AI"
-          sync GITHUB_TOKEN "$SHIPPED_GITHUB_TOKEN" SHIPPED_GITHUB_TOKEN "printing fails: Cloudflare shares its IPs, so anonymous GitHub lookups are rate-limited"
+          sync GITHUB_TOKEN "$SHIPPED_GITHUB_TOKEN" SHIPPED_GITHUB_TOKEN "printing can fail with github-busy: anonymous GitHub lookups share Cloudflare's IPs and its 60-an-hour limit"
           sync TURNSTILE_SITE_KEY "$TURNSTILE_SITE_KEY" TURNSTILE_SITE_KEY "staging uses Turnstile test keys"
           sync TURNSTILE_SECRET_KEY "$TURNSTILE_SECRET_KEY" TURNSTILE_SECRET_KEY "staging uses Turnstile test keys"
 

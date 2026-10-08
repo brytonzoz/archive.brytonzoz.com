@@ -17,7 +17,8 @@
   // Fonts for the receipts' preview images (worker/shipped-og.ts).
   "rules": [{ "type": "Data", "globs": ["**/*.ttf"], "fallthrough": true }],
   // SITE_ENV gates staging-only behavior (Stripe test keys only for sponsors, Turnstile test keys, AI-less demo prints).
-  "vars": { "SITE_ENV": "production", "SHIPPED_MODEL": "claude-haiku-5-5", "SHIPPED_DAILY_CAP_USD": "5", "SHIPPED_MAX_SEARCHES": "2" },
+  // ANTHROPIC_WORKSPACE_DEFAULT: /shipped's Claude workspace (an id, not a secret); a claude_workspace secret overrides it.
+  "vars": { "SITE_ENV": "production", "SHIPPED_MODEL": "claude-haiku-5-5", "SHIPPED_DAILY_CAP_USD": "5", "SHIPPED_MAX_SEARCHES": "2", "ANTHROPIC_WORKSPACE_DEFAULT": "wrkspc_015V5D4e1of8jhCEbcx6eP6W" },
   "r2_buckets": [
     { "binding": "MUSIC", "bucket_name": "brytonzoz-media" },
     // /shipped: printed receipts' preview images and sponsor logos (staged until approved).
@@ -40,7 +41,7 @@
       "routes": [],
       "workers_dev": true,
       "triggers": { "crons": [] },
-      "vars": { "SITE_ENV": "staging", "SHIPPED_MODEL": "claude-haiku-5-5", "SHIPPED_DAILY_CAP_USD": "1", "SHIPPED_MAX_SEARCHES": "2" },
+      "vars": { "SITE_ENV": "staging", "SHIPPED_MODEL": "claude-haiku-5-5", "SHIPPED_DAILY_CAP_USD": "1", "SHIPPED_MAX_SEARCHES": "2", "ANTHROPIC_WORKSPACE_DEFAULT": "wrkspc_015V5D4e1of8jhCEbcx6eP6W" },
       "r2_buckets": [
         { "binding": "MUSIC", "bucket_name": "brytonzoz-media" },
         { "binding": "SHIPPED", "bucket_name": "brytonzoz-shipped-staging" }

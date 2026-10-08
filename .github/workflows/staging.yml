@@ -146,8 +146,8 @@ jobs:
           }
           sync ANTHROPIC_API_KEY "$ANTHROPIC_KEY" "CLAUDE_KEY (repo secret)" "the Worker uses its own claude_key if set, else receipts print as a demo"
           sync TINYFISH_API_KEY "$TINYFISH_KEY" "TINYFISH (repo secret)" "the Worker uses its own tinyfish if set, else receipts skip TinyFish"
-          sync ANTHROPIC_WORKSPACE_ID "$CLAUDE_WORKSPACE" "CLAUDE_WORKSPACE (repo secret)" "that is fine unless the Claude key is a multi-workspace key"
-          sync GITHUB_TOKEN "$SHIPPED_GITHUB_TOKEN" SHIPPED_GITHUB_TOKEN "anonymous GitHub lookups share Cloudflare's IPs and a 60-an-hour limit"
+          sync ANTHROPIC_WORKSPACE_ID "$CLAUDE_WORKSPACE" "CLAUDE_WORKSPACE (repo secret)" "the Worker uses ANTHROPIC_WORKSPACE_DEFAULT from wrangler.jsonc"
+          sync GITHUB_TOKEN "$SHIPPED_GITHUB_TOKEN" SHIPPED_GITHUB_TOKEN "GitHub is read from its public pages (no token needed)"
           sync TURNSTILE_SITE_KEY "$TURNSTILE_SITE_KEY" TURNSTILE_SITE_KEY "staging uses Turnstile test keys"
           sync TURNSTILE_SECRET_KEY "$TURNSTILE_SECRET_KEY" TURNSTILE_SECRET_KEY "staging uses Turnstile test keys"
           sync STRIPE_SHIPPED_WEBHOOK_SECRET "$SHIPPED_WEBHOOK" STRIPE_TEST_SHIPPED_WEBHOOK_SECRET "(optional) refunds made in the Stripe dashboard don't remove /shipped lines"

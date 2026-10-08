@@ -114,8 +114,11 @@ push, and give the owner the staging link from the PR comment once the Staging w
  seeded tears and springs, `sound.ts` the opt-in synthesized clicks; share images in `lib/receipt-svg.ts`). The Worker
  (`worker/shipped.ts`) gathers free sources (`worker/shipped-sources.ts`: GitHub, iTunes, HN, npm, Product Hunt with a
  token, their site) plus TinyFish search/fetch (`worker/shipped-tinyfish.ts`, secret `tinyfish`/`TINYFISH`; only the
- free endpoints, guarded in code and metered per day in D1, never any paid TinyFish product). Claude (`claude_key`/
- `CLAUDE_KEY`, cheapest Haiku) only assembles the receipt (`worker/shipped-ai.ts`); its paid web search runs only when
+ free endpoints, guarded in code and metered per day in D1, never any paid TinyFish product). GitHub needs no token:
+ github.com's public profile, repositories tab and `.atom` feed, GitHub search read through TinyFish Fetch, and the
+ anonymous API only while its quota has room; all cached, and a GitHub failure never stops a receipt. Claude (`claude_key`/
+ `CLAUDE_KEY`, cheapest Haiku, workspace `ANTHROPIC_WORKSPACE_DEFAULT` in `wrangler.jsonc`, overridden by a
+ `claude_workspace` secret) only assembles the receipt (`worker/shipped-ai.ts`); its paid web search runs only when
  the free sources find under 2 items, max 2 searches. Without a key, receipts print as demos. A credit/billing error from
  Anthropic flips the machine to "OUT OF PAPER" globally (no retries; cached receipts and sharing keep working); clear it
  with "Paper restocked" in `/admin` once credits are added. Logos are dithered into R2; `/shipped/r/<id>/` serves

@@ -17,7 +17,6 @@ import {
   type PaidFor,
   type YearReceipt as Printed,
 } from '../../lib/shipped-year';
-import { Ticket } from './paper';
 import { YearReceipt } from './YearReceipt';
 
 export type Loaded = { receipt: Printed; paidFor: PaidFor };
@@ -29,54 +28,59 @@ const KICKER: Record<Printed['subject']['kind'], string> = {
   name: 'NAME',
 };
 
-export function VisitorReceipt({ receipt, paidFor, heading = 'h2' }: Loaded & { heading?: 'h1' | 'h2' }) {
+export function VisitorReceipt({ receipt, paidFor }: Loaded) {
   const who = subjectLabel(receipt.subject);
   const kicker = receipt.subject.kind === 'github' && receipt.subject.display !== who ? `@${receipt.subject.id} · GITHUB` : KICKER[receipt.subject.kind];
   return (
-    <Ticket label={`Shipped in ${receipt.year}: ${who}`}>
-      <YearReceipt
-        heading={heading}
-        year={receipt.year}
-        who={receipt.subject.kind === 'github' ? receipt.subject.display : who}
-        kicker={kicker}
-        date={receiptDate(receipt.printedAt)}
-        number={receiptNumber(receipt.id)}
-        items={receipt.items.map((item, i) => ({
-          key: `${i}-${item.name}`,
-          name: item.name,
-          status: item.status,
-          date: itemDate(item.date),
-          description: item.description,
-          href: item.link,
-          logo: item.logo ? { src: item.logo, width: 24, height: 24 } : null,
-        }))}
-        count={itemsShipped(receipt)}
-        note={receipt.note}
-        paidFor={paidFor}
-        barcode={`BZ${receiptNumber(receipt.id)}`}
-        fine={
-          <>
-            <p>
-              Made from public pages and APIs{receipt.demo ? ' (demo print: no AI on this server)' : ', itemized by AI'}. Only public, professional work.
-            </p>
-            <p className="mt-2 space-x-3">
-              <Link href={`/shipped/remove/?id=${receipt.id}`} className="shipped-link">
-                Not you? Remove this receipt
-              </Link>
-              <Link href="/shipped/#sponsor" className="shipped-link">
-                Sponsor this receipt
-              </Link>
-            </p>
-          </>
-        }
-      />
-    </Ticket>
+    <YearReceipt
+      year={receipt.year}
+      who={receipt.subject.kind === 'github' ? receipt.subject.display : who}
+      kicker={kicker}
+      date={receiptDate(receipt.printedAt)}
+      number={receiptNumber(receipt.id)}
+      items={receipt.items.map((item, i) => ({
+        key: `${i}-${item.name}`,
+        name: item.name,
+        status: item.status,
+        date: itemDate(item.date),
+        description: item.description,
+        href: item.link,
+        logo: item.logo ? { src: item.logo, width: 24, height: 24 } : null,
+      }))}
+      count={itemsShipped(receipt)}
+      note={receipt.note}
+      paidFor={paidFor}
+      barcode={`BZ${receiptNumber(receipt.id)}`}
+      fine={
+        <>
+          <p>
+            Made from public pages and APIs
+            {receipt.demo ? ' (demo print: no AI on this server)' : ', itemized by AI'}. Only public, professional work.
+          </p>
+          <p className="mt-2 space-x-3">
+            <Link href={`/shipped/remove/?id=${receipt.id}`} className="shipped-link">
+              Not you? Remove this receipt
+            </Link>
+            <Link href="/shipped/#sponsor" className="shipped-link">
+              Sponsor this receipt
+            </Link>
+          </p>
+        </>
+      }
+    />
   );
 }
 
 function beacon(id: number, how: string) {
-  const body = new Blob([JSON.stringify({ id, how })], { type: 'application/json' });
-  if (!navigator.sendBeacon?.('/api/shipped/shared', body)) fetch('/api/shipped/shared', { method: 'POST', body, keepalive: true }).catch(() => undefined);
+  const body = new Blob([JSON.stringify({ id, how })], {
+    type: 'application/json',
+  });
+  if (!navigator.sendBeacon?.('/api/shipped/shared', body))
+    fetch('/api/shipped/shared', {
+      method: 'POST',
+      body,
+      keepalive: true,
+    }).catch(() => undefined);
   track({ type: 'share', release: 'shipped', detail: how });
 }
 
@@ -91,11 +95,11 @@ export function ShareBar({ receipt }: { receipt: Printed }) {
         POST TO X
       </a>
       <div className="shipped-share-row">
-        <a href={`${CARD_PATH(receipt.id)}?download=1`} download className="shipped-button is-ghost" onClick={() => beacon(receipt.id, 'card')}>
-          DOWNLOAD IMAGE
+        <a href={`${CARD_PATH(receipt.id)}?download=1`} download className="shipped-button is-ghost" aria-label="Save the share card image" onClick={() => beacon(receipt.id, 'card')}>
+          SAVE CARD
         </a>
-        <a href={`${TALL_PATH(receipt.id)}?download=1`} download className="shipped-button is-ghost" onClick={() => beacon(receipt.id, 'tall')}>
-          FULL RECEIPT
+        <a href={`${TALL_PATH(receipt.id)}?download=1`} download className="shipped-button is-ghost" aria-label="Save the full receipt image" onClick={() => beacon(receipt.id, 'tall')}>
+          SAVE FULL
         </a>
         <button
           type="button"

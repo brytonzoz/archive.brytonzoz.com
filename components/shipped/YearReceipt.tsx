@@ -1,9 +1,11 @@
-// The "SHIPPED IN <year>" receipt layout. Bryton's own receipt on /shipped/ is drawn with it, and so is
-// every visitor's, so his is the template theirs follow (the share images in lib/receipt-svg.ts match it).
+// The "SHIPPED IN <year>" receipt. Bryton's own receipt on /shipped/ is printed with it, and so is every
+// visitor's, so his is the template theirs follow (the share images in lib/receipt-svg.ts match it).
+// Set like a real ESC/POS print: no letter-spacing, double-height for the store and the customer, one
+// inverse band, dotted leaders, and the PAID FOR BY box at the foot.
 import React from 'react';
 import Link from 'next/link';
 import type { PaidBy, PaidFor } from '../../lib/shipped-year';
-import { Barcode, ExternalLink, Line, Rule } from './paper';
+import { Barcode, ExternalLink, Line, Rule, Tall } from './paper';
 
 export type ViewItem = {
   key: string;
@@ -33,7 +35,6 @@ export type YearReceiptProps = {
   after?: React.ReactNode;
   /** Small print under the barcode. */
   fine?: React.ReactNode;
-  heading?: 'h1' | 'h2';
 };
 
 function ItemName({ item }: { item: ViewItem }) {
@@ -58,19 +59,23 @@ function Sponsor({ entry }: { entry: PaidBy }) {
   );
 }
 
-/** "THIS RECEIPT PAID FOR BY:" — on Bryton's receipt and every visitor's. */
+/** "THIS RECEIPT WAS PAID FOR BY": on Bryton's receipt and every visitor's. */
 export function PaidForBlock({ paidFor }: { paidFor: PaidFor }) {
   return (
-    <section className="mt-4 text-center" aria-label="This receipt paid for by">
-      <p className="text-[10.5px] tracking-[0.2em] text-[#1c1917]/60">THIS RECEIPT PAID FOR BY:</p>
+    <section className="shipped-paidby" aria-label="This receipt was paid for by">
+      <p className="shipped-paidby-head">THIS RECEIPT WAS PAID FOR BY</p>
       {paidFor.presented ? (
-        <p className="mt-1.5 text-[12.5px] font-semibold tracking-[0.12em]">
-          PRESENTED BY <Sponsor entry={paidFor.presented} />
+        <p className="mt-2 text-[11px]">
+          PRESENTED BY
+          <br />
+          <Tall className="mt-1 text-[15px] font-semibold">
+            <Sponsor entry={paidFor.presented} />
+          </Tall>
         </p>
       ) : null}
-      <ul className="mt-1.5 space-y-1.5">
+      <ul className="mt-2 space-y-2">
         {paidFor.lines.map((entry) => (
-          <li key={entry.key} className="text-[12px] font-semibold tracking-[0.08em]">
+          <li key={entry.key} className="text-[13px] font-semibold leading-snug">
             {entry.logo ? (
               // eslint-disable-next-line @next/next/no-img-element
               <img src={entry.logo} alt="" loading="lazy" className="shipped-logo mx-auto mb-1 max-h-12 w-auto max-w-[70%]" />
@@ -84,51 +89,62 @@ export function PaidForBlock({ paidFor }: { paidFor: PaidFor }) {
 }
 
 export function YearReceipt(props: YearReceiptProps) {
-  const Heading = props.heading ?? 'h2';
   return (
-    <article>
+    <article className="shipped-receipt">
       <header className="text-center">
-        <p className="text-[11px] font-semibold tracking-[0.32em] text-[#1c1917]/70">STORE RECEIPT</p>
-        <Heading className="mt-2 text-[21px] font-semibold leading-none tracking-[0.2em]">SHIPPED IN {props.year}</Heading>
-        <p className="mt-2 break-words text-[13.5px] font-semibold tracking-[0.18em]">{props.who.toUpperCase()}</p>
-        {props.kicker ? <p className="mt-0.5 text-[11px] tracking-[0.16em] text-[#1c1917]/70">{props.kicker}</p> : null}
+        <p>
+          <Tall className="text-[15px] font-semibold">BRYTONZOZ.COM</Tall>
+        </p>
+        <p className="mt-1 text-[11px] opacity-75">SHIPPED DEPT. · NEW YORK, NY</p>
       </header>
 
-      <div className="mt-4 space-y-1 text-[12px] tracking-[0.04em]">
+      <Rule />
+      <div className="space-y-0.5 text-[12px]">
         <Line label="DATE" value={props.date} />
         <Line label="RECEIPT" value={`#${props.number}`} />
+        <Line label="CASHIER" value="NIGHT SHIFT" />
       </div>
-      <div className="mt-3">
-        <Rule />
-      </div>
+      <Rule />
 
-      <p className="shipped-lead mt-2 text-[10px] tracking-[0.16em] text-[#1c1917]/55">
+      <h2 className="text-center">
+        <span className="shipped-inverse">SHIPPED IN {props.year}</span>
+        <span className="sr-only">: </span>
+        <span className="mt-3 block text-[11px] font-normal opacity-70" aria-hidden="true">
+          CUSTOMER
+        </span>
+        <span className="mt-0.5 block break-words">
+          <Tall className="text-[16px] font-semibold">{props.who.toUpperCase()}</Tall>
+        </span>
+      </h2>
+      {props.kicker ? <p className="mt-1 text-center text-[11px] opacity-70">{props.kicker}</p> : null}
+
+      <Rule />
+      <p className="shipped-lead text-[10.5px] opacity-60" aria-hidden="true">
         <span>ITEM</span>
-        <span className="shipped-lead-fill" aria-hidden="true" />
+        <span className="shipped-lead-fill is-blank" />
         <span>STATUS</span>
       </p>
       <ol className="mt-1">
         {props.items.map((item) => (
-          <li key={item.key} className="shipped-year-item border-b border-dashed border-[#1c1917]/20 py-2 last:border-b-0">
+          <li key={item.key} className="shipped-year-item">
             {item.logo ? (
               // eslint-disable-next-line @next/next/no-img-element
               <img src={item.logo.src} width={item.logo.width} height={item.logo.height} alt="" loading="lazy" decoding="async" className="shipped-item-logo shipped-logo mb-1" />
             ) : null}
             <div className="shipped-lead">
-              <h3 className="min-w-0 break-words text-[14px] font-semibold leading-snug">
+              <h3 className="min-w-0 break-words text-[13.5px] font-semibold leading-snug">
                 <ItemName item={item} />
               </h3>
               <span className="shipped-lead-fill" aria-hidden="true" />
-              <p className="shrink-0 text-[12px] font-semibold tracking-[0.12em]">
+              <p className="shrink-0 text-[12px] font-semibold">
                 <span className="sr-only">Status: </span>
                 {item.status}
               </p>
             </div>
             {item.date || item.description ? (
-              <p className="mt-0.5 text-[12px] leading-relaxed text-[#1c1917]/78">
-                {item.date ? <span className="tracking-[0.08em] text-[#1c1917]/60">{item.date}</span> : null}
-                {item.date && item.description ? ' · ' : null}
+              <p className="mt-0.5 text-[11.5px] leading-[1.45] opacity-80">
                 {item.description}
+                {item.date ? <span className="whitespace-nowrap opacity-75">{item.description ? '  ' : ''}{item.date}</span> : null}
               </p>
             ) : null}
           </li>
@@ -137,29 +153,31 @@ export function YearReceipt(props: YearReceiptProps) {
 
       {props.after}
 
-      <div className="mt-1">
-        <Rule heavy />
+      <Rule heavy />
+      <div className="shipped-lead items-end py-1 text-[13px] font-semibold">
+        <span>ITEMS SHIPPED</span>
+        <span className="shipped-lead-fill" aria-hidden="true" />
+        <Tall className="text-[18px] tabular-nums">{String(props.count)}</Tall>
       </div>
-      <div className="mt-2 text-[15px] font-semibold">
-        <Line label="ITEMS SHIPPED" value={String(props.count)} />
-      </div>
-      <div className="mt-2">
-        <Rule heavy />
-      </div>
+      <Rule heavy />
 
-      <p className="mt-4 text-center text-[12.5px] italic leading-relaxed text-[#1c1917]/85">“{props.note}”</p>
+      <section className="mt-3" aria-label="Cashier’s note">
+        <p className="text-[10.5px] opacity-60">CASHIER’S NOTE</p>
+        <p className="mt-1 text-[12.5px] leading-[1.5]">{props.note}</p>
+      </section>
 
       <PaidForBlock paidFor={props.paidFor} />
 
       <footer className="mt-4 text-center text-[11px] leading-relaxed">
-        <p className="tracking-[0.18em]">
+        <Barcode value={props.barcode} />
+        <p className="mt-2">
           PRINTED AT{' '}
           <Link href="/shipped/" className="shipped-link font-semibold">
             BRYTONZOZ.COM/SHIPPED
           </Link>
         </p>
-        <Barcode value={props.barcode} />
-        {props.fine ? <div className="mt-3 text-[10.5px] leading-relaxed text-[#1c1917]/60">{props.fine}</div> : null}
+        <p className="mt-1 opacity-60">*** CUSTOMER COPY ***</p>
+        {props.fine ? <div className="mt-3 text-[10.5px] leading-relaxed opacity-70">{props.fine}</div> : null}
       </footer>
     </article>
   );

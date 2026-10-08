@@ -1,22 +1,14 @@
-// Thermal-receipt building blocks shared by /shipped/'s master receipt, printed receipts and forms.
+// Thermal-receipt building blocks shared by /shipped/'s receipts and forms: torn paper, dotted leaders,
+// rules and the barcode. Every strip of paper tears differently, but the same strip always tears the same.
 import React from 'react';
 import { receiptBarcodeUnits } from '../../lib/shipped';
+import { paperClip, tornEdge } from './physics';
 
 export function Rule({ heavy = false }: { heavy?: boolean }) {
   return (
-    <p className="shipped-rule" aria-hidden="true">
+    <p className={`shipped-rule${heavy ? ' is-heavy' : ''}`} aria-hidden="true">
       {(heavy ? '=' : '-').repeat(64)}
     </p>
-  );
-}
-
-export function Serration({ flip = false }: { flip?: boolean }) {
-  const teeth = 28;
-  const points = Array.from({ length: teeth + 1 }, (_, i) => `${(i / teeth) * 400},${i % 2 === 0 ? 10 : 0}`).join(' ');
-  return (
-    <svg className={`shipped-serration${flip ? ' rotate-180' : ''}`} viewBox="0 0 400 10" preserveAspectRatio="none" aria-hidden="true">
-      <polygon points={`0,10 ${points} 400,10`} fill="currentColor" />
-    </svg>
   );
 }
 
@@ -25,9 +17,14 @@ export function Line({ label, value, className = '' }: { label: React.ReactNode;
     <div className={`shipped-lead ${className}`}>
       <span className="min-w-0">{label}</span>
       <span className="shipped-lead-fill" aria-hidden="true" />
-      <span className="shrink-0 tabular-nums tracking-wide">{value}</span>
+      <span className="shrink-0 tabular-nums">{value}</span>
     </div>
   );
+}
+
+/** ESC/POS double height: the same glyphs, stretched, the way receipt printers do headings. */
+export function Tall({ children, className = '' }: { children: React.ReactNode; className?: string }) {
+  return <span className={`shipped-tall ${className}`}>{children}</span>;
 }
 
 export function Barcode({ value }: { value: string }) {
@@ -36,21 +33,36 @@ export function Barcode({ value }: { value: string }) {
     <div className="mt-3">
       <div className="shipped-barcode" aria-hidden="true">
         {units.map((unit, index) => (
-          <span key={index} style={{ width: `${+(unit * 1.6).toFixed(1)}px`, background: index % 2 === 0 ? '#1c1917' : 'transparent' }} />
+          <span key={index} style={{ width: `${+(unit * 1.6).toFixed(1)}px`, background: index % 2 === 0 ? 'currentColor' : 'transparent' }} />
         ))}
       </div>
-      <p className="mt-1.5 text-center text-[10px] tracking-[0.28em] text-[#1c1917]/70">{value}</p>
+      <p className="mt-1.5 text-center text-[10px] tracking-[0.2em] opacity-70">{value}</p>
     </div>
   );
 }
 
-/** One strip of paper with torn edges. */
-export function Ticket({ children, id, label }: { children: React.ReactNode; id?: string; label?: string }) {
+export type TicketProps = {
+  children: React.ReactNode;
+  id?: string;
+  label?: string;
+  /** Picks the shape of the tears. Defaults to the label. */
+  seed?: string;
+  /** Which edges are torn (a strip still in the printer has a clean top). */
+  torn?: { top?: boolean; bottom?: boolean };
+  className?: string;
+  /** A narrower slip (forms, errors) instead of a full receipt. */
+  slip?: boolean;
+};
+
+/** One strip of thermal paper. */
+export function Ticket({ children, id, label, seed, torn = { top: true, bottom: true }, className = '', slip = false }: TicketProps) {
+  const key = seed ?? label ?? id ?? 'paper';
+  const clip = paperClip(torn.top ? tornEdge(`${key}:top`) : null, torn.bottom ? tornEdge(`${key}:bottom`) : null);
   return (
-    <section className="shipped-ticket" id={id} aria-label={label}>
-      <Serration />
-      <div className="shipped-paper font-medium">{children}</div>
-      <Serration flip />
+    <section className={`shipped-ticket${slip ? ' is-slip' : ''} ${className}`} id={id} aria-label={label}>
+      <div className="shipped-paper" style={{ clipPath: clip, WebkitClipPath: clip }}>
+        <div className="shipped-ink">{children}</div>
+      </div>
     </section>
   );
 }

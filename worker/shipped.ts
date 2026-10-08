@@ -476,6 +476,10 @@ async function print(request: Request, env: ShippedEnv, ctx: ExecutionContext): 
           await setOutOfCredit(db);
           return json({ error: 'out-of-paper' }, 503);
         }
+        if (error instanceof PrintError && !isProduction(env)) {
+          const g = gathered;
+          error.detail = `${error.detail ?? ''} | gathered: ran ${g.ran.join(',')}; failed ${g.failed.join(',') || 'none'}; ${g.found.length} found, ${g.web.length} web, ${g.pages.length} pages`;
+        }
         throw error;
       }
     }

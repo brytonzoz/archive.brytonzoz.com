@@ -5,14 +5,15 @@ import Link from 'next/link';
 import { ditherLogo, type DitheredLogo } from '../../lib/dither';
 import { money } from '../../lib/shipped-receipt';
 import { SPONSOR_CONFIG, SPONSOR_TIERS, priceCents, validateSponsor, type SponsorTier } from '../../lib/shipped-sponsors';
+import { receiptDate } from '../../lib/shipped';
 import { Line, Rule, Ticket } from './paper';
 import { refreshShippedState, useShippedState } from './state';
 import { Turnstile, type TurnstileHandle } from './Turnstile';
 
 const TEXT_LABEL: Record<SponsorTier, string> = {
   name: 'NAME ON THE LINE',
-  logo: 'NAME BESIDE THE LOGO',
-  header: 'SUPPORTED BY',
+  logo: 'NAME UNDER THE LOGO',
+  header: 'PRESENTED BY …',
 };
 
 const ERRORS: Record<string, string> = {
@@ -22,13 +23,11 @@ const ERRORS: Record<string, string> = {
   'checkout-failed': 'Checkout didn’t open. Try again.',
 };
 
-const pad = (n: number) => String(n).padStart(3, '0');
-
 type Bought = { status: string; text: string; totalCents: number | null; taxCents: number | null; receipt: string | null };
 
 const BOUGHT: Record<string, string> = {
-  pending: 'PAID. Your shout-out prints as soon as Bryton approves it. If it isn’t approved, you’re refunded in full automatically.',
-  printed: 'PAID AND PRINTED. Your shout-out is on the receipt.',
+  pending: 'PAID. Your line joins the PAID FOR BY rotation as soon as Bryton approves it. If it isn’t approved, you’re refunded in full automatically.',
+  printed: 'PAID AND APPROVED. Your line is in the PAID FOR BY rotation on shared receipts.',
   unpaid: 'Checkout didn’t finish, so nothing was charged.',
   closed: 'That checkout closed before it was paid. Nothing was charged.',
   refunded: 'This shout-out was refunded.',
@@ -71,8 +70,8 @@ export function SponsorDesk() {
     if (logo) URL.revokeObjectURL(logo.url);
   }, [logo]);
 
-  const roll = sponsors?.roll ?? 1;
-  const offers = sponsors?.tiers ?? SPONSOR_TIERS.map((t) => ({ tier: t, ...SPONSOR_CONFIG.tiers[t], cents: priceCents(t, roll), available: false }));
+  const offers = sponsors?.tiers ?? SPONSOR_TIERS.map((t) => ({ tier: t, ...SPONSOR_CONFIG.tiers[t], cents: priceCents(t), available: false }));
+  const fmt = (n: number | undefined) => (n === undefined ? '······' : n.toLocaleString('en-US'));
   const offer = offers.find((o) => o.tier === tier) ?? offers[0];
   const open = Boolean(sponsors?.open);
 
@@ -121,14 +120,19 @@ export function SponsorDesk() {
     <Ticket id="sponsor" label="Buy a supporter shout-out">
       <header className="text-center">
         <p className="text-[11px] font-semibold tracking-[0.32em] text-[#1c1917]/70">SUPPORTER DESK</p>
-        <h2 className="mt-2 text-[20px] font-semibold leading-none tracking-[0.2em]">BUY A SHOUT-OUT</h2>
+        <h2 className="mt-2 text-[20px] font-semibold leading-none tracking-[0.2em]">SPONSOR THE RECEIPTS</h2>
         <p className="mt-2 text-[12px] leading-relaxed text-[#1c1917]/75">
-          A supporter shout-out printed on the receipt, plus a downloadable receipt image.
+          Your name or logo in the THIS RECEIPT PAID FOR BY block on the Shipped receipts people print and share, plus a downloadable
+          supporter receipt.
         </p>
       </header>
       <div className="mt-3 space-y-1 text-[12px]">
-        <Line label={`ROLL ${pad(roll)}`} value={`${sponsors?.filled ?? 0}/${sponsors?.rollSize ?? SPONSOR_CONFIG.rollSize} LINES`} />
-        <Line label="HEADER SLOTS LEFT" value={`${sponsors?.headerSlotsLeft ?? SPONSOR_CONFIG.headerSlots}/${SPONSOR_CONFIG.headerSlots}`} />
+        <Line label="RECEIPTS PRINTED SO FAR" value={fmt(state?.printed)} />
+        <Line label="RECEIPTS SHARED SO FAR" value={fmt(state?.shared)} />
+        <Line
+          label="PRESENTED-BY SLOT"
+          value={sponsors?.presentedNextOpen ? `TAKEN · OPENS ${receiptDate(new Date(sponsors.presentedNextOpen).toISOString())}` : 'OPEN'}
+        />
       </div>
       <div className="mt-2">
         <Rule />
@@ -257,10 +261,10 @@ export function SponsorDesk() {
       </form>
 
       <p className="mt-4 text-center text-[10.5px] leading-relaxed text-[#1c1917]/60">
-        You’re buying a supporter shout-out printed on the receipt plus a downloadable receipt image. It isn’t a donation or
-        advertising: no traffic, clicks or impressions are promised, and links are marked sponsored. Nothing prints until Bryton
-        approves it; if it isn’t approved you’re refunded in full automatically. Prices step up with every roll of{' '}
-        {SPONSOR_CONFIG.rollSize}.{' '}
+        You’re buying a supporter shout-out: a place in the PAID FOR BY rotation on shared Shipped receipts (their pages and share
+        images) for {SPONSOR_CONFIG.tiers.name.days} days, plus a downloadable receipt image. Not on Bryton’s own receipt. The counts above
+        are what’s happened so far, not a promise: no traffic, clicks, views or impressions are guaranteed, and links are marked
+        sponsored. Nothing runs until Bryton approves it; if it isn’t approved you’re refunded in full automatically.{' '}
         <Link href="/shipped/refunds/" className="shipped-link">
           Refund policy
         </Link>

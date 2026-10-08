@@ -10,7 +10,6 @@ import {
 } from '../../lib/shipped';
 import { SHIPPED_ITEMS, SHIPPED_UPDATED } from '../../lib/shipped-data';
 import { Barcode, ExternalLink, Line, Rule, Ticket } from './paper';
-import { SponsorRoll } from './SponsorRoll';
 
 const GROUPS = yearGroups(SHIPPED_ITEMS);
 const COUNTS = shippedCounts(SHIPPED_ITEMS);
@@ -82,16 +81,17 @@ function YearDivider({ label, count }: { label: string; count: number }) {
   );
 }
 
-/** Bryton's master receipt: everything he started, in timeline order, from data/shipped/businesses.json. */
+/** Bryton's full archive: everything he started, in timeline order, with notes (data/shipped/businesses.json). */
 export function Receipt() {
   return (
-    <Ticket label="Shipped receipt">
+    <Ticket id="archive" label="The full archive">
       <article>
         <header className="text-center">
           <p className="text-[11px] font-semibold tracking-[0.32em] text-[#1c1917]/70">STORE RECEIPT</p>
           <p className="mt-2 text-[13px] font-semibold tracking-[0.22em]">BRYTON ZOZ</p>
           <p className="mt-0.5 text-[11px] tracking-[0.18em] text-[#1c1917]/75">NEW YORK · ARTIST / BUILDER</p>
-          <h1 className="mt-3 text-[22px] font-semibold leading-none tracking-[0.28em]">SHIPPED</h1>
+          <h2 className="mt-3 text-[22px] font-semibold leading-none tracking-[0.28em]">SHIPPED</h2>
+          <p className="mt-1 text-[11px] tracking-[0.24em] text-[#1c1917]/70">THE FULL ARCHIVE</p>
         </header>
 
         <div className="mt-4 space-y-1 text-[12px] tracking-[0.04em]">
@@ -119,8 +119,6 @@ export function Receipt() {
             </ol>
           </section>
         ))}
-
-        <SponsorRoll />
 
         <div className="mt-1">
           <Rule />
@@ -158,7 +156,7 @@ export function Receipt() {
           </p>
           <p className="mt-3 text-[12px]">
             <a href="#print" className="shipped-link font-semibold">
-              Print your own receipt ↓
+              Print your own receipt ↑
             </a>
           </p>
           <Barcode value={SHIPPED_BARCODE_VALUE} />

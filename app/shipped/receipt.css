@@ -223,6 +223,257 @@
   border-top: 1px dashed rgba(28, 25, 23, 0.5);
 }
 
+/* ---- The receipt printer (components/shipped/Machine.tsx). Motion is transform/opacity, plus a one-shot
+   stepped clip reveal for the print itself. ---- */
+
+.shipped-machine {
+  width: min(29rem, 100%);
+  margin: 0 auto;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+}
+
+.shipped-machine-body {
+  position: relative;
+  z-index: 2;
+  width: 100%;
+  border-radius: 22px 22px 12px 12px;
+  background: linear-gradient(180deg, #3a3633 0%, #23201e 55%, #181614 100%);
+  box-shadow:
+    inset 0 1px 0 rgba(255, 255, 255, 0.09),
+    inset 0 -2px 0 rgba(0, 0, 0, 0.6),
+    0 26px 44px rgba(0, 0, 0, 0.6);
+  padding: 14px 18px 16px;
+  color: #f3ead8;
+}
+
+.shipped-machine-top {
+  display: flex;
+  align-items: center;
+  gap: 0.6rem;
+  font-size: 10px;
+  letter-spacing: 0.22em;
+}
+
+.shipped-led {
+  flex: none;
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background: #30d158;
+  box-shadow: 0 0 8px #30d158;
+}
+
+.is-feeding .shipped-led,
+.is-printing .shipped-led {
+  background: #ff9f0a;
+  box-shadow: 0 0 8px #ff9f0a;
+  animation: shipped-blink 0.9s steps(2, jump-none) infinite;
+}
+
+.shipped-machine-brand {
+  opacity: 0.55;
+  white-space: nowrap;
+}
+
+.shipped-machine-display {
+  margin-left: auto;
+  max-width: 62%;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  border-radius: 4px;
+  background: #0b170d;
+  box-shadow: inset 0 1px 3px rgba(0, 0, 0, 0.85);
+  padding: 3px 8px;
+  font-size: 10.5px;
+  letter-spacing: 0.12em;
+  color: #9ef0a8;
+}
+
+.shipped-machine-slot {
+  margin: 12px 8px 0;
+  height: 10px;
+  border-radius: 5px;
+  background: #050505;
+  box-shadow:
+    inset 0 3px 4px rgba(0, 0, 0, 0.9),
+    0 1px 0 rgba(255, 255, 255, 0.07);
+}
+
+/* The paper comes out from under the slot. */
+.shipped-machine-out {
+  position: relative;
+  z-index: 1;
+  width: calc(100% - 2.5rem);
+  margin-top: -16px;
+}
+
+.shipped-machine-paper {
+  transform-origin: 50% 0;
+  animation: shipped-print var(--print-ms, 3600ms) steps(56, end) both;
+}
+
+.is-tearing .shipped-machine-paper,
+.is-torn .shipped-machine-paper {
+  transform: translateY(22px) rotate(-1.1deg);
+  transition: transform 520ms cubic-bezier(0.2, 1.5, 0.4, 1);
+}
+
+.shipped-machine-stub {
+  height: 64px;
+  margin: 0 auto;
+  width: min(26.5rem, 100%);
+  background: #f3ead8;
+  clip-path: polygon(0 0, 100% 0, 100% 100%, 95% 88%, 90% 100%, 85% 88%, 80% 100%, 75% 88%, 70% 100%, 65% 88%, 60% 100%, 55% 88%, 50% 100%, 45% 88%, 40% 100%, 35% 88%, 30% 100%, 25% 88%, 20% 100%, 15% 88%, 10% 100%, 5% 88%, 0 100%);
+  animation: shipped-feed 0.42s steps(2, jump-none) infinite alternate;
+}
+
+@keyframes shipped-print {
+  from {
+    clip-path: inset(0 -60px 100% -60px);
+  }
+  to {
+    clip-path: inset(0 -60px -90px -60px);
+  }
+}
+
+@keyframes shipped-feed {
+  from {
+    transform: translateY(0);
+  }
+  to {
+    transform: translateY(5px);
+  }
+}
+
+@keyframes shipped-blink {
+  from {
+    opacity: 1;
+  }
+  to {
+    opacity: 0.25;
+  }
+}
+
+@keyframes shipped-pop {
+  0% {
+    transform: translateY(14px) scale(0.98);
+  }
+  60% {
+    transform: translateY(-4px) scale(1.01);
+  }
+  100% {
+    transform: none;
+  }
+}
+
+/* PRINT YOURS bounces once when Bryton's receipt tears off. */
+.shipped-cta {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 2.5rem;
+  width: 100%;
+  scroll-margin-top: 1.5rem;
+}
+
+.shipped-cta.is-ready > .shipped-ticket {
+  animation: shipped-pop 460ms cubic-bezier(0.2, 1.4, 0.4, 1) both;
+}
+
+/* What to do with a receipt once it's torn off. */
+.shipped-after {
+  width: min(26.5rem, 100%);
+  margin-top: -1rem;
+  transition:
+    opacity 300ms ease-out,
+    transform 300ms ease-out;
+}
+
+/* Sharing stays on screen while the receipt scrolls by. The layout's overflow-x-hidden wrapper would be the
+   sticky container; clip hides the same overflow without becoming one. */
+.overflow-x-hidden:has(.shipped-page) {
+  overflow-x: clip;
+}
+
+.shipped-after.is-ready {
+  position: sticky;
+  bottom: max(0.75rem, env(safe-area-inset-bottom));
+  z-index: 5;
+  padding: 0.5rem;
+  border-radius: 12px;
+  background: rgba(12, 11, 10, 0.97);
+  box-shadow: 0 -10px 30px rgba(0, 0, 0, 0.45);
+}
+
+.shipped-after:not(.is-ready) {
+  opacity: 0;
+  transform: translateY(8px);
+  pointer-events: none;
+}
+
+.shipped-share {
+  display: flex;
+  flex-direction: column;
+  gap: 0.55rem;
+  color: #f3ead8;
+}
+
+.shipped-button.is-big {
+  min-height: 3.5rem;
+  background: #f3ead8;
+  color: #1c1917;
+  font-size: 16px;
+  letter-spacing: 0.24em;
+}
+
+.shipped-share-row {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 0.5rem;
+}
+
+.shipped-share-row .shipped-button {
+  padding: 0.5rem 0.35rem;
+  font-size: 11px;
+  letter-spacing: 0.12em;
+}
+
+.shipped-recent {
+  width: min(40rem, 100%);
+}
+
+.shipped-recent-list {
+  display: flex;
+  gap: 0.6rem;
+  overflow-x: auto;
+  padding: 0.75rem 0.25rem;
+  scroll-snap-type: x mandatory;
+}
+
+.shipped-recent-stub {
+  display: block;
+  width: 9.5rem;
+  border-radius: 2px;
+  background: #f3ead8;
+  color: #1c1917;
+  padding: 0.6rem 0.7rem;
+  text-decoration: none;
+  scroll-snap-align: start;
+  transition: transform 150ms ease-out;
+}
+
+.shipped-recent-stub:hover {
+  transform: translateY(-3px);
+}
+
+.shipped-recent-stub:focus-visible {
+  outline: 2px solid #f3ead8;
+  outline-offset: 2px;
+}
+
 @media (prefers-reduced-motion: reduce) {
   .shipped-choice,
   .shipped-button {
@@ -231,5 +482,23 @@
 
   .shipped-ticket {
     filter: drop-shadow(0 8px 16px rgba(0, 0, 0, 0.4));
+  }
+
+  .shipped-machine-paper,
+  .shipped-led,
+  .shipped-machine-stub,
+  .shipped-cta.is-ready > .shipped-ticket {
+    animation: none !important;
+  }
+
+  .shipped-machine-paper {
+    clip-path: none;
+  }
+
+  .is-tearing .shipped-machine-paper,
+  .is-torn .shipped-machine-paper,
+  .shipped-after,
+  .shipped-recent-stub {
+    transition: none;
   }
 }

@@ -36,34 +36,36 @@ export default function RefundsPage() {
 
         <Section title="WHAT YOU’RE BUYING">
           <p>
-            A supporter shout-out printed on the receipt at brytonzoz.com/shipped, plus a downloadable image of your supporter
-            receipt. It isn’t a donation or advertising: no traffic, clicks, impressions or search ranking are promised, and links are
-            marked sponsored. There’s no goal it funds and there are no prizes. Roll 1 prices, before tax:
+            A supporter shout-out: your name or logo in the THIS RECEIPT PAID FOR BY block on the Shipped receipts people print and
+            share at brytonzoz.com/shipped (their pages and share images), plus a downloadable image of your supporter receipt. Lines
+            rotate, so each receipt shows a few of the running lines at a time. It isn’t on Bryton’s own receipt. It isn’t a donation or
+            advertising: no traffic, clicks, views, impressions or search ranking are promised, and links are marked sponsored. There’s
+            no goal it funds and there are no prizes. Prices, before tax:
           </p>
           <div className="space-y-1">
             {SPONSOR_TIERS.map((tier) => (
-              <Line key={tier} label={SPONSOR_CONFIG.tiers[tier].label} value={money(SPONSOR_CONFIG.tiers[tier].baseCents)} />
+              <Line key={tier} label={`${SPONSOR_CONFIG.tiers[tier].label} · ${SPONSOR_CONFIG.tiers[tier].days} DAYS`} value={money(SPONSOR_CONFIG.tiers[tier].cents)} />
             ))}
           </div>
           <p>
-            Each roll holds {SPONSOR_CONFIG.rollSize} lines. When one fills up it’s archived and the next roll’s prices step up. A HEADER
-            runs for {SPONSOR_CONFIG.headerDays} days from approval, with up to {SPONSOR_CONFIG.headerSlots} at a time.
+            Each line runs for {SPONSOR_CONFIG.tiers.name.days} days from approval. PRESENTED BY is one sponsor at a time; if it’s taken,
+            yours starts when the current one ends.
           </p>
         </Section>
 
         <Section title="REVIEW FIRST">
           <p>
             Every shout-out is reviewed by hand before it prints. If it isn’t approved, you’re refunded in full (tax included)
-            automatically to the way you paid. Nothing shows on the site until it’s approved, and a refunded shout-out comes off the
-            receipt.
+            automatically to the way you paid. Nothing shows on the site until it’s approved, and a refunded shout-out comes out of the
+            rotation.
           </p>
         </Section>
 
         <Section title="AFTER IT PRINTS">
           <p>
             Approved lines are final. If a line is taken down because it breaks the rules (hate, adult content, scams, impersonation,
-            anything illegal, or a link that changes into one of those), there’s no refund. If it’s taken down for any other reason, or a
-            HEADER can’t run its full {SPONSOR_CONFIG.headerDays} days, you’re refunded in full.
+            anything illegal, or a link that changes into one of those), there’s no refund. If it’s taken down for any other reason, or it can’t run its
+            full {SPONSOR_CONFIG.tiers.name.days} days, you’re refunded in full.
           </p>
         </Section>
 

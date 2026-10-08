@@ -8,8 +8,8 @@ export const dynamic = 'force-static';
 // The shell for every /shipped/r/<id>/ page. worker/shipped.ts serves it with this receipt's title,
 // description, preview image and data swapped in, so every tag below needs to exist to be rewritten.
 const TITLE = 'A printed receipt | Shipped';
-const DESCRIPTION = 'A GitHub profile, itemized. Printed at brytonzoz.com/shipped.';
-const ALT = 'A printed receipt itemizing a GitHub profile';
+const DESCRIPTION = 'Everything they shipped this year, itemized. Printed at brytonzoz.com/shipped.';
+const ALT = 'A printed receipt: what someone shipped this year, one line per item';
 
 export const metadata: Metadata = {
   title: { absolute: TITLE },
@@ -21,7 +21,7 @@ export const metadata: Metadata = {
     url: '/shipped/r/',
     siteName: 'Bryton Zoz',
     type: 'website',
-    images: [{ url: SHIPPED_OG_IMAGE, width: 1200, height: 630, alt: ALT }],
+    images: [{ url: SHIPPED_OG_IMAGE, width: 1200, height: 675, alt: ALT }],
   },
   twitter: {
     card: 'summary_large_image',

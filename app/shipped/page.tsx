@@ -1,15 +1,17 @@
 import React from 'react';
 import type { Metadata } from 'next';
-import { PrintForm } from '../../components/shipped/PrintForm';
+import { BrytonReceipt } from '../../components/shipped/BrytonReceipt';
+import { RecentStrip } from '../../components/shipped/RecentStrip';
 import { Receipt } from '../../components/shipped/Receipt';
+import { ShippedHero } from '../../components/shipped/ShippedHero';
 import { SponsorDesk } from '../../components/shipped/SponsorDesk';
 import { SHIPPED_OG_IMAGE } from '../../lib/shipped';
+import { SITE_YEAR } from '../../lib/shipped-year';
 
 export const dynamic = 'force-static';
 
-const TITLE = 'Shipped';
-const DESCRIPTION =
-  'Every business, app and site Bryton Zoz has started since 2020, itemized on one receipt: what is live, what is a prototype, and what died.';
+const TITLE = `Shipped in ${SITE_YEAR}`;
+const DESCRIPTION = `Everything Bryton Zoz shipped in ${SITE_YEAR}, itemized on a receipt. Print yours: everything you shipped this year, on one receipt.`;
 
 export const metadata: Metadata = {
   title: { absolute: `${TITLE} — Bryton Zoz` },
@@ -54,9 +56,12 @@ export const metadata: Metadata = {
 export default function ShippedPage() {
   return (
     <>
-      <Receipt />
-      <PrintForm />
+      <ShippedHero duration={5200}>
+        <BrytonReceipt />
+      </ShippedHero>
+      <RecentStrip />
       <SponsorDesk />
+      <Receipt />
     </>
   );
 }

@@ -1,11 +1,13 @@
 'use client';
 
 import React, { useCallback, useEffect, useState } from 'react';
-import { money, receiptNumber } from '../../lib/shipped-receipt';
+import { money } from '../../lib/shipped-receipt';
+import { receiptNumber } from '../../lib/shipped-year';
 import { SPONSOR_CONFIG, type SponsorTier } from '../../lib/shipped-sponsors';
 
-// /shipped in /admin: the sponsor-line moderation queue (nothing prints until approved here; reject
-// refunds automatically), printed receipts (hide one to take it and its share page down), and AI spend.
+// /shipped in /admin: the sponsor-line moderation queue (nothing runs until approved here; reject
+// refunds automatically), takedown requests, sponsor impressions, printed receipts (hide one to take it
+// and its share page down), and AI spend.
 
 type Line = {
   id: number;
@@ -23,14 +25,33 @@ type Line = {
   paid_at: number | null;
   ends_at: number | null;
 };
-type PrintedRow = { id: number; login: string; mode: string; demo: number; hidden: number; cost_micros: number | null; created_at: number };
-type SpendRow = { day: string; receipts: number; failures: number; input_tokens: number; output_tokens: number; cost_micros: number };
+type PrintedRow = {
+  id: number;
+  login: string;
+  mode: string;
+  demo: number;
+  hidden: number;
+  listed: number;
+  shares: number;
+  views: number;
+  searches: number | null;
+  cost_micros: number | null;
+  created_at: number;
+};
+type SpendRow = { day: string; receipts: number; failures: number; input_tokens: number; output_tokens: number; searches?: number; cost_micros: number };
+type Takedown = { id: number; receipt_id: number; subject_key: string; reason: string | null; created_at: number; login: string | null };
+type Impression = { sponsor: string; label: string; card: number; tall: number; page: number };
 type Data = {
   provider: { id: string; live: boolean } | null;
   generator: { enabled: boolean; demo: boolean; reason: string | null };
   model: string;
+  maxSearches: number;
   capUsd: number;
   printed: number;
+  shared: number;
+  views: number;
+  takedowns: Takedown[];
+  impressions: Impression[];
   pending: Line[];
   lines: Line[];
   receipts: PrintedRow[];
@@ -130,7 +151,10 @@ export function ShippedCard({ password }: { password: string }) {
     <section className="rounded-[20px] bg-[#1a1a1c] p-5 ring-1 ring-inset ring-white/[0.06]">
       <h2 className="text-[17px] font-semibold tracking-[-0.01em]">Shipped</h2>
       <p className="mt-0.5 text-[13px] text-white/45">
-        Print my receipt: {generator} · {data.printed.toLocaleString()} printed · today {usd(today?.cost_micros ?? 0)} of ${data.capUsd.toFixed(2)}
+        Shipped receipts: {generator} · up to {data.maxSearches} web searches each · {data.printed.toLocaleString()} printed ·{' '}
+        {data.shared.toLocaleString()} shared · {data.views.toLocaleString()} page views · today {usd(today?.cost_micros ?? 0)} of $
+        {data.capUsd.toFixed(2)}
+        {today?.receipts ? ` (${usd(Math.round(today.cost_micros / today.receipts))} a receipt)` : ''}
         <br />
         Sponsor checkout: {data.provider ? `${data.provider.id}${data.provider.live ? '' : ' (test, no real money)'}` : 'closed (no payment provider)'}
       </p>
@@ -150,7 +174,7 @@ export function ShippedCard({ password }: { password: string }) {
                   {SPONSOR_CONFIG.tiers[line.tier].label} · {money(line.amount_cents)}
                 </span>
                 <span className="text-[12px] text-white/50">
-                  #{line.id} · roll {line.roll} · paid {when(line.paid_at)}
+                  #{line.id} · paid {when(line.paid_at)}
                 </span>
               </div>
               <p className="mt-1 break-words text-[15px] text-white">{line.text}</p>
@@ -194,8 +218,8 @@ export function ShippedCard({ password }: { password: string }) {
               <li key={line.id} className="flex items-center gap-3 text-[13px]">
                 <span className="min-w-0 flex-1 truncate text-white/85">
                   {line.line_no ? `${String(line.line_no).padStart(3, '0')} · ` : ''}
-                  {line.text} <span className="text-white/45">· {SPONSOR_CONFIG.tiers[line.tier].label} · roll {line.roll}</span>
-                  {line.tier === 'header' && line.ends_at ? <span className="text-white/45"> · until {when(line.ends_at)}</span> : null}
+                  {line.text} <span className="text-white/45">· {SPONSOR_CONFIG.tiers[line.tier].label}</span>
+                  {line.ends_at ? <span className="text-white/45"> · until {when(line.ends_at)}</span> : null}
                   {line.note ? <span className="text-[#ffb340]"> · {line.note}</span> : null}
                 </span>
                 <Chip status={line.status} />
@@ -205,13 +229,81 @@ export function ShippedCard({ password }: { password: string }) {
         </>
       ) : null}
 
+      <h3 className="mt-5 text-[14px] font-semibold">Takedown requests ({data.takedowns.length})</h3>
+      {data.takedowns.length ? (
+        <ul className="mt-2 space-y-3">
+          {data.takedowns.map((request) => (
+            <li key={request.id} className="rounded-[14px] bg-white/[0.04] p-3 text-[13px]">
+              <a href={`/shipped/r/${request.receipt_id}/`} target="_blank" rel="noopener noreferrer" className="font-semibold text-white/90 underline">
+                #{receiptNumber(request.receipt_id)} {request.login ?? request.subject_key}
+              </a>
+              <span className="text-white/45"> · {request.subject_key} · {when(request.created_at)}</span>
+              {request.reason ? <p className="mt-1 break-words text-white/80">“{request.reason}”</p> : null}
+              <div className="mt-2 flex gap-2">
+                <button
+                  type="button"
+                  disabled={busy === request.id}
+                  onClick={() => window.confirm(`Remove every receipt for ${request.subject_key} and stop it printing again?`) && act('remove-takedown', request.id)}
+                  className="h-8 rounded-full bg-[#ff453a] px-3 text-[12px] font-semibold text-white disabled:opacity-50"
+                >
+                  Remove and block
+                </button>
+                <button
+                  type="button"
+                  disabled={busy === request.id}
+                  onClick={() => act('dismiss-takedown', request.id)}
+                  className="h-8 rounded-full bg-white/[0.08] px-3 text-[12px] font-semibold text-white/75 hover:bg-white/[0.12] disabled:opacity-50"
+                >
+                  Dismiss
+                </button>
+              </div>
+            </li>
+          ))}
+        </ul>
+      ) : (
+        <p className="mt-1 text-[13px] text-white/50">None.</p>
+      )}
+
+      {data.impressions.length ? (
+        <>
+          <h3 className="mt-5 text-[14px] font-semibold">PAID FOR BY impressions, last 30 days</h3>
+          <p className="text-[12px] text-white/45">Share images drawn (X cards, full receipts) and share-page views. For your own records; never promised to sponsors.</p>
+          <table className="mt-2 w-full text-left text-[13px] tabular-nums">
+            <thead className="text-white/45">
+              <tr>
+                <th className="py-1 font-normal">Line</th>
+                <th className="py-1 text-right font-normal">Cards</th>
+                <th className="py-1 text-right font-normal">Receipts</th>
+                <th className="py-1 text-right font-normal">Pages</th>
+              </tr>
+            </thead>
+            <tbody className="text-white/80">
+              {data.impressions.map((row) => (
+                <tr key={row.sponsor} className="border-t border-white/[0.06]">
+                  <td className="py-1">{row.label}</td>
+                  <td className="py-1 text-right">{row.card}</td>
+                  <td className="py-1 text-right">{row.tall}</td>
+                  <td className="py-1 text-right">{row.page}</td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </>
+      ) : null}
+
       <h3 className="mt-5 text-[14px] font-semibold">Printed receipts</h3>
       {data.receipts.length ? (
         <ul className="mt-2 space-y-2">
           {data.receipts.map((receipt) => (
             <li key={receipt.id} className="flex items-center gap-3 text-[13px]">
               <a href={`/shipped/r/${receipt.id}/`} target="_blank" rel="noopener noreferrer" className={`min-w-0 flex-1 truncate ${receipt.hidden ? 'text-white/40 line-through' : 'text-white/85'}`}>
-                #{receiptNumber(receipt.id)} @{receipt.login} <span className="text-white/45">· {receipt.mode}{receipt.demo ? ' · demo' : ''} · {usd(receipt.cost_micros ?? 0)} · {when(receipt.created_at)}</span>
+                #{receiptNumber(receipt.id)} {receipt.login}{' '}
+                <span className="text-white/45">
+                  · {receipt.mode}
+                  {receipt.demo ? ' · demo' : ''}
+                  {receipt.listed ? ' · listed' : ''} · {usd(receipt.cost_micros ?? 0)}
+                  {receipt.searches ? ` · ${receipt.searches} searches` : ''} · {receipt.shares} shares · {receipt.views} views · {when(receipt.created_at)}
+                </span>
               </a>
               <button
                 type="button"
@@ -219,7 +311,7 @@ export function ShippedCard({ password }: { password: string }) {
                 onClick={() =>
                   receipt.hidden
                     ? act('show-receipt', receipt.id)
-                    : window.confirm(`Take down @${receipt.login}’s receipt? It also stops new prints for that username.`) && act('hide-receipt', receipt.id)
+                    : window.confirm(`Take down ${receipt.login}’s receipt? It also stops new prints for that name.`) && act('hide-receipt', receipt.id)
                 }
                 className="h-8 shrink-0 rounded-full bg-white/[0.08] px-3 text-[12px] font-semibold text-white/75 hover:bg-white/[0.12] disabled:opacity-50"
               >
@@ -242,6 +334,7 @@ export function ShippedCard({ password }: { password: string }) {
                 <th className="py-1 font-normal">Printed</th>
                 <th className="py-1 font-normal">Failed</th>
                 <th className="py-1 font-normal">Tokens in / out</th>
+                <th className="py-1 font-normal">Searches</th>
                 <th className="py-1 text-right font-normal">Cost</th>
               </tr>
             </thead>
@@ -254,6 +347,7 @@ export function ShippedCard({ password }: { password: string }) {
                   <td className="py-1">
                     {row.input_tokens.toLocaleString()} / {row.output_tokens.toLocaleString()}
                   </td>
+                  <td className="py-1">{row.searches ?? 0}</td>
                   <td className="py-1 text-right">{usd(row.cost_micros)}</td>
                 </tr>
               ))}

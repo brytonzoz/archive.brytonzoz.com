@@ -1,31 +1,26 @@
 'use client';
 
 import { useEffect, useState } from 'react';
-import type { PublicSponsor } from '../../lib/shipped-receipt';
 import type { SponsorTier, TierConfig } from '../../lib/shipped-sponsors';
 
 export type TierOffer = TierConfig & { tier: SponsorTier; cents: number; available: boolean };
 
+export type RecentReceipt = { id: number; who: string; count: number; potential: boolean };
+
 export type ShippedState = {
   printed: number;
-  generator: { enabled: boolean; demo: boolean; reason: string | null; turnstileSiteKey: string | null };
+  shared: number;
+  recent: RecentReceipt[];
+  generator: { enabled: boolean; demo: boolean; reason: string | null; turnstileSiteKey: string | null; year: number; sources: string[] };
   sponsors: {
     open: boolean;
     reason: string | null;
     provider?: string | null;
     live?: boolean;
     taxAtCheckout?: boolean;
-    roll?: number;
-    rollSize?: number;
-    filled?: number;
-    archived?: number[];
-    headerSlotsLeft?: number;
-    headerNextOpen?: number | null;
-    headerDays?: number;
+    presentedNextOpen?: number | null;
     tiers?: TierOffer[];
   };
-  lines: PublicSponsor[];
-  header: PublicSponsor[];
 };
 
 let pending: Promise<ShippedState | null> | null = null;

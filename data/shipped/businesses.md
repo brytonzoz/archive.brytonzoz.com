@@ -1,6 +1,7 @@
 # Bryton Zoz: master receipt dataset (FINAL)
 
-Updated Oct 8 2026. 35 lines. Statuses: LIVE, ACTIVE, IN PROGRESS, PROTOTYPE, HIATUS, INACTIVE, DECEASED. Revenue is rough recollection (~).
+Updated Oct 8 2026. 34 lines. Statuses: LIVE, ACTIVE, IN PROGRESS, PROTOTYPE, HIATUS, INACTIVE, DECEASED. Revenue is rough recollection (~).
+Readable copy of businesses.json, which is the source of truth for /shipped/.
 
 | # | Name | Years | Status | Description | Note | Link | Logo |
 |---|---|---|---|---|---|---|---|
@@ -18,7 +19,7 @@ Updated Oct 8 2026. 35 lines. Statuses: LIVE, ACTIVE, IN PROGRESS, PROTOTYPE, HI
 | 12 | NONPARALLEL v2 | 2023– | ACTIVE | Creative tech for artists: release links, online stores, and streaming platforms. | Now sells one-time builds from $195 at nonprllel.com. | https://nonprllel.com | nonparallel.webp |
 | 13 | Loopless / SCRPWRK (SCRPWRK / ScrapWRK) | 2024– | ACTIVE | Turns textile scraps into one-of-a-kind sustainable fashion pieces. |  | https://scrapwrk.com |  |
 | 14 | EntreLabz v2 | 2025– | ACTIVE | App studio shipping websites and apps in weeks, not months. | Home base for Habituize, Phyra, and local website sprints. | https://entrelabz.com | entrelabz.png |
-| 15 | Habituize (formerly DayONE, then Unifyr) | 2025– | LIVE | Habit-building iPhone app; version 2.0 was a complete ground-up rebuild. | Formerly DayONE, then Unifyr. On the App Store since Dec 2025. | https://habituize.app | habituize.webp |
+| 15 | Habituize (formerly DayONE, then Unifyr) | 2025– | LIVE | Habit-building iPhone app; version 2.0 was a complete ground-up rebuild. | DayONE grew into Unifyr, then got stripped back to the daily-reset habit core. | https://habituize.app | habituize.webp |
 | 16 | LiveCaps | 2025 | PROTOTYPE | Real-time captions overlay for any audio on your computer, powered by Whisper. | Desktop app plus a marketing site with Pro subscriptions. |  |  |
 | 17 | WellnessBuddy | 2025 | PROTOTYPE | Habit-building iPhone app with on-device AI, built in SwiftUI and CoreML. |  |  |  |
 | 18 | StreamingAPP | 2025 | PROTOTYPE | Artist streaming app for music, radio stations, and fashion drops. |  |  |  |
@@ -27,25 +28,24 @@ Updated Oct 8 2026. 35 lines. Statuses: LIVE, ACTIVE, IN PROGRESS, PROTOTYPE, HI
 | 21 | Bloom | 2025 | PROTOTYPE | Task tracker web app with task cards and a progress view. |  |  |  |
 | 22 | Idea Forge | 2025 | PROTOTYPE | Idea generator web app for sparking new project and business concepts. |  |  |  |
 | 23 | Zonova Aesthetics | 2025– | LIVE | Med spa website with services, results gallery, and online booking. | Client build for a Kentucky med spa. | https://www.zonovaaesthetics.com |  |
-| 24 | Phyra | 2026 | DECEASED | AI physique coach: meals, food logging, workouts, and body progress. | Started as text-based coaching with a trainer. |  | phyra.png |
-| 25 | NONPARALLEL v3 | 2026– | ACTIVE | Independent music label with merch drops under the NONPARALLEL name. |  | https://brytonzoz.com/nonparallel/ | nonparallel-v3.webp |
-| 26 | ProfitScanner | 2026– | ACTIVE | Scan thrift finds and get AI resale estimates to spot profitable flips. | On the App Store since May 2026. | https://getprofitscanner.com | profitscanner.webp |
-| 27 | Physiquify | 2026 | DECEASED | AI personal-training assistant inside texting, sold to personal trainers. | Got way in over my head. |  |  |
-| 28 | Metra | 2026 | DECEASED | AI calorie-counting app built to pair with the Phyra coach. | Canceled. |  |  |
-| 29 | PostBalloon | 2026 | DECEASED | Done-for-you managed social media content service for businesses. | Shut down after ~20 competitors launched the same thing. |  | postballoon.png |
-| 30 | Mopkin | 2026– | LIVE | Free AI cleaning buddy: snap your messy room, get one doable step. | No account, no subscription. On the App Store since Aug 2026. | https://mopkin.app | mopkin.webp |
-| 31 | Pocket Factory | 2026– | LIVE | Custom NFC tap cards for businesses, still taking orders with zero marketing. | Grew out of the Zoz Studios business-card work. | https://getpocketfactory.com | pocket-factory.webp |
-| 32 | LaLisa Comics | 2026 | PROTOTYPE | Mock-up e-commerce store for limited-edition comics and collector items. |  |  |  |
-| 33 | Local Business Website Templates | 2026 | PROTOTYPE | Reusable 48-hour website templates for fitness, contractor, and beauty businesses. | Demo-ready sites for website sprint sales. |  |  |
-| 34 | Embody Elegance | 2026– | LIVE | Color analysis and style consultation site with booking for an Ohio stylist. | Client build. | https://embody-elegance.com |  |
-| 35 | brytonzoz.com | ? | LIVE | My personal hub for everything I build, release, and sell. |  | https://brytonzoz.com |  |
+| 24 | NONPARALLEL v3 | 2026– | ACTIVE | Independent music label with merch drops under the NONPARALLEL name. |  | https://brytonzoz.com/nonparallel/ | nonparallel-v3.webp |
+| 25 | ProfitScanner | 2026– | ACTIVE | Scan thrift finds and get AI resale estimates to spot profitable flips. | On the App Store since May 2026. No marketing push. | https://getprofitscanner.com | profitscanner.webp |
+| 26 | Physiquify | 2026 | DECEASED | AI personal-training service; you texted Phyra, its AI coach, inside the app. | Built to sit on top of personal trainers. Got way in over my head. |  | phyra.png |
+| 27 | Metra | 2026 | DECEASED | AI calorie-counting app built to pair with Physiquify. | Canceled. |  |  |
+| 28 | PostBalloon | 2026 | DECEASED | Done-for-you managed social media content service for businesses. | Shut down after ~20 competitors launched the same thing. |  | postballoon.png |
+| 29 | Mopkin | 2026– | LIVE | Free AI cleaning buddy: snap your messy room, get one doable step. | No account, no subscription. On the App Store since Aug 2026. | https://mopkin.app | mopkin.webp |
+| 30 | Pocket Factory | 2026– | LIVE | Custom NFC tap cards for businesses, still taking orders with zero marketing. | First order Aug 2026; site live Sept 2026. Grew out of Zoz Studios business cards. | https://getpocketfactory.com | pocket-factory.webp |
+| 31 | LaLisa Comics | 2026 | PROTOTYPE | Mock-up e-commerce store for limited-edition comics and collector items. |  |  |  |
+| 32 | Local Business Website Templates | 2026 | PROTOTYPE | Reusable 48-hour website templates for fitness, contractor, and beauty businesses. | Demo-ready sites for website sprint sales. |  |  |
+| 33 | Embody Elegance | 2026– | LIVE | Color analysis and style consultation site with booking for an Ohio stylist. | Client build. | https://embody-elegance.com |  |
+| 34 | brytonzoz.com | 2026– | LIVE | My personal hub for everything I build, release, and sell. |  | https://brytonzoz.com |  |
 
 ## Sources / status basis
 
 - **Full Fit Clothing**: Bryton (Oct 8 2026)
 - **Thrifted Online**: Bryton (Oct 8 2026)
 - **Zoz Wear**: Bryton (Oct 8 2026)
-- **NONPARALLEL v1**: Bryton (Oct 8 2026); logo assignment inferred (older blue wordmark)
+- **NONPARALLEL v1**: Bryton (Oct 8 2026); logo confirmed by Bryton (blue nonParallel)
 - **Zoz Studios**: Bryton (Oct 8 2026)
 - **1StopShop**: Bryton (Oct 8 2026)
 - **Zoz Wear Foundation**: Bryton (Oct 8 2026)
@@ -53,7 +53,7 @@ Updated Oct 8 2026. 35 lines. Statuses: LIVE, ACTIVE, IN PROGRESS, PROTOTYPE, HI
 - **EntreLabz v1**: Bryton (Oct 8 2026); logo assignment inferred (wordmark era unclear)
 - **DemandUp Services**: Bryton (Oct 8 2026)
 - **RemiWeb**: Bryton (Oct 8 2026)
-- **NONPARALLEL v2**: inferred: nonprllel.com up with live Stripe pricing (checked Oct 8 2026)
+- **NONPARALLEL v2**: inferred: nonprllel.com up with live Stripe pricing (checked Oct 8 2026); logo confirmed by Bryton (purple slanted)
 - **Loopless / SCRPWRK**: Bryton (Oct 8 2026)
 - **EntreLabz v2**: Bryton (Oct 8 2026)
 - **Habituize**: Bryton + App Store (first release 2025-12-03, v2.0.2 2026-07-23); Unifyr fold-in inferred
@@ -65,15 +65,14 @@ Updated Oct 8 2026. 35 lines. Statuses: LIVE, ACTIVE, IN PROGRESS, PROTOTYPE, HI
 - **Bloom**: GitHub bloom-finance-flow (created 2025-04-23); from components, the name suggests finance but the code is a task tracker
 - **Idea Forge**: GitHub idea-forge-ignite-web (created 2025-04-28); from IdeaGenerator component
 - **Zonova Aesthetics**: GitHub Zonova (created 2025-12-24); live site matches repo. Bryton listed it as a prototype
-- **Phyra**: Bryton (Oct 8 2026); phyra.app was still up on Oct 8 2026
 - **NONPARALLEL v3**: Bryton (Oct 8 2026); logo confirmed by Bryton (rainbow drip)
-- **ProfitScanner**: Bryton (ACTIVE); App Store listing live (released 2026-05-07), so LIVE may fit better
-- **Physiquify**: Bryton (Oct 8 2026); no site or repo found (physiquify.com is a parked domain, not his)
+- **ProfitScanner**: Bryton (Oct 8 2026): stays ACTIVE
+- **Physiquify**: Bryton (Oct 8 2026): Phyra was the AI coach inside Physiquify, merged into one line
 - **Metra**: Bryton (Oct 8 2026); metra.app is a for-sale domain, not his
 - **PostBalloon**: Bryton (Oct 8 2026); postballoon.com still returned 200 on Oct 8 2026
 - **Mopkin**: Bryton + App Store (first release 2026-08-18)
-- **Pocket Factory**: Bryton (LIVE); start year inferred from Shopify product first published 2026-09-15 and the © 2026 footer
+- **Pocket Factory**: Bryton (Oct 8 2026): first order Aug 2026, site live Sept 2026
 - **LaLisa Comics**: GitHub lisa-comic-glow-up (created 2026-02-26; OG says "Mock Up Ecom Store")
 - **Local Business Website Templates**: GitHub website-template-fitness, contractor-local-service-template, Website-Template-Beauty (created 2026-07-08)
 - **Embody Elegance**: GitHub embody-elegance (created 2026-07-27); live site matches repo build
-- **brytonzoz.com**: site live (Oct 8 2026); launch year unknown
+- **brytonzoz.com**: Bryton (Oct 8 2026)

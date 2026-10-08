@@ -12,7 +12,7 @@ const ITEMS = toItems(DATA, LOGOS);
 
 test('the master receipt prints every entry in the data, in its order', () => {
   assert.equal(ITEMS.length, DATA.meta.count);
-  assert.equal(ITEMS.length, 35);
+  assert.equal(ITEMS.length, 34);
   assert.deepEqual(ITEMS.map((item) => item.name), DATA.entries.map((entry) => entry.name));
   assert.equal(new Set(ITEMS.map((item) => item.name)).size, ITEMS.length, 'names are unique (React keys)');
   const years = ITEMS.map((item) => item.start);
@@ -27,7 +27,7 @@ test('statuses match the data and the totals add up', () => {
   assert.equal(Object.values(counts.byStatus).reduce((a, b) => a + b, 0), counts.items);
   assert.deepEqual(
     { live: counts.byStatus.LIVE, active: counts.byStatus.ACTIVE, prototype: counts.byStatus.PROTOTYPE, hiatus: counts.byStatus.HIATUS, deceased: counts.byStatus.DECEASED },
-    { live: 7, active: 5, prototype: 8, hiatus: 2, deceased: 13 },
+    { live: 7, active: 5, prototype: 8, hiatus: 2, deceased: 12 },
   );
   assert.equal(counts.running, 12);
   assert.equal(counts.first, 2020);
@@ -35,9 +35,9 @@ test('statuses match the data and the totals add up', () => {
   assert.throws(() => toItems({ meta: DATA.meta, entries: [{ ...DATA.entries[0], status: 'RIP' }] }, LOGOS));
 });
 
-test('year dividers run 2020 to 2026, then UNDATED', () => {
+test('year dividers run 2020 to 2026', () => {
   const groups = yearGroups(ITEMS);
-  assert.deepEqual(groups.map((group) => group.label), ['2020', '2021', '2022', '2023', '2024', '2025', '2026', 'UNDATED']);
+  assert.deepEqual(groups.map((group) => group.label), ['2020', '2021', '2022', '2023', '2024', '2025', '2026']);
   assert.equal(groups.reduce((sum, group) => sum + group.items.length, 0), ITEMS.length);
 });
 
@@ -67,6 +67,8 @@ test('every logo in the data has a small dithered print in public/shipped/logos'
     assert.ok(logo.width <= 72 && logo.height <= 28, logo.src);
   }
   assert.equal(ITEMS.filter((item) => item.logo).length, 15);
+  assert.equal(ITEMS.some((item) => item.name === 'Phyra'), false, 'Phyra is part of Physiquify');
+  assert.equal(ITEMS.find((item) => item.name === 'Physiquify').logo.src, '/shipped/logos/phyra.png');
 });
 
 test('GitHub usernames follow GitHub rules', () => {

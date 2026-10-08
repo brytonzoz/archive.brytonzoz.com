@@ -41,6 +41,8 @@ export const maxSearches = (env: AiEnv) => Math.min(2, Math.max(0, Math.round(Nu
 export const SEARCH_BELOW = 2;
 
 export class PrintError extends Error {
+  /** What the upstream said (status and error type), surfaced off production only. */
+  detail?: string;
   constructor(public code: string, public status = 502) {
     super(code);
   }
@@ -277,6 +279,15 @@ function normalize(raw: unknown, gathered: Gathered, allowed: Allowed, year: num
   return finish(items, ok(note) && !AI_VOICE.test(note) ? note : cannedNote(items.length, seed), seed);
 }
 
+function upstreamError(text: string): string {
+  try {
+    const body = JSON.parse(text) as { error?: { type?: string; message?: string } };
+    return `${body.error?.type ?? 'error'}: ${(body.error?.message ?? '').slice(0, 160)}`;
+  } catch {
+    return 'non-JSON body';
+  }
+}
+
 export async function assembleReceipt(subject: Subject, gathered: Gathered, year: number, seed: number, env: AiEnv): Promise<AiResult> {
   const model = env.SHIPPED_MODEL || DEFAULT_MODEL;
   const searches = maxSearches(env);
@@ -327,8 +338,11 @@ export async function assembleReceipt(subject: Subject, gathered: Gathered, year
       console.error('shipped: anthropic rejected request', text.slice(0, 300));
     }
     if (!response?.ok) {
-      if (response) console.error('shipped: anthropic error', response.status, (await response.text()).slice(0, 300));
-      throw fail(response && (response.status === 429 || response.status === 529) ? 'ai-busy' : 'ai-error');
+      const text = response ? (await response.text()).slice(0, 300) : '';
+      if (response) console.error('shipped: anthropic error', response.status, text);
+      const error = fail(response && (response.status === 429 || response.status === 529) ? 'ai-busy' : 'ai-error');
+      error.detail = `anthropic ${response?.status ?? 'no response'}: ${upstreamError(text)}`;
+      throw error;
     }
     message = (await response.json()) as Message;
     const u = message.usage ?? {};
@@ -347,6 +361,10 @@ export async function assembleReceipt(subject: Subject, gathered: Gathered, year
   const parsed = message?.stop_reason === 'refusal' ? null : parseJson(finalText.length ? finalText : blocks);
   const cost = spent();
   console.log(JSON.stringify({ shipped: 'ai', model, inputTokens: usage.input, outputTokens: usage.output, searches: usage.searches, costMicros: cost, stop: message?.stop_reason, ok: Boolean(parsed) }));
-  if (!parsed) throw fail('ai-error');
+  if (!parsed) {
+    const error = fail('ai-error');
+    error.detail = `unparsable reply (stop: ${message?.stop_reason ?? 'none'}, ${finalText.length} text blocks)`;
+    throw error;
+  }
   return { ...normalize(parsed, gathered, allowed, year, seed), model, inputTokens: usage.input, outputTokens: usage.output, searches: usage.searches, costMicros: cost };
 }

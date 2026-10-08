@@ -505,7 +505,7 @@ async function print(request: Request, env: ShippedEnv, ctx: ExecutionContext): 
     console.log(JSON.stringify({ shipped: 'print', id: inserted.id, kind: subject.kind, items: receipt.items.length, potential: receipt.potential, ran: gathered.ran, failed: gathered.failed, costMicros: usage.cost }));
     return json({ id: inserted.id });
   } catch (error) {
-    if (error instanceof PrintError) return json({ error: error.code }, error.status);
+    if (error instanceof PrintError) return json({ error: error.code, ...(error.detail && !isProduction(env) ? { detail: error.detail } : {}) }, error.status);
     console.error('shipped: print failed', error);
     return json({ error: 'jammed' }, 500);
   }

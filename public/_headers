@@ -13,3 +13,14 @@
 /.well-known/apple-developer-merchantid-domain-association
   Content-Type: text/plain
   Cache-Control: public, max-age=3600
+
+# /shipped is a private X link, not for search. Header backup for the page's noindex
+# meta. Do not Disallow it in robots.txt — crawlers (and X's card bot) need to fetch it.
+/shipped
+  X-Robots-Tag: noindex, nofollow, noarchive
+
+/shipped/
+  X-Robots-Tag: noindex, nofollow, noarchive
+
+/shipped/*
+  X-Robots-Tag: noindex, nofollow, noarchive

@@ -113,7 +113,7 @@ const SPONSOR_LIMIT_PER_HOUR = 6;
 const TAKEDOWN_LIMIT_PER_HOUR = 5;
 const DEFAULT_CAP_USD = 5;
 /** Bump when the share images change, so cached ones are redrawn. */
-const IMAGE_VERSION = 2;
+const IMAGE_VERSION = 3;
 
 const SCHEMA = [
   `CREATE TABLE IF NOT EXISTS shipped_receipts (
@@ -969,7 +969,7 @@ async function sharePage(request: Request, env: ShippedEnv & { ASSETS: Fetcher }
   const who = subjectLabel(receipt.subject);
   const n = itemsShipped(receipt);
   const title = receipt.potential ? `${who}: shipped in ${receipt.year} (potential) | Shipped` : `${who} shipped ${n} thing${n === 1 ? '' : 's'} in ${receipt.year} | Shipped`;
-  const description = `${shareText(receipt)} Printed at ${SHIPPED_HOST}.`;
+  const description = `${shareText(receipt).replace(/:$/, '.')} Print yours at ${SHIPPED_HOST}.`;
   const page = new URL(RECEIPT_PATH(receipt.id), url).toString();
   const image = new URL(CARD_PATH(receipt.id), url).toString();
   const alt = `A printed receipt: what ${who} shipped in ${receipt.year}, one line per item`;

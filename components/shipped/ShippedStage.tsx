@@ -13,6 +13,7 @@ import { press } from './feel';
 import { HumanCheck, type HumanCheckHandle } from './HumanCheck';
 import { Machine, type Job, type Tone } from './Machine';
 import { Line, Rule, Tall } from './paper';
+import { Ticker } from './Ticker';
 import { refreshShippedState, useShippedState } from './state';
 import { ShareBar, VisitorReceipt, rememberPile, type Loaded } from './visitor';
 
@@ -271,6 +272,9 @@ export function ShippedStage({ opening, title }: { opening: Opening; title: Reac
 
   return (
     <div className="shipped-stage">
+      <div className="shipped-ticker-pin">
+        <Ticker />
+      </div>
       <section className="shipped-kiosk" id="print" aria-labelledby="shipped-title">
         <h2 id="shipped-title" className="shipped-kiosk-title">
           {title}

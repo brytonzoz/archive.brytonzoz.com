@@ -47,7 +47,18 @@
   margin: 0 auto;
 }
 
-/* ---- Ticker + sponsors (under the printer) ---------------------------------------------------------- */
+/* ---- Ticker (pinned above the printer) + sponsors -------------------------------------------------- */
+
+.shipped-ticker-pin {
+  position: sticky;
+  top: env(safe-area-inset-top, 0px);
+  z-index: 40;
+  order: -2;
+  width: 100%;
+  margin: 0;
+  padding: 0.15rem 0 0.4rem;
+  background: var(--counter);
+}
 
 .shipped-board {
   width: 100%;
@@ -862,6 +873,11 @@
     justify-content: center;
     align-items: start;
     column-gap: clamp(3rem, 7vw, 7rem);
+  }
+
+  .shipped-ticker-pin {
+    grid-column: 1 / -1;
+    order: 0;
   }
 
   .shipped-kiosk {

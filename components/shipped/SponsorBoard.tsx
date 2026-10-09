@@ -8,7 +8,6 @@ import { moneyShort } from '../../lib/shipped-receipt';
 import { BID_RULES, HERO_SLOT, HOUSE_SLOTS, SLOT_COUNT, bidRange, slotLabel, sponsorTag, takeoversOpen } from '../../lib/shipped-sponsors';
 import type { SponsorSlot } from '../../lib/shipped-year';
 import { press } from './feel';
-import { Ticker } from './Ticker';
 import { chooseSponsor, closeSponsor, openSponsor, useSponsorPick } from './sponsor-pick';
 import { useShippedState } from './state';
 
@@ -168,7 +167,6 @@ export function SponsorBoard() {
 
   return (
     <section className={`shipped-board${open ? ' is-open' : ''}`} id="board">
-      <Ticker />
       <p className="shipped-board-proof">
         {state && now !== null ? (closed ? 'printer is off' : `shuts off in ${countdown(left)}`) : '··'}
       </p>

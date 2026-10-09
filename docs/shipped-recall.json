@@ -1,0 +1,860 @@
+{
+  "at": "2026-10-09T18:36:11.609Z",
+  "year": 2026,
+  "envPresent": {
+    "GITHUB_TOKEN": false,
+    "PRODUCTHUNT": false,
+    "TINYFISH": false,
+    "ANTHROPIC": false
+  },
+  "medianRecall": 1,
+  "pass": true,
+  "costNote": "Deterministic harvest is $0. Claude Haiku + 3 web searches worst-case is about $0.03–$0.04 of the $0.05 receipt cap. A fourth search wave would be +$0.01 and is only skipped when the remaining budget cannot buy it (coverageCapped).",
+  "rows": [
+    {
+      "query": "levelsio",
+      "ms": 1616,
+      "error": null,
+      "identity": {
+        "name": "@levelsio",
+        "bio": "💸http://levels.vc 📸http://PhotoAI.com $86K/m 🎮http://VibeJam.com $44K/m 🫟http://InfiniteSlop.ai $26K/m 🏡http://InteriorAI.com $21K/m 👙@X $17K/m 🌍http://Nomads.com $12K/m 🏩http://Hotelist.com $6K/m",
+        "site": "https://levels.io/",
+        "x": "levelsio",
+        "github": "levelsio",
+        "sites": [
+          "https://readmake.com/",
+          "https://levels.vc/",
+          "https://photoai.com/",
+          "https://vibejam.com/",
+          "https://infiniteslop.ai/",
+          "https://interiorai.com/",
+          "https://nomads.com/",
+          "https://hotelist.com/",
+          "https://levels.io/"
+        ],
+        "phUsers": [
+          "levelsio"
+        ],
+        "npmUsers": [
+          "levelsio"
+        ]
+      },
+      "items": 26,
+      "inYear": 26,
+      "receiptItems": 20,
+      "recall": 0.875,
+      "foundShips": [
+        "XDR Boost",
+        "SuperLevels",
+        "Hotelist",
+        "levels.io blog",
+        "pieter.com",
+        "Photo AI",
+        "Interior AI"
+      ],
+      "missedShips": [
+        "DroneSim"
+      ],
+      "shouldFound": [],
+      "shouldMissed": [],
+      "statsFound": 4,
+      "statsExpected": 4,
+      "statLabels": [
+        "660k/mo public revenue · levels.vc/",
+        "86k/mo public revenue · x.com/levelsio",
+        "5k users · readmake.com/",
+        "553 GitHub stars · github.com/levelsio/superlevels",
+        "187 GitHub stars · github.com/levelsio/xdr-boost",
+        "3 public GitHub repos · github.com/levelsio"
+      ],
+      "gaps": [
+        "producthunt"
+      ],
+      "ran": [
+        "x-profile:levelsio",
+        "github:levelsio repos=3",
+        "site",
+        "sites",
+        "research-pass:harvest",
+        "github",
+        "appstore",
+        "hn",
+        "npm",
+        "github-overview",
+        "research-pass:gaps:producthunt"
+      ],
+      "sourcedPct": 100,
+      "note": "660k/mo public revenue · levels.vc. 20 public things for @levelsio. SUPERLEVELS set the tone.",
+      "names": [
+        "XDR-BOOST",
+        "SUPERLEVELS",
+        "READMAKE",
+        "LEVELS",
+        "PHOTOAI",
+        "VIBEJAM",
+        "INFINITESLOP",
+        "INTERIORAI",
+        "NOMADS",
+        "HOTELIST",
+        "MAKE: THE INDIE STARTUP MANUAL",
+        "CURSOR VIBE JAM 2026",
+        "INFINITE SLOP BY @LEVELSIO + FAL",
+        "BY @LEVELSIO",
+        "THE INDIE WAY",
+        "SEE THE CHANGELOG",
+        "🏆 BOOK OF THE YEAR",
+        "2X MAKER",
+        "OF THE YEAR",
+        "REMOTE OK"
+      ]
+    },
+    {
+      "query": "marclou",
+      "ms": 1708,
+      "error": null,
+      "identity": {
+        "name": "Marc Lou",
+        "bio": "making stuff",
+        "site": "https://marclou.com/",
+        "x": "marclou",
+        "github": "marclou",
+        "sites": [
+          "https://marclou.com/"
+        ],
+        "phUsers": [
+          "marclou"
+        ],
+        "npmUsers": [
+          "marclou"
+        ]
+      },
+      "items": 30,
+      "inYear": 30,
+      "receiptItems": 20,
+      "recall": 1,
+      "foundShips": [
+        "TrustMRR",
+        "DataFast",
+        "McCreep",
+        "DataRadar",
+        "CodeFast",
+        "ShipFast",
+        "Stalkr"
+      ],
+      "missedShips": [],
+      "shouldFound": [],
+      "shouldMissed": [],
+      "statsFound": 2,
+      "statsExpected": 2,
+      "statLabels": [
+        "281k/mo public revenue · marclou.com/",
+        "281k/mo public revenue · marclou.com/projects",
+        "9 GitHub stars · github.com/marclou/McCreep",
+        "1 GitHub stars · github.com/marclou/dataradar",
+        "25 public GitHub repos · github.com/marclou"
+      ],
+      "gaps": [
+        "producthunt"
+      ],
+      "ran": [
+        "x-profile:miss",
+        "github:marclou repos=25",
+        "site",
+        "sites",
+        "research-pass:harvest",
+        "github",
+        "appstore",
+        "hn",
+        "npm",
+        "github-overview",
+        "research-pass:gaps:producthunt"
+      ],
+      "sourcedPct": 100,
+      "note": "20 launches · 1 GitHub · 19 on their site. Receipt paper running low.",
+      "names": [
+        "MCCREEP",
+        "MARC LOU (@MARCLOU)",
+        "CODEFAST",
+        "SHIPFAST",
+        "DATAFAST",
+        "TRUSTMRR",
+        "SHIP OR DIE",
+        "ZENVOICE",
+        "INDIE PAGE",
+        "POOPUP",
+        "BYEDISPUTE",
+        "WORKBOOKPDF",
+        "HABITS GARDEN",
+        "LAUNCHVIRAL",
+        "STALKR",
+        "SUPERSHRIMP",
+        "BIOAGE",
+        "SPONSOR MY BODY",
+        "DATAMARKETTERMINAL A BLOOMBERG TERMINAL",
+        "FOUNDERTOWN CHAT ROOMS FOR FOUNDERS AT T"
+      ]
+    },
+    {
+      "query": "tibo_maker",
+      "ms": 2679,
+      "error": null,
+      "identity": {
+        "name": "Tibo",
+        "bio": "📽 http://revid.ai 📈 http://outrank.so 🤖 http://squad.so http://superx.so http://postsyncer.com http://bazzly.ai http://feather.so sold Tweet Hunter, Taplio ($10m) PH Maker of Year 🥇 growth tips: http://tmaker.io",
+        "site": "https://www.tmaker.io/",
+        "x": "tibo_maker",
+        "github": null,
+        "sites": [
+          "https://www.tmaker.io/",
+          "https://revid.ai/",
+          "https://outrank.so/",
+          "https://squad.so/",
+          "https://superx.so/",
+          "https://postsyncer.com/",
+          "https://bazzly.ai/",
+          "https://feather.so/"
+        ],
+        "phUsers": [
+          "tibo_maker"
+        ],
+        "npmUsers": [
+          "tibo_maker"
+        ]
+      },
+      "items": 30,
+      "inYear": 30,
+      "receiptItems": 20,
+      "recall": 1,
+      "foundShips": [
+        "SuperX",
+        "Revid",
+        "Outrank",
+        "Squad",
+        "PostSyncer",
+        "Bazzly",
+        "Feather"
+      ],
+      "missedShips": [],
+      "shouldFound": [],
+      "shouldMissed": [],
+      "statsFound": 0,
+      "statsExpected": 1,
+      "statLabels": [
+        "1M/mo public revenue · tmaker.io/",
+        "100k/mo public revenue · tmaker.io/",
+        "13k founder · bazzly.ai/"
+      ],
+      "gaps": [
+        "producthunt"
+      ],
+      "ran": [
+        "x-profile:tibo_maker",
+        "github:unresolved",
+        "site",
+        "sites",
+        "research-pass:harvest",
+        "appstore",
+        "hn",
+        "npm",
+        "research-pass:gaps:producthunt"
+      ],
+      "sourcedPct": 100,
+      "note": "1M/mo public revenue · tmaker.io. 20 public things for Tibo. REVID set the tone.",
+      "names": [
+        "REVID",
+        "OUTRANK",
+        "SQUAD",
+        "SUPERX",
+        "POSTSYNCER",
+        "BAZZLY",
+        "FEATHER",
+        "REVID AI",
+        "SOCIAL MEDIA SCHEDULER FOR 11+ PLATFORMS",
+        "TIBO MAKER",
+        "MOONB",
+        "AIAPPLY",
+        "BRIGHT BRANDS",
+        "VÆKSTER",
+        "CLI FOR AI AGENTS",
+        "GET STARTED FOR FREE",
+        "GET CHROME EXTENSION",
+        "REST API & WEBHOOKS",
+        "CLI",
+        "CHATGPT"
+      ]
+    },
+    {
+      "query": "shadcn",
+      "ms": 2030,
+      "error": null,
+      "identity": {
+        "name": "shadcn",
+        "bio": "I own a computer.",
+        "site": null,
+        "x": "shadcn",
+        "github": "shadcn",
+        "sites": [],
+        "phUsers": [
+          "shadcn"
+        ],
+        "npmUsers": [
+          "shadcn"
+        ]
+      },
+      "items": 11,
+      "inYear": 11,
+      "receiptItems": 11,
+      "recall": 0.8,
+      "foundShips": [
+        "improve",
+        "tweakcn",
+        "shadcn/ui",
+        "shadcn"
+      ],
+      "missedShips": [
+        "cva"
+      ],
+      "shouldFound": [],
+      "shouldMissed": [],
+      "statsFound": 2,
+      "statsExpected": 2,
+      "statLabels": [
+        "9.2k GitHub stars · github.com/shadcn/improve",
+        "24 GitHub stars · github.com/shadcn/shadcn-vite-geist",
+        "11587k npm weekly downloads · npmjs.com/package/shadcn",
+        "8274k npm weekly downloads · npmjs.com/package/cn",
+        "2931k npm weekly downloads · npmjs.com/package/@shadcn/react",
+        "1455k npm weekly downloads · npmjs.com/package/@shadcn/lint",
+        "228 public GitHub repos · github.com/shadcn"
+      ],
+      "gaps": [
+        "producthunt"
+      ],
+      "ran": [
+        "x-profile:miss",
+        "github:shadcn repos=228",
+        "sites",
+        "research-pass:harvest",
+        "github",
+        "appstore",
+        "hn",
+        "npm",
+        "github-overview",
+        "research-pass:gaps:producthunt"
+      ],
+      "sourcedPct": 100,
+      "note": "11 launches · 7 on npm · 3 on GitHub · 1 their site. SHADCN is first on the tape.",
+      "names": [
+        "SHADCN-VITE-GEIST",
+        "IMPROVE",
+        "CREATE-REGISTRY",
+        "@SHADCN/HELPERS",
+        "MODEL-PICKER-NESTED-COMBOBOX",
+        "@SHADCN/REACT",
+        "CN",
+        "@SHADCN/LINT",
+        "SHADCN",
+        "@SHADCN/REGISTRY",
+        "FOUNDER NOT FOUND"
+      ]
+    },
+    {
+      "query": "steventey",
+      "ms": 1549,
+      "error": null,
+      "identity": {
+        "name": "Steven Tey",
+        "bio": "In the progress of learning and applying Data Science into Business Operation, Supply Chain Management, etc.",
+        "site": "https://steventey.com/",
+        "x": "steventey",
+        "github": "StevenTey",
+        "sites": [
+          "https://steventey.com/"
+        ],
+        "phUsers": [
+          "steventey",
+          "StevenTey"
+        ],
+        "npmUsers": [
+          "steventey",
+          "StevenTey"
+        ]
+      },
+      "items": 13,
+      "inYear": 13,
+      "receiptItems": 13,
+      "recall": 1,
+      "foundShips": [
+        "Dub",
+        "Novel",
+        "ShareGPT",
+        "One Word Domains"
+      ],
+      "missedShips": [],
+      "shouldFound": [],
+      "shouldMissed": [],
+      "statsFound": 1,
+      "statsExpected": 1,
+      "statLabels": [
+        "5.2k users · steventey.com/projects",
+        "285k npm weekly downloads · npmjs.com/package/dub",
+        "32k npm weekly downloads · npmjs.com/package/@dub/embed-core",
+        "31k npm weekly downloads · npmjs.com/package/@dub/embed-react",
+        "1.5k npm weekly downloads · npmjs.com/package/@dub/react-native",
+        "6 public GitHub repos · github.com/StevenTey"
+      ],
+      "gaps": [
+        "producthunt"
+      ],
+      "ran": [
+        "x-profile:miss",
+        "github:StevenTey repos=6",
+        "site",
+        "sites",
+        "research-pass:harvest",
+        "github",
+        "appstore",
+        "hn",
+        "npm",
+        "github-overview",
+        "research-pass:gaps:producthunt"
+      ],
+      "sourcedPct": 100,
+      "note": "13 launches · 6 on npm · 7 on their site. Someone likes the publish button.",
+      "names": [
+        "@DUB/REACT-NATIVE",
+        "@DUB/EMBED-CORE",
+        "@DUB/EMBED-REACT",
+        "@DUB/UTILS",
+        "@DUB/UI",
+        "DUB",
+        "FOUNDER NOT FOUND",
+        "DOMAINSGPT",
+        "SHAREGPT",
+        "ONE WORD DOMAINS",
+        "EXTRAPOLATE",
+        "PRECEDENT",
+        "NOVEL"
+      ]
+    },
+    {
+      "query": "pontusab",
+      "ms": 1936,
+      "error": null,
+      "identity": {
+        "name": "Pontus Abrahamsson",
+        "bio": "Building.",
+        "site": "https://midday.ai/",
+        "x": "pontusab",
+        "github": "pontusab",
+        "sites": [
+          "https://midday.ai/"
+        ],
+        "phUsers": [
+          "pontusab"
+        ],
+        "npmUsers": [
+          "pontusab"
+        ]
+      },
+      "items": 12,
+      "inYear": 12,
+      "receiptItems": 12,
+      "recall": 1,
+      "foundShips": [
+        "Workbench",
+        "Caltext",
+        "Hyper",
+        "Toolpick",
+        "message-ui",
+        "Cursy",
+        "Behind the Code",
+        "Midday"
+      ],
+      "missedShips": [],
+      "shouldFound": [],
+      "shouldMissed": [],
+      "statsFound": 2,
+      "statsExpected": 2,
+      "statLabels": [
+        "450 GitHub stars · github.com/pontusab/workbench",
+        "363 GitHub stars · github.com/pontusab/caltext",
+        "195 GitHub stars · github.com/pontusab/hyper",
+        "160 GitHub stars · github.com/pontusab/toolpick",
+        "4 HN points · news.ycombinator.com/item?id=48049069",
+        "106 public GitHub repos · github.com/pontusab"
+      ],
+      "gaps": [
+        "own-site",
+        "producthunt"
+      ],
+      "ran": [
+        "x-profile:miss",
+        "github:pontusab repos=106",
+        "sites",
+        "research-pass:harvest",
+        "github",
+        "appstore",
+        "hn",
+        "npm",
+        "github-overview",
+        "research-pass:gaps:own-site,producthunt",
+        "research-pass:gap-fill"
+      ],
+      "sourcedPct": 100,
+      "note": "12 launches · 1 Hacker News · 10 on GitHub · 1 their site. Receipt paper running low.",
+      "names": [
+        "TOOLPICK",
+        "CALTEXT",
+        "WORKBENCH",
+        "AI-SDK-HEAL",
+        "MCP-TYPEGEN",
+        "HYPER",
+        "MIDDAY IS JOINING RAMP",
+        "MESSAGE-UI",
+        "CURSY",
+        "HOMEBREW-TAP",
+        "BEHINDTHECODE",
+        "FOUNDER NOT FOUND"
+      ]
+    },
+    {
+      "query": "arvidkahl",
+      "ms": 5005,
+      "error": null,
+      "identity": {
+        "name": "Arvid Kahl",
+        "bio": "Writer, entrepreneur, and coder at heart. I co-founded and sold FeedbackPanda. Now building Podscan.fm, talking about it at tbf.fm. Be kind to each other.",
+        "site": "https://thebootstrappedfounder.com/",
+        "x": "arvidkahl",
+        "github": "arvidkahl",
+        "sites": [
+          "https://thebootstrappedfounder.com/",
+          "https://podscan.fm/",
+          "https://tbf.fm/"
+        ],
+        "phUsers": [
+          "arvidkahl"
+        ],
+        "npmUsers": [
+          "arvidkahl"
+        ]
+      },
+      "items": 12,
+      "inYear": 12,
+      "receiptItems": 12,
+      "recall": 1,
+      "foundShips": [
+        "Podscan",
+        "The Bootstrapped Founder"
+      ],
+      "missedShips": [],
+      "shouldFound": [],
+      "shouldMissed": [
+        "ralph-tui",
+        "open-ring",
+        "senko"
+      ],
+      "statsFound": 1,
+      "statsExpected": 1,
+      "statLabels": [
+        "5k/mo public revenue · podscan.fm/",
+        "2.5k/mo public revenue · podscan.fm/",
+        "51 public GitHub repos · github.com/arvidkahl"
+      ],
+      "gaps": [
+        "producthunt"
+      ],
+      "ran": [
+        "x-profile:miss",
+        "github:arvidkahl repos=51",
+        "site",
+        "sites",
+        "research-pass:harvest",
+        "github",
+        "appstore",
+        "hn",
+        "npm",
+        "github-overview",
+        "research-pass:gaps:producthunt"
+      ],
+      "sourcedPct": 100,
+      "note": "5k/mo public revenue · podscan.fm. 12 public things for Arvid. PODSCAN set the tone.",
+      "names": [
+        "PODSCAN",
+        "TBF",
+        "THE BOOTSTRAPPED FOUNDER",
+        "2026 &#8211; THE BOOTSTRAPPED FOUNDER",
+        "“WORKING IN” VS “WORKING ON” THE BUSINES",
+        "FOUNDER NOT FOUND",
+        "THE BOOTSTRAPPED FOUNDER &#8211; HOW TO",
+        "TWITTER TEARDOWN",
+        "LEARN HOW YOUR COMMENT DATA IS PROCESSED",
+        "FIND YOUR FOLLOWING",
+        "ZERO TO SOLD",
+        "THE EMBEDDED ENTREPRENEUR"
+      ]
+    },
+    {
+      "query": "nutlope",
+      "ms": 2014,
+      "error": null,
+      "identity": {
+        "name": "Hassan",
+        "bio": "Head of Developer Experience @togethercompute. Building open source AI apps like http://roomgpt.io, http://llamacoder.io, & http://1kpapers.com.",
+        "site": "https://nutlope.com/",
+        "x": "nutlope",
+        "github": "Nutlope",
+        "sites": [
+          "https://www.nutlope.com/",
+          "https://roomgpt.io/",
+          "https://llamacoder.io/",
+          "https://1kpapers.com/"
+        ],
+        "phUsers": [
+          "nutlope",
+          "Nutlope"
+        ],
+        "npmUsers": [
+          "nutlope",
+          "Nutlope"
+        ]
+      },
+      "items": 30,
+      "inYear": 30,
+      "receiptItems": 20,
+      "recall": 1,
+      "foundShips": [
+        "Hallmark",
+        "Inspo",
+        "1kpapers",
+        "Variate",
+        "AI Subtitles",
+        "NYC AI Atlas",
+        "TogetherLink",
+        "GeoGuessBench"
+      ],
+      "missedShips": [],
+      "shouldFound": [],
+      "shouldMissed": [],
+      "statsFound": 2,
+      "statsExpected": 3,
+      "statLabels": [
+        "12M visitors · nutlope.com/",
+        "5M visitors · nutlope.com/",
+        "30k GitHub stars · github.com/Nutlope/hallmark",
+        "875 GitHub stars · github.com/Nutlope/inspo",
+        "462 GitHub stars · github.com/Nutlope/ai-subtitles",
+        "211 GitHub stars · github.com/Nutlope/variate",
+        "4.4 App Store rating · apps.apple.com/us/app/super-action-fighting-hero/id6737546836",
+        "4.3 App Store rating · apps.apple.com/us/app/car-sale-tycoon-city-driving/id6473836744",
+        "4.2 App Store rating · apps.apple.com/us/app/real-highway-car-driving-games/id6446430995",
+        "4.2 App Store rating · apps.apple.com/us/app/bus-driving-coach-simulator-3d/id6473719676",
+        "32324 App Store ratings · apps.apple.com/us/app/real-highway-car-driving-games/id6446430995",
+        "5817 App Store ratings · apps.apple.com/us/app/super-action-fighting-hero/id6737546836"
+      ],
+      "gaps": [
+        "github-profile",
+        "producthunt"
+      ],
+      "ran": [
+        "x-profile:nutlope",
+        "github:Nutlope repos=107",
+        "site",
+        "sites",
+        "research-pass:harvest",
+        "github",
+        "appstore",
+        "hn",
+        "npm",
+        "github-overview",
+        "research-pass:gaps:github-profile,producthunt"
+      ],
+      "sourcedPct": 100,
+      "note": "20 launches · 8 on App Store · 12 on GitHub. Someone likes the publish button.",
+      "names": [
+        "BUS DRIVING COACH SIMULATOR 3D",
+        "AI-SUBTITLES",
+        "REAL HIGHWAY CAR DRIVING GAMES",
+        "EXPLAINLIKEIMFIVE",
+        "HALLMARK",
+        "INSPO",
+        "AI-BROWSER-GAMES",
+        "TOGETHERLINK",
+        "NYC-AI-ATLAS",
+        "SUPER ACTION FIGHTING HERO",
+        "VARIATE",
+        "OPEN-CUSTOMER-INSIGHTS",
+        "1KPAPERS",
+        "AHMED HASSAN ACADEMY",
+        "LEXUS HASSAN JAMEEL MOTORS",
+        "CAR SALE TYCOON : CITY DRIVING",
+        "TOYOTA HASSAN JAMEEL",
+        "AICOMMITS V4.2.2",
+        "HASSAN",
+        "GEOGUESSBENCH"
+      ]
+    },
+    {
+      "query": "simonw",
+      "ms": 1287,
+      "error": null,
+      "identity": {
+        "name": "Simon Willison",
+        "bio": "Creator @datasetteproj, co-creator Django. PSF board. Hangs out with @natbat. He/Him. Mastodon: https://fedi.simonwillison.net/@simon Bsky: http://simonwillison.net",
+        "site": "https://simonwillison.net/",
+        "x": "simonw",
+        "github": "simonw",
+        "sites": [
+          "https://simonwillison.net/",
+          "https://fedi.simonwillison.net/@simon"
+        ],
+        "phUsers": [
+          "simonw"
+        ],
+        "npmUsers": [
+          "simonw"
+        ]
+      },
+      "items": 30,
+      "inYear": 30,
+      "receiptItems": 20,
+      "recall": 0.833,
+      "foundShips": [
+        "mcp-explorer",
+        "micropython-wasm",
+        "moebius-web",
+        "llm-coding-agent",
+        "llm-typesafe"
+      ],
+      "missedShips": [
+        "scriptc"
+      ],
+      "shouldFound": [],
+      "shouldMissed": [],
+      "statsFound": 1,
+      "statsExpected": 1,
+      "statLabels": [
+        "100/mo public revenue · simonwillison.net/2026/",
+        "1.2k GitHub stars · github.com/simonw/showboat",
+        "760 GitHub stars · github.com/simonw/rodney",
+        "218 GitHub stars · github.com/simonw/cia-world-factbook-2020",
+        "174 GitHub stars · github.com/simonw/micropython-wasm",
+        "1094 HN points · news.ycombinator.com/item?id=48296794",
+        "804 HN points · news.ycombinator.com/item?id=48188183",
+        "802 HN points · news.ycombinator.com/item?id=49324985",
+        "787 HN points · news.ycombinator.com/item?id=48037128",
+        "992 public GitHub repos · github.com/simonw"
+      ],
+      "gaps": [
+        "own-site",
+        "project-list",
+        "producthunt"
+      ],
+      "ran": [
+        "x-profile:simonw",
+        "github:simonw repos=992",
+        "site",
+        "sites",
+        "research-pass:harvest",
+        "github",
+        "appstore",
+        "hn",
+        "npm",
+        "github-overview",
+        "research-pass:gaps:own-site,project-list,producthunt",
+        "research-pass:gap-fill"
+      ],
+      "sourcedPct": 100,
+      "note": "20 launches · 9 on Hacker News · 11 on GitHub. CLAUDE-CODE-TRANSCRIPTS 0.6 is first on the tape.",
+      "names": [
+        "CLAUDE-CODE-TRANSCRIPTS 0.6",
+        "GO-TO-WHEEL",
+        "CIA-WORLD-FACTBOOK-2020",
+        "SHOWBOAT",
+        "RODNEY",
+        "SHOWBOAT AND RODNEY, SO AGENTS CAN DEMO",
+        "PRESENT",
+        "SOMETHING IS AFOOT IN THE LAND OF QWEN",
+        "SCAN-FOR-SECRETS",
+        "LLM-OPENAI-VIA-CODEX",
+        "THE ZIG PROJECT'S RATIONALE FOR THEIR AN",
+        "DEEPSEEK V4",
+        "VIBE CODING AND AGENTIC ENGINEERING ARE",
+        "THE LAST SIX MONTHS IN LLMS IN FIVE MINU",
+        "I THINK ANTHROPIC AND OPENAI HAVE FOUND",
+        "MICROPYTHON-WASM",
+        "CLAUDE FABLE IS RELENTLESSLY PROACTIVE",
+        "MOEBIUS-WEB",
+        "MCP-EXPLORER",
+        "QWEN 3.8 27B IS EXCELLENT, BUT IT DEFAUL"
+      ]
+    },
+    {
+      "query": "dannypostmaa",
+      "ms": 1809,
+      "error": null,
+      "identity": {
+        "name": "Danny Postma",
+        "bio": "Founder of HeadshotPro, a Singapore-based AI photography company.",
+        "site": "https://www.headshotpro.com/",
+        "x": "dannypostmaa",
+        "github": "dannypostma",
+        "sites": [
+          "https://www.headshotpro.com/"
+        ],
+        "phUsers": [
+          "dannypostmaa",
+          "dannypostma"
+        ],
+        "npmUsers": [
+          "dannypostmaa",
+          "dannypostma"
+        ]
+      },
+      "items": 3,
+      "inYear": 3,
+      "receiptItems": 3,
+      "recall": 1,
+      "foundShips": [
+        "AgentBar",
+        "HeadshotPro"
+      ],
+      "missedShips": [],
+      "shouldFound": [],
+      "shouldMissed": [],
+      "statsFound": 2,
+      "statsExpected": 2,
+      "statLabels": [
+        "28 GitHub stars · github.com/dannypostma/agentbar",
+        "18 public GitHub repos · github.com/dannypostma"
+      ],
+      "gaps": [
+        "thin-for-prolific",
+        "revenue",
+        "producthunt"
+      ],
+      "ran": [
+        "x-profile:miss",
+        "github:dannypostma repos=18",
+        "site",
+        "sites",
+        "research-pass:harvest",
+        "github",
+        "appstore",
+        "hn",
+        "npm",
+        "github-overview",
+        "research-pass:gaps:thin-for-prolific,revenue,producthunt",
+        "research-pass:gap-fill"
+      ],
+      "sourcedPct": 100,
+      "note": "3 launches · 1 GitHub · 2 on their site. AGENTBAR is first on the tape.",
+      "names": [
+        "AGENTBAR",
+        "FOUNDER NOT FOUND",
+        "AI HEADSHOT GENERATOR FOR PROFESSIONAL H"
+      ]
+    }
+  ]
+}

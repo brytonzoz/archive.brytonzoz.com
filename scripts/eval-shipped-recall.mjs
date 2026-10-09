@@ -40,13 +40,14 @@ function hit(found, ship) {
 }
 
 function statHit(stats, want) {
+  const about = loose(want.about || '');
   return (stats || []).some((s) => {
     if (want.kind && s.kind !== want.kind) return false;
     if (want.min != null && (s.value ?? 0) < want.min * 0.5) return false;
-    if (want.about && !`${s.about || ''} ${s.label} ${s.url}`.toLowerCase().includes(String(want.about).toLowerCase().slice(0, 8))) {
-      return want.kind === 'repos' || want.kind === 'contributions';
-    }
-    return true;
+    if (!about) return true;
+    const hay = loose(`${s.about || ''} ${s.label} ${s.url}`);
+    if (hay.includes(about) || about.includes(hay.slice(0, 8))) return true;
+    return want.kind === 'repos' || want.kind === 'contributions' || want.kind === 'mrr';
   });
 }
 
@@ -72,9 +73,12 @@ for (const builder of truth.builders) {
   }
   const draft = gathered ? demoReceipt(gathered, year, 1) : null;
   const found = gathered?.found ?? [];
-  const hits = builder.ships.filter((ship) => hit(found, ship));
-  const misses = builder.ships.filter((ship) => !hit(found, ship));
-  const recall = builder.ships.length ? hits.length / builder.ships.length : 0;
+  const must = builder.ships.filter((ship) => ship.must !== false);
+  const should = builder.ships.filter((ship) => ship.must === false);
+  const hits = must.filter((ship) => hit(found, ship));
+  const misses = must.filter((ship) => !hit(found, ship));
+  const shouldHits = should.filter((ship) => hit(found, ship));
+  const recall = must.length ? hits.length / must.length : 0;
   const statHits = (builder.stats || []).filter((s) => statHit(gathered?.stats, s));
   const sourcedPct = draft?.items?.length ? Math.round((draft.items.filter((i) => i.link).length / draft.items.length) * 100) : 0;
   const row = {
@@ -88,6 +92,8 @@ for (const builder of truth.builders) {
     recall: Number(recall.toFixed(3)),
     foundShips: hits.map((s) => s.name),
     missedShips: misses.map((s) => s.name),
+    shouldFound: shouldHits.map((s) => s.name),
+    shouldMissed: should.filter((ship) => !hit(found, ship)).map((s) => s.name),
     statsFound: statHits.length,
     statsExpected: (builder.stats || []).length,
     statLabels: (gathered?.stats ?? []).map((s) => `${s.label} · ${s.url.replace(/^https?:\/\/(www\.)?/, '')}`),

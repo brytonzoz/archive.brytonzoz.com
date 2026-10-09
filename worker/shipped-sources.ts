@@ -25,6 +25,7 @@ import {
   parsePersonName,
   parseProductQuery,
   productNameFromHost,
+  siteHint,
   readXProfile,
   scoreGithubMatch,
   urlsFromText,
@@ -999,7 +1000,7 @@ async function bestGithubFor(
 
 /** Expand a typed subject to GitHub, X, sites, PH/npm usernames. Cached 24h. */
 export async function resolveIdentity(subject: Subject, env: SourceEnv, tinyfish: TinyfishAccess = null): Promise<ResolvedIdentity> {
-  return cached(`id:v2:${subject.kind}:${subject.id.toLowerCase()}:${loose(subject.display)}`, 1440 * MIN, () => resolveIdentityFresh(subject, env, tinyfish));
+  return cached(`id:v3:${subject.kind}:${subject.id.toLowerCase()}:${loose(subject.display)}`, 1440 * MIN, () => resolveIdentityFresh(subject, env, tinyfish));
 }
 
 async function resolveIdentityFresh(subject: Subject, env: SourceEnv, tinyfish: TinyfishAccess): Promise<ResolvedIdentity> {
@@ -1084,7 +1085,10 @@ async function resolveIdentityFresh(subject: Subject, env: SourceEnv, tinyfish: 
     profile.bio ||= matched.bio;
     profile.site ||= matched.blog;
     profile.x ||= matched.x;
-    if (matched.blog) profile.sites = mergeSites(profile.sites, [matched.blog]);
+    if (matched.blog) {
+      profile.site = matched.blog;
+      profile.sites = mergeSites(profile.sites, [matched.blog]);
+    }
   } else if (profile.github) {
     const user = await githubUser(profile.github, env, tinyfish).catch(() => null);
     if (user) {
@@ -1097,6 +1101,12 @@ async function resolveIdentityFresh(subject: Subject, env: SourceEnv, tinyfish: 
   } else notes.push('github:unresolved');
 
   if (profile.bio) profile.sites = mergeSites(profile.sites, urlsFromText(profile.bio));
+  const hinted = siteHint(subject.id) || siteHint(profile.x) || siteHint(profile.github);
+  if (hinted) {
+    profile.site ||= hinted;
+    profile.sites = mergeSites(profile.sites, [hinted]);
+    notes.push(`site-hint:${hostOf(hinted)}`);
+  }
   const finished = finishProfile(profile);
   notes.push(`sites:${finished.sites.map((u) => hostOf(u)).join(',') || 'none'}`);
   return { profile: finished, notes, cacheKey: identityCacheKey(finished, subject) };
@@ -1126,8 +1136,8 @@ export function candidatesFromIdentity(subject: Subject, resolved: ResolvedIdent
 const NAV_LINK =
   /^(home|about|blog|contact|login|sign ?in|sign up|subscribe|newsletter|privacy|terms|careers|jobs|pricing|docs|support|twitter|github|x|linkedin|instagram|shop|store|cart|projects|changelog|source|start now|media kit|tech stack|api reference|investments?|sponsor( my work)?)$/i;
 const JUNK_ITEM =
-  /\b(subscribe|newsletter|sign[- ]?up|sign-up here|log ?in|listen on|apple podcasts|spotify|overcast|pocket casts|amazon music|telegram|investments?|media kit|tech stack|api reference|broadcast by|transistor|start now|follow me|buy me a coffee|powered by|wordpress|built with|24 startups|my book|my newsletter|sponsor my work)\b/i;
-const GENERIC_NAME = /^(self|write|code|ideas|source|projects|changelog|home|shop|nvidia|replicate|fal|vercel|cursor|perplexity|openai|anthropic|sync)$/i;
+  /\b(subscribe|newsletter|sign[- ]?up|sign-up here|log ?in|listen on|apple podcasts|spotify|overcast|pocket casts|amazon music|telegram|investments?|media kit|tech stack|api reference|broadcast by|transistor|start now|follow me|buy me a coffee|powered by|wordpress|built with|24 startups|my book|my newsletter|sponsor my work|diamond sponsor|gold sponsor|silver sponsor|submit your game)\b/i;
+const GENERIC_NAME = /^(self|write|code|ideas|source|projects|changelog|home|shop|nvidia|replicate|fal|vercel|cursor|perplexity|openai|anthropic|sync|make)$/i;
 
 function yearMention(text: string, year: number): boolean {
   return new RegExp(`\\b${year}\\b`).test(text);
@@ -1344,6 +1354,7 @@ async function gatherFresh(
   }
 
   const pageStats = mergeStats([
+    profile.bio ? extractPublicStats(profile.bio, profile.x ? `https://x.com/${profile.x}` : profile.site || 'https://x.com/', profile.name) : [],
     ...projectPages.map((page) => extractPublicStats(`${page.title}\n${page.description}\n${page.text}`, page.url)),
     ...pages.map((page) => extractPublicStats(`${page.title}\n${page.text}`, page.url)),
     found.flatMap((item) => item.metrics ?? []),

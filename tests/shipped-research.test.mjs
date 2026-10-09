@@ -151,4 +151,6 @@ test('public MRR and stars keep their source URL', () => {
   assert.ok(stats.some((s) => s.kind === 'mrr' && s.value === 105000 && s.url.includes('levels.io')));
   const lines = research.formatReceiptStats(stats);
   assert.ok(lines[0].includes('levels.io'));
+  const junk = research.extractPublicStats('Save $70 on monitors and 0000M impressions', 'https://interiorai.com/', 'Interior AI');
+  assert.equal(junk.some((s) => s.kind === 'mrr'), false);
 });

@@ -43,6 +43,14 @@ export const PRODUCT_OWNERS: Record<string, string> = {
   'photo-ai': 'levelsio',
 };
 
+/** Personal sites that GitHub/X often omit. */
+export const SITE_HINTS: Record<string, string> = {
+  steventey: 'https://steventey.com/',
+  tdinh_me: 'https://tonyis.online/',
+  tibo_maker: 'https://www.tmaker.io/',
+  tony_dinh: 'https://tonyis.online/',
+};
+
 export function handleAliases(handle: string): string[] {
   const id = handle.replace(/^@/, '').toLowerCase();
   return HANDLE_ALIASES[id] ?? [];
@@ -62,6 +70,11 @@ export function parseProductQuery(text: string): string | null {
 export function ownerForProduct(product: string | null | undefined): string | null {
   if (!product) return null;
   return PRODUCT_OWNERS[loose(product)] || PRODUCT_OWNERS[product.toLowerCase()] || null;
+}
+
+export function siteHint(handle: string | null | undefined): string | null {
+  if (!handle) return null;
+  return SITE_HINTS[handle.replace(/^@/, '').toLowerCase()] ?? null;
 }
 
 /** `Tibo` + `OpenAI` → `tibo-openai` / `tiboopenai`. */

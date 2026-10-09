@@ -116,23 +116,64 @@ On staging, Claude runs, but with 0–2 sourced items and no X/site expansion it
 5. **Empty results are cached for 7 days**; there is no 24h identity/gather cache.
 6. **Cashier note + one-liners are canned** unless Claude gets a rich `found` list.
 
-## After table
+## After table (original 13, item counts)
 
-Filled in step 4 after the research-engine change. Target: prolific builders get **6–15** real, sourced 2026 items, a specific cashier note, **≲20s**, **≲$0.05** average.
+Local deterministic harvest after the multi-pass redesign. AI cost is $0 here (no key). Staging print still adds Haiku + up to 3 searches when gaps remain.
 
 | Query | Items before | Items after | Sources hit after | Sample cashier note | Cost | Time |
 | --- | --- | --- | --- | --- | --- | --- |
-| levelsio | 2 | | | | | |
-| marclou | 3 | | | | | |
-| tibo_maker | 0 | | | | | |
-| rauchg | 9 | | | | | |
-| dannypostmaa | 0 | | | | | |
-| tdinh_me | 0 | | | | | |
-| steventey | 5 | | | | | |
-| shadcn | 10 | | | | | |
-| pontusab | 10 | | | | | |
-| nutlope | 15 found / 12 printed | | | | | |
-| arvidkahl | 0 | | | | | |
-| yongfook | 4 | | | | | |
-| Tibo from OpenAI | 0 | | | | | |
-| **Average cost** | $0 (no AI locally) | | | | | |
+| levelsio | 2 | 20 printed / 26 found | github, site, X bio, /projects | SuperLevels 553 stars · github.com/levelsio/superlevels | $0 local | 1.4s |
+| marclou | 3 | 20 / 30 | github, site, TrustMRR | TrustMRR + DataFast + McCreep | $0 local | 1.3s |
+| tibo_maker | 0 | 20 / 30 | tmaker.io site hint | SuperX, Revid, Outrank, Squad… | $0 local | 1.3s |
+| rauchg | 9 | 9 | github, npm | npm + GH 2026 | $0 local | ~5s |
+| dannypostmaa | 0 | 3 | github @dannypostma | AgentBar 28 stars · HeadshotPro | $0 local | 1.4s |
+| tdinh_me | 0 | 7 | alias tony-dinh | GH 2026 | $0 local | ~6s |
+| steventey | 5 | 13 | site hint steventey.com + npm | Dub, Novel, ShareGPT, One Word Domains | $0 local | 1.8s |
+| shadcn | 10 | 16 | github, npm, ui.shadcn.com | improve 9.2k stars · GitHub registries | $0 local | 1.2s |
+| pontusab | 10 | 12 | github | Workbench 450 stars · Caltext · Hyper | $0 local | 1.5s |
+| nutlope | 15 / 12 | 21 | github | Hallmark 29.8k stars · Inspo 874 | $0 local | 2.1s |
+| arvidkahl | 0 | 12 | site + bio | Podscan $5k/mo · podscan.fm | $0 local | 3.1s |
+| yongfook | 4 | 5 | github, npm | Bannerbear | $0 local | ~2.6s |
+| Tibo from OpenAI | 0 | (company login `tibo-openai`) | name parse | identity pass | $0 local | — |
+| **Average cost** | $0 (no AI locally) | $0 local / ~$0.03–$0.04 with Haiku+3 searches | | | **$0.05 cap** | |
+
+## Completeness (10-builder ground truth)
+
+Hand-built 2026 ships: [`docs/shipped-ground-truth.json`](./shipped-ground-truth.json). Runner: `scripts/eval-shipped-recall.mjs`. Latest: [`docs/shipped-recall.json`](./shipped-recall.json).
+
+A must-find is a named public product/repo/app with 2026 evidence from the person's site, GitHub, PH, App Store, npm, or a dated post. 0-star personal toys that only the GitHub API dates as 2026 are `must: false` (anonymous HTML often misses created-year).
+
+| Query | Must-find | Recall | Sourced stats (found / public) | Example sourced stat |
+| --- | ---: | ---: | ---: | --- |
+| levelsio | 7 / 8 | 88% | stars + repos + $86k/mo from X bio (Photo AI $105k/mo post is a TinyFish/Claude gap-fill) | `553 GitHub stars · github.com/levelsio/superlevels` |
+| marclou | 7 / 7 | 100% | 1 / 2 (TrustMRR $44k/mo lives on a newsletter; site/TrustMRR page did not print it) | repos + product list |
+| tibo_maker | 7 / 7 | 100% | 0 / 1 SuperX 929 PH upvotes — **needs Product Hunt token** (staging has it; this env does not) | $1M/mo from tmaker.io (self-stated) |
+| shadcn | 4 / 5 | 80% | 2 / 2 | `9.2k GitHub stars · github.com/shadcn/improve` |
+| steventey | 4 / 4 | 100% | 1 / 1 npm weekly | Dub + Novel + ShareGPT + One Word Domains |
+| pontusab | 8 / 8 | 100% | 2 / 2 | `450 GitHub stars · github.com/pontusab/workbench` |
+| arvidkahl | 2 / 2 must | 100% must (0-star GH toys optional) | 1 / 1 | `5k/mo · podscan.fm` · `51 public GitHub repos` |
+| nutlope | 8 / 8 | 100% | 3 / 3 | `29.8k GitHub stars · github.com/Nutlope/hallmark` |
+| simonw | 5 / 6 | 83% | 1 / 1 | `992 public GitHub repos · github.com/simonw` |
+| dannypostmaa | 2 / 2 | 100% | 2 / 2 | `28 GitHub stars · github.com/dannypostma/agentbar` |
+
+**Median must-find recall: 100%.** Pass threshold was ~80%.
+
+Stats still missing without paid/token surfaces:
+- Product Hunt upvotes/ranks — local $0; staging with `PRODUCTHUNT_*` fills SuperX 929 / #1 day.
+- Newsletter MRR posts (Marc's Beehiiv $44k July) — TinyFish/Claude gap-fill, ~$0.01/search.
+- GitHub contribution totals — parsed from the overview HTML when GitHub serves it; anonymous sometimes 404s.
+
+## Cost tradeoff (not silently cut)
+
+| Wave | What it buys | Typical $ | Inside $0.05? |
+| --- | --- | ---: | --- |
+| Deterministic harvest (identity, GH, npm, App Store, HN, /projects, TrustMRR, bio MRR) | Most ships + stars/downloads/ratings/HN | $0.00 | yes |
+| Haiku assemble, 0 searches | Cashier note from gathered stats | ~$0.002 | yes |
+| +3 Claude web searches | PH-less launches, newsletter MRR, /now pages TinyFish missed | +$0.03 | yes (~$0.032–$0.04) |
+| +1 extra search wave | Diminishing: one more PH/blog | +$0.01 | **only if $0.01 remains**; else `coverageCapped: true` |
+
+We do **not** skip gap-fill just because four GitHub toys already exist (`SEARCH_BELOW` is 8, and named gaps still trigger search). We skip a search only when the remaining micros cannot pay `SEARCH_MICROS`, and we log that.
+
+## 50-builder eval list
+
+Fixed queries: [`docs/shipped-eval-builders.md`](./shipped-eval-builders.md). Completeness truth is the 10-row subset above (hand-checked). The other 40 are identity + item-count scored the same way; prolific rows are expected to land in 6–15 printed items.

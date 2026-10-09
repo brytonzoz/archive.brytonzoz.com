@@ -114,9 +114,9 @@
       "ships": [
         { "name": "Podscan", "aliases": ["podscan", "podscan.fm"], "url": "https://podscan.fm/", "date": "2026" },
         { "name": "The Bootstrapped Founder", "aliases": ["thebootstrappedfounder", "tbf"], "url": "https://thebootstrappedfounder.com/", "date": "2026" },
-        { "name": "ralph-tui", "aliases": ["ralph-tui"], "url": "https://ralph-tui.com/", "date": "2026-01-19" },
-        { "name": "open-ring", "aliases": ["open-ring"], "url": "https://github.com/arvidkahl/open-ring", "date": "2026-01-09" },
-        { "name": "senko", "aliases": ["senko"], "url": "https://github.com/arvidkahl/senko", "date": "2026-07-20" }
+        { "name": "ralph-tui", "aliases": ["ralph-tui"], "url": "https://ralph-tui.com/", "date": "2026-01-19", "must": false },
+        { "name": "open-ring", "aliases": ["open-ring"], "url": "https://github.com/arvidkahl/open-ring", "date": "2026-01-09", "must": false },
+        { "name": "senko", "aliases": ["senko"], "url": "https://github.com/arvidkahl/senko", "date": "2026-07-20", "must": false }
       ],
       "stats": [
         { "kind": "repos", "about": "arvidkahl", "min": 40, "url": "https://github.com/arvidkahl" }

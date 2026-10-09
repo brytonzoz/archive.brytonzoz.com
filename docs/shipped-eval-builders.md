@@ -74,4 +74,19 @@ If a query 404s or lands on a decoy, replace it in this table and record the swa
 
 ## Scoreboard
 
-Filled by `scripts/diagnose-shipped-research.mjs` after each run. Latest after-run: see [`shipped-research-diagnosis.md`](./shipped-research-diagnosis.md) § Scoreboard (50).
+Completeness (recall vs hand-built 2026 ships) is the 10-builder table in [`shipped-research-diagnosis.md`](./shipped-research-diagnosis.md) § Completeness. Latest raw: [`shipped-recall.json`](./shipped-recall.json).
+
+| Query | Items | Recall | Sourced stats | Note |
+| --- | ---: | ---: | ---: | --- |
+| levelsio | 26 | 88% | stars + repos + $86k/mo | missed DroneSim |
+| marclou | 30 | 100% | partial MRR | TrustMRR $44k is on a newsletter |
+| tibo_maker | 30 | 100% | PH votes need token | SuperX + Revid + Outrank |
+| shadcn | 16 | 80% | 2/2 | improve 9.2k stars |
+| steventey | 13 | 100% | npm weekly | site hint |
+| pontusab | 12 | 100% | 2/2 | Workbench 450 stars |
+| arvidkahl | 12 | 100% must | 1/1 | Podscan $5k/mo |
+| nutlope | 21 | 100% | 3/3 | Hallmark 29.8k stars |
+| simonw | 30 | 83% | repos | prolific GH |
+| dannypostmaa | 3 | 100% | 2/2 | AgentBar + HeadshotPro |
+
+Median must-find recall **100%**. The other 40 rows on this list use the same gather path; swap a handle here if identity lands on a decoy.

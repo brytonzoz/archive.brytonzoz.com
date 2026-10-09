@@ -164,16 +164,7 @@ export function ShippedStage({ opening, title }: { opening: Opening; title: Reac
   const prints = useRef(0);
   const run = useRef(0);
   const house = job.key === 'house' || Boolean(job.kind === 'print' && job.slip);
-  const wantFocus = paper === 'torn' && Boolean(current) && job.kind === 'print' && !house;
-  const [focus, setFocus] = useState(false);
-  useEffect(() => {
-    if (!wantFocus) {
-      setFocus(false);
-      return;
-    }
-    const timer = window.setTimeout(() => setFocus(true), 50);
-    return () => window.clearTimeout(timer);
-  }, [wantFocus]);
+  const focus = paper === 'torn' && Boolean(current) && job.kind === 'print' && !house;
   const paperMax = usePaperMax(focus, house);
 
   useEffect(() => {
@@ -184,7 +175,7 @@ export function ShippedStage({ opening, title }: { opening: Opening; title: Reac
     }
   }, []);
 
-  // /r/<id>/ finds out which receipt it is after the first render.
+  // /shipped/r/<id>/ finds out which receipt it is after the first render.
   useEffect(() => {
     if (touched.current) return;
     setJob(openingJob(opening));

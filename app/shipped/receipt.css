@@ -787,14 +787,7 @@
 }
 
 .shipped-stage.is-focus {
-  position: relative;
   min-height: 100svh;
-  gap: 0;
-}
-
-html.shipped-focus .shipped-page {
-  overflow: hidden;
-  padding-bottom: 0;
 }
 
 html.shipped-focus .shipped-stack > p {
@@ -802,15 +795,12 @@ html.shipped-focus .shipped-stack > p {
 }
 
 .shipped-stage.is-focus .shipped-ticker-pin {
-  position: absolute;
-  left: 0;
-  right: 0;
-  top: 0;
-  z-index: 1;
+  max-height: 0;
   opacity: 0;
+  overflow: hidden;
   pointer-events: none;
-  transform: translate3d(0, -12px, 0);
-  padding-bottom: 0;
+  padding: 0;
+  margin: 0;
 }
 
 .shipped-counter {
@@ -1304,28 +1294,20 @@ html.shipped-focus .shipped-stack > p {
 }
 
 .shipped-printer.is-focus .shipped-printer-body {
-  position: absolute;
-  left: 50%;
-  top: 0;
-  z-index: 0;
-  width: min(29rem, calc(100% - 32px));
-  transform: translateX(-50%) translate3d(0, -46%, 0) scale(0.74);
-  opacity: 0.22;
+  transform: scale(0.72) translate3d(0, -28%, 0);
+  opacity: 0.28;
   transform-origin: 50% 0;
   pointer-events: none;
-  transition: transform 480ms var(--ease-drawer), opacity 320ms var(--ease-out);
+  margin-bottom: -7.5rem;
+  transition: transform 480ms var(--ease-drawer), opacity 320ms var(--ease-out), margin 480ms var(--ease-drawer);
 }
 
 .shipped-printer.is-focus .shipped-out {
-  position: relative;
-  z-index: 2;
   width: min(26.5rem, 100%);
-  margin-top: 0;
-  padding-top: calc(8px + env(safe-area-inset-top, 0px));
 }
 
 .shipped-printer.is-focus .shipped-tilt.is-scroll {
-  max-height: 100svh;
+  max-height: calc(100svh - 24px);
   overflow: auto;
   overscroll-behavior: contain;
   padding-bottom: calc(148px + env(safe-area-inset-bottom, 0px));
@@ -1333,11 +1315,6 @@ html.shipped-focus .shipped-stack > p {
 
 .shipped-printer.is-focus .shipped-pull {
   transform: none !important;
-}
-
-.shipped-printer.is-focus .shipped-stub,
-.shipped-printer.is-focus .shipped-hint {
-  display: none;
 }
 
 .shipped-stub {

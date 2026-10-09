@@ -426,7 +426,7 @@ export function Machine({ job, display, tone, onPrinted, onTorn, tearSignal = 0,
           </button>
         </div>
         <div className="shipped-mouth" aria-hidden="true">
-          <span className="shipped-slot" />
+          <span className="shipped-aperture" />
           <span className="shipped-bar" />
         </div>
       </div>

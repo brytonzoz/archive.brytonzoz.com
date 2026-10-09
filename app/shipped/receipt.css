@@ -527,6 +527,10 @@
   min-width: 0;
   color: inherit;
   text-decoration: none;
+  /* Never inherit the printer mouth's absolute slot — these are in-flow bands. */
+  position: relative;
+  inset: auto;
+  height: auto;
 }
 
 .shipped-slot:focus-visible {
@@ -1017,7 +1021,7 @@
   box-shadow: inset 0 2px 3px rgba(0, 0, 0, 0.8);
 }
 
-.shipped-slot {
+.shipped-aperture {
   position: absolute;
   left: 1.6rem;
   right: 1.6rem;

@@ -230,10 +230,13 @@
 .shipped-board-toggle-copy {
   flex: 1 1 auto;
   min-width: 0;
-  font-size: 13px;
+  font-size: 12.5px;
   font-weight: 500;
   letter-spacing: -0.01em;
   color: rgba(243, 234, 216, 0.88);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
 }
 
 .shipped-board-marks {
@@ -986,8 +989,8 @@
 }
 
 .shipped-lcd:not(.is-input) .shipped-lcd-block,
-.shipped-lcd-input:not(:placeholder-shown):not(:focus) + .shipped-lcd-block {
-  opacity: 0;
+.shipped-lcd-input:not(:placeholder-shown) + .shipped-lcd-block {
+  display: none;
 }
 
 .shipped-lcd-text {
@@ -1079,6 +1082,7 @@
   cursor: progress;
 }
 
+.shipped-key:disabled,
 .shipped-key[aria-disabled='true'] {
   color: rgba(243, 234, 216, 0.28);
   cursor: default;

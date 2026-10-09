@@ -170,7 +170,7 @@ export function Ticker() {
   const shared = useConfirmedCount(live ? (state?.shared ?? 0) : 0);
   const shipped = useConfirmedCount(live ? (state?.shipped ?? 0) : 0);
   const views = useConfirmedCount(live ? (state?.views ?? 0) : 0);
-  const places = Math.max(4, String(Math.max(printed, 1)).length);
+  const places = Math.max(4, String(Math.max(0, printed)).length);
 
   return (
     <>

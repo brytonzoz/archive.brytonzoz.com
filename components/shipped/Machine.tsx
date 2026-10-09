@@ -446,6 +446,7 @@ export function Machine({ job, display, tone, onPrinted, onTorn, tearSignal = 0,
       <button
         type="button"
         className="shipped-key is-tear"
+        disabled={phase !== 'hanging'}
         aria-disabled={phase !== 'hanging'}
         onPointerDown={press}
         onClick={() => {

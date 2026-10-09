@@ -38,6 +38,9 @@ export type YearReceiptProps = {
   fine?: React.ReactNode;
   /** Item names and statuses only (the opening example). */
   compact?: boolean;
+  deepCut?: { name: string; why: string } | null;
+  badges?: string[];
+  firstRun?: boolean;
 };
 
 function ItemName({ item }: { item: ViewItem }) {
@@ -125,6 +128,7 @@ export function YearReceipt(props: YearReceiptProps) {
         <Line label="DATE" value={props.date} />
         <Line label="RECEIPT" value={`#${props.number}`} />
         <Line label="CASHIER" value="NIGHT SHIFT" />
+        {props.firstRun ? <Line label="RUN" value="FIRST RUN" /> : null}
       </div>
       <Rule />
 
@@ -139,6 +143,15 @@ export function YearReceipt(props: YearReceiptProps) {
         </span>
       </h2>
       {props.kicker ? <p className="mt-1 text-center text-[11px] opacity-70">{props.kicker}</p> : null}
+      {props.badges?.length ? <p className="mt-2 text-center text-[10px] font-semibold tracking-[0.14em] opacity-70">{props.badges.join(' · ')}</p> : null}
+
+      {props.deepCut ? (
+        <section className="mt-3 text-center" aria-label="How did it know?">
+          <p className="shipped-inverse">HOW DID IT KNOW?</p>
+          <p className="mt-2 text-[13px] font-semibold">{props.deepCut.name}</p>
+          <p className="mt-0.5 text-[11px] opacity-70">{props.deepCut.why}</p>
+        </section>
+      ) : null}
 
       <Rule />
       <p className="shipped-lead text-[10.5px] opacity-60" aria-hidden="true">

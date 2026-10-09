@@ -59,6 +59,22 @@ test('long item names wrap and the status lands on the leader line', () => {
   }
 });
 
+test('the sourced deep-cut prints first as HOW DID IT KNOW', () => {
+  const doc = receiptToDoc({
+    ...RECEIPT,
+    firstRun: true,
+    deepCut: { name: 'SHOW HN APP', why: 'Sourced · hn' },
+    badges: ['FIRST RUN', 'DEEP CUT'],
+  });
+  const text = doc.text;
+  assert.match(text, /HOW DID IT KNOW\?/);
+  assert.match(text, /SHOW HN APP/);
+  assert.match(text, /FIRST RUN/);
+  const how = doc.lines.findIndex((line) => line.kind === 'text' && line.invert && line.text === 'HOW DID IT KNOW?');
+  const itemsHead = doc.lines.findIndex((line) => line.kind === 'text' && line.text.startsWith('ITEM'));
+  assert.ok(how >= 0 && how < itemsHead);
+});
+
 test('the plain-text copy carries every item and the note', () => {
   const text = docText(receiptToDoc(RECEIPT).lines);
   assert.match(text, /SHORT: SHIPPED/);

@@ -71,6 +71,7 @@ export function receiptToDoc(receipt: ThermalReceipt): PrintDoc {
   lead(lines, 'DATE', receipt.date);
   lead(lines, 'RECEIPT', `#${receipt.number}`);
   lead(lines, 'CASHIER', 'NIGHT SHIFT');
+  if (receipt.firstRun) lead(lines, 'RUN', 'FIRST RUN');
   lines.push({ kind: 'rule' });
 
   feed(6);
@@ -79,7 +80,17 @@ export function receiptToDoc(receipt: ThermalReceipt): PrintDoc {
   text(lines, 'CUSTOMER', 'center', { small: true, faint: true });
   text(lines, receipt.who.toUpperCase(), 'center', { bold: true, tall: true });
   if (receipt.kicker) text(lines, receipt.kicker, 'center', { small: true, faint: true });
+  if (receipt.badges?.length) text(lines, receipt.badges.join(' · '), 'center', { small: true });
   lines.push({ kind: 'rule' });
+
+  if (receipt.deepCut) {
+    feed(6);
+    text(lines, 'HOW DID IT KNOW?', 'center', { bold: true, invert: true });
+    feed(8);
+    text(lines, receipt.deepCut.name, 'center', { bold: true });
+    text(lines, receipt.deepCut.why, 'center', { small: true });
+    lines.push({ kind: 'rule' });
+  }
 
   lines.push({ kind: 'text', text: `ITEM${' '.repeat(COLS_SMALL - 10)}STATUS`, align: 'left', small: true, faint: true });
   receipt.items.forEach((item, index) => {

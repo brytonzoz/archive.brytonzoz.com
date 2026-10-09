@@ -67,6 +67,17 @@
   color: rgba(243, 234, 216, 0.48);
 }
 
+.shipped-board-ticker {
+  margin: 0.55rem -0.25rem 0;
+  overflow: hidden;
+  white-space: nowrap;
+  text-overflow: ellipsis;
+  font-size: 10.5px;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: rgba(243, 234, 216, 0.42);
+}
+
 .shipped-board-hero,
 .shipped-board-cell {
   background-color: var(--paper);

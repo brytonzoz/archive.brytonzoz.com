@@ -169,6 +169,12 @@ function header(c: number, date: string, number: string) {
   ];
 }
 
+function headerFull(c: number, data: Pick<YearOg, 'date' | 'number' | 'firstRun' | 'badges'>) {
+  const extra = data.firstRun ? [leader(148, 'RUN', 'FIRST RUN', 12, 600), rule(164)] : [rule(146)];
+  const chips = data.badges?.length ? [txt(c, data.firstRun ? 182 : 164, fit(data.badges.join(' · '), 48), 9, { anchor: 'middle', opacity: 0.7 })] : [];
+  return [...header(c, data.date, data.number).slice(0, -1), ...extra, ...chips];
+}
+
 // ---- The home page card -----------------------------------------------------------------------------
 
 export type MasterOg = {
@@ -230,6 +236,9 @@ export type YearOg = {
   sponsors: YearOgSlot[];
   url: string;
   barcode: number[];
+  deepCut?: { name: string; why: string } | null;
+  badges?: string[];
+  firstRun?: boolean;
 };
 
 function qrMark(x: number, y: number, width: number, code: { size: number; path: string }) {
@@ -305,7 +314,12 @@ export function yearCardSvg(data: YearOg): string {
     txt(72, 322, name, name.length > 16 ? 28 : 34, { weight: 600, spacing: -0.5, fill: CREAM }),
     txt(72, 372, `${data.count} ${data.count === 1 ? 'thing' : 'things'} shipped`, 26, { fill: CREAM, opacity: 0.8 }),
   ];
-  wrap(`“${data.note}”`, 44, 2).forEach((line, i) => left.push(txt(72, 424 + i * 26, line, 18, { fill: CREAM, opacity: 0.6 })));
+  if (data.deepCut) {
+    left.push(txt(72, 412, 'How did it know?', 16, { fill: CREAM, opacity: 0.5 }));
+    left.push(txt(72, 440, fit(data.deepCut.name, 36), 20, { weight: 600, fill: CREAM }));
+  } else {
+    wrap(`“${data.note}”`, 44, 2).forEach((line, i) => left.push(txt(72, 424 + i * 26, line, 18, { fill: CREAM, opacity: 0.6 })));
+  }
   const hero = data.sponsors[0];
   if (hero) {
     left.push(txt(72, 540, 'Sponsored by', 14, { fill: CREAM, opacity: 0.45 }));
@@ -315,8 +329,14 @@ export function yearCardSvg(data: YearOg): string {
   left.push(txt(72, 636, 'Print yours: shipped.brytonzoz.com', 15, { fill: CREAM, opacity: 0.5 }));
 
   const c = PAPER_W / 2;
-  const body: string[] = [...header(c, data.date, data.number), ...customer(c, 180, data.year, data.who), rule(258)];
-  let y = 290;
+  const body: string[] = [...headerFull(c, data), ...customer(c, data.firstRun ? 214 : 180, data.year, data.who), rule(data.firstRun ? 292 : 258)];
+  let y = data.firstRun ? 324 : 290;
+  if (data.deepCut) {
+    body.push(inverse(c, y, 'HOW DID IT KNOW?', 11));
+    y += 26;
+    body.push(txt(c, y, fit(data.deepCut.name.toUpperCase(), 28), 12, { weight: 600, anchor: 'middle' }));
+    y += 28;
+  }
   for (const item of data.items) {
     if (y > 700) break;
     if (item.logo) body.push(logoImage(28, y - 15, 20, item.logo));
@@ -326,11 +346,20 @@ export function yearCardSvg(data: YearOg): string {
   return scene(1200, 675, `${sheet(680, body.join(''), 'translate(736 40) rotate(0.6 200 0)', `card:${data.number}`, { open: true, soft: true })}${printerLip(706, 40, 460)}${left.join('')}`);
 }
 
-/** The whole receipt as one tall image (2×), PAID FOR BY block and all. */
-export function yearTallSvg(data: YearOg): string {
+function yearReceiptPaint(data: YearOg): { body: string; height: number } {
   const c = PAPER_W / 2;
-  const body: string[] = [...header(c, data.date, data.number), ...customer(c, 180, data.year, data.who), rule(258)];
-  let y = 288;
+  const body: string[] = [...headerFull(c, data), ...customer(c, data.firstRun ? 214 : 180, data.year, data.who), rule(data.firstRun ? 292 : 258)];
+  let y = data.firstRun ? 322 : 288;
+  if (data.deepCut) {
+    body.push(inverse(c, y, 'HOW DID IT KNOW?', 12));
+    y += 28;
+    body.push(txt(c, y, fit(data.deepCut.name.toUpperCase(), 30), 13, { weight: 600, anchor: 'middle' }));
+    y += 18;
+    body.push(txt(c, y, fit(data.deepCut.why, 48), 10.5, { anchor: 'middle', opacity: 0.7 }));
+    y += 24;
+    body.push(rule(y));
+    y += 20;
+  }
   for (const item of data.items) {
     const indent = item.logo ? 64 : 28;
     if (item.logo) body.push(logoImage(28, y - 16, 28, item.logo));
@@ -356,6 +385,21 @@ export function yearTallSvg(data: YearOg): string {
   body.push(txt(c, y, 'PRINTED AT SHIPPED.BRYTONZOZ.COM', 10.5, { weight: 600, anchor: 'middle' }));
   body.push(txt(c, y + 16, '*** CUSTOMER COPY ***', 10, { anchor: 'middle', opacity: 0.6 }));
   body.push(txt(c, y + 32, fit(data.url, 52), 9.5, { anchor: 'middle', opacity: 0.55 }));
-  const height = y + 56;
-  return scene(PAPER_W + 120, height + 120, sheet(height, body.join(''), 'translate(60 50) rotate(-0.6 200 0)', `tall:${data.number}`), 2);
+  return { body: body.join(''), height: y + 56 };
+}
+
+/** The whole receipt as one tall image (2×), PAID FOR BY block and all. */
+export function yearTallSvg(data: YearOg): string {
+  const { body, height } = yearReceiptPaint(data);
+  return scene(PAPER_W + 120, height + 120, sheet(height, body, 'translate(60 50) rotate(-0.6 200 0)', `tall:${data.number}`), 2);
+}
+
+/** 4-inch Rollo (203 dpi → 832 dots). White paper, no counter, 1:1 for the cutter. */
+export const ROLLO_DOTS = 832;
+
+export function yearRolloSvg(data: YearOg): string {
+  const { body, height } = yearReceiptPaint(data);
+  const scale = (ROLLO_DOTS - 32) / PAPER_W;
+  const outH = Math.ceil(height * scale + 32);
+  return `<svg xmlns="http://www.w3.org/2000/svg" width="${ROLLO_DOTS}" height="${outH}" viewBox="0 0 ${ROLLO_DOTS} ${outH}"><rect width="${ROLLO_DOTS}" height="${outH}" fill="${PAPER}"/><g transform="translate(16 16) scale(${scale.toFixed(4)})">${body}</g></svg>`;
 }

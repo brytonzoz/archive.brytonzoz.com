@@ -5,9 +5,11 @@ import React, { useEffect, useRef, useState } from 'react';
 import { track } from '../../lib/analytics';
 import { receiptDate } from '../../lib/shipped';
 import { money } from '../../lib/shipped-receipt';
+import { isFirstRun, itemsForPrint, pickDeepCut, receiptBadges, receiptModules } from '../../lib/shipped-modules';
 import {
   CARD_PATH,
   RECEIPT_PATH,
+  ROLLO_PATH,
   TALL_PATH,
   itemDate,
   itemsShipped,
@@ -51,6 +53,9 @@ export function pileTokenFor(id: number): string | null {
 export function VisitorReceipt({ receipt, sponsors }: Loaded) {
   const who = subjectLabel(receipt.subject);
   const kicker = receipt.subject.kind === 'github' && receipt.subject.display !== who ? `@${receipt.subject.id} · GITHUB` : KICKER[receipt.subject.kind];
+  const ordered = itemsForPrint(receipt.potential ? [] : receipt.items);
+  const cut = pickDeepCut(ordered);
+  const badges = receiptBadges(receiptModules({ receipt }));
   return (
     <YearReceipt
       year={receipt.year}
@@ -58,7 +63,7 @@ export function VisitorReceipt({ receipt, sponsors }: Loaded) {
       kicker={kicker}
       date={receiptDate(receipt.printedAt)}
       number={receiptNumber(receipt.id)}
-      items={receipt.items.map((item, i) => ({
+      items={(receipt.potential ? receipt.items : ordered).map((item, i) => ({
         key: `${i}-${item.name}`,
         name: item.name,
         status: item.status,
@@ -71,16 +76,22 @@ export function VisitorReceipt({ receipt, sponsors }: Loaded) {
       note={receipt.note}
       sponsors={sponsors}
       barcode={`SH${receiptNumber(receipt.id)}`}
+      deepCut={cut ? { name: cut.name, why: `Sourced from ${cut.source}` } : null}
+      badges={badges}
+      firstRun={isFirstRun(receipt.id)}
       fine={
         <>
           <p>
             Made from public pages and APIs
             {receipt.demo ? ' (demo print: no AI on this server)' : ', itemized by AI'}. Every item links to its public source. Only public,
-            professional work.
+            professional work. Wrong? Remove or correct it.
           </p>
           <p className="mt-2 space-x-3">
             <a href={`/remove/?id=${receipt.id}`} className="shipped-link">
-              Report or remove this receipt
+              Report, remove or correct
+            </a>
+            <a href="/#print" className="shipped-link">
+              Print a friend&apos;s
             </a>
             <a href="/#sponsor" className="shipped-link">
               Sponsor a slot
@@ -215,14 +226,46 @@ function RemoveMine({ receipt, onRemoved }: { receipt: Printed; onRemoved?: () =
   );
 }
 
-/** Sharing is the obvious next step: post to X first, then the images and the link. */
+/** Sharing is the obvious next step: one-tap image share, then X, save and copy-link. */
 export function ShareBar({ receipt, onRemoved }: { receipt: Printed; onRemoved?: () => void }) {
   const [copied, setCopied] = useState(false);
+  const [sharing, setSharing] = useState(false);
   const url = typeof window === 'undefined' ? RECEIPT_PATH(receipt.id) : new URL(RECEIPT_PATH(receipt.id), window.location.origin).toString();
   const intent = `https://x.com/intent/post?text=${encodeURIComponent(shareText(receipt))}&url=${encodeURIComponent(url)}`;
+
+  async function shareImage() {
+    setSharing(true);
+    try {
+      const imageUrl = new URL(`${TALL_PATH(receipt.id)}?download=1`, window.location.origin).toString();
+      const blob = await fetch(imageUrl).then((response) => (response.ok ? response.blob() : null));
+      const file = blob ? new File([blob], `shipped-${receipt.year}-${receiptNumber(receipt.id)}.png`, { type: 'image/png' }) : null;
+      if (file && navigator.canShare?.({ files: [file] })) {
+        await navigator.share({ files: [file], text: shareText(receipt), url });
+        beacon(receipt.id, 'share');
+        return;
+      }
+      if (navigator.share) {
+        await navigator.share({ text: shareText(receipt), url });
+        beacon(receipt.id, 'share');
+        return;
+      }
+      await navigator.clipboard.writeText(url);
+      setCopied(true);
+      window.setTimeout(() => setCopied(false), 2000);
+      beacon(receipt.id, 'copy');
+    } catch (error) {
+      if (error instanceof DOMException && error.name === 'AbortError') return;
+    } finally {
+      setSharing(false);
+    }
+  }
+
   return (
     <div className="shipped-share" role="group" aria-label="Share your receipt">
-      <a href={intent} target="_blank" rel="noopener noreferrer" className="shipped-button is-big" onClick={() => beacon(receipt.id, 'x')}>
+      <button type="button" className="shipped-button is-big" onClick={shareImage} disabled={sharing}>
+        {sharing ? 'SHARING…' : 'SHARE IMAGE'}
+      </button>
+      <a href={intent} target="_blank" rel="noopener noreferrer" className="shipped-button is-ghost" onClick={() => beacon(receipt.id, 'x')}>
         POST TO X
       </a>
       <div className="shipped-share-row">
@@ -231,6 +274,9 @@ export function ShareBar({ receipt, onRemoved }: { receipt: Printed; onRemoved?:
         </a>
         <a href={`${TALL_PATH(receipt.id)}?download=1`} download className="shipped-button is-ghost" aria-label="Save the full receipt image" onClick={() => beacon(receipt.id, 'tall')}>
           SAVE FULL
+        </a>
+        <a href={`${ROLLO_PATH(receipt.id)}?download=1`} download className="shipped-button is-ghost" aria-label="Save a 4-inch Rollo print" onClick={() => beacon(receipt.id, 'rollo')}>
+          4-IN ROLLO
         </a>
         <button
           type="button"

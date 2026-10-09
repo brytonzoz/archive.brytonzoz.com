@@ -322,7 +322,8 @@ export function ShippedStage({ opening, title }: { opening: Opening; title: Reac
               </p>
             ) : (
               <p id="shipped-print-hint" className="shipped-kiosk-hint">
-                Try levelsio, rauchg, or yoursite.com
+                Public pages only. Wrong? Remove or correct it after it prints. First line usually lands in about 15
+                seconds; a reprint of the same name is instant.
               </p>
             )}
 

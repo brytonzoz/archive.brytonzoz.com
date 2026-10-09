@@ -4,8 +4,9 @@ import { initWasm, Resvg } from '@resvg/resvg-wasm';
 import resvgWasm from '@resvg/resvg-wasm/index_bg.wasm';
 import plexRegular from './fonts/IBMPlexMono-Regular.ttf';
 import plexSemiBold from './fonts/IBMPlexMono-SemiBold.ttf';
-import { yearCardSvg, yearTallSvg, type YearOg } from '../lib/receipt-svg';
+import { yearCardSvg, yearRolloSvg, yearTallSvg, type YearOg } from '../lib/receipt-svg';
 import { receiptBarcodeUnits, receiptDate } from '../lib/shipped';
+import { isFirstRun, itemsForPrint, pickDeepCut, receiptBadges, receiptModules } from '../lib/shipped-modules';
 import { qr } from '../lib/shipped-qr';
 import { itemDate, itemsShipped, receiptNumber, subjectLabel, QR_PATH, RECEIPT_PATH, type SponsorBlock, type YearReceipt } from '../lib/shipped-year';
 
@@ -49,9 +50,11 @@ export async function decodePixels(svg: string): Promise<{ pixels: Uint8Array; w
 export type LogoResolver = (path: string | null) => Promise<string | null>;
 
 async function yearOg(receipt: YearReceipt, block: SponsorBlock, origin: string, logo: LogoResolver, maxItems: number): Promise<YearOg> {
-  const items = receipt.items.slice(0, maxItems);
+  const ordered = itemsForPrint(receipt.potential ? [] : receipt.items);
+  const items = (receipt.potential ? receipt.items : ordered).slice(0, maxItems);
   const logos = await Promise.all(items.map((item) => logo(item.logo).catch(() => null)));
   const sponsorLogos = await Promise.all(block.slots.map((slot) => logo(slot.logo).catch(() => null)));
+  const cut = pickDeepCut(ordered);
   return {
     number: receiptNumber(receipt.id),
     year: receipt.year,
@@ -70,6 +73,9 @@ async function yearOg(receipt: YearReceipt, block: SponsorBlock, origin: string,
     sponsors: block.slots.map((slot, i) => ({ name: slot.name, cta: slot.cta, logo: sponsorLogos[i], qr: qr(new URL(QR_PATH(slot.qr), origin).toString()) })),
     url: new URL(RECEIPT_PATH(receipt.id), origin).toString().replace(/^https?:\/\//, ''),
     barcode: receiptBarcodeUnits(`BZ${receiptNumber(receipt.id)}${receipt.year}`),
+    deepCut: cut ? { name: cut.name, why: `Sourced from ${cut.source}` } : null,
+    badges: receiptBadges(receiptModules({ receipt })),
+    firstRun: isFirstRun(receipt.id),
   };
 }
 
@@ -81,4 +87,9 @@ export async function yearCardPng(receipt: YearReceipt, block: SponsorBlock, ori
 /** The whole receipt, tall, for downloading. */
 export async function yearTallPng(receipt: YearReceipt, block: SponsorBlock, origin: string, logo: LogoResolver) {
   return renderPng(yearTallSvg(await yearOg(receipt, block, origin, logo, 30)));
+}
+
+/** 4-inch Rollo PNG (832 dots wide at 203 dpi). */
+export async function yearRolloPng(receipt: YearReceipt, block: SponsorBlock, origin: string, logo: LogoResolver) {
+  return renderPng(yearRolloSvg(await yearOg(receipt, block, origin, logo, 30)));
 }

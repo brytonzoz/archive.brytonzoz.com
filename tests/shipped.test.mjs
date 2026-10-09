@@ -101,7 +101,7 @@ test('item dates and the share text', () => {
   assert.equal(itemDate(null), null);
   assert.equal(itemDate('soon'), null);
   const receipt = { year: 2026, potential: false, subject: { kind: 'x', id: 'levelsio', display: '@levelsio' }, items: [{}, {}, {}] };
-  assert.equal(shareText(receipt), 'Shipped 2026: 3 things, itemized on one receipt. Print yours before the printer shuts off:');
+  assert.equal(shareText(receipt), 'I shipped 3 things in 2026. Receipt attached.');
   assert.doesNotMatch(shareText(receipt), /@/, 'sharing never tags the person on the receipt');
   assert.equal(itemsShipped({ ...receipt, potential: true, items: [{}] }), 1);
   assert.match(shareText({ ...receipt, potential: true, items: [{}] }), /potential/);

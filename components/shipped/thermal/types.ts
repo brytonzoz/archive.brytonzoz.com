@@ -33,6 +33,11 @@ export type ThermalReceipt = {
   barcode: string;
   /** Item names and statuses only (the opening example). */
   compact?: boolean;
+  /** Sourced deep-cut printed first ("How did it know?"). */
+  deepCut?: { name: string; why: string } | null;
+  /** Honest chips: FIRST RUN, DEEP CUT, SOURCED… */
+  badges?: string[];
+  firstRun?: boolean;
 };
 
 export type Align = 'left' | 'center' | 'right';

@@ -107,6 +107,7 @@ export function SponsorBoard() {
         <p className="shipped-board-pitch">Pay and your logo is on every receipt printed.</p>
         <p className="shipped-board-proof">
           {state ? `${state.printed.toLocaleString('en-US')} printed` : '·· printed'}
+          {state ? ` · ${state.shared.toLocaleString('en-US')} shared` : null}
           {state && now !== null ? (
             <>
               {' · '}
@@ -114,6 +115,14 @@ export function SponsorBoard() {
             </>
           ) : null}
         </p>
+        {state?.recent.length ? (
+          <p className="shipped-board-ticker" aria-label="Recently printed">
+            {state.recent
+              .slice(0, 8)
+              .map((row) => `${row.who.toUpperCase()} · ${row.potential ? 'POTENTIAL' : `${row.count} SHIPPED`}`)
+              .join('  ·  ')}
+          </p>
+        ) : null}
       </header>
 
       <article className="shipped-board-hero" aria-label={slotLabel(hero.slot)}>

@@ -7,7 +7,9 @@
 // Only paths listed in wrangler.jsonc's run_worker_first reach this; the rest are served as plain assets.
 import { handleShippedPage, outOfPaper, qrRedirect, type ShippedEnv } from './shipped';
 import { hardenPage, secure, switchedOff } from './shipped-guard';
+import { SHIPPED_APP_TITLE, SHIPPED_DESCRIPTION, SHIPPED_MANIFEST_NAME, SHIPPED_MANIFEST_SHORT } from '../lib/shipped-brand';
 import { SHIPPED_URL } from '../lib/shipped-year';
+import shareImages from '../lib/share-images.json';
 
 const NOINDEX = 'noindex, nofollow, noarchive';
 const PAGES = /^\/(?:(lab|refunds|remove|sandbox-pay|terms)(?:\/.*)?)?$/;
@@ -22,6 +24,28 @@ function noindex(response: Response): Response {
   const headers = new Headers(response.headers);
   headers.set('x-robots-tag', NOINDEX);
   return new Response(response.body, { status: response.status, statusText: response.statusText, headers });
+}
+
+/** Author / keywords / creator / Twitter handles inherited from brytonzoz.com's root layout. */
+const DROP_META = new Set(['author', 'creator', 'keywords', 'publisher', 'twitter:creator', 'twitter:site']);
+
+/** Strip Bryton's JSON-LD and author tags; keep only the small made-by credit in the page body. */
+function debrand(response: Response): Response {
+  if (!(response.headers.get('content-type') ?? '').includes('text/html')) return response;
+  return new HTMLRewriter()
+    .on('script[type="application/ld+json"]', {
+      element(el) {
+        el.remove();
+      },
+    })
+    .on('meta', {
+      element(el) {
+        const name = (el.getAttribute('name') ?? el.getAttribute('property') ?? '').toLowerCase();
+        if (DROP_META.has(name)) el.remove();
+        else if (name === 'apple-mobile-web-app-title' || name === 'application-name') el.setAttribute('content', SHIPPED_APP_TITLE);
+      },
+    })
+    .transform(response);
 }
 
 /** Absolute links baked into the build name production's host; on staging (or locally) they name this one. */
@@ -58,7 +82,7 @@ export async function handleShippedHost(request: Request, env: HostEnv, ctx: Exe
     const headers = secure(new Headers(response.headers));
     return new Response(null, { status: response.status, headers });
   }
-  return hardenPage(response);
+  return hardenPage(debrand(response));
 }
 
 async function route(request: Request, env: HostEnv, ctx: ExecutionContext): Promise<Response | null> {
@@ -76,6 +100,26 @@ async function route(request: Request, env: HostEnv, ctx: ExecutionContext): Pro
 
   // Indexing is off (noindex on every page and header), but crawlers must be allowed in to see that.
   if (path === '/robots.txt') return new Response(ROBOTS, { headers: { 'content-type': 'text/plain; charset=utf-8', 'cache-control': 'public, max-age=3600' } });
+  if (path === '/manifest.webmanifest' || path === '/manifest.json') {
+    return new Response(
+      JSON.stringify({
+        name: SHIPPED_MANIFEST_NAME,
+        short_name: SHIPPED_MANIFEST_SHORT,
+        description: SHIPPED_DESCRIPTION,
+        start_url: '/',
+        scope: '/',
+        display: 'standalone',
+        background_color: '#121316',
+        theme_color: '#121316',
+        icons: [
+          { src: shareImages.icons['192'], sizes: '192x192', type: 'image/png', purpose: 'any' },
+          { src: shareImages.icons['512'], sizes: '512x512', type: 'image/png', purpose: 'any' },
+          { src: shareImages.icons['512'], sizes: '512x512', type: 'image/png', purpose: 'maskable' },
+        ],
+      }),
+      { headers: { 'content-type': 'application/manifest+json; charset=utf-8', 'cache-control': 'public, max-age=3600', 'x-robots-tag': NOINDEX } },
+    );
+  }
   if (OWN_FILES.test(path)) return null;
   const qr = path.match(/^\/q\/([a-z0-9]{1,12})\/?$/i);
   if (qr) return qrRedirect(env, qr[1].toLowerCase(), ctx);

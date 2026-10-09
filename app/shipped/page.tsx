@@ -6,13 +6,14 @@ import { ShippedStage } from '../../components/shipped/ShippedStage';
 import { SponsorBoard } from '../../components/shipped/SponsorBoard';
 import { SponsorDesk } from '../../components/shipped/SponsorDesk';
 import { SHIPPED_OG_IMAGE } from '../../lib/shipped';
+import { SHIPPED_DESCRIPTION, SHIPPED_TITLE } from '../../lib/shipped-brand';
 import { EVENT_NAME } from '../../lib/shipped-event';
-import { SHIPPED_URL, SITE_YEAR } from '../../lib/shipped-year';
+import { SHIPPED_URL } from '../../lib/shipped-year';
 
 export const dynamic = 'force-static';
 
-const TITLE = `${EVENT_NAME}: the public receipt printer`;
-const DESCRIPTION = `Print a free receipt of everything you publicly shipped in ${SITE_YEAR}: apps, launches, repos, releases, sites. Two weeks only.`;
+const TITLE = SHIPPED_TITLE;
+const DESCRIPTION = SHIPPED_DESCRIPTION
 
 export const metadata: Metadata = {
   title: { absolute: TITLE },

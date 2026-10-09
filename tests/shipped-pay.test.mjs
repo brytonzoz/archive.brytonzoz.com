@@ -33,6 +33,13 @@ test('slot prices are fixed and set by the server: $1 for a house slot, holder +
   assert.equal(sponsors.SLOT_COUNT, 10);
 });
 
+test('Shipped names itself in metadata, never Bryton Zoz', async () => {
+  const brand = await import('../lib/shipped-brand.ts');
+  for (const value of [brand.SHIPPED_APP_TITLE, brand.SHIPPED_TITLE, brand.SHIPPED_DESCRIPTION, brand.SHIPPED_MANIFEST_NAME, brand.SHIPPED_MANIFEST_SHORT]) {
+    assert.equal(/bryton/i.test(value), false, value);
+  }
+});
+
 test('floors rise with receipts printed; a house hero never sells below the current floor', () => {
   const floors = sponsors.floorsAt(sponsors.DEFAULT_LADDER, 0);
   assert.equal(floors.hero, 500);

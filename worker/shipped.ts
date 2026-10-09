@@ -32,7 +32,7 @@ import { yearCardPng, yearTallPng, type LogoResolver } from './shipped-og';
 import { PRINT_KIND, SPONSOR_KIND, isProduction, sponsorProvider, type PayEnv, type SponsorEvent } from './shipped-pay';
 import { brandIcon, clean, faviconUrl, gather, githubUser, hostOf, readSite, searchGithubUsers, tinyfishAccess, type SourceEnv } from './shipped-sources';
 import { TINYFISH_DAILY, type TinyfishKind, type TinyfishMeter } from './shipped-tinyfish';
-import { finalUrl } from './shipped-fetch';
+import { checkFetchUrl, finalUrl } from './shipped-fetch';
 import {
   DAY,
   HOUR,
@@ -374,10 +374,13 @@ async function lookup(request: Request, env: ShippedEnv): Promise<Response> {
     for (const person of people.slice(0, 3)) candidates.push({ kind: 'github', id: person.login, display: query.value, detail: `GitHub @${person.login}` });
     candidates.push({ kind: 'name', id: query.value, display: query.value, detail: people.length ? 'Search the web for this name' : 'Name or brand' });
   }
-  const safe = candidates.filter((c) => !hasBlockedWord(c.id) && !hasBlockedWord(c.display)).slice(0, 4);
+  const safe = candidates.filter((c) => !hasBlockedWord(c.id) && !hasBlockedWord(c.display) && (c.kind !== 'domain' || publicDomain(c.id))).slice(0, 4);
   if (!safe.length) return json({ error: 'invalid-query' }, 400);
   return json({ candidates: safe, auto: safe.length === 1 });
 }
+
+/** A domain we would actually fetch: no IPs in disguise (127.0.0.1.nip.io), no local or internal names. */
+const publicDomain = (domain: string) => checkFetchUrl(`https://${domain.toLowerCase()}/`).ok;
 
 function readSubject(raw: unknown): Subject | null {
   const value = (raw && typeof raw === 'object' ? raw : {}) as Record<string, unknown>;
@@ -386,7 +389,7 @@ function readSubject(raw: unknown): Subject | null {
   const valid =
     (kind === 'github' && isGithubLogin(id)) ||
     (kind === 'x' && isXHandle(id)) ||
-    (kind === 'domain' && isDomain(id.toLowerCase())) ||
+    (kind === 'domain' && isDomain(id.toLowerCase()) && publicDomain(id)) ||
     (kind === 'name' && readQuery(id)?.kind === 'name');
   if (!valid || hasBlockedWord(id)) return null;
   const subject: Subject = { kind, id: kind === 'domain' ? id.toLowerCase() : id, display: '' };

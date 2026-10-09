@@ -47,7 +47,11 @@ test('takeovers lock an hour before close; prorated refunds never exceed what wa
 test('sponsor links: https, a real public domain of their own, no shorteners, redirects or lookalikes', () => {
   assert.deepEqual(sponsors.sponsorUrlProblem('acme.dev'), { url: 'https://acme.dev/' });
   assert.deepEqual(sponsors.sponsorUrlProblem('https://www.acme.dev/pricing#top'), { url: 'https://www.acme.dev/pricing' });
+  assert.deepEqual(sponsors.sponsorUrlProblem('https://acme.dev./'), { url: 'https://acme.dev/' }, 'a trailing dot is not a different site');
   const cases = {
+    'https://127.0.0.1.nip.io/': 'host',
+    'https://10-0-0-1.sslip.io/': 'host',
+    'https://bit.ly./abc': 'shortener',
     'http://acme.dev': 'https',
     'javascript:alert(1)': 'https',
     'data:text/html,<script>alert(1)</script>': 'format',

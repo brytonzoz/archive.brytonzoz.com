@@ -105,6 +105,8 @@ const SHORTENERS = new Set([
 /** TLDs that are mostly abuse in practice, and anonymous hosting/tunnels. */
 const RISKY_TLDS = new Set(['zip', 'mov', 'top', 'xyz', 'tk', 'ml', 'ga', 'cf', 'gq', 'click', 'country', 'kim', 'work', 'rest', 'fit', 'loan', 'win', 'bid', 'icu', 'cam', 'monster', 'support', 'onion', 'su', 'ru', 'cn']);
 const RISKY_HOST = /(^|\.)(ngrok(-free)?\.(io|app|dev)|trycloudflare\.com|workers\.dev|pages\.dev|vercel\.app|netlify\.app|glitch\.me|repl\.co|000webhostapp\.com|duckdns\.org|no-ip\.\w+|ddns\.net|blogspot\.com|weebly\.com|wixsite\.com|firebaseapp\.com|web\.app|herokuapp\.com|github\.io|gitlab\.io|sites\.google\.com|forms\.gle|docs\.google\.com|drive\.google\.com|dropbox\.com|mega\.nz|t\.me|telegram\.(me|org)|wa\.me|discord\.(gg|com))$/;
+/** Wildcard DNS that resolves to whatever IP is in the name (127.0.0.1.nip.io): an IP in disguise. */
+const IP_IN_DNS = /(^|\.)(nip\.io|sslip\.io|xip\.io|nip\.direct|traefik\.me|localtest\.me|lvh\.me|vcap\.me|lacolhost\.com|localho\.st|1u\.ms|rbndr\.us)$/;
 /** Brand names that aren't the brand's own domain are impersonation. */
 const IMPERSONATED = /(paypal|stripe|apple|google|microsoft|metamask|coinbase|binance|amazon|chase|wellsfargo|bankofamerica|venmo|cashapp|irs|usps|fedex|ups|dhl|github|openai|anthropic|brytonzoz)/;
 
@@ -129,6 +131,7 @@ export function sponsorUrlProblem(raw: string): { url: string } | { problem: Url
     return { problem: 'host' };
   }
   if (!/^[a-z]{2,24}$/.test(tld) || labels.some((label) => !/^[a-z0-9]([a-z0-9-]{0,61}[a-z0-9])?$/.test(label))) return { problem: 'host' };
+  if (IP_IN_DNS.test(host)) return { problem: 'host' };
   if (labels.some((label) => label.startsWith('xn--'))) return { problem: 'lookalike' };
   if (SHORTENERS.has(host) || SHORTENERS.has(labels.slice(-2).join('.'))) return { problem: 'shortener' };
   if (RISKY_TLDS.has(tld) || RISKY_HOST.test(host)) return { problem: 'risky' };
@@ -137,6 +140,7 @@ export function sponsorUrlProblem(raw: string): { url: string } | { problem: Url
   if (brand && registrable !== brand) return { problem: 'lookalike' };
   if (/[?&](url|redirect|redirect_uri|next|dest|destination|goto|continue|return|returnto|r|u)=/i.test(url.search)) return { problem: 'risky' };
   url.hash = '';
+  url.hostname = host;
   return { url: url.toString() };
 }
 

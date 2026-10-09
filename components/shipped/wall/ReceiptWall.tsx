@@ -10,13 +10,14 @@ import { WallSlip } from './WallSlip';
 
 const PAGE = 24;
 const BUFFER = 720;
+const RETRIES = 3;
 
 async function fetchPile(before?: number | null): Promise<PileResponse> {
   const url = new URL('/api/shipped/pile', window.location.origin);
   url.searchParams.set('limit', String(PAGE));
   if (before) url.searchParams.set('before', String(before));
   const response = await fetch(url, { cache: 'no-store' });
-  if (!response.ok) return { receipts: [], total: 0, frozen: false, next: null };
+  if (!response.ok) throw new Error('pile');
   return response.json() as Promise<PileResponse>;
 }
 
@@ -32,6 +33,7 @@ export function ReceiptWall({ page = false }: { page?: boolean }) {
   const [focus, setFocus] = useState<number | null>(null);
   const [reduced, setReduced] = useState(false);
   const loading = useRef(false);
+  const tries = useRef(0);
 
   useEffect(() => {
     setCrumpledIds(new Set(readCrumpled()));
@@ -47,15 +49,26 @@ export function ReceiptWall({ page = false }: { page?: boolean }) {
     loading.current = true;
     try {
       const page = await fetchPile(before);
+      if (!before && page.receipts.length === 0) throw new Error('empty');
       setReceipts((current) => {
         const seen = new Set(current.map((row) => row.id));
         return before ? [...current, ...page.receipts.filter((row) => !seen.has(row.id))] : page.receipts;
       });
       setNext(page.next);
       setTotal(page.total);
+      setReady(true);
+    } catch {
+      if (!before && tries.current < RETRIES) {
+        tries.current += 1;
+        window.setTimeout(() => {
+          loading.current = false;
+          void load();
+        }, 400 * tries.current);
+        return;
+      }
+      setReady(true);
     } finally {
       loading.current = false;
-      setReady(true);
     }
   }, []);
 
@@ -94,26 +107,22 @@ export function ReceiptWall({ page = false }: { page?: boolean }) {
   }, [cards, view]);
 
   useEffect(() => {
-    if (!ready || next === null) return;
+    if (!receipts.length || next === null) return;
     const last = cards[cards.length - 1];
     if (last && last.y < view.top + view.height + BUFFER * 2) void load(next);
-  }, [ready, next, cards, view, load]);
+  }, [receipts.length, next, cards, view, load]);
 
   const focused = focus !== null ? byId.get(focus) ?? null : null;
+  const empty = receipts.length === 0;
 
   return (
     <section className={`shipped-wall${page ? ' is-page' : ''}`} data-wall="" aria-label="The wall">
       <header className="shipped-wall-head">
         <h2>The wall</h2>
-        <p>{ready ? (total ? `${total} pinned` : 'Nothing pinned yet') : 'Loading'}</p>
+        <p>{empty ? 'Pinning' : `${total} pinned`}</p>
       </header>
-      <div ref={board} className="shipped-wall-board" style={{ height: ready ? Math.max(height, 280) : 280 }}>
-        {!ready ? <p className="shipped-wall-empty">Loading the wall…</p> : null}
-        {ready && !receipts.length ? (
-          <p className="shipped-wall-empty">
-            Nothing pinned yet. Print a receipt and tick the wall key so it shows up here — only for people who opt in.
-          </p>
-        ) : null}
+      <div ref={board} className="shipped-wall-board" style={{ height: empty ? Math.max(height, 520) : Math.max(height, 280) }}>
+        {empty ? <WallSkeleton width={width} /> : null}
         {visible.map((card) => {
           const receipt = byId.get(card.id);
           if (!receipt) return null;
@@ -131,6 +140,26 @@ export function ReceiptWall({ page = false }: { page?: boolean }) {
         />
       ) : null}
     </section>
+  );
+}
+
+function WallSkeleton({ width }: { width: number }) {
+  const dummies = Array.from({ length: 8 }, (_, i) => ({ id: -(i + 1), items: [{ name: '—' }, { name: '—' }, { name: '—' }] }));
+  const { cards, height } = layoutWall(dummies, new Set(), width, wallColumns(width));
+  return (
+    <div className="shipped-wall-skel" style={{ height }} aria-hidden="true">
+      {cards.map((card) => (
+        <div
+          key={card.id}
+          className="shipped-wall-skel-pin"
+          style={{
+            width: card.w,
+            height: card.h,
+            transform: `translate3d(${card.x}px, ${card.y}px, 0) rotate(${card.rotate}deg)`,
+          }}
+        />
+      ))}
+    </div>
   );
 }
 

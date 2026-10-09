@@ -222,7 +222,16 @@ test('the wall crumples only in this browser and pages from the listed pile', as
   const wall = fs.readFileSync(new URL('../components/shipped/wall/ReceiptWall.tsx', import.meta.url), 'utf8');
   assert.match(wall, /\/api\/shipped\/pile/);
   assert.match(wall, /localStorage/);
+  assert.match(wall, /WallSkeleton/);
+  assert.doesNotMatch(wall, /Nothing pinned yet/);
   assert.doesNotMatch(wall, /shipped-sources|shipped-ai/);
+  const worker = fs.readFileSync(new URL('../worker/shipped.ts', import.meta.url), 'utf8');
+  assert.match(worker, /listed !== false/);
+  assert.match(worker, /wall-opt-out/);
+  const machine = fs.readFileSync(new URL('../components/shipped/Machine.tsx', import.meta.url), 'utf8');
+  assert.match(machine, /Keep it off the wall/);
+  const visitor = fs.readFileSync(new URL('../components/shipped/visitor.tsx', import.meta.url), 'utf8');
+  assert.match(visitor, /Unpin from the wall/);
   const home = fs.readFileSync(new URL('../app/shipped/page.tsx', import.meta.url), 'utf8');
   assert.match(home, /ReceiptWall/);
   assert.doesNotMatch(home, /RecentStrip|ReceiptPile/);

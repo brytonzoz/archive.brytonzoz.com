@@ -58,7 +58,7 @@ export type YearReceipt = {
   potential: boolean;
   /** Printed without the AI (no key): free sources only, a canned note. */
   demo: boolean;
-  /** Listed in "recently printed" (the printer opted in). */
+  /** On the wall. Default true; the printer can keep it off. */
   listed: boolean;
   /** Print order of the 12 modules (ids only; content is always derived). */
   layout?: string[];

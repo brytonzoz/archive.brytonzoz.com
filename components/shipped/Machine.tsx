@@ -455,12 +455,12 @@ export function Machine({ job, display, tone, onPrinted, onTorn, tearSignal = 0,
         <button
           type="button"
           className="shipped-key"
-          aria-pressed={desk.listed}
-          aria-label={desk.listed ? 'Listed on the wall. Tap to unlist' : 'Pin it on the wall under recently printed'}
+          aria-pressed={!desk.listed}
+          aria-label={desk.listed ? 'Keep it off the wall' : 'Kept off the wall. Tap to pin it'}
           onPointerDown={press}
           onClick={() => desk.onListed(!desk.listed)}
         >
-          <span aria-hidden="true">{desk.listed ? 'WALL ON' : 'WALL'}</span>
+          <span aria-hidden="true">KEEP OFF</span>
         </button>
       ) : null}
       <span className="shipped-keys-space" aria-hidden="true" />

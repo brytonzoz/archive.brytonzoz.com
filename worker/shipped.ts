@@ -5,7 +5,7 @@
 //   GET  /api/shipped/state            event window, counters, generator, payments, the sponsor block
 //   GET  /api/shipped/proof            PRINTED / SHARED / MAILED / VIEWS and how they are counted (starts at 0)
 //   POST /api/shipped/lookup           { q } -> { candidates, auto } (who did they mean?)
-//   POST /api/shipped/print            { subject, token, listed } -> { id, pile } (same subject within 7 days: cached)
+//   POST /api/shipped/print            { subject, token, listed? } -> { id, pile } (listed defaults on; listed:false keeps it off the wall)
 //   GET  /api/shipped/pile             the pile (lib/shipped-pile.ts); POST { id, token } tosses a receipt on
 //   POST /api/shipped/shared           { id, how } share counter (sendBeacon)
 //   POST /api/shipped/seen             { id } sponsor-block impression (once per visitor/receipt/day)
@@ -203,7 +203,7 @@ const SCHEMA = [
     id INTEGER PRIMARY KEY AUTOINCREMENT, login TEXT NOT NULL, login_key TEXT NOT NULL, day TEXT NOT NULL,
     mode TEXT NOT NULL, data TEXT NOT NULL, demo INTEGER NOT NULL DEFAULT 0, hidden INTEGER NOT NULL DEFAULT 0,
     model TEXT, input_tokens INTEGER, output_tokens INTEGER, cost_micros INTEGER, created_at INTEGER NOT NULL,
-    searches INTEGER, listed INTEGER NOT NULL DEFAULT 0, shares INTEGER NOT NULL DEFAULT 0, views INTEGER NOT NULL DEFAULT 0)`,
+    searches INTEGER, listed INTEGER NOT NULL DEFAULT 1, shares INTEGER NOT NULL DEFAULT 0, views INTEGER NOT NULL DEFAULT 0)`,
   'CREATE UNIQUE INDEX IF NOT EXISTS shipped_receipts_daily ON shipped_receipts (login_key, day, mode)',
   'CREATE INDEX IF NOT EXISTS shipped_receipts_key ON shipped_receipts (login_key, hidden)',
   `CREATE TABLE IF NOT EXISTS shipped_takedowns (
@@ -254,6 +254,15 @@ async function migrate(db: D1Database) {
       });
   }
   await db.batch(MARKET_SCHEMA.map((sql) => db.prepare(sql)));
+  // One-time: the wall used to be opt-in. Every receipt that was not taken down goes on the wall.
+  const backfilled = await db.prepare(`SELECT 1 AS x FROM shipped_flags WHERE key = 'wall-opt-out'`).first();
+  if (!backfilled) {
+    await db.prepare('UPDATE shipped_receipts SET listed = 1 WHERE hidden = 0').run();
+    await db
+      .prepare(`INSERT INTO shipped_flags (key, value, set_at) VALUES ('wall-opt-out', '1', ?) ON CONFLICT(key) DO NOTHING`)
+      .bind(Date.now())
+      .run();
+  }
 }
 
 let schemaReady: Promise<unknown> | null = null;
@@ -521,7 +530,7 @@ async function print(request: Request, env: ShippedEnv, ctx: ExecutionContext): 
     const slot = await concurrencySlot(db, env, PRINT_LOCK);
     if (!slot) return json({ error: 'busy', retryAfter: 10 }, 503);
     held.push(slot);
-    return await generate(request, env, ctx, db, subject, key, year, mode, state, body.listed === true, (micros) => {
+    return await generate(request, env, ctx, db, subject, key, year, mode, state, body.listed !== false, (micros) => {
       reserved = micros;
     });
   } finally {

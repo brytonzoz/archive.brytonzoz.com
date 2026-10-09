@@ -149,7 +149,7 @@ export function ShippedStage({ opening, title }: { opening: Opening; title: Reac
   const state = useShippedState();
   const generator = state?.generator;
   const [query, setQuery] = useState('');
-  const [listed, setListed] = useState(false);
+  const [listed, setListed] = useState(true);
   const [token, setToken] = useState<string | null>(null);
   const [step, setStep] = useState<Step>({ name: 'idle' });
   const [error, setError] = useState<string | null>(null);
@@ -169,9 +169,9 @@ export function ShippedStage({ opening, title }: { opening: Opening; title: Reac
 
   useEffect(() => {
     try {
-      setListed(window.localStorage.getItem('shipped-pile') === 'on');
+      setListed(window.localStorage.getItem('shipped-wall-off') !== '1');
     } catch {
-      // Private mode: PILE lasts for this page only.
+      // Private mode: the choice lasts for this page only.
     }
   }, []);
 
@@ -381,7 +381,7 @@ export function ShippedStage({ opening, title }: { opening: Opening; title: Reac
                   onListed: (value) => {
                     setListed(value);
                     try {
-                      window.localStorage.setItem('shipped-pile', value ? 'on' : 'off');
+                      window.localStorage.setItem('shipped-wall-off', value ? '0' : '1');
                     } catch {
                       // Private mode: the choice lasts for this page only.
                     }

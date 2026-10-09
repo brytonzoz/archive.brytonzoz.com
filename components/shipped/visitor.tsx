@@ -198,6 +198,38 @@ function MailedPrint({ receipt }: { receipt: Printed }) {
   );
 }
 
+/** The browser that printed it can take it off the wall without deleting the page. */
+function UnpinMine({ receipt }: { receipt: Printed }) {
+  const [pile, setPile] = useState<string | null>(null);
+  const [listed, setListed] = useState(receipt.listed !== false);
+  const [busy, setBusy] = useState(false);
+  useEffect(() => setPile(pileTokenFor(receipt.id)), [receipt.id]);
+  if (!pile) return null;
+  if (!listed) {
+    return <p className="mt-2 text-center text-[11px] text-[#f3ead8]/55">Off the wall.</p>;
+  }
+  async function unpin() {
+    setBusy(true);
+    const response = await fetch('/api/shipped/pile', {
+      method: 'POST',
+      headers: { 'content-type': 'application/json' },
+      body: JSON.stringify({ id: receipt.id, token: pile, off: true }),
+    }).catch(() => null);
+    if (response?.ok) {
+      setListed(false);
+      refreshShippedState();
+    }
+    setBusy(false);
+  }
+  return (
+    <p className="mt-2 text-center text-[11px] text-[#f3ead8]/55">
+      <button type="button" className="underline" onClick={() => void unpin()} disabled={busy}>
+        {busy ? 'Unpinning…' : 'Unpin from the wall'}
+      </button>
+    </p>
+  );
+}
+
 /** The browser that printed a receipt can take it down at once (no review, nothing else blocked). */
 function RemoveMine({ receipt, onRemoved }: { receipt: Printed; onRemoved?: () => void }) {
   const [pile, setPile] = useState<string | null>(null);
@@ -406,6 +438,7 @@ export function SharePill({
                   </a>
                 </div>
                 <MailedPrint receipt={receipt} />
+                <UnpinMine receipt={receipt} />
                 <RemoveMine receipt={receipt} onRemoved={onRemoved} />
               </div>
             </>

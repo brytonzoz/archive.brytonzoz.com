@@ -2044,6 +2044,38 @@ html.shipped-focus .shipped-board {
   opacity: 0.78;
 }
 
+.shipped-wall-skel {
+  position: absolute;
+  inset: 0;
+}
+
+.shipped-wall-skel-pin {
+  position: absolute;
+  top: 0;
+  left: 0;
+  border-radius: 2px;
+  background: linear-gradient(180deg, #efe4cf, #e2d3b5);
+  box-shadow: 0 8px 14px rgba(0, 0, 0, 0.22);
+  overflow: hidden;
+  transform-origin: 50% 8px;
+}
+
+.shipped-wall-skel-pin::after {
+  content: '';
+  position: absolute;
+  inset: 0;
+  background: linear-gradient(90deg, transparent, rgba(255, 248, 236, 0.45), transparent);
+  transform: translateX(-100%);
+  animation: shipped-shimmer 1.4s ease-in-out infinite;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .shipped-wall-skel-pin::after {
+    animation: none;
+    opacity: 0.2;
+  }
+}
+
 .shipped-wall-pin {
   position: absolute;
   top: 0;

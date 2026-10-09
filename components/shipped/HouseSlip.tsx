@@ -17,7 +17,7 @@ export function HouseSlip() {
       <div className="space-y-1 text-[12px]">
         <Line label="1. TYPE A NAME OR @HANDLE" value="FREE" />
         <Line label={`2. IT PRINTS YOUR ${SITE_YEAR}`} value="AUTO" />
-        <Line label="3. POST IT, PIN IT ON THE WALL" value="FREE" />
+        <Line label="3. POST IT. IT GOES ON THE WALL" value="FREE" />
         <Line label="MAILED THERMAL PRINT (US)" value="$5" />
       </div>
       <Rule heavy />

@@ -58,7 +58,6 @@ const SOURCE_SURPRISE: Record<ItemSource, number> = {
   site: 3,
   web: 3,
   bryton: 2,
-  x: 2,
   github: 1,
   none: 0,
 };
@@ -71,7 +70,6 @@ const SOURCE_LABEL: Record<ItemSource, string> = {
   producthunt: 'Product Hunt',
   site: 'their site',
   web: 'the web',
-  x: 'X',
   bryton: 'a public page',
   none: 'a public page',
 };

@@ -234,6 +234,7 @@ const COLUMNS = [
   'ALTER TABLE shipped_spend ADD COLUMN searches INTEGER NOT NULL DEFAULT 0',
   ...MARKET_COLUMNS,
   'ALTER TABLE shipped_bids ADD COLUMN serial INTEGER',
+  'ALTER TABLE print_orders ADD COLUMN refund_cents INTEGER',
 ];
 
 async function migrate(db: D1Database) {
@@ -305,6 +306,7 @@ async function generatorState(env: ShippedEnv, db: D1Database | null, off?: Set<
   if (!demo) {
     if (await outOfCredit(db)) return stop('out-of-paper');
     const cap = await cycleBudgetCap(db, env);
+    // No database is the only remaining null; a sales-query miss now yields the $180 base.
     if (cap === null) return stop('out-of-paper');
     const used = await budgetUsed(db, budgetKey());
     if (used.spent + used.reserved >= cap) return stop('out-of-paper');

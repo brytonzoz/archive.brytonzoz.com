@@ -70,7 +70,7 @@ test('locks: one holder at a time, stale locks can be retaken, concurrency slots
   assert.ok(await guard.concurrencySlot(db, env, 60_000, now));
 });
 
-test('cycle budget: $180 from the 8th plus 80% of this cycle settled sales; fail closed without sales tables', async () => {
+test('cycle budget: $180 from the 8th plus 80% of this cycle settled sales; missing sales tables are $0', async () => {
   const budget = await import('../lib/shipped-budget.ts');
   const oct9 = Date.UTC(2026, 9, 9, 15);
   const oct7 = Date.UTC(2026, 9, 7, 15);
@@ -92,8 +92,8 @@ test('cycle budget: $180 from the 8th plus 80% of this cycle settled sales; fail
   assert.equal(budget.budgetAlertLevel(0, 180_000_000), 0);
 
   const empty = memoryD1();
-  assert.equal(await guard.cycleBudgetCap(null, {}), null, 'no database');
-  assert.equal(await guard.cycleBudgetCap(empty, {}), null, 'sales tables missing → fail closed');
+  assert.equal(await guard.cycleBudgetCap(null, {}), null, 'no database still fails closed');
+  assert.equal(await guard.cycleBudgetCap(empty, {}, oct9), 180_000_000, 'missing sales tables count as $0 sales, not a dead printer');
 
   const db = memoryD1();
   db.raw.exec(`CREATE TABLE shipped_bids (
@@ -118,6 +118,17 @@ test('cycle budget: $180 from the 8th plus 80% of this cycle settled sales; fail
   assert.equal(await guard.netSettledCents(db, Date.UTC(2026, 9, 8), Date.UTC(2026, 10, 8)), net);
   assert.equal(await guard.cycleBudgetCap(db, {}, oct9), budget.cycleCapMicros(180, net));
   assert.ok(net < 6700, 'Stripe fees come off; last-cycle $40 does not count; the unpaid hold does not count');
+
+  const brokenPrints = memoryD1();
+  brokenPrints.raw.exec(`CREATE TABLE shipped_bids (
+    id INTEGER PRIMARY KEY, status TEXT, amount_cents INTEGER, total_cents INTEGER, refund_cents INTEGER, paid_at INTEGER
+  )`);
+  brokenPrints.raw.exec(`CREATE TABLE print_orders (id INTEGER PRIMARY KEY, status TEXT, amount_cents INTEGER, paid_at INTEGER)`);
+  brokenPrints.raw.exec(`INSERT INTO shipped_bids (status, amount_cents, total_cents, refund_cents, paid_at) VALUES ('live', 5000, 5000, 0, ${thisCycle})`);
+  brokenPrints.raw.exec(`INSERT INTO print_orders (status, amount_cents, paid_at) VALUES ('to_print', 500, ${thisCycle})`);
+  const bidOnly = budget.saleNetCents(5000, 0);
+  assert.equal(await guard.netSettledCents(brokenPrints, Date.UTC(2026, 9, 8), Date.UTC(2026, 10, 8)), bidOnly, 'missing print_orders.refund_cents is $0 prints, not a dead cap');
+  assert.equal(await guard.cycleBudgetCap(brokenPrints, {}, oct9), budget.cycleCapMicros(180, bidOnly));
 
   assert.deepEqual(await guard.recordBudgetAlerts(db, 90_000_000, 180_000_000, oct9), [50]);
   assert.deepEqual(await guard.recordBudgetAlerts(db, 90_000_000, 180_000_000, oct9), [], 'once per cycle');

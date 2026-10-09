@@ -222,37 +222,57 @@ const SETTLED = `status NOT IN ('checkout', 'failed', 'lost') AND paid_at IS NOT
 
 type SaleRow = { amount: number; refund: number };
 
-/** Money we actually kept in `[fromMs, toMs)`: paid bids and print orders after Stripe fees and refunds. Holds (checkout) are excluded. Null on any read failure. */
-export async function netSettledCents(db: D1Database, fromMs: number, toMs: number): Promise<number | null> {
+/** One table's settled net. A missing table, missing column, or other read error is $0, not a hard fail. */
+async function settledFrom(
+  db: D1Database,
+  sql: string,
+  fromMs: number,
+  toMs: number,
+  extraCostCents = 0,
+): Promise<number> {
   try {
-    const [bids, prints] = await Promise.all([
-      db
-        .prepare(
-          `SELECT COALESCE(total_cents, amount_cents) AS amount, COALESCE(refund_cents, 0) AS refund FROM shipped_bids WHERE ${SETTLED} AND paid_at >= ? AND paid_at < ?`,
-        )
-        .bind(fromMs, toMs)
-        .all<SaleRow>(),
-      db
-        .prepare(
-          `SELECT COALESCE(total_cents, amount_cents) AS amount, COALESCE(refund_cents, 0) AS refund FROM print_orders WHERE ${SETTLED} AND paid_at >= ? AND paid_at < ?`,
-        )
-        .bind(fromMs, toMs)
-        .all<SaleRow>(),
-    ]);
-    if (!bids?.results || !prints?.results) return null;
+    const rows = await db.prepare(sql).bind(fromMs, toMs).all<SaleRow>();
+    if (!rows?.results) return 0;
     let n = 0;
-    for (const row of [...bids.results, ...prints.results]) {
-      if (!Number.isFinite(row.amount) || !Number.isFinite(row.refund)) return null;
-      n += saleNetCents(row.amount, row.refund);
+    for (const row of rows.results) {
+      if (!Number.isFinite(row.amount) || !Number.isFinite(row.refund)) continue;
+      n += saleNetCents(row.amount, row.refund + extraCostCents);
     }
-    return n >= 0 ? Math.floor(n) : null;
-  } catch {
-    return null;
+    return Math.max(0, Math.floor(n));
+  } catch (error) {
+    console.error('shipped: sales query failed, treating as $0', error instanceof Error ? error.message.slice(0, 160) : 'unknown');
+    return 0;
   }
 }
 
 /**
- * This cycle's AI cap. Fail closed: no database, or sales we cannot read, means no printing.
+ * Money we actually kept in `[fromMs, toMs)`: paid bids and print orders after Stripe fees and refunds.
+ * Holds (checkout) are excluded. A query error counts as $0 of sales, not as a missing cap.
+ * `postageCents` is subtracted from each settled mailed print when set (bids are unchanged).
+ */
+export async function netSettledCents(db: D1Database, fromMs: number, toMs: number, postageCents = 0): Promise<number> {
+  const extra = Number.isFinite(postageCents) && postageCents > 0 ? Math.floor(postageCents) : 0;
+  const [bids, prints] = await Promise.all([
+    settledFrom(
+      db,
+      `SELECT COALESCE(total_cents, amount_cents) AS amount, COALESCE(refund_cents, 0) AS refund FROM shipped_bids WHERE ${SETTLED} AND paid_at >= ? AND paid_at < ?`,
+      fromMs,
+      toMs,
+    ),
+    settledFrom(
+      db,
+      `SELECT COALESCE(total_cents, amount_cents) AS amount, COALESCE(refund_cents, 0) AS refund FROM print_orders WHERE ${SETTLED} AND paid_at >= ? AND paid_at < ?`,
+      fromMs,
+      toMs,
+      extra,
+    ),
+  ]);
+  return bids + prints;
+}
+
+/**
+ * This cycle's AI cap. No database still fails closed (nothing to print against).
+ * A sales-ledger miss is $0 of income; the $180 base still stands.
  * `SHIPPED_CYCLE_CAP_USD` replaces the $180 base (this cycle's settled sales still add 80%).
  */
 export async function cycleBudgetCap(db: D1Database | null, env: GuardEnv, now = Date.now()): Promise<number | null> {
@@ -260,7 +280,6 @@ export async function cycleBudgetCap(db: D1Database | null, env: GuardEnv, now =
   const base = num(env.SHIPPED_CYCLE_CAP_USD, CYCLE_BASE_USD, 0, 10_000);
   const cycle = cycleBounds(now);
   const net = await netSettledCents(db, cycle.startMs, cycle.endMs);
-  if (net === null) return null;
   return capFromSales(base, net);
 }
 

@@ -1,7 +1,7 @@
 // Shipped's AI budget: $180 per cycle (UTC, resets on the 8th of each month, from 8 Oct 2026), plus
-// 80% of each settled sale this cycle (sponsor slots + mailed prints) after Stripe's US card fee
-// and refunds. Holds (unpaid checkouts) do not count. The Worker fails closed: if the cap cannot be
-// computed, printing says out of paper.
+// 80% of each settled sale this cycle (sponsor slots + mailed prints) after Stripe's US card fee,
+// refunds, and an optional print/postage cost. Holds (unpaid checkouts) do not count. A sales-ledger
+// read error counts as $0 of sales (the $180 base still stands). Claude errors still fail closed.
 
 export const CYCLE_RESET_DAY = 8;
 export const CYCLE_BASE_USD = 180;

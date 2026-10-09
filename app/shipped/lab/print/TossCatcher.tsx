@@ -85,6 +85,12 @@ export function TossCatcher() {
   useTossTarget({
     rect: () => {
       const box = tray.current?.getBoundingClientRect();
+      if (!box) return null;
+      if (box.bottom < 0 || box.top > window.innerHeight) return null;
+      return { x: box.left, y: box.top, width: box.width, height: box.height };
+    },
+    bounds: () => {
+      const box = tray.current?.getBoundingClientRect();
       return box ? { x: box.left, y: box.top, width: box.width, height: box.height } : null;
     },
     receive: (payload) => {

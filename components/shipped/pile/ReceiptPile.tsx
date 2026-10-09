@@ -253,6 +253,14 @@ export function ReceiptPile({
             if (!el) return null;
             const box = el.getBoundingClientRect();
             if (box.width < 1 || box.height < 1) return null;
+            if (box.bottom < 0 || box.top > window.innerHeight) return null;
+            return { x: box.left, y: box.top, width: box.width, height: box.height };
+          },
+          bounds: () => {
+            const el = root.current;
+            if (!el) return null;
+            const box = el.getBoundingClientRect();
+            if (box.width < 1 || box.height < 1) return null;
             return { x: box.left, y: box.top, width: box.width, height: box.height };
           },
           reveal: () => {

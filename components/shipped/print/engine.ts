@@ -42,6 +42,8 @@ export type EngineHooks = {
   tossable(): boolean;
   speed(): number;
   target(): ScreenRect | null;
+  /** The pile's box even when it is below the fold. */
+  bounds(): ScreenRect | null;
   reveal(): void;
   toss(payload: TossPayload): boolean;
   phase(phase: PrintPhase, landed?: boolean): void;
@@ -202,6 +204,8 @@ export class PrintEngine {
   // The job
   private receipt: ThermalReceipt | null = null;
   private doc: PrintDoc | null = null;
+  /** The receipt actually on the paper (load() only stages the next one). */
+  private job: { receipt: ThermalReceipt; doc: PrintDoc } | null = null;
   private raster: Raster | null = null;
   private plan: FeedPlan | null = null;
   private token = 0;
@@ -280,6 +284,8 @@ export class PrintEngine {
   private writes = new Map<HTMLElement, string>();
   private observer: ResizeObserver | null = null;
   private holdTimer = 0;
+  private idleHandle = 0;
+  private catchingUp = false;
 
   constructor(el: EngineElements, hooks: EngineHooks) {
     this.el = el;
@@ -311,12 +317,19 @@ export class PrintEngine {
     this.token++;
     cancelAnimationFrame(this.frame);
     window.clearTimeout(this.holdTimer);
+    if (this.idleHandle) {
+      const cancel = (window as unknown as { cancelIdleCallback?: (id: number) => void }).cancelIdleCallback;
+      cancel?.(this.idleHandle);
+      this.idleHandle = 0;
+    }
     if (this.motor) this.hooks.sounds().feedStop();
     this.motor = false;
     this.endDrag();
     this.ball?.canvas.remove();
     this.ball?.sprite?.canvas.remove();
     this.ball = null;
+    this.strips.forEach((canvas) => canvas.remove());
+    this.tiles.forEach((canvas) => canvas.remove());
     this.observer?.disconnect();
     this.el.sheet.removeEventListener('pointerdown', this.onPointerDown);
     this.el.sheet.removeEventListener('keydown', this.onKeyDown);
@@ -338,8 +351,20 @@ export class PrintEngine {
     }
   }
 
+  private sheetReceipt(): ThermalReceipt | null {
+    return this.job?.receipt ?? this.receipt;
+  }
+
   print() {
     if (!this.receipt || !this.doc || this.destroyed) return;
+    if (this.leaving) {
+      const token = ++this.token;
+      this.leaving.then = () => {
+        if (token !== this.token) return;
+        void this.startPrint(token);
+      };
+      return;
+    }
     const token = ++this.token;
     if (this.mode === 'printing' && this.motor) {
       this.hooks.sounds().feedStop();
@@ -351,6 +376,8 @@ export class PrintEngine {
     };
     if ((this.mode === 'hanging' || this.mode === 'free' || this.mode === 'printing') && !this.hooks.reduced()) {
       this.endDrag();
+      this.auto = false;
+      this.pendingToss = false;
       this.leaving = { t: 0, then: go };
       this.kick();
     } else {
@@ -359,11 +386,17 @@ export class PrintEngine {
   }
 
   tear() {
+    if (this.leaving) return;
     if (this.mode !== 'hanging' || this.auto) return;
-    this.startAutoTear(this.started ? this.side : prng(`${this.receipt?.id}:side`)() < 0.5 ? -1 : 1);
+    this.startAutoTear(this.started ? this.side : prng(`${this.sheetReceipt()?.id}:side`)() < 0.5 ? -1 : 1);
   }
 
   crumpleAndToss() {
+    if (this.leaving) return;
+    if (this.mode === 'printing' || this.mode === 'loading') {
+      this.pendingToss = true;
+      return;
+    }
     if (this.mode === 'hanging') {
       this.pendingToss = true;
       this.tear();
@@ -379,6 +412,7 @@ export class PrintEngine {
 
   /** The FEED key: push out a little blank paper. */
   feed() {
+    if (this.leaving) return;
     if (this.mode === 'hanging' && !this.started && !this.drag) {
       if (this.fedExtra >= FEED_MAX) return;
       this.fedExtra += FEED_STEP;
@@ -399,7 +433,7 @@ export class PrintEngine {
       }
       return;
     }
-    if (!this.motor) {
+    if (!this.motor && !document.hidden) {
       this.hooks.sounds().feedStart();
       this.motor = true;
     }
@@ -433,9 +467,9 @@ export class PrintEngine {
     // The serrated bar: its teeth have the paper's tooth pitch and line up with the tear.
     const barLeft = this.paperLeft - 14;
     const barWidth = W + 28;
-    // Teeth about 1.2 mm tall with their tips 1.6 mm above the slot; the bar's body covers the slot's lip.
-    const tip = 13 * s;
-    const depth = 10 * s;
+    // Tips meet the paper's torn tips (STUB_ROWS above the slot), valleys a tooth below that.
+    const tip = (STUB_ROWS + TOOTH_DEPTH * 0.5) * s;
+    const depth = TOOTH_DEPTH * s;
     const height = tip + 4;
     el.bar.style.setProperty('--teeth', `${depth.toFixed(2)}px`);
     // The bar lives in the printer's front: place it in that box's coordinates.
@@ -459,6 +493,7 @@ export class PrintEngine {
     this.writeClips();
     if (this.mode === 'free') {
       this.placeHands();
+      this.setHands(this.handsH);
       if (this.sub === 'rest') {
         this.bodyState.x = this.rest.x;
         this.bodyState.y = this.rest.y;
@@ -518,6 +553,7 @@ export class PrintEngine {
     const doc = this.doc;
     if (!receipt || !doc) return;
     this.leaving = null;
+    this.job = { receipt, doc };
     this.setMode('loading');
     const family = pageFont(this.el.root);
     const [logos] = await Promise.all([loadLogos(doc), prepareFont(family)]);
@@ -554,6 +590,7 @@ export class PrintEngine {
     this.jobT = 0;
     this.hint = 0;
     this.burned = 0;
+    this.catchingUp = false;
     this.sizeSheet();
     this.mode = 'loading'; // (writeClips cuts the new sheet's top edge only once there is a sheet)
     this.writeClips();
@@ -571,8 +608,10 @@ export class PrintEngine {
       return;
     }
     this.setMode('printing');
-    this.hooks.sounds().feedStart();
-    this.motor = true;
+    if (!document.hidden) {
+      this.hooks.sounds().feedStart();
+      this.motor = true;
+    }
     this.kick();
   }
 
@@ -592,7 +631,6 @@ export class PrintEngine {
     this.landed = false;
     this.lift = this.vlift = 0;
     this.bz = this.vbz = this.tilt = this.vtilt = 0;
-    this.pendingToss = false;
     this.revealed = false;
     this.texture = null;
     this.clipKey = '';
@@ -701,7 +739,7 @@ export class PrintEngine {
       const band = raster.bands[index];
       // The shove that follows nudges the standing paper.
       if (band.height > 0 && band.kind !== 'feed') {
-        const r = prng(`${this.receipt?.id}:${index}:sway`);
+        const r = prng(`${this.sheetReceipt()?.id}:${index}:sway`);
         this.vsx += (r() - 0.35) * 5 * (band.height / 30);
         this.vsz += (r() - 0.5) * 7 * (band.height / 30);
         this.vflex += 0.55 * (band.height / 30);
@@ -906,12 +944,14 @@ export class PrintEngine {
     const pad = 22;
     this.handsH = Math.ceil(Hr + pad + 34);
     const handsTop = this.el.hands.offsetTop;
-    const tilt = (prng(`${this.receipt?.id}:rest`)() - 0.5) * 0.016;
+    const tilt = (prng(`${this.sheetReceipt()?.id}:rest`)() - 0.5) * 0.016;
     this.rest = { x: this.frameW / 2, y: handsTop + pad + Hr / 2, a: tilt };
   }
 
   /** Grows or shrinks the hands zone, compensating any shift of the component on the page (FLIP). */
   private setHands(height: number) {
+    const prev = this.el.hands.offsetHeight;
+    const handsBox = this.el.hands.getBoundingClientRect();
     const before = this.el.frame.getBoundingClientRect().top - this.flipY;
     this.el.hands.style.height = `${height}px`;
     const after = this.el.frame.getBoundingClientRect().top - this.flipY;
@@ -920,16 +960,24 @@ export class PrintEngine {
       this.flipY += shift;
       this.kick();
     }
-    if (height === 0) this.handsH = 0;
+    if (height === 0) {
+      this.handsH = 0;
+      const vh = window.innerHeight;
+      if (prev > 8 && handsBox.top < vh && handsBox.bottom > vh) {
+        window.scrollBy({ top: -(handsBox.bottom - vh), behavior: 'auto' });
+      }
+    }
   }
 
   // ---- the ball -------------------------------------------------------------------------------------
 
   private buildTexture(): HTMLCanvasElement | null {
+    if (this.destroyed) return null;
     if (this.texture) return this.texture;
     const raster = this.raster;
     if (!raster || !this.edge || !this.topEdge) return null;
     const tearRow = this.F - STUB_ROWS;
+    const rows = tearRow + EDGE_PAD;
     const outline: { x: number; y: number }[] = [];
     for (const p of this.topEdge) outline.push({ x: p.x, y: EDGE_PAD + p.y });
     for (let i = this.edge.length - 1; i >= 0; i--) outline.push({ x: this.edge[i].x, y: tearRow + this.edge[i].y });
@@ -937,7 +985,7 @@ export class PrintEngine {
     this.texture = paperTexture({
       ink: raster.canvas,
       inkTop: this.T0,
-      rows: tearRow,
+      rows,
       width: Math.min(PAPER_DOTS, this.W * dpr),
       grain: grainTile(),
       grainDots: GRAIN_SIZE / this.s,
@@ -946,11 +994,18 @@ export class PrintEngine {
     return this.texture;
   }
 
+  private bringPileIntoView() {
+    const bounds = this.hooks.bounds();
+    if (!bounds || bounds.height < 1) return;
+    const vh = window.innerHeight;
+    if (bounds.y <= vh * 0.72 && bounds.y + bounds.height >= vh * 0.12) return;
+    window.scrollBy({ top: bounds.y - vh * 0.35, behavior: this.hooks.reduced() ? 'auto' : 'smooth' });
+  }
+
   private startCrumple() {
-    const receipt = this.receipt;
+    const receipt = this.sheetReceipt();
     if (!receipt || this.mode !== 'free') return;
     this.pendingToss = false;
-    this.hooks.reveal();
     this.endDrag();
     const raster = this.raster;
     const frameBox = this.el.frame.getBoundingClientRect();
@@ -962,13 +1017,17 @@ export class PrintEngine {
     // The receipt's own origin (top-left) on the page.
     const ox = frameBox.left + b.x - (W / 2) * cos + (Hr / 2) * sin;
     const oy = frameBox.top + b.y - (W / 2) * sin - (Hr / 2) * cos;
+    // Match the pile's wad: a tight ball ~44–64 css px, not the open sheet.
+    const wad = clamp(0.07 * Math.sqrt(W * Math.min(Hr, 360)), 22, 32);
 
     if (this.hooks.reduced()) {
-      const size = 80;
-      const centre = { x: frameBox.left + b.x, y: frameBox.top + b.y };
-      const landed = this.hooks.toss({ receipt, raster, from: { x: centre.x - size / 2, y: centre.y - size / 2, width: size, height: size }, velocity: { x: 0, y: 0 }, crumple: 1, spin: 0 });
       this.park();
       this.setHands(0);
+      this.bringPileIntoView();
+      this.hooks.reveal();
+      const size = wad * 2;
+      const centre = { x: frameBox.left + b.x, y: frameBox.top + b.y };
+      const landed = this.hooks.toss({ receipt, raster, from: { x: centre.x - size / 2, y: centre.y - size / 2, width: size, height: size }, velocity: { x: 0, y: 0 }, crumple: 1, spin: 0 });
       this.hooks.phase('tossed', landed);
       this.hooks.tossed(landed);
       return;
@@ -977,10 +1036,19 @@ export class PrintEngine {
     const texture = this.buildTexture();
     if (!texture) return;
     // Ball up the part you can see (a long receipt is crumpled around the middle of the screen).
+    const textureH = (this.F - STUB_ROWS + EDGE_PAD) * this.s;
     const viewMid = localPoint(b, window.innerWidth / 2 - frameBox.left, window.innerHeight / 2 - frameBox.top);
-    const radius = clamp(0.16 * Math.sqrt(W * Hr), 34, 92);
+    const radius = wad;
     const centre = { x: W / 2, y: clamp(viewMid.y + Hr / 2, Math.min(Hr / 2, radius + 20), Math.max(Hr / 2, Hr - radius - 20)) };
-    const crumple = new Crumple({ width: W, height: Hr, texture, center: centre, radius, random: prng(`${receipt.id}:crumple`) });
+    const crumple = new Crumple({
+      width: W,
+      height: Math.max(Hr, textureH),
+      texture,
+      center: centre,
+      radius,
+      random: prng(`${receipt.id}:crumple`),
+      cols: 14,
+    });
     const dpr = Math.min(2, window.devicePixelRatio || 1);
     // The crumple is drawn on a canvas just over the part of the receipt on screen (the paper only moves
     // in toward the ball; the margin covers the folds that lift toward you).
@@ -1019,6 +1087,9 @@ export class PrintEngine {
       return;
     }
     this.park();
+    this.setHands(0);
+    this.bringPileIntoView();
+    this.hooks.reveal();
     this.ball = {
       phase: 'crumple',
       t: 0,
@@ -1070,8 +1141,8 @@ export class PrintEngine {
         const cos = Math.cos(place.angle);
         const sin = Math.sin(place.angle);
         ball.start = { x: ball.origin.x + place.x + c.x * cos - c.y * sin, y: ball.origin.y + place.y + c.x * sin + c.y * cos };
-        // From here the ball is the same faceted paper the pile draws, so it matches on landing.
-        const size = Math.max(48, Math.round(ball.crumple.radius * 2));
+        // Same wad the pile draws, at the pile's on-screen size (not the open sheet).
+        const size = Math.max(44, Math.round(ball.crumple.radius * 2));
         const pileBall = ballSprite({ id: ball.receipt.id, length: pileLength(ball.raster?.height ?? 800) }, size, dpr);
         pileBall.style.width = `${size}px`;
         pileBall.style.height = `${size}px`;
@@ -1094,21 +1165,22 @@ export class PrintEngine {
         ball.t = 0;
         ball.last = { ...ball.start, t: now };
         this.hooks.sounds().toss();
-        // The empty hands zone stays until the next print: shrinking the page under a thrown ball (and
-        // whatever the reader scrolled to) would jump it.
         this.placeSprite(ball, ball.start.x, ball.start.y, 0, 1);
       }
       return true;
     }
     // In flight: a parabola from where it was balled up to the pile, re-aimed every frame.
     const start = ball.start!;
-    const rect = this.hooks.target();
+    const rect = this.hooks.target() ?? this.hooks.bounds();
     let aim: { x: number; y: number };
-    if (rect && !ball.aimless) {
+    if (rect) {
+      ball.aimless = undefined;
       aim = { x: rect.x + rect.width / 2, y: rect.y + rect.height * 0.45 };
+    } else if (this.hooks.tossable() && ball.t < 0.85) {
+      this.placeSprite(ball, start.x, start.y, ball.spin * ball.t, 1);
+      return true;
     } else {
       if (!ball.aimless) {
-        // Nowhere to go: up, over and off the screen.
         const dir = start.x < window.innerWidth / 2 ? 1 : -1;
         ball.aimless = { x: start.x + dir * window.innerWidth * 0.55, y: window.innerHeight + 260 };
         ball.duration = 0.95;
@@ -1166,8 +1238,8 @@ export class PrintEngine {
     this.ball?.canvas.remove();
     this.ball?.sprite?.canvas.remove();
     this.ball = null;
-    this.hooks.phase('tossed', landed);
     this.hooks.tossed(landed);
+    if (this.mode === 'gone') this.hooks.phase('tossed', landed);
   }
 
   // ---- the loop -------------------------------------------------------------------------------------
@@ -1199,14 +1271,16 @@ export class PrintEngine {
         this.leaving = null;
         then();
       }
-    }
-
-    if (this.mode === 'printing' && this.plan && this.raster) {
+    } else if (this.mode === 'printing' && this.plan && this.raster) {
       active = true;
       this.jobT += gap * 1000;
       const sample = sampleFeed(this.plan, this.jobT, this.hint);
       this.hint = sample.step;
-      if (sample.burned > this.burned) this.burnTo(sample.burned, gap > 0.25);
+      if (sample.burned > this.burned) {
+        if (gap > 0.25 || sample.burned - this.burned > 2) this.catchingUp = true;
+        this.burnTo(sample.burned, this.catchingUp);
+        if (this.burned >= sample.burned) this.catchingUp = false;
+      }
       // The paper can't show a line the head hasn't burned yet (a catch-up spreads over a few frames).
       const band = this.raster.bands[this.burned - 1];
       const limit = band ? band.y + band.height + 2 : 0;
@@ -1246,10 +1320,12 @@ export class PrintEngine {
       this.vib = 0;
     }
 
-    if (this.mode === 'printing' || this.mode === 'hanging') {
-      if (this.stepStanding(dt)) active = true;
-    } else if (this.mode === 'free') {
-      if (this.stepFree(dt)) active = true;
+    if (!this.leaving) {
+      if (this.mode === 'printing' || this.mode === 'hanging') {
+        if (this.stepStanding(dt)) active = true;
+      } else if (this.mode === 'free') {
+        if (this.stepFree(dt)) active = true;
+      }
     }
 
     if (Math.abs(this.flipY) > 0.1 || Math.abs(this.vflipY) > 1) {
@@ -1403,7 +1479,12 @@ export class PrintEngine {
         this.sub = 'rest';
         // Ready to crumple without a hitch.
         const idle = (window as unknown as { requestIdleCallback?: (cb: () => void) => number }).requestIdleCallback;
-        if (idle) idle(() => this.buildTexture());
+        if (idle) {
+          this.idleHandle = idle(() => {
+            this.idleHandle = 0;
+            if (!this.destroyed) this.buildTexture();
+          });
+        }
       }
     }
     if (this.sub === 'rest') moving = false;
@@ -1687,6 +1768,7 @@ export class PrintEngine {
   };
 
   private onKeyDown = (event: KeyboardEvent) => {
+    if (this.leaving) return;
     if (event.key !== 'Enter' && event.key !== ' ') return;
     if (this.mode !== 'hanging') return;
     event.preventDefault();

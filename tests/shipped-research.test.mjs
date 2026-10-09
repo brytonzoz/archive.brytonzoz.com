@@ -5,15 +5,17 @@ import { test } from 'node:test';
 const identity = await import('../worker/shipped-identity.ts');
 const sources = await import('../worker/shipped-sources.ts');
 const ai = await import('../worker/shipped-ai.ts');
+const research = await import('../worker/shipped-research.ts');
 
 test('handle variants stitch X spellings to GitHub logins', () => {
   assert.ok(identity.handleVariants('dannypostmaa').includes('dannypostma'));
-  assert.ok(identity.handleVariants('tdinh_me').includes('tdinh'));
+  assert.ok(identity.handleVariants('tdinh_me').includes('tdinhme'));
   assert.ok(identity.handleVariants('tibo_maker').includes('tibo-maker'));
+  assert.equal(identity.handleVariants('tibo_maker').includes('tibo'), false);
 });
 
 test('name queries split "Tibo from OpenAI"', () => {
-  assert.deepEqual(identity.parsePersonName('Tibo from OpenAI'), { name: 'Tibo', company: 'OpenAI', tokens: ['Tibo'] });
+  assert.deepEqual(identity.parsePersonName('Tibo from OpenAI'), { name: 'Tibo', company: 'OpenAI', tokens: ['Tibo'], product: null });
   assert.equal(identity.parsePersonName('Steven Tey').company, null);
 });
 
@@ -31,6 +33,18 @@ test('a 0-repo decoy GitHub account scores below the real one', () => {
   const realScore = identity.scoreGithubMatch({ user: real, wantX: 'dannypostmaa', wantName: 'Danny Postma' });
   assert.ok(realScore > decoyScore, `${realScore} vs ${decoyScore}`);
   assert.ok(realScore >= 8);
+  const otherTibo = identity.scoreGithubMatch({
+    user: { login: 'T-Dnzt', name: 'Tibo', bio: '', blog: null, x: null, repos: 40 },
+    wantX: 'tibo_maker',
+    wantName: 'Tibo',
+  });
+  assert.ok(otherTibo < 8, `wrong Tibo scored ${otherTibo}`);
+  const nameOnly = identity.scoreGithubMatch({
+    user: { login: 'T-Dnzt', name: 'Tibo', bio: '', blog: null, x: null, repos: 40 },
+    wantName: 'Tibo',
+    wantCompany: 'OpenAI',
+  });
+  assert.ok(nameOnly < 8, `OpenAI-less Tibo scored ${nameOnly}`);
 });
 
 test('undated own-site products become found items; other years do not', () => {
@@ -89,10 +103,10 @@ test('cashier note and stats are specific to the items, never stock copy', () =>
   assert.match(draft.note, /launch/i);
 });
 
-test('paid search is allowed below 4 items and capped at 3 uses', () => {
-  assert.equal(ai.SEARCH_BELOW, 4);
+test('paid search still runs when harvest is gappy, not only when the tape is empty', () => {
+  assert.equal(ai.SEARCH_BELOW, 8);
   assert.equal(ai.maxSearches({}), 3);
-  assert.equal(ai.maxSearches({ SHIPPED_MAX_SEARCHES: '9' }), 3);
+  assert.equal(ai.maxSearches({ SHIPPED_MAX_SEARCHES: '9' }), 5);
   assert.equal(ai.maxSearches({ SHIPPED_MAX_SEARCHES: '0' }), 0);
   const gathered = {
     found: [
@@ -107,4 +121,34 @@ test('paid search is allowed below 4 items and capped at 3 uses', () => {
     failed: [],
   };
   assert.ok(sources.inYearCount(gathered, 2026) < ai.SEARCH_BELOW);
+});
+
+test('product nicknames and known handle aliases resolve', () => {
+  assert.equal(identity.parseProductQuery('the guy who made Photo AI'), 'Photo AI');
+  assert.equal(identity.ownerForProduct('Photo AI'), 'levelsio');
+  assert.ok(identity.handleAliases('tdinh_me').includes('tony-dinh'));
+  assert.ok(identity.handleAliases('theo').includes('t3dotgg'));
+  assert.ok(identity.companyLogins('Tibo', 'OpenAI').includes('tibo-openai'));
+});
+
+test('a /projects page dated 2026 becomes found items', () => {
+  const items = research.itemsFromProjectList({
+    text: '2026\n●2026-07 pieter.com Windows XP PC Active\n●2026-04 XDR Boost Active\n2025-03 Old Thing',
+    url: 'https://levels.io/projects',
+    year: 2026,
+  });
+  assert.ok(items.some((item) => /xdr boost/i.test(item.name)));
+  assert.ok(items.some((item) => /pieter/i.test(item.name)));
+  assert.equal(items.some((item) => /old thing/i.test(item.name)), false);
+});
+
+test('public MRR and stars keep their source URL', () => {
+  const stats = research.extractPublicStats(
+    'photoai.com is making $105,000/mo revenue and SuperLevels has 553 stars',
+    'https://levels.io/photoai-40870-line-index-php-105k-mo-revenue',
+    'Photo AI',
+  );
+  assert.ok(stats.some((s) => s.kind === 'mrr' && s.value === 105000 && s.url.includes('levels.io')));
+  const lines = research.formatReceiptStats(stats);
+  assert.ok(lines[0].includes('levels.io'));
 });

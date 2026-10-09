@@ -1,0 +1,175 @@
+{
+  "year": 2026,
+  "criteria": "A must-find ship is a named public product, repo, app, or package with 2026 evidence from the person's own site (/projects, /2026, changelog), GitHub (created or released in 2026, or ≥50 stars created that year), Product Hunt, App Store, npm, or a dated public post. Continuing products count when they have a 2026 public artifact (revenue post, changelog, WIP). Throwaway repos and partner/sponsor links are out.",
+  "builders": [
+    {
+      "query": "levelsio",
+      "prolific": true,
+      "identity": { "github": "levelsio", "x": "levelsio", "site": "https://levels.io/" },
+      "ships": [
+        { "name": "XDR Boost", "aliases": ["xdr-boost", "xdrboost"], "url": "https://github.com/levelsio/xdr-boost", "date": "2026-04-01" },
+        { "name": "SuperLevels", "aliases": ["superlevels"], "url": "https://github.com/levelsio/superlevels", "date": "2026-04-23" },
+        { "name": "Hotelist", "aliases": ["hotelist.com"], "url": "https://hotelist.com/", "date": "2026-08" },
+        { "name": "levels.io blog", "aliases": ["levels.io", "blog platform"], "url": "https://levels.io/", "date": "2026-05" },
+        { "name": "pieter.com", "aliases": ["windows xp"], "url": "https://pieter.com/", "date": "2026-07" },
+        { "name": "DroneSim", "aliases": ["dronesim.com", "drone sim"], "url": "https://dronesim.com/", "date": "2026" },
+        { "name": "Photo AI", "aliases": ["photoai", "photoai.com"], "url": "https://photoai.com/", "date": "2026-03" },
+        { "name": "Interior AI", "aliases": ["interiorai", "interiorai.com"], "url": "https://interiorai.com/", "date": "2026" }
+      ],
+      "stats": [
+        { "kind": "mrr", "about": "Photo AI", "min": 100000, "url": "https://levels.io/photoai-40870-line-index-php-105k-mo-revenue" },
+        { "kind": "stars", "about": "SuperLevels", "min": 500, "url": "https://github.com/levelsio/superlevels" },
+        { "kind": "stars", "about": "XDR Boost", "min": 150, "url": "https://github.com/levelsio/xdr-boost" },
+        { "kind": "repos", "about": "levelsio", "min": 3, "url": "https://github.com/levelsio" }
+      ]
+    },
+    {
+      "query": "marclou",
+      "prolific": true,
+      "identity": { "github": "marclou", "x": "marclou", "site": "https://marclou.com/" },
+      "ships": [
+        { "name": "TrustMRR", "aliases": ["trustmrr"], "url": "https://trustmrr.com/", "date": "2026" },
+        { "name": "DataFast", "aliases": ["datafast", "datafa.st"], "url": "https://datafa.st/", "date": "2026" },
+        { "name": "McCreep", "aliases": ["mccreep"], "url": "https://github.com/marclou/McCreep", "date": "2026-05-13" },
+        { "name": "DataRadar", "aliases": ["dataradar"], "url": "https://dataradar.datafa.st/", "date": "2026-02-28" },
+        { "name": "CodeFast", "aliases": ["codefast", "codefa.st"], "url": "https://codefa.st/", "date": "2026" },
+        { "name": "ShipFast", "aliases": ["shipfast", "shipfa.st"], "url": "https://shipfa.st/", "date": "2026" },
+        { "name": "Stalkr", "aliases": ["stalkr", "stalkr.ai"], "url": "https://stalkr.ai/", "date": "2026-09" }
+      ],
+      "stats": [
+        { "kind": "mrr", "about": "TrustMRR", "min": 40000, "url": "https://marclou.beehiiv.com/p/i-vibe-coded-330k-in-9-months" },
+        { "kind": "repos", "about": "marclou", "min": 20, "url": "https://github.com/marclou" }
+      ]
+    },
+    {
+      "query": "tibo_maker",
+      "prolific": true,
+      "identity": { "github": "tibo-maker", "x": "tibo_maker", "site": "https://www.tmaker.io/" },
+      "ships": [
+        { "name": "SuperX", "aliases": ["superx", "superx.so"], "url": "https://superx.so/", "date": "2026-02-09" },
+        { "name": "Revid", "aliases": ["revid", "revid.ai"], "url": "https://www.revid.ai/", "date": "2026" },
+        { "name": "Outrank", "aliases": ["outrank", "outrank.so"], "url": "https://outrank.so/", "date": "2026" },
+        { "name": "Squad", "aliases": ["squad.so"], "url": "https://squad.so/", "date": "2026" },
+        { "name": "PostSyncer", "aliases": ["postsyncer"], "url": "https://postsyncer.com/", "date": "2026" },
+        { "name": "Bazzly", "aliases": ["bazzly"], "url": "https://bazzly.ai/", "date": "2026" },
+        { "name": "Feather", "aliases": ["feather.so"], "url": "https://feather.so/", "date": "2026" }
+      ],
+      "stats": [
+        { "kind": "upvotes", "about": "SuperX", "min": 900, "url": "https://www.producthunt.com/products/superx" }
+      ]
+    },
+    {
+      "query": "shadcn",
+      "prolific": true,
+      "identity": { "github": "shadcn", "x": "shadcn", "site": "https://ui.shadcn.com/" },
+      "ships": [
+        { "name": "improve", "aliases": ["improve"], "url": "https://github.com/shadcn/improve", "date": "2026-06-10" },
+        { "name": "tweakcn", "aliases": ["tweakcn"], "url": "https://tweakcn.com/", "date": "2026-01-30" },
+        { "name": "cva", "aliases": ["cva.style"], "url": "https://cva.style/", "date": "2026-09-12" },
+        { "name": "shadcn/ui", "aliases": ["shadcn ui", "ui.shadcn", "github registries"], "url": "https://ui.shadcn.com/", "date": "2026-06" },
+        { "name": "shadcn", "aliases": ["@shadcn/ui", "npm shadcn"], "url": "https://www.npmjs.com/package/shadcn", "date": "2026" }
+      ],
+      "stats": [
+        { "kind": "stars", "about": "improve", "min": 9000, "url": "https://github.com/shadcn/improve" },
+        { "kind": "repos", "about": "shadcn", "min": 200, "url": "https://github.com/shadcn" }
+      ]
+    },
+    {
+      "query": "steventey",
+      "prolific": true,
+      "identity": { "github": "StevenTey", "x": "steventey", "site": "https://steventey.com/" },
+      "ships": [
+        { "name": "Dub", "aliases": ["dub.co", "@dub/ui", "@dub/embed-react"], "url": "https://dub.co/", "date": "2026" },
+        { "name": "Novel", "aliases": ["novel"], "url": "https://novel.sh/", "date": "2026" },
+        { "name": "ShareGPT", "aliases": ["sharegpt"], "url": "https://sharegpt.com/", "date": "2026" },
+        { "name": "One Word Domains", "aliases": ["one word domains"], "url": "https://oneword.domains/", "date": "2026" }
+      ],
+      "stats": [
+        { "kind": "downloads", "about": "dub", "min": 1, "url": "https://www.npmjs.com/package/@dub/ui" }
+      ]
+    },
+    {
+      "query": "pontusab",
+      "prolific": true,
+      "identity": { "github": "pontusab", "x": "pontusab", "site": "https://midday.ai/" },
+      "ships": [
+        { "name": "Workbench", "aliases": ["workbench", "getworkbench"], "url": "https://getworkbench.dev/", "date": "2026-04-21" },
+        { "name": "Caltext", "aliases": ["caltext"], "url": "https://github.com/pontusab/caltext", "date": "2026-04-08" },
+        { "name": "Hyper", "aliases": ["hyper", "hyperjs"], "url": "https://hyperjs.ai/", "date": "2026-04-24" },
+        { "name": "Toolpick", "aliases": ["toolpick"], "url": "https://github.com/pontusab/toolpick", "date": "2026-03-21" },
+        { "name": "message-ui", "aliases": ["message-ui"], "url": "https://message-ui.com/", "date": "2026-06-01" },
+        { "name": "Cursy", "aliases": ["cursy"], "url": "https://cursy.dev/", "date": "2026-06-01" },
+        { "name": "Behind the Code", "aliases": ["behindthecode"], "url": "https://github.com/pontusab/behindthecode", "date": "2026-06-04" },
+        { "name": "Midday", "aliases": ["midday"], "url": "https://midday.ai/", "date": "2026" }
+      ],
+      "stats": [
+        { "kind": "stars", "about": "Workbench", "min": 400, "url": "https://github.com/pontusab/workbench" },
+        { "kind": "repos", "about": "pontusab", "min": 50, "url": "https://github.com/pontusab" }
+      ]
+    },
+    {
+      "query": "arvidkahl",
+      "prolific": true,
+      "identity": { "github": "arvidkahl", "x": "arvidkahl", "site": "https://thebootstrappedfounder.com/" },
+      "ships": [
+        { "name": "Podscan", "aliases": ["podscan", "podscan.fm"], "url": "https://podscan.fm/", "date": "2026" },
+        { "name": "The Bootstrapped Founder", "aliases": ["thebootstrappedfounder", "tbf"], "url": "https://thebootstrappedfounder.com/", "date": "2026" },
+        { "name": "ralph-tui", "aliases": ["ralph-tui"], "url": "https://ralph-tui.com/", "date": "2026-01-19" },
+        { "name": "open-ring", "aliases": ["open-ring"], "url": "https://github.com/arvidkahl/open-ring", "date": "2026-01-09" },
+        { "name": "senko", "aliases": ["senko"], "url": "https://github.com/arvidkahl/senko", "date": "2026-07-20" }
+      ],
+      "stats": [
+        { "kind": "repos", "about": "arvidkahl", "min": 40, "url": "https://github.com/arvidkahl" }
+      ]
+    },
+    {
+      "query": "nutlope",
+      "prolific": true,
+      "identity": { "github": "Nutlope", "x": "nutlope", "site": "https://nutlope.com/" },
+      "ships": [
+        { "name": "Hallmark", "aliases": ["hallmark", "usehallmark"], "url": "https://www.usehallmark.com/", "date": "2026-04-27" },
+        { "name": "Inspo", "aliases": ["inspo", "inspomcp"], "url": "https://inspomcp.dev/", "date": "2026-04-29" },
+        { "name": "1kpapers", "aliases": ["1kpapers"], "url": "https://www.1kpapers.com/", "date": "2026-08-04" },
+        { "name": "Variate", "aliases": ["variate"], "url": "https://variate-skill.vercel.app/", "date": "2026-07-17" },
+        { "name": "AI Subtitles", "aliases": ["ai-subtitles", "usesubstudio"], "url": "https://www.usesubstudio.com/", "date": "2026-02-25" },
+        { "name": "NYC AI Atlas", "aliases": ["nyc-ai-atlas", "nycaiatlas"], "url": "https://www.nycaiatlas.com/", "date": "2026-07-07" },
+        { "name": "TogetherLink", "aliases": ["togetherlink"], "url": "https://togetherlink.vercel.app/", "date": "2026-06-22" },
+        { "name": "GeoGuessBench", "aliases": ["geoguessbench"], "url": "https://geoguessbench.com/", "date": "2026-10-05" }
+      ],
+      "stats": [
+        { "kind": "stars", "about": "Hallmark", "min": 20000, "url": "https://github.com/Nutlope/hallmark" },
+        { "kind": "stars", "about": "Inspo", "min": 800, "url": "https://github.com/Nutlope/inspo" },
+        { "kind": "repos", "about": "Nutlope", "min": 100, "url": "https://github.com/Nutlope" }
+      ]
+    },
+    {
+      "query": "simonw",
+      "prolific": true,
+      "identity": { "github": "simonw", "x": "simonw", "site": "https://simonwillison.net/" },
+      "ships": [
+        { "name": "mcp-explorer", "aliases": ["mcp-explorer"], "url": "https://github.com/simonw/mcp-explorer", "date": "2026-07-28" },
+        { "name": "micropython-wasm", "aliases": ["micropython-wasm"], "url": "https://github.com/simonw/micropython-wasm", "date": "2026-06-02" },
+        { "name": "moebius-web", "aliases": ["moebius-web"], "url": "https://simonw.github.io/moebius-web/", "date": "2026-06-22" },
+        { "name": "llm-coding-agent", "aliases": ["llm-coding-agent"], "url": "https://github.com/simonw/llm-coding-agent", "date": "2026-07-02" },
+        { "name": "scriptc", "aliases": ["scriptc"], "url": "https://scriptc.dev/", "date": "2026-07-27" },
+        { "name": "llm-typesafe", "aliases": ["llm-typesafe"], "url": "https://github.com/simonw/llm-typesafe", "date": "2026-09-22" }
+      ],
+      "stats": [
+        { "kind": "repos", "about": "simonw", "min": 200, "url": "https://github.com/simonw" }
+      ]
+    },
+    {
+      "query": "dannypostmaa",
+      "prolific": true,
+      "identity": { "github": "dannypostma", "x": "dannypostmaa", "site": "https://www.headshotpro.com/" },
+      "ships": [
+        { "name": "AgentBar", "aliases": ["agentbar"], "url": "https://github.com/dannypostma/agentbar", "date": "2026-08-13" },
+        { "name": "HeadshotPro", "aliases": ["headshotpro", "ai headshot"], "url": "https://www.headshotpro.com/", "date": "2026" }
+      ],
+      "stats": [
+        { "kind": "stars", "about": "AgentBar", "min": 20, "url": "https://github.com/dannypostma/agentbar" },
+        { "kind": "repos", "about": "dannypostma", "min": 10, "url": "https://github.com/dannypostma" }
+      ]
+    }
+  ]
+}

@@ -8,6 +8,7 @@ import { ITEM_STATUSES } from '../lib/shipped-year';
 import { hasBlockedWord } from '../lib/shipped-sponsors';
 import { REQUIRED_MODULES, sanitizeLayout, type ModuleId } from '../lib/shipped-modules';
 import { clean, hostOf, inYearCount, publicUrl, type Found, type Gathered } from './shipped-sources';
+import { RECEIPT_BUDGET_MICROS, formatReceiptStats, searchBudget, type SourcedStat } from './shipped-research';
 
 export interface AiEnv {
   ANTHROPIC_API_KEY?: string;
@@ -39,9 +40,9 @@ export const costMicros = (model: string, input: number, output: number, searche
   return Math.ceil(input * inPrice + output * outPrice) + searches * SEARCH_MICROS;
 };
 
-export const maxSearches = (env: AiEnv) => Math.min(3, Math.max(0, Math.round(Number(env.SHIPPED_MAX_SEARCHES ?? 3)) || 0));
-/** Fewer free finds from the year than this and the paid search may run. */
-export const SEARCH_BELOW = 4;
+export const maxSearches = (env: AiEnv) => Math.min(5, Math.max(0, Math.round(Number(env.SHIPPED_MAX_SEARCHES ?? 3)) || 0));
+/** Paid search still runs when harvest left named gaps, not only when the tape is almost empty. */
+export const SEARCH_BELOW = 8;
 
 export class PrintError extends Error {
   /** What the upstream said (status and error type), surfaced off production only. */
@@ -62,7 +63,7 @@ export type DraftItem = { name: string; description: string; date: string | null
 export type Draft = { items: DraftItem[]; note: string; stats: string[]; potential: boolean; layout: ModuleId[] };
 export type AiResult = Draft & { model: string; inputTokens: number; outputTokens: number; searches: number; costMicros: number };
 
-const MAX_ITEMS = 20;
+const MAX_ITEMS = 25;
 
 // Things a "shipped" receipt never prints, whatever a page or the model says.
 const PERSONAL =
@@ -151,7 +152,8 @@ const SOURCE_LABEL: Record<string, string> = {
 };
 
 /** Honest count lines from what is actually on the tape. Empty groups are omitted. */
-export function formatStats(items: { source?: string }[]): string[] {
+export function formatStats(items: { source?: string }[], sourced: SourcedStat[] = []): string[] {
+  if (sourced.length) return formatReceiptStats(sourced);
   const real = items.filter((item) => item.source && item.source !== 'none');
   if (!real.length) return [];
   const counts = new Map<string, number>();
@@ -172,15 +174,18 @@ export function groundedNote(items: DraftItem[], seed: number, profileName = '')
   if (!real.length) return POTENTIAL_NOTES[seed % POTENTIAL_NOTES.length];
   const stats = formatStats(real)[0] ?? `${real.length} launches`;
   const first = real[0]?.name ?? 'THIS';
+  const last = real[real.length - 1]?.name ?? first;
   const niche = real.find((item) => /ai|app|cli|kit|sdk|shop|scan|cast|mail/i.test(`${item.name} ${item.description}`));
+  const pick = (seed + real.length + first.length) % 6;
   const variants = [
     `${stats}. ${first} is first on the tape.`,
-    `${stats}. The publish key is getting a workout.`,
+    `${stats}. ${last} closed the year.`,
     `${real.length} public things${profileName ? ` for ${profileName.split(' ')[0]}` : ''}. ${first} set the tone.`,
-    niche ? `${stats}. Same niche as ${niche.name}, new receipt line.` : `${stats}. No empty aisle.`,
+    niche ? `${stats}. ${niche.name} is the through-line.` : `${stats}. No empty aisle.`,
     real.length >= 8 ? `${stats}. Receipt paper running low.` : `${stats}. Keep the carbon copy.`,
+    `${stats}. Someone likes the publish button.`,
   ];
-  const note = variants[seed % variants.length];
+  const note = variants[pick];
   return note.length > 140 ? `${stats}. ${first} led.` : note;
 }
 
@@ -203,7 +208,11 @@ function finish(items: DraftItem[], note: string, seed: number, modulesRaw?: unk
   }
   const sorted = items.slice(0, MAX_ITEMS).sort(byDate);
   const stats = Array.isArray(statsRaw)
-    ? statsRaw.filter((line): line is string => typeof line === 'string' && ok(line)).map((line) => clean(line, 90)).slice(0, 3)
+    ? statsRaw
+        .filter((line): line is string => typeof line === 'string' && !hasBlockedWord(line) && !/[<>{}`\\]/.test(line))
+        .map((line) => line.replace(/\s+/g, ' ').trim().slice(0, 90))
+        .filter(Boolean)
+        .slice(0, 4)
     : formatStats(sorted);
   const whoNote = ok(note) && !AI_VOICE.test(note) ? note : groundedNote(sorted, seed);
   const printed = printNote(whoNote, stats);
@@ -222,7 +231,7 @@ function printNote(note: string, stats: string[]): string {
 export function demoReceipt(gathered: Gathered, year: number, seed: number): Draft {
   const items: DraftItem[] = gathered.found
     .filter((item) => yearDate(item.date, year) !== false && ok(item.name) && publicUrl(item.link))
-    .slice(0, 15)
+    .slice(0, 20)
     .map((item) => ({
       name: upper(item.name, 40),
       description: ok(item.description) ? item.description : '',
@@ -232,7 +241,7 @@ export function demoReceipt(gathered: Gathered, year: number, seed: number): Dra
       icon: item.icon,
       source: item.source,
     }));
-  return finish(items, groundedNote(items, seed, gathered.profile.name), seed);
+  return finish(items, groundedNote(items, seed, gathered.profile.name), seed, undefined, formatStats(items, gathered.stats ?? []));
 }
 
 function systemPrompt(year: number, searches: number) {
@@ -249,7 +258,7 @@ function systemPrompt(year: number, searches: number) {
     'Status (one allowed word) goes where a price would. LIVE for a running product or site, RELEASED for a version/release, LAUNCHED for a launch post, SHIPPED otherwise, BETA if it says beta, DECEASED if shut down.',
     'Item names: the product name as people know it, max 32 characters. Description: a specific one-liner grounded in the source (what it is, not a slogan), max 70 characters. "Menu bar app that keeps the Mac awake", not "An innovative solution".',
     'Cashier "note": max 110 characters. Voice: a deadpan night-shift cashier. Witty, specific to THIS person and THESE items (launch count, a repeating niche, a platform habit). A playful roast of the pattern is fine; cruelty is not. Every claim must map to a sourced item. Never generic ("thank you for shipping"), never inspirational, never invented facts.',
-    'Also output "stats": 1-3 short lines of counts you can prove from the items, like "7 launches · 3 on Product Hunt · 1 App Store app". Omit a platform if the count is 0.',
+    'Also output "stats": 1-4 short lines copied from <found>.stats (GitHub stars, npm weekly downloads, PH upvotes, App Store ratings, public MRR, user counts, HN points). Keep the source host/path on each line. Never invent a number.',
     'Banned words and moves everywhere: delve, testament, journey, innovative, seamless, elevate, unlock, empower, leverage, cutting-edge, game-changer, robust, passion, incredible, amazing, "truly", loser, pathetic, scam, flop, cringe, exclamation marks, emoji, em dashes, and praise like "impressive year".',
     `Do not add extra receipt bands. The tape is short: items, a one-line cashier note, stamp and serial. If you output modules, ids only from ${REQUIRED_MODULES.join(', ')}. Never output HTML, markdown, CSS, filler ids (deep-cut, first-last, platforms, still-running, volume, friend, sources, serial) or extra keys.`,
     `Finish with only a JSON object, no markdown: {"items":[{"name":"","description":"","date":"YYYY-MM or YYYY-MM-DD or null","status":"${ITEM_STATUSES.join('|')}","link":"url or null"}],"note":"","stats":[""]}`,
@@ -261,7 +270,17 @@ function promptData(subject: Subject, gathered: Gathered, year: number) {
     subject: { typed_as: subject.kind, value: subject.id, display: subject.display },
     profile: gathered.profile,
     year,
-    found: gathered.found.map((item) => ({ name: item.name, description: item.description, date: item.date ?? (item.thisYear ? `created in ${year}, day unknown` : null), link: item.link, source: item.source, status: item.status })),
+    found: gathered.found.map((item) => ({
+      name: item.name,
+      description: item.description,
+      date: item.date ?? (item.thisYear ? `created in ${year}, day unknown` : null),
+      link: item.link,
+      source: item.source,
+      status: item.status,
+      metrics: item.metrics ?? [],
+    })),
+    stats: gathered.stats ?? [],
+    gaps: gathered.gaps ?? [],
     search_results: gathered.web,
     pages: gathered.pages,
     own_site: gathered.site ? { url: gathered.site.url, title: gathered.site.title, description: gathered.site.description, text: gathered.site.text, links: gathered.site.links } : null,
@@ -434,8 +453,11 @@ export async function assembleReceipt(subject: Subject, gathered: Gathered, year
   if (gathered.profile.site) allowed.add(gathered.profile.site);
 
   for (const page of gathered.pages) allowed.add(page.url);
-  const thin = inYearCount(gathered, year) < SEARCH_BELOW;
-  const searchCap = thin ? searches : 0;
+  const gaps = gathered.gaps ?? [];
+  const thin = inYearCount(gathered, year) < SEARCH_BELOW || gaps.length > 0;
+  const want = thin ? searches : 0;
+  const searchCap = searchBudget({ remainingMicros: Math.min(budgetMicros, RECEIPT_BUDGET_MICROS), want, searchMicros: SEARCH_MICROS });
+  if (want > searchCap) gathered.coverageCapped = true;
   const toolSets: unknown[][] = searchCap ? [[{ type: 'web_search_20250305', name: 'web_search', max_uses: searchCap }], []] : [[]];
   const user = { role: 'user', content: promptFor(subject, gathered, year) };
 

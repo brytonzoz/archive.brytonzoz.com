@@ -16,16 +16,34 @@ import { hasBlockedWord } from '../lib/shipped-sponsors';
 import { tinyfishFetch, tinyfishSearch, type TinyfishMeter, type TinyfishPage } from './shipped-tinyfish';
 import { safeFetch } from './shipped-fetch';
 import {
+  companyLogins,
   extraSitePaths,
+  handleAliases,
   handleVariants,
   mergeSites,
+  ownerForProduct,
   parsePersonName,
+  parseProductQuery,
   productNameFromHost,
   readXProfile,
   scoreGithubMatch,
   urlsFromText,
   type XProfile,
 } from './shipped-identity';
+import {
+  describeWithStat,
+  detectGaps,
+  extraResearchPaths,
+  extractPublicStats,
+  formatReceiptStats,
+  githubContributions,
+  itemsFromProjectList,
+  mergeStats,
+  sourcedStat,
+  trustmrrUrls,
+  withMetrics,
+  type SourcedStat,
+} from './shipped-research';
 
 export interface SourceEnv {
   GITHUB_TOKEN?: string;
@@ -53,6 +71,8 @@ export type Found = {
   score: number;
   /** From this year even without a date (GitHub search said it was created this year). */
   thisYear?: boolean;
+  /** Proven public numbers for this line (stars, downloads, votes…), each with a source URL. */
+  metrics?: import('./shipped-research').SourcedStat[];
 };
 
 export type WebResult = { title: string; url: string; snippet: string; date: string | null };
@@ -90,7 +110,18 @@ const npmUsersOf = (profile: Profile) => profile.npmUsers ?? [];
 /** A page TinyFish read for us (their site, a launch post), cut down for the prompt. */
 export type PageInfo = { url: string; title: string; description: string; published: string | null; text: string };
 
-export type Gathered = { found: Found[]; web: WebResult[]; pages: PageInfo[]; site: SiteInfo | null; profile: Profile; ran: string[]; failed: string[] };
+export type Gathered = {
+  found: Found[];
+  web: WebResult[];
+  pages: PageInfo[];
+  site: SiteInfo | null;
+  profile: Profile;
+  ran: string[];
+  failed: string[];
+  stats?: import('./shipped-research').SourcedStat[];
+  gaps?: string[];
+  coverageCapped?: boolean;
+};
 
 export type SourceContext = { subject: Subject; profile: Profile; year: number; env: SourceEnv; tinyfish: TinyfishAccess };
 
@@ -269,6 +300,9 @@ async function tinyfishPage(url: string, tinyfish: TinyfishAccess): Promise<Tiny
 }
 
 const REPO_NAME = /^[A-Za-z0-9._-]{1,100}$/;
+/** Toys and placeholders that are not a ship. */
+const SKIP_REPOS =
+  /^(my-app|throwaway(-\d+)?|test[-_.]?|tmp|demo|dotfiles|playground|sandbox)(-|$)/i;
 /** github.com/<these> are GitHub's own pages, not people. */
 const NOT_USERS = new Set(
   'about apps blog collections contact customer-stories dashboard enterprise events explore features github issues join login logout marketplace new notifications orgs organizations pricing pulls readme search security sessions settings signup site sponsors stars team topics trending users codespaces copilot solutions resources premium-support git-guides mobile partners password_reset watching'.split(' '),
@@ -403,18 +437,29 @@ const github: SourceProvider = {
     for (const [key, date] of createdOn) {
       const row = rows.get(key);
       const name = row?.name ?? [...(searched ?? []), ...(feed ?? []).map((e) => e.repo)].find((n) => n.toLowerCase() === key) ?? key;
-      found.push({
-        name: clean(name, 60),
-        description: row?.description ?? '',
-        date,
-        link: `${GH}/${login}/${name}`,
-        icon: row?.homepage ? faviconUrl(row.homepage) : null,
-        source: 'github',
-        status: row?.homepage ? 'LIVE' : 'SHIPPED',
-        score: 2 + Math.log10(1 + (row?.stars ?? 0)) * 2 + (row?.homepage ? 1 : 0),
-        dateConfidence: date ? 'exact' : 'year',
-        thisYear: true,
-      });
+      if (SKIP_REPOS.test(name)) continue;
+      const repoUrl = `${GH}/${login}/${name}`;
+      found.push(
+        withMetrics(
+          {
+            name: clean(name, 60),
+            description: row?.description ?? '',
+            date,
+            link: repoUrl,
+            icon: row?.homepage ? faviconUrl(row.homepage) : null,
+            source: 'github',
+            status: row?.homepage ? 'LIVE' : 'SHIPPED',
+            score: 2 + Math.log10(1 + (row?.stars ?? 0)) * 2 + (row?.homepage ? 1 : 0),
+            dateConfidence: date ? 'exact' : 'year',
+            thisYear: true,
+          },
+          [
+            row?.stars
+              ? sourcedStat('stars', `${row.stars >= 1000 ? `${(row.stars / 1000).toFixed(row.stars >= 10_000 ? 0 : 1).replace(/\.0$/, '')}k` : String(row.stars)} GitHub stars`, row.stars, repoUrl, name)
+              : null,
+          ],
+        ),
+      );
     }
 
     // Older projects that cut a release this year: the feed's releases, newest per repo.
@@ -479,17 +524,28 @@ const appStore: SourceProvider = {
   async run({ subject, profile, year }) {
     const term = subject.kind === 'domain' ? subject.id.split('.')[0] : profile.name || subject.display.replace(/^@/, '');
     if (loose(term).length < 3 || /^@/.test(term)) return [];
+    const shortName = loose(term).length < 6;
     const data = await getJson<{ results?: Record<string, unknown>[] }>(
       `https://itunes.apple.com/search?term=${encodeURIComponent(term)}&entity=software&attribute=softwareDeveloper&limit=50&country=us`,
     );
     const want = loose(term);
+    const nameTokens = String(term)
+      .split(/\s+/)
+      .map((t) => loose(t))
+      .filter((t) => t.length >= 4);
     const site = subject.kind === 'domain' ? subject.id : hostOf(profile.site);
     const sites = new Set([site, ...sitesOf(profile).map((url) => hostOf(url))].filter((h): h is string => Boolean(h)));
     return (data.results ?? [])
       .filter((app) => {
-        const dev = loose(String(app.artistName ?? '')) + '|' + loose(String(app.sellerName ?? ''));
+        const artist = loose(String(app.artistName ?? ''));
+        const seller = loose(String(app.sellerName ?? ''));
+        const dev = `${artist}|${seller}`;
         const sellerHost = hostOf(publicUrl(app.sellerUrl));
-        return dev.includes(want) || (sellerHost && sites.has(sellerHost));
+        if (sellerHost && sites.has(sellerHost)) return true;
+        if (shortName) return false;
+        // "Hassan El Mghari" must not match every Hassan on the store.
+        if (nameTokens.length >= 2) return nameTokens.every((t) => dev.includes(t));
+        return dev.includes(want);
       })
       .map((app) => {
         const released = day(app.releaseDate);
@@ -509,6 +565,14 @@ const appStore: SourceProvider = {
         source: 'appstore',
         status: 'LAUNCHED',
         score: 5 + Math.log10(1 + (Number(app.userRatingCount) || 0)),
+        metrics: [
+          Number(app.averageUserRating)
+            ? sourcedStat('rating', `${Number(app.averageUserRating).toFixed(1)} App Store rating`, Number(app.averageUserRating), String(app.trackViewUrl ?? '').split('?')[0], clean(app.trackName, 40))
+            : null,
+          Number(app.userRatingCount)
+            ? sourcedStat('reviews', `${Number(app.userRatingCount)} App Store ratings`, Number(app.userRatingCount), String(app.trackViewUrl ?? '').split('?')[0], clean(app.trackName, 40))
+            : null,
+        ].filter((s): s is SourcedStat => Boolean(s)),
       }));
   },
 };
@@ -536,11 +600,18 @@ const hackerNews: SourceProvider = {
     }
     const pages = await Promise.allSettled(urls.slice(0, 6).map((url) => getJson<{ hits?: Record<string, unknown>[] }>(url)));
     const found: Found[] = [];
-    const want = [profile.name, profile.x, profile.github, ...domains].filter(Boolean).map((v) => loose(String(v)));
+        const want = [profile.name, profile.x, profile.github, ...domains].filter(Boolean).map((v) => loose(String(v)));
+    const authors = new Set(handles);
     for (const page of pages) {
       if (page.status !== 'fulfilled') continue;
       for (const hit of page.value.hits ?? []) {
-        const title = String(hit.title ?? '').replace(/^(show|launch) hn:\s*/i, '');
+        const rawTitle = String(hit.title ?? '');
+        const title = rawTitle.replace(/^(show|launch) hn:\s*/i, '');
+        const author = String(hit.author ?? '').toLowerCase();
+        const urlHost = hostOf(publicUrl(hit.url));
+        const authored = authors.has(author);
+        const ownUrl = Boolean(urlHost && domains.includes(urlHost));
+        if (!authored && !ownUrl) continue;
         const hay = loose(`${title} ${hit.author ?? ''} ${hit.url ?? ''}`);
         if (want.length && !want.some((w) => w.length >= 3 && hay.includes(w))) continue;
         const [name, ...rest] = title.split(/\s+[–—-]\s+|:\s+/);
@@ -555,6 +626,17 @@ const hackerNews: SourceProvider = {
           source: 'hn',
           status: 'LAUNCHED',
           score: 3 + Math.log10(1 + (Number(hit.points) || 0)) * 1.5,
+          metrics: Number(hit.points)
+            ? [
+                sourcedStat(
+                  'hn',
+                  `${Number(hit.points)} HN points`,
+                  Number(hit.points),
+                  `https://news.ycombinator.com/item?id=${hit.objectID}`,
+                  clean(name, 40),
+                ),
+              ].filter((s): s is SourcedStat => Boolean(s))
+            : [],
         });
       }
     }
@@ -577,21 +659,36 @@ const npm: SourceProvider = {
       ),
     );
     const objects = pages.flatMap((page) => (page.status === 'fulfilled' ? page.value.objects ?? [] : []));
-    return objects
+    const recent = objects
       .filter((entry) => inYear(day(entry.package.date), year))
       .sort((a, b) => (b.score?.final ?? 0) - (a.score?.final ?? 0))
-      .slice(0, 5)
-      .map(({ package: pkg, score }): Found => ({
+      .slice(0, 20);
+    const downloads = await Promise.all(
+      recent.map(({ package: pkg }) =>
+        getJson<{ downloads?: number }>(`https://api.npmjs.org/downloads/point/last-week/${encodeURIComponent(String(pkg.name))}`).catch(() => null),
+      ),
+    );
+    return recent.map(({ package: pkg, score }, i): Found => {
+      const link = publicUrl((pkg.links as Record<string, unknown> | undefined)?.npm);
+      const weekly = Number(downloads[i]?.downloads) || 0;
+      return {
         name: clean(pkg.name, 60),
         description: clean(pkg.description, 140),
         date: day(pkg.date),
         dateConfidence: 'exact',
-        link: publicUrl((pkg.links as Record<string, unknown> | undefined)?.npm),
+        link,
         icon: null,
         source: 'npm',
         status: 'RELEASED',
-        score: 1 + (score?.final ?? 0) * 2,
-      }));
+        score: 1 + (score?.final ?? 0) * 2 + Math.log10(1 + weekly),
+        metrics:
+          weekly && link
+            ? [sourcedStat('downloads', `${weekly >= 1000 ? `${(weekly / 1000).toFixed(weekly >= 10_000 ? 0 : 1).replace(/\.0$/, '')}k` : String(weekly)} npm weekly downloads`, weekly, link, clean(pkg.name, 40))].filter(
+                (s): s is SourcedStat => Boolean(s),
+              )
+            : [],
+      };
+    });
   },
 };
 
@@ -633,7 +730,7 @@ const productHunt: SourceProvider = {
           method: 'POST',
           headers: { authorization: `Bearer ${token}`, 'content-type': 'application/json' },
           body: JSON.stringify({
-            query: 'query($u:String!){user(username:$u){madePosts(first:20){edges{node{name tagline createdAt url website thumbnail{url}}}}}}',
+            query: 'query($u:String!){user(username:$u){madePosts(first:20){edges{node{name tagline createdAt url website votesCount thumbnail{url}}}}}}',
             variables: { u: username },
           }),
         }),
@@ -652,7 +749,12 @@ const productHunt: SourceProvider = {
         icon: publicUrl((post.thumbnail as Record<string, unknown> | undefined)?.url),
         source: 'producthunt',
         status: 'LAUNCHED',
-        score: 5,
+        score: 5 + Math.log10(1 + (Number(post.votesCount) || 0)),
+        metrics: Number(post.votesCount)
+          ? [sourcedStat('upvotes', `${Number(post.votesCount)} Product Hunt upvotes`, Number(post.votesCount), publicUrl(post.url) ?? 'https://www.producthunt.com/', clean(post.name, 40))].filter(
+              (s): s is SourcedStat => Boolean(s),
+            )
+          : [],
       }))
       .filter((item) => !item.date || inYear(item.date, year));
   },
@@ -723,7 +825,9 @@ export async function readSite(siteUrl: string): Promise<SiteInfo | null> {
     if (href && text && !links.some((l) => l.url === href)) links.push({ text, url: href });
     if (links.length >= 40) break;
   }
-  const text = clean(decode(html.replace(/<(script|style|noscript|svg)[\s\S]*?<\/\1>/gi, ' ').replace(/<[^>]+>/g, ' ')), 2500);
+  const rawText = decode(html.replace(/<(script|style|noscript|svg)[\s\S]*?<\/\1>/gi, ' ').replace(/<[^>]+>/g, ' '));
+  const dated = (rawText.match(/(?:^|\n).{0,20}20\d\d[-/.]\d{1,2}.{0,80}/g) ?? []).join('\n');
+  const text = clean(`${dated}\n${rawText}`, 12_000);
   return {
     url: base,
     title: clean(decode(html.match(/<title[^>]*>([\s\S]*?)<\/title>/i)?.[1] ?? ''), 100) || clean(meta('og:title'), 100),
@@ -895,7 +999,7 @@ async function bestGithubFor(
 
 /** Expand a typed subject to GitHub, X, sites, PH/npm usernames. Cached 24h. */
 export async function resolveIdentity(subject: Subject, env: SourceEnv, tinyfish: TinyfishAccess = null): Promise<ResolvedIdentity> {
-  return cached(`id:v1:${subject.kind}:${subject.id.toLowerCase()}:${loose(subject.display)}`, 1440 * MIN, () => resolveIdentityFresh(subject, env, tinyfish));
+  return cached(`id:v2:${subject.kind}:${subject.id.toLowerCase()}:${loose(subject.display)}`, 1440 * MIN, () => resolveIdentityFresh(subject, env, tinyfish));
 }
 
 async function resolveIdentityFresh(subject: Subject, env: SourceEnv, tinyfish: TinyfishAccess): Promise<ResolvedIdentity> {
@@ -904,7 +1008,16 @@ async function resolveIdentityFresh(subject: Subject, env: SourceEnv, tinyfish: 
   if (subject.kind === 'github') profile.github = subject.id;
   if (subject.kind === 'x') profile.x = subject.id;
   if (subject.kind === 'domain' && isDomain(subject.id)) profile.site = `https://${subject.id}/`;
-  if (subject.kind === 'name') profile.name = subject.display;
+  const nameParts = subject.kind === 'name' ? parsePersonName(subject.display) : parsePersonName(subject.display);
+  if (subject.kind === 'name' && !nameParts.product) profile.name = subject.display;
+  if (nameParts.product) notes.push(`product:${nameParts.product}`);
+
+  const productOwner = ownerForProduct(nameParts.product || parseProductQuery(subject.display));
+  if (productOwner) {
+    notes.push(`product-owner:${productOwner}`);
+    if (isXHandle(productOwner)) profile.x ||= productOwner;
+    if (isGithubLogin(productOwner)) profile.github ||= productOwner;
+  }
 
   const xHandle = profile.x || (subject.kind !== 'domain' && isXHandle(subject.id) ? subject.id : null);
   const fetchXPage = tinyfish
@@ -914,7 +1027,7 @@ async function resolveIdentityFresh(subject: Subject, env: SourceEnv, tinyfish: 
       }
     : undefined;
   const xProfile: XProfile | null = xHandle
-    ? await cached(`x:${xHandle.toLowerCase()}`, 1440 * MIN, () => readXProfile(xHandle, fetchXPage)).catch(() => null)
+    ? await cached(`x:${xHandle.toLowerCase()}`, 30 * MIN, () => readXProfile(xHandle, fetchXPage)).catch(() => null)
     : null;
   if (xProfile) {
     notes.push(`x-profile:${xProfile.handle}`);
@@ -925,30 +1038,45 @@ async function resolveIdentityFresh(subject: Subject, env: SourceEnv, tinyfish: 
     profile.sites = mergeSites(profile.sites, xProfile.urls, [xProfile.site]);
   } else if (xHandle) notes.push('x-profile:miss');
 
-  const parts = subject.kind === 'name' ? parsePersonName(subject.display) : { name: profile.name, company: null, tokens: profile.name ? [profile.name] : [] };
+  const parts = subject.kind === 'name' ? nameParts : { name: profile.name, company: null, tokens: profile.name ? [profile.name] : [], product: null };
   if (parts.company) notes.push(`name-parse:${parts.name}|${parts.company}`);
 
+  const aliasLogins = [
+    ...handleAliases(subject.id),
+    ...handleAliases(profile.x ?? ''),
+    ...companyLogins(parts.name || subject.id, parts.company),
+    productOwner,
+    profile.github,
+  ].filter((l): l is string => Boolean(l));
   const variantLogins = handleVariants(subject.id);
-  const searchTerms = [
-    parts.name && parts.name !== subject.display ? parts.name : null,
-    parts.company ? `${parts.name} ${parts.company}` : null,
-    profile.name && profile.name !== subject.id ? profile.name : null,
-    subject.kind === 'name' ? subject.display : null,
-  ].filter((t): t is string => Boolean(t && t.length >= 2));
+  const knownLogins = [...aliasLogins, ...variantLogins];
+  notes.push(`gh-try:${knownLogins.slice(0, 8).join(',') || 'none'}`);
 
-  const searched: string[] = [];
-  for (const term of searchTerms.slice(0, 3)) {
-    const people = await searchGithubUsers(term, env, tinyfish).catch(() => []);
-    notes.push(`gh-search:${term}=${people.map((p) => p.login).join(',') || 'none'}`);
-    searched.push(...people.map((p) => p.login));
-  }
-
-  const tryLogins = [...variantLogins, ...searched, profile.github].filter((l): l is string => Boolean(l));
-  const matched = await bestGithubFor(
-    { wantX: profile.x, wantName: profile.name || parts.name, wantSite: profile.site, wantCompany: parts.company, logins: tryLogins },
+  let matched = await bestGithubFor(
+    { wantX: profile.x, wantName: profile.name || parts.name, wantSite: profile.site, wantCompany: parts.company, logins: knownLogins },
     env,
     tinyfish,
   );
+
+  if (!matched && !nameParts.product) {
+    const searchTerms = [
+      parts.name && parts.name !== subject.display ? parts.name : null,
+      parts.company ? `${parts.name} ${parts.company}` : null,
+      profile.name && profile.name !== subject.id ? profile.name : null,
+      subject.kind === 'name' && parts.name ? parts.name : null,
+    ].filter((t): t is string => Boolean(t && t.length >= 2));
+    const searched: string[] = [];
+    for (const term of searchTerms.slice(0, 3)) {
+      const people = await searchGithubUsers(term, env, tinyfish).catch(() => []);
+      notes.push(`gh-search:${term}=${people.map((p) => p.login).join(',') || 'none'}`);
+      searched.push(...people.map((p) => p.login));
+    }
+    matched = await bestGithubFor(
+      { wantX: profile.x, wantName: profile.name || parts.name, wantSite: profile.site, wantCompany: parts.company, logins: searched },
+      env,
+      tinyfish,
+    );
+  }
   if (matched) {
     notes.push(`github:${matched.login} repos=${matched.repos}`);
     profile.github = matched.login;
@@ -995,7 +1123,11 @@ export function candidatesFromIdentity(subject: Subject, resolved: ResolvedIdent
   return [{ kind: 'name', id: subject.id, display: subject.display || subject.id, detail }];
 }
 
-const NAV_LINK = /^(home|about|blog|contact|login|sign ?in|privacy|terms|careers|jobs|pricing|docs|support|twitter|github|x|linkedin|instagram)$/i;
+const NAV_LINK =
+  /^(home|about|blog|contact|login|sign ?in|sign up|subscribe|newsletter|privacy|terms|careers|jobs|pricing|docs|support|twitter|github|x|linkedin|instagram|shop|store|cart|projects|changelog|source|start now|media kit|tech stack|api reference|investments?|sponsor( my work)?)$/i;
+const JUNK_ITEM =
+  /\b(subscribe|newsletter|sign[- ]?up|sign-up here|log ?in|listen on|apple podcasts|spotify|overcast|pocket casts|amazon music|telegram|investments?|media kit|tech stack|api reference|broadcast by|transistor|start now|follow me|buy me a coffee|powered by|wordpress|built with|24 startups|my book|my newsletter|sponsor my work)\b/i;
+const GENERIC_NAME = /^(self|write|code|ideas|source|projects|changelog|home|shop|nvidia|replicate|fal|vercel|cursor|perplexity|openai|anthropic|sync)$/i;
 
 function yearMention(text: string, year: number): boolean {
   return new RegExp(`\\b${year}\\b`).test(text);
@@ -1020,9 +1152,11 @@ export function itemsFromWebEvidence(opts: {
 
   const considerLink = (text: string, url: string, source: Found['source'], score: number, date: string | null, confidence: DateConfidence) => {
     const host = hostOf(url);
-    if (!host || SKIP_PAGES.test(host) || NAV_LINK.test(text)) return;
-    const name = clean(text, 40) || productNameFromHost(host);
-    if (!name || name.length < 2) return;
+    if (!host || SKIP_PAGES.test(host) || NAV_LINK.test(text) || JUNK_ITEM.test(text)) return;
+    const cut = text.split(/\s*[.$•|·]\s*/)[0] ?? text;
+    const name = clean(cut, 40) || productNameFromHost(host);
+    if (!name || name.length < 2 || NAV_LINK.test(name) || JUNK_ITEM.test(name) || GENERIC_NAME.test(name)) return;
+    if (profile.name && loose(name) === loose(profile.name)) return;
     add({
       name,
       description: own.has(host) ? clean(`Listed on ${hostOf(profile.site) ?? 'their site'}`, 140) : clean(`Public page on ${host}`, 140),
@@ -1038,6 +1172,10 @@ export function itemsFromWebEvidence(opts: {
   };
 
   if (site) {
+    const homeName = clean((site.title || '').replace(/\s*[|/·–—-].*$/, ''), 40);
+    if (homeName && !NAV_LINK.test(homeName) && !JUNK_ITEM.test(homeName) && !/\b(blog|podcast|writer|newsletter)\b/i.test(homeName)) {
+      considerLink(homeName, site.url, 'site', 4.2, null, 'unknown');
+    }
     for (const link of site.links) {
       const url = publicUrl(link.url);
       if (!url) continue;
@@ -1091,7 +1229,7 @@ function dedupeFound(found: Found[]): Found[] {
 export async function gather(subject: Subject, env: SourceEnv, year: number, meter: TinyfishMeter | null = null): Promise<Gathered> {
   const tinyfish = tinyfishAccess(env, meter);
   const resolved = await resolveIdentity(subject, env, tinyfish);
-  return cached(`gather:v3:${year}:${resolved.cacheKey}`, 1440 * MIN, () => gatherFresh(subject, resolved.profile, env, year, meter, tinyfish, resolved.notes));
+  return cached(`gather:v4:${year}:${resolved.cacheKey}`, 1440 * MIN, () => gatherFresh(subject, resolved.profile, env, year, meter, tinyfish, resolved.notes));
 }
 
 async function gatherFresh(
@@ -1124,7 +1262,13 @@ async function gatherFresh(
     : [];
 
   const homepage = profile.site;
-  const extraHomes = sitesOf(profile).filter((url) => hostOf(url) !== hostOf(homepage)).slice(0, 5);
+  const extraHomes = [
+    ...sitesOf(profile).filter((url) => hostOf(url) !== hostOf(homepage)),
+    ...(homepage ? extraResearchPaths(homepage) : []),
+    ...trustmrrUrls(profile),
+  ]
+    .filter((url, i, all) => all.findIndex((u) => u.replace(/\/+$/, '') === url.replace(/\/+$/, '')) === i)
+    .slice(0, 10);
   const [results, site, extraSites, searched] = await Promise.all([
     Promise.allSettled(SOURCES.filter((source) => source.enabled(ctx)).map(async (source) => ({ id: source.id, found: await source.run(ctx) }))),
     homepage ? readSite(homepage).catch(() => null) : Promise.resolve(null),
@@ -1140,6 +1284,7 @@ async function gatherFresh(
   ]);
   if (site) ran.push('site');
   if (extraSites.some(Boolean)) ran.push('sites');
+  ran.push('research-pass:harvest');
 
   const web: WebResult[] = [];
   for (const row of searched.flat()) {
@@ -1190,5 +1335,44 @@ async function gatherFresh(
   }
   found.push(...itemsFromWebEvidence({ profile, site, pages, web, year }));
 
-  return { found: dedupeFound(found), web: web.slice(0, 12), pages, site, profile, ran, failed };
+  const projectPages = [site, ...ownPages].filter((page): page is SiteInfo => Boolean(page));
+  for (const page of projectPages) {
+    found.push(...itemsFromProjectList({ text: `${page.title}\n${page.description}\n${page.text}`, url: page.url, year }));
+  }
+  for (const page of pages) {
+    found.push(...itemsFromProjectList({ text: `${page.title}\n${page.text}`, url: page.url, year }));
+  }
+
+  const pageStats = mergeStats([
+    ...projectPages.map((page) => extractPublicStats(`${page.title}\n${page.description}\n${page.text}`, page.url)),
+    ...pages.map((page) => extractPublicStats(`${page.title}\n${page.text}`, page.url)),
+    found.flatMap((item) => item.metrics ?? []),
+  ]);
+
+  if (profile.github) {
+    try {
+      const [html, user] = await Promise.all([githubPage(`/${profile.github}`), githubUser(profile.github, env, tinyfish).catch(() => null)]);
+      const contrib = html ? githubContributions(html, year) : null;
+      if (contrib) {
+        pageStats.push(sourcedStat('contributions', `${contrib.toLocaleString('en-US')} GitHub contributions in ${year}`, contrib, `${GH}/${profile.github}`, profile.github)!);
+      }
+      if (user?.repos) {
+        pageStats.push(sourcedStat('repos', `${user.repos} public GitHub repos`, user.repos, `${GH}/${profile.github}`, user.name || profile.github)!);
+      }
+      ran.push('github-overview');
+    } catch {
+      failed.push('github-overview');
+    }
+  }
+
+  const deduped = dedupeFound(found).map((item) => ({ ...item, description: describeWithStat(item) }));
+  const stats = mergeStats([pageStats]);
+  const draft: Gathered = { found: deduped, web: web.slice(0, 12), pages, site, profile, ran, failed, stats };
+  const gaps = detectGaps(draft);
+  ran.push(`research-pass:gaps:${gaps.join(',') || 'none'}`);
+
+  // Pass 3 — gap-fill from already-fetched pages first (free). Paid TinyFish/Claude only if still thin.
+  if (gaps.includes('thin-for-prolific') || gaps.includes('own-site')) ran.push('research-pass:gap-fill');
+
+  return { ...draft, found: deduped, stats, gaps, coverageCapped: false };
 }

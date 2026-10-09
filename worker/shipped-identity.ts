@@ -18,7 +18,60 @@ export type XProfile = {
   urls: string[];
 };
 
-export type NameParts = { name: string; company: string | null; tokens: string[] };
+export type NameParts = { name: string; company: string | null; tokens: string[]; product: string | null };
+
+/** X/handle spellings that are not the GitHub login. Keep this list short — only proven mismatches. */
+export const HANDLE_ALIASES: Record<string, string[]> = {
+  tdinh_me: ['tony-dinh'],
+  tibo_maker: ['tibo-maker'],
+  dannypostmaa: ['dannypostma'],
+  theo: ['t3dotgg'],
+  t3dotgg: ['t3dotgg'],
+  antfu7: ['antfu'],
+  swyx: ['swyxio', 'sw-yx'],
+  officiallogank: ['logankilpatrick'],
+  alexalbert__: ['alexalbert'],
+  jh3yy: ['jh3y'],
+  rauno: ['raunofreiberg'],
+  mkbhd: ['MKBHD'],
+};
+
+/** "the guy who made Photo AI" → the person who ships that product. */
+export const PRODUCT_OWNERS: Record<string, string> = {
+  photoai: 'levelsio',
+  'photo ai': 'levelsio',
+  'photo-ai': 'levelsio',
+};
+
+export function handleAliases(handle: string): string[] {
+  const id = handle.replace(/^@/, '').toLowerCase();
+  return HANDLE_ALIASES[id] ?? [];
+}
+
+/** Typed "the guy who made Photo AI" / "Photo AI guy" → the product name. */
+export function parseProductQuery(text: string): string | null {
+  const raw = cleanText(text, 80);
+  const made =
+    raw.match(/^(?:the\s+)?(?:guy|person|one|dev|developer|maker|creator|dude)\s+who\s+made\s+(.+)$/i) ||
+    raw.match(/^who\s+made\s+(.+)$/i) ||
+    raw.match(/^(.+?)\s+(?:guy|creator|maker)$/i);
+  const product = made ? cleanText(made[1], 60) : null;
+  return product && product.length >= 3 ? product : null;
+}
+
+export function ownerForProduct(product: string | null | undefined): string | null {
+  if (!product) return null;
+  return PRODUCT_OWNERS[loose(product)] || PRODUCT_OWNERS[product.toLowerCase()] || null;
+}
+
+/** `Tibo` + `OpenAI` → `tibo-openai` / `tiboopenai`. */
+export function companyLogins(name: string, company: string | null | undefined): string[] {
+  if (!company) return [];
+  const n = (name.split(/\s+/)[0] ?? '').replace(/[^A-Za-z0-9-]/g, '').toLowerCase();
+  const c = (company.split(/\s+/)[0] ?? '').replace(/[^A-Za-z0-9-]/g, '').toLowerCase();
+  if (n.length < 2 || c.length < 2) return [];
+  return [`${n}-${c}`, `${n}${c}`, `${n}_${c}`].filter((v) => isGithubLogin(v));
+}
 
 const decode = (text: string) =>
   text.replace(/&amp;/g, '&').replace(/&lt;/g, '<').replace(/&gt;/g, '>').replace(/&quot;/g, '"').replace(/&#39;|&apos;/g, "'");
@@ -84,14 +137,16 @@ export function productNameFromHost(host: string): string {
   return cleanText(base.replace(/[-_]+/g, ' '), 40);
 }
 
-/** Typed "Tibo from OpenAI" / "Ada at Vercel" → name + company. */
+/** Typed "Tibo from OpenAI" / "Ada at Vercel" → name + company. Product nicknames stay out of the name. */
 export function parsePersonName(text: string): NameParts {
+  const product = parseProductQuery(text);
+  if (product) return { name: '', company: null, tokens: [], product };
   const raw = cleanText(text, 80);
   const from = raw.match(/^(.+?)\s+(?:from|at|of|@)\s+(.+)$/i);
   const name = cleanText(from?.[1] ?? raw, 60);
   const company = from ? cleanText(from[2], 40) : null;
   const tokens = name.split(/\s+/).filter((t) => t.length >= 2);
-  return { name, company, tokens };
+  return { name, company, tokens, product: null };
 }
 
 /**
@@ -109,7 +164,8 @@ export function handleVariants(handle: string): string[] {
   add(id.replace(/_/g, '-'));
   if (/(.)\1$/i.test(id) && id.length > 4) add(id.slice(0, -1));
   const parts = id.split(/[_-]/).filter(Boolean);
-  if (parts.length > 1 && parts[0].length >= 3) add(parts[0]);
+  // A short first token ("tibo", "tdinh") is too generic to try as a GitHub login.
+  if (parts.length > 1 && parts[0].length >= 6) add(parts[0]);
   return out.filter((v) => isGithubLogin(v) || isXHandle(v)).slice(0, 8);
 }
 
@@ -129,14 +185,24 @@ export function scoreGithubMatch(opts: {
 }): number {
   const { user, wantX, wantName, wantSite, wantCompany } = opts;
   let score = 0;
+  const xLinked = Boolean(wantX && user.x && user.x.toLowerCase() === wantX.toLowerCase());
+  const variantHit = Boolean(
+    wantX && handleVariants(wantX).some((v) => v.toLowerCase() === user.login.toLowerCase() || (user.x && v.toLowerCase() === user.x.toLowerCase())),
+  );
+  const siteHit = Boolean(wantSite && user.blog && hostOf(user.blog) === hostOf(wantSite));
   if (wantX && user.x && user.x.toLowerCase() === wantX.toLowerCase()) score += 50;
   if (wantX && user.login.toLowerCase() === wantX.toLowerCase()) score += 8;
-  if (wantX && handleVariants(wantX).some((v) => v.toLowerCase() === user.login.toLowerCase() || (user.x && v.toLowerCase() === user.x.toLowerCase()))) score += 18;
-  if (wantName && namesClose(user.name || user.login, wantName)) score += 20;
-  if (wantSite && user.blog && hostOf(user.blog) === hostOf(wantSite)) score += 25;
-  if (wantCompany && `${user.bio} ${user.name}`.toLowerCase().includes(wantCompany.toLowerCase())) score += 10;
-  if (user.repos > 0) score += Math.min(10, Math.round(Math.log10(1 + user.repos) * 4));
+  if (variantHit) score += 18;
+  if (siteHit) score += 25;
+  const nameHit = Boolean(wantName && namesClose(user.name || user.login, wantName));
+  const shortName = Boolean(wantName && !/\s/.test(wantName) && wantName.length < 8);
+  // A first name like "Tibo" or a shared "Tony Dinh" must not steal an X identity.
+  const companyHit = Boolean(wantCompany && `${user.bio} ${user.name} ${user.login}`.toLowerCase().includes(wantCompany.toLowerCase()));
+  if (nameHit && (!wantX || xLinked || variantHit || siteHit) && (!shortName || xLinked || siteHit || companyHit)) score += shortName ? 8 : 20;
+  if (companyHit) score += 16;
+  if (user.repos > 0 && score > 0) score += Math.min(8, Math.round(Math.log10(1 + user.repos) * 3));
   if (user.repos === 0 && !user.blog && !user.x) score -= 20;
+  if (wantX && !xLinked && !variantHit && !siteHit && user.login.toLowerCase() !== wantX.toLowerCase()) return Math.min(score, 6);
   return score;
 }
 
@@ -146,7 +212,7 @@ export async function readXProfile(
   fetchPage?: (url: string) => Promise<{ title: string; description: string; text: string; links: string[] } | null>,
 ): Promise<XProfile | null> {
   if (!isXHandle(handle)) return null;
-  const fromFx = await readFxTwitter(handle);
+  const fromFx = (await readFxTwitter(handle)) ?? (await readFxTwitter(handle, 'https://api.vxtwitter.com'));
   if (fromFx) return fromFx;
   if (!fetchPage) return null;
   const page = await fetchPage(`https://x.com/${handle}`).catch(() => null);
@@ -159,8 +225,8 @@ export async function readXProfile(
   return { handle, name: cleanText(name, 60), bio, site, urls: uniqueUrls(urls) };
 }
 
-async function readFxTwitter(handle: string): Promise<XProfile | null> {
-  const response = await fetch(`https://api.fxtwitter.com/${encodeURIComponent(handle)}`, {
+async function readFxTwitter(handle: string, origin = 'https://api.fxtwitter.com'): Promise<XProfile | null> {
+  const response = await fetch(`${origin}/${encodeURIComponent(handle)}`, {
     headers: { 'user-agent': UA, accept: 'application/json' },
     signal: AbortSignal.timeout(TIMEOUT),
   }).catch(() => null);
@@ -206,7 +272,7 @@ export function extraSitePaths(siteUrl: string): string[] {
   const base = url.replace(/\/+$/, '');
   const host = hostOf(url);
   if (!host || isDomain(host) === false) return [];
-  return [`${base}/`, `${base}/now`, `${base}/projects`, `${base}/changelog`, `${base}/shipped`];
+  return [`${base}/`, `${base}/now`, `${base}/projects`, `${base}/changelog`, `${base}/shipped`, `${base}/2026`, `${base}/work`];
 }
 
 export { httpsUrl, namesClose, uniqueUrls };

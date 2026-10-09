@@ -23,7 +23,8 @@
 //   GET  /shipped/r/<id>/              share page: the static shell with this receipt's tags and data
 //   GET  /shipped/r/<id>/og.png        the 1200×675 card for X        (?download=1 to save it)
 //   GET  /shipped/r/<id>/receipt.png   the whole receipt as one image (?download=1 to save it)
-//   GET  /shipped/r/<id>/rollo.png     4-inch Rollo print (832 dots, ?download=1)
+//   GET  /shipped/r/<id>/rollo.pdf     4-inch Rollo PDF (812 dots / 203 dpi, ?download=1)
+//   GET  /shipped/r/<id>/rollo.png     4-inch Rollo PNG (same layout)
 //   /api/admin/shipped*                moderation, takedowns, bids, the print queue, spend; behind the /admin password
 //
 // Every guardrail (rate limits, locks, the budget, kill switches, the human check, headers) lives in
@@ -31,7 +32,7 @@
 // Tables are created (and new columns added) on first use; see SCHEMA below.
 import { DEFAULT_MODEL, PrintError, assembleReceipt, demoReceipt, maxSearches, promptFor, worstCaseMicros, type AiEnv, type DraftItem } from './shipped-ai';
 import { ICON_HASH, bytesDataUri, iconDataUri, iconKey, reencodeLogo, storeIcon } from './shipped-icons';
-import { yearCardPng, yearRolloPng, yearTallPng, type LogoResolver } from './shipped-og';
+import { yearCardPng, yearRolloPdf, yearRolloPng, yearTallPng, type LogoResolver } from './shipped-og';
 import { PRINT_KIND, SPONSOR_KIND, isProduction, sponsorProvider, type PayEnv, type SponsorEvent } from './shipped-pay';
 import { brandIcon, clean, faviconUrl, gather, githubUser, hostOf, readSite, searchGithubUsers, tinyfishAccess, type SourceEnv } from './shipped-sources';
 import { TINYFISH_DAILY, type TinyfishKind, type TinyfishMeter } from './shipped-tinyfish';
@@ -95,6 +96,7 @@ import {
   CARD_PATH,
   TALL_PATH,
   ROLLO_PATH,
+  ROLLO_PNG_PATH,
   isDomain,
   isGithubLogin,
   isXHandle,
@@ -189,7 +191,7 @@ const FAILED_FOR = 10 * MINUTE;
 /** Longest a print may hold its locks (gathering + up to three 40 s model calls). */
 const PRINT_LOCK = 3 * MINUTE;
 /** Bump when the share images change, so cached ones are redrawn. */
-const IMAGE_VERSION = 6;
+const IMAGE_VERSION = 7;
 
 const SCHEMA = [
   `CREATE TABLE IF NOT EXISTS shipped_receipts (
@@ -702,7 +704,7 @@ async function takedown(request: Request, env: ShippedEnv, ctx: ExecutionContext
 async function purgeReceipt(env: ShippedEnv, id: number, origin?: string): Promise<void> {
   await dropShareImages(env, id).catch(() => undefined);
   const origins = new Set([origin, env.SHIPPED_HOST ? `https://${env.SHIPPED_HOST}` : null, SHIPPED_URL].filter((o): o is string => Boolean(o)));
-  const paths = [RECEIPT_PATH(id), CARD_PATH(id), TALL_PATH(id), ROLLO_PATH(id), `/shipped${RECEIPT_PATH(id)}`, `/shipped${CARD_PATH(id)}`, `/shipped${TALL_PATH(id)}`, `/shipped${ROLLO_PATH(id)}`, `/api/shipped/receipts/${id}`, '/api/shipped/state', '/api/shipped/pile'];
+  const paths = [RECEIPT_PATH(id), CARD_PATH(id), TALL_PATH(id), ROLLO_PATH(id), ROLLO_PNG_PATH(id), `/shipped${RECEIPT_PATH(id)}`, `/shipped${CARD_PATH(id)}`, `/shipped${TALL_PATH(id)}`, `/shipped${ROLLO_PATH(id)}`, `/shipped${ROLLO_PNG_PATH(id)}`, `/api/shipped/receipts/${id}`, '/api/shipped/state', '/api/shipped/pile'];
   const cache = edgeCache();
   if (!cache) return;
   await Promise.all([...origins].flatMap((o) => paths.map((path) => cache.delete(new Request(new URL(path, o))).catch(() => false))));
@@ -1476,7 +1478,13 @@ function logoResolver(env: ShippedEnv, db: D1Database | null): LogoResolver {
   };
 }
 
-type ImageKind = 'card' | 'tall' | 'rollo';
+type ImageKind = 'card' | 'tall' | 'rollo' | 'rollo-pdf';
+
+function pdf(body: BodyInit | null, cache: string): Response {
+  const headers = secure(new Headers({ 'content-type': 'application/pdf', 'cache-control': cache, 'x-robots-tag': 'noindex' }));
+  headers.set('content-security-policy', "default-src 'none'; sandbox");
+  return new Response(body, { headers });
+}
 
 async function shareImage(request: Request, env: ShippedEnv, ctx: ExecutionContext, id: number, kind: ImageKind): Promise<Response> {
   const url = new URL(request.url);
@@ -1485,18 +1493,21 @@ async function shareImage(request: Request, env: ShippedEnv, ctx: ExecutionConte
   if (!receipt) return kind === 'card' ? Response.redirect(new URL('/og-shipped.jpg', url).toString(), 302) : new Response('Not found', { status: 404 });
   const block = await sponsorBlock(db, env);
   const sponsors = block.slots.map((slot) => `${slot.qr}:${slot.logo ? 1 : 0}`).join(',');
-  const cacheKey = `share/${id}/${kind}-v${IMAGE_VERSION}-${seedOf(sponsors).toString(36)}.png`;
+  const pdfKind = kind === 'rollo-pdf';
+  const ext = pdfKind ? 'pdf' : 'png';
+  const cacheKey = `share/${id}/${kind}-v${IMAGE_VERSION}-${seedOf(sponsors).toString(36)}.${ext}`;
   const download = url.searchParams.has('download');
+  const filename = `shipped-${receipt.year}-${receiptNumber(id)}${kind === 'tall' ? '-receipt' : kind === 'rollo' || pdfKind ? '-rollo' : ''}.${ext}`;
   const respond = (body: BodyInit) => {
-    const response = png(body, 'public, max-age=300');
-    if (download) response.headers.set('content-disposition', `attachment; filename="shipped-${receipt.year}-${receiptNumber(id)}${kind === 'tall' ? '-receipt' : kind === 'rollo' ? '-rollo' : ''}.png"`);
+    const response = pdfKind ? pdf(body, 'public, max-age=300') : png(body, 'public, max-age=300');
+    if (download) response.headers.set('content-disposition', `attachment; filename="${filename}"`);
     return response;
   };
   const stored = await env.SHIPPED?.get(cacheKey);
   if (stored) return respond(stored.body);
-  const render = kind === 'card' ? yearCardPng : kind === 'rollo' ? yearRolloPng : yearTallPng;
+  const render = kind === 'card' ? yearCardPng : kind === 'rollo' ? yearRolloPng : kind === 'rollo-pdf' ? yearRolloPdf : yearTallPng;
   const image = await render(receipt, block, shippedOrigin(env, url), logoResolver(env, db));
-  ctx.waitUntil(env.SHIPPED?.put(cacheKey, image, { httpMetadata: { contentType: 'image/png' } }) ?? Promise.resolve());
+  ctx.waitUntil(env.SHIPPED?.put(cacheKey, image, { httpMetadata: { contentType: pdfKind ? 'application/pdf' : 'image/png' } }) ?? Promise.resolve());
   return respond(image);
 }
 
@@ -1559,17 +1570,17 @@ async function sharePage(request: Request, env: ShippedEnv & { ASSETS: Fetcher }
     .transform(new Response(shell.body, { status: 200, headers }));
 }
 
-/** /shipped/r/<id>/, its og.png, receipt.png and rollo.png. Anything else under /shipped/r/ is the static shell. Edge-cached briefly. */
+/** /shipped/r/<id>/, its og.png, receipt.png, rollo.png and rollo.pdf. Anything else under /shipped/r/ is the static shell. Edge-cached briefly. */
 export async function handleShippedPage(request: Request, env: ShippedEnv & { ASSETS: Fetcher }, ctx: ExecutionContext): Promise<Response> {
   env = withKeyAliases(env);
   const url = new URL(request.url);
-  const match = url.pathname.match(/^\/shipped\/r\/(\d{1,9})(\/(og\.png|receipt\.png|rollo\.png)?)?$/);
+  const match = url.pathname.match(/^\/shipped\/r\/(\d{1,9})(\/(og\.png|receipt\.png|rollo\.png|rollo\.pdf)?)?$/);
   if (!match) return env.ASSETS.fetch(request);
   const id = Number(match[1]);
   if (!match[2]) return Response.redirect(new URL(RECEIPT_PATH(id), url).toString(), 301);
   if ((await switchedOff(env, env.DB ?? null)).has('site')) return outOfPaper();
-  if (match[3] === 'og.png' || match[3] === 'receipt.png' || match[3] === 'rollo.png') {
-    const kind = match[3] === 'og.png' ? 'card' : match[3] === 'rollo.png' ? 'rollo' : 'tall';
+  if (match[3] === 'og.png' || match[3] === 'receipt.png' || match[3] === 'rollo.png' || match[3] === 'rollo.pdf') {
+    const kind: ImageKind = match[3] === 'og.png' ? 'card' : match[3] === 'rollo.pdf' ? 'rollo-pdf' : match[3] === 'rollo.png' ? 'rollo' : 'tall';
     if (url.searchParams.has('download')) return shareImage(request, env, ctx, id, kind);
     return cached(request, ctx, 300, () => shareImage(request, env, ctx, id, kind));
   }

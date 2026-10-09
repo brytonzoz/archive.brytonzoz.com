@@ -439,12 +439,19 @@ export function yearTallSvg(data: YearOg): string {
   return scene(PAPER_W + 120, height + 120, sheet(height, body, 'translate(60 50) rotate(-0.6 200 0)', `tall:${data.number}`), 2);
 }
 
-/** 4-inch Rollo (203 dpi → 832 dots). White paper, no counter, 1:1 for the cutter. */
-export const ROLLO_DOTS = 832;
+/** 4-inch Rollo (203 dpi → 812 dots). White paper, no counter, 1:1 for the cutter. */
+export const ROLLO_DPI = 203;
+export const ROLLO_DOTS = 812;
+const ROLLO_TEAR = 40;
 
 export function yearRolloSvg(data: YearOg): string {
   const { body, height } = yearReceiptPaint(data);
   const scale = (ROLLO_DOTS - 32) / PAPER_W;
-  const outH = Math.ceil(height * scale + 32);
-  return `<svg xmlns="http://www.w3.org/2000/svg" width="${ROLLO_DOTS}" height="${outH}" viewBox="0 0 ${ROLLO_DOTS} ${outH}"><rect width="${ROLLO_DOTS}" height="${outH}" fill="${PAPER}"/><g transform="translate(16 16) scale(${scale.toFixed(4)})">${body}</g></svg>`;
+  const paperH = Math.ceil(height * scale + 16);
+  const outH = paperH + ROLLO_TEAR;
+  const y = paperH + 8;
+  let dashes = '';
+  for (let x = 24; x < ROLLO_DOTS - 24; x += 12) dashes += `<rect x="${x}" y="${y}" width="7" height="2" fill="${INK}"/>`;
+  const tear = `${dashes}<text x="${ROLLO_DOTS / 2}" y="${y + 20}" font-family="${OG_FONT}" font-size="11" font-weight="500" text-anchor="middle" fill="${INK}" opacity="0.55">TEAR</text>`;
+  return `<svg xmlns="http://www.w3.org/2000/svg" width="${ROLLO_DOTS}" height="${outH}" viewBox="0 0 ${ROLLO_DOTS} ${outH}"><rect width="${ROLLO_DOTS}" height="${outH}" fill="${PAPER}"/><g transform="translate(16 16) scale(${scale.toFixed(4)})">${body}</g>${tear}</svg>`;
 }

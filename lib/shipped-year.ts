@@ -110,7 +110,8 @@ export const RECEIPT_PATH = (id: number) => `/r/${id}/`;
 export const CARD_PATH = (id: number) => `/r/${id}/og.png`;
 export const QR_PATH = (key: string) => `/q/${key}`;
 export const TALL_PATH = (id: number) => `/r/${id}/receipt.png`;
-export const ROLLO_PATH = (id: number) => `/r/${id}/rollo.png`;
+export const ROLLO_PATH = (id: number) => `/r/${id}/rollo.pdf`;
+export const ROLLO_PNG_PATH = (id: number) => `/r/${id}/rollo.png`;
 
 const MONTHS = ['JAN', 'FEB', 'MAR', 'APR', 'MAY', 'JUN', 'JUL', 'AUG', 'SEP', 'OCT', 'NOV', 'DEC'];
 

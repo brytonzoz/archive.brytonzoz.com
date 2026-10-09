@@ -278,7 +278,7 @@ export function ShareBar({ receipt, onRemoved }: { receipt: Printed; onRemoved?:
         <a href={`${TALL_PATH(receipt.id)}?download=1`} download className="shipped-button is-ghost" aria-label="Save the full receipt image" onClick={() => beacon(receipt.id, 'tall')}>
           SAVE FULL
         </a>
-        <a href={`${ROLLO_PATH(receipt.id)}?download=1`} download className="shipped-button is-ghost" aria-label="Save a 4-inch Rollo print" onClick={() => beacon(receipt.id, 'rollo')}>
+        <a href={`${ROLLO_PATH(receipt.id)}?download=1`} download className="shipped-button is-ghost" aria-label="Save a 4-inch Rollo PDF" onClick={() => beacon(receipt.id, 'rollo')}>
           4-IN ROLLO
         </a>
         <button

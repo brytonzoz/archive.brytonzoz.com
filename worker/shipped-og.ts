@@ -5,6 +5,7 @@ import resvgWasm from '@resvg/resvg-wasm/index_bg.wasm';
 import plexRegular from './fonts/IBMPlexMono-Regular.ttf';
 import plexSemiBold from './fonts/IBMPlexMono-SemiBold.ttf';
 import { yearCardSvg, yearRolloSvg, yearTallSvg, type YearOg } from '../lib/receipt-svg';
+import { pdfFromRgb, rgbFlate, rgbaToRgb } from '../lib/rollo-pdf';
 import { receiptBarcodeUnits, receiptDate } from '../lib/shipped';
 import { isFirstRun, itemsForPrint, pickDeepCut, receiptBadges, receiptModules } from '../lib/shipped-modules';
 import { qr } from '../lib/shipped-qr';
@@ -92,7 +93,14 @@ export async function yearTallPng(receipt: YearReceipt, block: SponsorBlock, ori
   return renderPng(yearTallSvg(await yearOg(receipt, block, origin, logo, 30)));
 }
 
-/** 4-inch Rollo PNG (832 dots wide at 203 dpi). */
+/** 4-inch Rollo PNG (812 dots wide at 203 dpi). */
 export async function yearRolloPng(receipt: YearReceipt, block: SponsorBlock, origin: string, logo: LogoResolver) {
   return renderPng(yearRolloSvg(await yearOg(receipt, block, origin, logo, 30)));
+}
+
+/** 4-inch Rollo PDF: 203 dpi, 812 px wide, one receipt per page, page length matches the tape. */
+export async function yearRolloPdf(receipt: YearReceipt, block: SponsorBlock, origin: string, logo: LogoResolver) {
+  const svg = yearRolloSvg(await yearOg(receipt, block, origin, logo, 30));
+  const { pixels, width, height } = await decodePixels(svg);
+  return pdfFromRgb(width, height, await rgbFlate(rgbaToRgb(pixels)));
 }

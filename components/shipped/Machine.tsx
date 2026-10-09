@@ -189,6 +189,8 @@ export function Machine({ job, display, tone, onPrinted, onTorn, tearSignal = 0,
         offset: frame.offset,
         transform: frame.transform,
         clipPath: frame.clipPath,
+        // iOS Safari's WAAPI ignores unprefixed clipPath; both names keep the header-first reveal.
+        webkitClipPath: frame.clipPath,
         easing: frame.easing,
       })),
       { duration, fill: 'both' },

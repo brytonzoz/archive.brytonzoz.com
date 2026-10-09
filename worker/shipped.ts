@@ -1639,12 +1639,16 @@ export async function handleShipped(request: Request, env: ShippedEnv, ctx: Exec
       return json({ receipt: found, sponsors: await sponsorBlock(db, env) }, 200, 'public, max-age=60');
     });
   }
+  const asImage = async (response: Response) => {
+    if (method === 'HEAD') return new Response(null, { status: response.status, headers: response.headers });
+    return response;
+  };
   const iconMatch = path.match(/^\/api\/shipped\/icon\/([a-f0-9]{24})\.png$/);
-  if (iconMatch && method === 'GET') return icon(env, iconMatch[1]);
+  if (iconMatch && (method === 'GET' || method === 'HEAD')) return asImage(await icon(env, iconMatch[1]));
   const logo = path.match(/^\/api\/shipped\/logo\/(\d{1,9})\.png$/);
-  if (logo && method === 'GET') return publicLogo(env, Number(logo[1]));
+  if (logo && (method === 'GET' || method === 'HEAD')) return asImage(await publicLogo(env, Number(logo[1])));
   const mark = path.match(/^\/api\/shipped\/mark\/(\d{1,2})$/);
-  if (mark && method === 'GET') return houseMark(env, Number(mark[1]));
+  if (mark && (method === 'GET' || method === 'HEAD')) return asImage(await houseMark(env, Number(mark[1])));
 
   return json({ error: 'not-found' }, 404);
 }

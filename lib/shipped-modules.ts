@@ -98,14 +98,17 @@ function monthKey(date: string | null): string | null {
 }
 
 function busiestMonth(items: YearItem[]): string | null {
-  const counts = new Map<string, number>();
+  const counts: Record<string, number> = {};
   for (const item of items) {
     const key = monthKey(item.date);
-    if (key) counts.set(key, (counts.get(key) ?? 0) + 1);
+    if (key) counts[key] = (counts[key] ?? 0) + 1;
   }
   let best: string | null = null;
   let n = 0;
-  for (const [key, count] of counts) {
+  const keys = Object.keys(counts);
+  for (let i = 0; i < keys.length; i++) {
+    const key = keys[i];
+    const count = counts[key];
     if (count > n) {
       best = key;
       n = count;
@@ -133,7 +136,9 @@ export function receiptModules({ receipt, printed }: ModuleContext): ReceiptModu
   const count = itemsShipped(receipt);
   const cut = pickDeepCut(items);
   const dated = items.filter((item) => item.date).sort((a, b) => (a.date ?? '').localeCompare(b.date ?? ''));
-  const platforms = [...new Set(items.map((item) => item.source).filter((source) => source !== 'none'))];
+  const platforms = items
+    .map((item) => item.source)
+    .filter((source, index, all) => source !== 'none' && all.indexOf(source) === index);
   const running = items.filter((item) => item.status === 'LIVE' || item.status === 'ACTIVE' || item.status === 'BETA').length;
   const firstRun = isFirstRun(receipt.id);
   const volume = volumeLine(count, receipt.potential);

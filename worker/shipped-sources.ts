@@ -1563,7 +1563,10 @@ function dedupeFound(found: Found[]): Found[] {
     .filter((item) => item.name && !hasBlockedWord(item.name))
     .sort((a, b) => b.score - a.score)
     .filter((item) => {
-      const key = loose(item.name.replace(/\s+v?\d+(\.\d+)*$/, ''));
+      const base = loose(item.name.replace(/\s+v?\d+(\.\d+)*$/, ''));
+      const key = item.date && (item.source === 'changelog' || item.source === 'company' || item.source === 'x')
+        ? `${base}|${item.date}|${loose(item.name)}`
+        : base;
       if (!key || seen.has(key)) return false;
       seen.add(key);
       return true;
@@ -1584,7 +1587,7 @@ export async function gather(
   const tinyfish = tinyfishAccess(env, meter);
   const resolved = await resolveIdentity(subject, env, tinyfish);
   const mode: GatherMode = opts?.mode === 'full' ? 'full' : 'free';
-  const key = mode === 'full' ? `gather:full:v1:${year}:${resolved.cacheKey}` : `gather:v10:${year}:${resolved.cacheKey}`;
+  const key = mode === 'full' ? `gather:full:v2:${year}:${resolved.cacheKey}` : `gather:v11:${year}:${resolved.cacheKey}`;
   return cached(key, 1440 * MIN, () => gatherFresh(subject, resolved.profile, env, year, meter, tinyfish, resolved.notes, mode));
 }
 
@@ -1747,11 +1750,12 @@ async function gatherFresh(
     draft = { ...draft, found: deduped, stats };
   }
 
-  // Person → role → company, then company harvest + person X, then Decisions ranks every line.
-  // Dynamic import keeps company/xai/decisions from cycling back into this module.
-  const { parseAffiliationQuery, affiliationFromBio, mergeAffiliation, viaLabel, defaultAttribution, companySlug } = await import('./shipped-affiliation');
+  // Person → role → company. Resolve a missing handle/name BEFORE the company harvest so
+  // "Tibo from OpenAI" becomes Thibault Sottiaux / Codex lead and the tape is scoped right.
+  const { parseAffiliationQuery, affiliationFromBio, mergeAffiliation, viaLabel, defaultAttribution, companySlug, needsPersonResolve } =
+    await import('./shipped-affiliation');
   const typed = parseAffiliationQuery(subject.display || subject.id);
-  const affiliation = mergeAffiliation(typed, affiliationFromBio(profile.bio || '', typed));
+  let affiliation = mergeAffiliation(typed, affiliationFromBio(profile.bio || '', typed));
   if (!affiliation.name) affiliation.name = who;
   if (!affiliation.companyX && affiliation.company) {
     const slug = companySlug(affiliation.company);
@@ -1765,9 +1769,78 @@ async function gatherFresh(
   let xaiPosts = 0;
   let xaiHit = false;
   let decisionsMicros = 0;
+  const { xaiConfigured } = await import('./shipped-xai');
+  if (xaiConfigured(env) && needsPersonResolve({ handle: profile.x, name: affiliation.name, company: affiliation.company, role: affiliation.role })) {
+    try {
+      const { resolvePersonWithXai } = await import('./shipped-xai');
+      const ident = await resolvePersonWithXai({ env, who, company: affiliation.company, role: affiliation.role });
+      xaiMicros += ident.spend.costMicros;
+      xaiTicks += ident.spend.ticks;
+      xaiPosts += ident.spend.posts;
+      if (ident.spend.ticks || ident.spend.costMicros) {
+        xaiHit = true;
+        ran.push('xai-identity');
+      }
+      const { verifyResolvedPerson } = await import('./shipped-decisions');
+      const verified = await verifyResolvedPerson({
+        env,
+        query: subject.display || subject.id,
+        company: affiliation.company,
+        candidate: ident,
+      });
+      decisionsMicros += verified.spend.costMicros;
+      if (verified.keep) {
+        if (ident.handle) profile.x = ident.handle;
+        if (ident.name) {
+          affiliation.name = ident.name;
+          if (!profile.name) profile.name = ident.name;
+        }
+        if (ident.company && !affiliation.company) affiliation.company = ident.company;
+        if (ident.role && affiliation.role === 'unknown') {
+          const role = ident.role.toLowerCase();
+          if (role.includes('ceo')) affiliation.role = 'ceo';
+          else if (role.includes('founder')) affiliation.role = 'founder';
+          else if (role.includes('lead') || role.includes('head') || role.includes('director')) affiliation.role = 'lead';
+        }
+        if (ident.product) affiliation.product = affiliation.product || ident.product;
+        if (ident.handle) {
+          try {
+            const { readXProfile } = await import('./shipped-identity');
+            const xProfile = await readXProfile(ident.handle);
+            if (xProfile?.bio) {
+              profile.bio = profile.bio || xProfile.bio;
+              affiliation = mergeAffiliation(affiliation, affiliationFromBio(xProfile.bio, affiliation));
+            }
+            if (xProfile?.name && !profile.name) profile.name = xProfile.name;
+            if (xProfile?.site && !profile.site) profile.site = xProfile.site;
+          } catch {
+            ran.push('x-profile:identity-miss');
+          }
+        }
+        ran.push(`identity:${affiliation.name || who}${profile.x ? `@${profile.x}` : ''}${affiliation.product ? `:${affiliation.product}` : ''}`);
+      } else {
+        ran.push('identity:rejected');
+      }
+    } catch {
+      failed.push('xai-identity');
+    }
+  }
+  if (!affiliation.companyX && affiliation.company) {
+    const slug = companySlug(affiliation.company);
+    if (slug && slug.length <= 15) affiliation.companyX = slug;
+  }
+  if (!affiliation.companyGithub && affiliation.company) affiliation.companyGithub = companySlug(affiliation.company);
+  profile.affiliation = affiliation;
+
   try {
     const { harvestCompany } = await import('./shipped-company');
-    const company = await harvestCompany({ affiliation, year, env, deep: mode === 'full' });
+    const company = await harvestCompany({
+      affiliation,
+      year,
+      env,
+      deep: mode === 'full',
+      gapFillX: mode === 'full' || found.length < 6,
+    });
     if (company.found.length) found.push(...company.found);
     ran.push(...company.ran);
     xaiMicros += company.spend.costMicros;
@@ -1796,20 +1869,8 @@ async function gatherFresh(
   const prolific = Boolean(profile.github || profile.site || affiliation.company || (profile.bio && profile.bio.length > 20));
   const deep = mode === 'full';
   try {
-    const { searchXShips, searchPersonAndCompanyX, searchWebShips, resolveRoleWithXai, xaiConfigured, xaiShouldGapFill, xaiMaxPosts, xaiDeepMaxPosts } =
+    const { searchXShips, searchPersonAndCompanyX, searchWebShips, xaiConfigured, xaiShouldGapFill, xaiMaxPosts, xaiDeepMaxPosts } =
       await import('./shipped-xai');
-    if (xaiConfigured(env) && !profile.x && !affiliation.company && subject.kind === 'name') {
-      const ident = await resolveRoleWithXai({ env, who });
-      xaiMicros += ident.spend.costMicros;
-      xaiTicks += ident.spend.ticks;
-      xaiPosts += ident.spend.posts;
-      if (ident.spend.ticks || ident.spend.costMicros) {
-        xaiHit = true;
-        ran.push('xai-identity');
-      }
-      if (ident.handle) profile.x = ident.handle;
-      if (ident.company && !affiliation.company) affiliation.company = ident.company;
-    }
     const wantDeep = deep && xaiConfigured(env);
     const wantGap = !deep && xaiConfigured(env) && xaiShouldGapFill(deduped.length, prolific);
     if (wantDeep) {

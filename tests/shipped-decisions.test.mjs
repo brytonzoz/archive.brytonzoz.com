@@ -21,6 +21,12 @@ const found = (over = {}) => ({
   ...over,
 });
 
+test('needsPersonResolve fires when a company is known but the handle is not', () => {
+  assert.equal(affiliation.needsPersonResolve({ handle: null, name: 'Tibo', company: 'OpenAI', role: 'unknown' }), true);
+  assert.equal(affiliation.needsPersonResolve({ handle: null, name: '', company: 'Higgsfield', role: 'ceo' }), true);
+  assert.equal(affiliation.needsPersonResolve({ handle: 'amasad', name: 'Amjad', company: 'Replit', role: 'ceo' }), false);
+});
+
 test('typed queries become person → role → company', () => {
   assert.deepEqual(affiliation.parseAffiliationQuery('CEO of Higgsfield'), {
     ...affiliation.emptyAffiliation(),

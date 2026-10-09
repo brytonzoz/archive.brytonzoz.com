@@ -121,6 +121,22 @@ export function companyScope(role: RoleKind): 'all' | 'product' | 'none' {
   return 'none';
 }
 
+/** Cheap xAI / web identity when the typed query has no handle yet. */
+export function needsPersonResolve(opts: { handle?: string | null; name?: string; company?: string | null; role?: RoleKind }): boolean {
+  if (opts.handle) return false;
+  if (opts.role === 'ceo' || opts.role === 'founder') return true;
+  if (opts.name && opts.company) return true;
+  if (opts.name && /\s/.test(opts.name)) return true;
+  return Boolean(opts.company || opts.name);
+}
+
+export function identitySearchQuery(who: string, company: string | null, role: RoleKind | string | null): string {
+  const titled = !who || /^(the\s+)?(ceo|founder|co-?founder)$/i.test(who);
+  if ((role === 'ceo' || role === 'founder') && company && titled) return `${role} of ${company}`;
+  if (who && company) return `${who} ${company}`;
+  return who || company || '';
+}
+
 export function viaLabel(affiliation: Affiliation, attribution: Attribution): string | null {
   if (!affiliation.company || attribution === 'unrelated' || attribution === 'personal') return null;
   const product = affiliation.product && attribution === 'company-led-by-person' ? ` · ${affiliation.product}` : '';

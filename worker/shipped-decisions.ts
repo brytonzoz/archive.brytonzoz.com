@@ -135,7 +135,8 @@ export function heuristicMark(item: Found, year: number, affiliation: Affiliatio
   const dated = Boolean(item.date && item.date.startsWith(String(year)));
   const thisYear = Boolean(item.thisYear) || dated;
   const isRealShip = tease ? 0.15 : item.link ? 0.82 : 0.4;
-  const inYear = dated ? 0.9 : thisYear ? 0.78 : item.date ? 0.15 : 0.45;
+  const changelogYear = (item.source === 'changelog' || item.source === 'company') && thisYear;
+  const inYear = dated ? 0.9 : changelogYear ? 0.86 : thisYear ? 0.78 : item.date ? 0.15 : 0.45;
   const attribution = item.via ? defaultAttribution(affiliation.role) : 'personal';
   const significance = Math.min(4, Math.max(0, Math.round(Math.log10(1 + (item.score ?? 1)) * 2)));
   return { isRealShip, inYear, attribution, significance, confidence: isRealShip * inYear };
@@ -289,4 +290,40 @@ export async function dedupeSameShips(opts: { env: DecisionsEnv; items: Found[] 
 
 export function sortBySignificance(items: Found[]): Found[] {
   return [...items].sort((a, b) => (b.significance ?? 0) - (a.significance ?? 0) || (b.score ?? 0) - (a.score ?? 0) || (a.date ?? '9999').localeCompare(b.date ?? '9999'));
+}
+
+/** Confirm a cheap name→handle guess before we treat it as the person. */
+export async function verifyResolvedPerson(opts: {
+  env: DecisionsEnv;
+  query: string;
+  company: string | null;
+  candidate: { name: string | null; handle: string | null; company: string | null; role: string | null; product: string | null };
+}): Promise<{ keep: boolean; spend: DecisionsSpend }> {
+  const spend = emptyDecisionsSpend();
+  const hasIdentity = Boolean(opts.candidate.handle || (opts.candidate.name && /\s/.test(opts.candidate.name || '')));
+  if (!hasIdentity) return { keep: false, spend };
+  if (!decisionsEnabled(opts.env)) return { keep: true, spend };
+  const input = [
+    `Typed query: ${opts.query}`,
+    `Company hint: ${opts.company ?? 'none'}`,
+    `Candidate name: ${opts.candidate.name ?? ''}`,
+    `Handle: ${opts.candidate.handle ? `@${opts.candidate.handle}` : ''}`,
+    `Company: ${opts.candidate.company ?? ''}`,
+    `Role: ${opts.candidate.role ?? ''}`,
+    `Product: ${opts.candidate.product ?? ''}`,
+  ].join('\n');
+  const result = await decide(opts.env, input, [
+    {
+      type: 'predicate',
+      name: 'is_same_person',
+      instructions: 'Is this candidate the real person the typed query refers to (same human, not a namesake or the company account)?',
+    },
+  ]);
+  if (!result) return { keep: true, spend };
+  spend.inputTokens = result.inputTokens;
+  spend.requests = 1;
+  spend.costMicros = decisionsCostMicros(result.inputTokens);
+  const answer = pick(result.answers, 'is_same_person');
+  const keep = answer?.type === 'predicate' ? answer.probability >= 0.55 : true;
+  return { keep, spend };
 }

@@ -255,20 +255,31 @@ function parseShips(text: string, year: number): Found[] {
   return found;
 }
 
-function parseIdentity(text: string): { handle: string | null; company: string | null; role: string | null } {
+export type ResolvedPerson = {
+  name: string | null;
+  handle: string | null;
+  company: string | null;
+  role: string | null;
+  product: string | null;
+};
+
+function parseIdentity(text: string): ResolvedPerson {
+  const empty = { name: null, handle: null, company: null, role: null, product: null };
   const start = text.indexOf('{');
   const end = text.lastIndexOf('}');
-  if (start < 0 || end <= start) return { handle: null, company: null, role: null };
+  if (start < 0 || end <= start) return empty;
   try {
     const raw = JSON.parse(text.slice(start, end + 1)) as Record<string, unknown>;
     const handle = typeof raw.handle === 'string' ? raw.handle.replace(/^@/, '').trim() : '';
     return {
+      name: typeof raw.name === 'string' ? clean(raw.name, 60) || null : null,
       handle: /^[A-Za-z0-9_]{1,15}$/.test(handle) ? handle : null,
       company: typeof raw.company === 'string' ? clean(raw.company, 40) || null : null,
       role: typeof raw.role === 'string' ? clean(raw.role, 20) || null : null,
+      product: typeof raw.product === 'string' ? clean(raw.product, 40) || null : null,
     };
   } catch {
-    return { handle: null, company: null, role: null };
+    return empty;
   }
 }
 
@@ -368,26 +379,53 @@ export async function searchXShips(opts: {
   return { found, spend: result.spend };
 }
 
-/** One cheap identity call when free resolve found no handle and no company. */
+/** One cheap identity call: x_user_search or web_search for "<name> <company>" / "CEO of <company>". */
+export async function resolvePersonWithXai(opts: {
+  env: XaiEnv;
+  who: string;
+  company?: string | null;
+  role?: string | null;
+}): Promise<ResolvedPerson & { spend: XaiSpend }> {
+  const empty = { name: null, handle: null, company: null, role: null, product: null, spend: emptyXaiSpend() };
+  if (!xaiConfigured(opts.env)) return empty;
+  const { identitySearchQuery } = await import('./shipped-affiliation');
+  const query = identitySearchQuery(opts.who, opts.company ?? null, opts.role ?? null);
+  if (!query.trim()) return empty;
+  const prompt = [
+    `Resolve the real person for: "${opts.who}"${opts.company ? ` at ${opts.company}` : ''}${opts.role ? ` (typed role: ${opts.role})` : ''}.`,
+    `Use ONE cheap lookup only: either x_user_search for "${query}" OR web_search for "${query}". Do not fetch posts or threads. Do not call more than one tool.`,
+    `JSON only: {"name":"legal name","handle":"x handle without @","company":"","role":"ceo|founder|lead|employee|unknown","product":"product they lead or empty"}`,
+  ].join('\n');
+  const result = await xaiResponses(opts.env, {
+    input: [{ role: 'user', content: prompt }],
+    tools: [
+      { type: 'x_search', enable_image_understanding: false, enable_video_understanding: false },
+      { type: 'web_search' },
+    ],
+    max_turns: 1,
+  });
+  if (!result) return empty;
+  const ident = parseIdentity(outputText(result.body));
+  console.log(
+    JSON.stringify({
+      shipped: 'xai-identity',
+      who: opts.who,
+      query,
+      ...ident,
+      ticks: result.spend.ticks,
+      costUsd: Number(ticksToUsd(result.spend.ticks).toFixed(6)),
+    }),
+  );
+  return { ...ident, spend: result.spend };
+}
+
+/** @deprecated prefer resolvePersonWithXai — kept so older callers still compile. */
 export async function resolveRoleWithXai(opts: {
   env: XaiEnv;
   who: string;
 }): Promise<{ handle: string | null; company: string | null; role: string | null; spend: XaiSpend }> {
-  if (!xaiConfigured(opts.env) || !opts.who.trim()) return { handle: null, company: null, role: null, spend: emptyXaiSpend() };
-  const result = await xaiResponses(opts.env, {
-    input: [
-      {
-        role: 'user',
-        content: `Who is "${opts.who}" on X? Return JSON only: {"handle":"","company":"","role":"ceo|founder|lead|employee|unknown"}. One x_user_search at most. Do not fetch posts or threads.`,
-      },
-    ],
-    tools: [{ type: 'x_search', enable_image_understanding: false, enable_video_understanding: false }],
-    max_turns: 1,
-  });
-  if (!result) return { handle: null, company: null, role: null, spend: emptyXaiSpend() };
-  const ident = parseIdentity(outputText(result.body));
-  console.log(JSON.stringify({ shipped: 'xai-identity', who: opts.who, ...ident, ticks: result.spend.ticks, costUsd: Number(ticksToUsd(result.spend.ticks).toFixed(6)) }));
-  return { ...ident, spend: result.spend };
+  const ident = await resolvePersonWithXai(opts);
+  return { handle: ident.handle, company: ident.company, role: ident.role, spend: ident.spend };
 }
 
 function addSpend(into: XaiSpend, extra: XaiSpend): XaiSpend {

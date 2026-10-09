@@ -31,7 +31,6 @@ export const COMPANY_PATHS = [
   '/products/release-notes',
   '/release-notes',
   '/index',
-  '/research',
   '/product',
 ];
 
@@ -85,18 +84,55 @@ const MONTH: Record<string, string> = {
 
 const MONTH_ALT = 'jan(?:uary)?|feb(?:ruary)?|mar(?:ch)?|apr(?:il)?|may|jun(?:e)?|jul(?:y)?|aug(?:ust)?|sep(?:t(?:ember)?)?|oct(?:ober)?|nov(?:ember)?|dec(?:ember)?';
 const SKIP_TITLE =
-  /^(home|about|blog|news|changelog|releases?|updates?|guides?|editorials?|listicles?|product|safety|research|company|all|careers?|sign in|log in|learn more|read more|show more|whats? new|index|docs|pricing|login)$/i;
+  /^(home|about|blog|news|changelog|releases?|updates?|guides?|editorials?|listicles?|product|safety|research|company|all|careers?|sign in|log in|learn more|read more|show more|whats? new|index|docs|pricing|login|related posts?|skip to main content)$/i;
+const ARTICLE_TITLE =
+  /\b(how to|tutorial|case stud(?:y|ies)|customer stor(?:y|ies)|deep dive|event recap|what we learned|behind the scenes|lessons? from|research paper|whitepaper)\b/i;
+const SHIP_PREFIX = /^(introducing|launching|announcing|presenting|meet|say hello to|now available[:\s]+|how to|how)\s+/i;
 
-function clean(value: unknown, max: number): string {
+function tidy(value: unknown): string {
   if (typeof value !== 'string') return '';
   return value
     .normalize('NFKC')
     .replace(/[\u0000-\u001f\u007f-\u009f\u200b-\u200f\u2028-\u202e\u2066-\u2069]/g, ' ')
     .replace(/[<>`{}]/g, '')
     .replace(/\s+/g, ' ')
-    .trim()
-    .slice(0, max)
     .trim();
+}
+
+function wordClamp(text: string, max: number): string {
+  if (text.length <= max) return text;
+  const cut = text.slice(0, max);
+  const space = cut.lastIndexOf(' ');
+  return (space >= Math.max(8, Math.floor(max * 0.4)) ? cut.slice(0, space) : cut).replace(/[,:;–—-]+$/, '').trim();
+}
+
+function clean(value: unknown, max: number): string {
+  return wordClamp(tidy(value), max);
+}
+
+function isNoiseTitle(text: string): boolean {
+  if (!text || text.length < 3 || SKIP_TITLE.test(text)) return true;
+  if (/^by\s+\S/i.test(text)) return true;
+  if (/\bmin(?:ute)?s?\s+read\b/i.test(text)) return true;
+  if (ARTICLE_TITLE.test(text)) return true;
+  if (/^how\s+\w+\s+is\b/i.test(text)) return true;
+  if (/\baccelerating\b/i.test(text) && !/\b(launch|released?|version|v\d)\b/i.test(text)) return true;
+  if (/^[A-Za-z0-9][\w.-]{1,40}\s+builds\b/i.test(text)) return true;
+  if (/\busing\b.{0,48}\bto\s+(search|find|build|make|create|train)\b/i.test(text)) return true;
+  return false;
+}
+
+/** Clean short product name: strip Introducing/How, never cut mid-word. */
+export function shipName(value: unknown, max = 40): string {
+  let text = tidy(value)
+    .replace(/^(guides?|editorials?|listicles?|news|product|safety|research|company|inside\s+\w+)\s+/i, '')
+    .replace(/\s+\d+\s*min(?:ute)?s?\s*$/i, '')
+    .replace(/^\d+\s*min(?:ute)?s?\s*·\s*/i, '')
+    .replace(/^·\s*/, '');
+  if (isNoiseTitle(text)) return '';
+  text = text.replace(SHIP_PREFIX, '').trim();
+  if (!text || isNoiseTitle(text)) return '';
+  return wordClamp(text, max);
 }
 
 function publicUrl(value: unknown): string | null {
@@ -196,15 +232,8 @@ export function extractAlternateFeeds(html: string, base: string): string[] {
 }
 
 function cleanTitle(name: string): string {
-  const trimmed = clean(
-    name
-      .replace(/^(guides?|editorials?|listicles?|news|product|safety|research|company|inside\s+\w+)\s+/i, '')
-      .replace(/\s+\d+\s*min(?:ute)?s?\s*$/i, '')
-      .replace(/^\d+\s*min(?:ute)?s?\s*·\s*/i, '')
-      .replace(/^·\s*/, ''),
-    60,
-  );
-  if (!trimmed || trimmed.length < 3 || SKIP_TITLE.test(trimmed)) return '';
+  const trimmed = shipName(name, 60);
+  if (!trimmed || trimmed.length < 3) return '';
   if (/^20\d\d(-\d{2}){1,2}$/.test(trimmed)) return '';
   if (/^\d+\s*min/i.test(trimmed)) return '';
   if (/^(changelog|contact|sign in|download|contact sales|search blog)$/i.test(trimmed)) return '';

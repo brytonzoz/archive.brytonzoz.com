@@ -100,6 +100,7 @@ export type Found = {
   inYear?: number;
   significance?: number;
   attribution?: import('./shipped-affiliation').Attribution;
+  kind?: string;
 };
 
 export type WebResult = { title: string; url: string; snippet: string; date: string | null };
@@ -1599,7 +1600,7 @@ export async function gather(
   const tinyfish = tinyfishAccess(env, meter);
   const resolved = await resolveIdentity(subject, env, tinyfish);
   const mode: GatherMode = opts?.mode === 'full' ? 'full' : 'free';
-  const key = mode === 'full' ? `gather:full:v6:${year}:${resolved.cacheKey}` : `gather:v15:${year}:${resolved.cacheKey}`;
+  const key = mode === 'full' ? `gather:full:v7:${year}:${resolved.cacheKey}` : `gather:v16:${year}:${resolved.cacheKey}`;
   return cached(key, 1440 * MIN, () => gatherFresh(subject, resolved.profile, env, year, meter, tinyfish, resolved.notes, mode));
 }
 
@@ -1777,23 +1778,27 @@ async function gatherFresh(
     needsCompanyResolve,
     needsIdentityRetry,
     cleanGithubCompany,
+    shouldInferCompany,
+    primaryProduct,
   } = await import('./shipped-affiliation');
   const typed = parseAffiliationQuery(subject.display || subject.id);
   let affiliation = mergeAffiliation(typed, affiliationFromBio(profile.bio || '', typed));
   if (!affiliation.name) affiliation.name = who;
   const applyCompanyHints = () => {
+    const infer = shouldInferCompany(affiliation);
     const fromSites = companyFromSites(sitesOf(profile), { name: affiliation.name || profile.name, handle: profile.x });
-    if (fromSites && !affiliation.company) {
+    if (infer && fromSites && !affiliation.company) {
       affiliation.company = fromSites.company;
       affiliation.companySite ||= fromSites.site;
     }
     const fromGithub = cleanGithubCompany(profile.company);
-    if (fromGithub && !affiliation.company) affiliation.company = fromGithub;
+    if (infer && fromGithub && !affiliation.company) affiliation.company = fromGithub;
     if (!affiliation.companyX && affiliation.company) {
       const slug = companyOrgGuess(affiliation.company);
       if (slug && slug.length <= 15) affiliation.companyX = slug;
     }
     if (!affiliation.companyGithub && affiliation.company) affiliation.companyGithub = companyOrgGuess(affiliation.company);
+    if (affiliation.product) affiliation.product = primaryProduct(affiliation.product, affiliation.company) || affiliation.product;
   };
   applyCompanyHints();
   profile.affiliation = affiliation;
@@ -1838,7 +1843,7 @@ async function gatherFresh(
       else if (role.includes('founder')) affiliation.role = 'founder';
       else if (role.includes('lead') || role.includes('head') || role.includes('director')) affiliation.role = 'lead';
     }
-    if (ident.product) affiliation.product = affiliation.product || ident.product;
+    if (ident.product) affiliation.product = affiliation.product || primaryProduct(ident.product, affiliation.company || ident.company);
     if (ident.handle) {
       try {
         const { readXProfile } = await import('./shipped-identity');

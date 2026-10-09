@@ -394,7 +394,7 @@ export async function resolvePersonWithXai(opts: {
   const prompt = [
     `Resolve the real person for: "${opts.who}"${opts.company ? ` at ${opts.company}` : ''}${opts.role ? ` (typed role: ${opts.role})` : ''}.`,
     `Use ONE cheap lookup only: either x_user_search for "${query}" OR web_search for "${query}". Do not fetch posts or threads. Do not call more than one tool.`,
-    `JSON only: {"name":"legal name","handle":"x handle without @","company":"","role":"ceo|founder|lead|employee|unknown","product":"product they lead or empty"}`,
+    `JSON only: {"name":"legal name","handle":"x handle without @","company":"","role":"ceo|founder|lead|employee|unknown","product":"ONE primary product they lead (not the whole company, not a list) or empty"}`,
   ].join('\n');
   const result = await xaiResponses(opts.env, {
     input: [{ role: 'user', content: prompt }],

@@ -32,20 +32,28 @@ test('typed queries become person → role → company', () => {
     ...affiliation.emptyAffiliation(),
     role: 'ceo',
     company: 'Higgsfield',
+    typedCompany: true,
   });
   assert.equal(affiliation.parseAffiliationQuery('Higgsfield CEO').role, 'ceo');
   assert.equal(affiliation.parseAffiliationQuery('Higgsfield CEO').company, 'Higgsfield');
   const tibo = affiliation.parseAffiliationQuery('Tibo from OpenAI');
   assert.equal(tibo.name, 'Tibo');
   assert.equal(tibo.company, 'OpenAI');
+  assert.equal(tibo.typedCompany, true);
   const lead = affiliation.parseAffiliationQuery('Codex lead at OpenAI');
   assert.equal(lead.role, 'lead');
   assert.equal(lead.product, 'Codex');
   assert.equal(lead.company, 'OpenAI');
   assert.equal(affiliation.companyScope('ceo'), 'all');
   assert.equal(affiliation.companyScope('lead'), 'product');
-  assert.equal(affiliation.companyScope('unknown'), 'all');
+  assert.equal(affiliation.companyScope('unknown'), 'none');
   assert.equal(affiliation.companyScope('employee'), 'none');
+  assert.equal(affiliation.companyScope(tibo), 'all');
+  assert.equal(affiliation.companyScope(lead), 'product');
+  assert.equal(affiliation.shouldInferCompany(affiliation.emptyAffiliation()), false);
+  assert.equal(affiliation.shouldInferCompany(tibo), true);
+  assert.deepEqual(affiliation.leadProductTokens('ChatGPT & Codex', 'OpenAI'), ['Codex']);
+  assert.equal(affiliation.primaryProduct('ChatGPT & Codex', 'OpenAI'), 'Codex');
   assert.equal(affiliation.viaLabel({ ...affiliation.emptyAffiliation(), company: 'OpenAI', product: 'Codex', role: 'lead' }, 'company-led-by-person'), 'via OpenAI · Codex');
 });
 
@@ -69,6 +77,40 @@ test('heuristic keep/drop matches the Decisions product threshold', () => {
   assert.equal(decisions.shouldKeep(tease), false);
   const old = decisions.heuristicMark(found({ date: '2025-11-01', thisYear: false }), 2026, person);
   assert.equal(decisions.shouldKeep(old), false);
+});
+
+test('tutorials, case studies, and research writeups are not ships', () => {
+  const person = affiliation.emptyAffiliation();
+  const drop = [
+    'HOW COOLEY IS ACCELERATING IPO WORK',
+    'FULL AI CAR COMMERCIAL TUTORIAL',
+    'HOW TO USE AGENTIC AI FOR CONTENT CREATION',
+    'POLIMILL BUILDS A FACTORY',
+    'ACCELERATING ANTIBIOTIC DISCOVERY',
+    'HOW TO MAKE REALISTIC VFX SHOTS',
+    'USING CODEX CHATGPT TO SEARCH FOR NEW ANTIBIOTICS',
+    'RAPIDLY SCALING ONLINE STORAGE',
+  ];
+  for (const name of drop) {
+    const mark = decisions.heuristicMark(found({ name, description: 'blog', link: 'https://openai.com/index/post' }), 2026, person);
+    assert.equal(decisions.shouldKeep(mark), false, name);
+    assert.equal(mark.kind, 'NOT_A_SHIP');
+  }
+  const lead = { ...affiliation.parseAffiliationQuery('Tibo from OpenAI'), role: 'lead', product: 'Codex' };
+  const health = decisions.heuristicMark(
+    found({ name: 'ChatGPT Health', description: 'via OpenAI', link: 'https://openai.com/index/chatgpt-health', via: 'via OpenAI · Codex' }),
+    2026,
+    lead,
+  );
+  assert.equal(health.attribution, 'unrelated');
+  assert.equal(decisions.shouldKeep(health), false);
+  const codex = decisions.heuristicMark(
+    found({ name: 'Codex long-running work', description: 'agents', link: 'https://developers.openai.com/codex/changelog', via: 'via OpenAI · Codex' }),
+    2026,
+    lead,
+  );
+  assert.equal(codex.attribution, 'company-led-by-person');
+  assert.ok(decisions.shouldKeep(codex), JSON.stringify(codex));
 });
 
 test('xAI is a keyword gap-fill with a hard post cap and monthly fail-closed', async () => {

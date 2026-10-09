@@ -2,7 +2,7 @@
 // / releases / updates, <link rel=alternate> feeds, sitemap.xml (2026 lastmod), GitHub org
 // releases, and App Store version rows. No per-company URL tables.
 import { extraResearchPaths, itemsFromProjectList } from './shipped-research';
-import { companyOrgGuess, companyScope, companySlug, companyTokens, productTokens, type Affiliation } from './shipped-affiliation';
+import { companyOrgGuess, companyScope, companySlug, companyTokens, leadProductTokens, type Affiliation } from './shipped-affiliation';
 import { type XaiEnv, type XaiSpend, emptyXaiSpend } from './shipped-xai';
 import {
   cached,
@@ -71,14 +71,19 @@ function prefixHosts(apex: string): string[] {
   return PREFIX_HOSTS.map((prefix) => `https://${prefix}.${host}/`);
 }
 
-function viaFor(affiliation: Affiliation): string {
-  return affiliation.product ? `via ${affiliation.company} · ${affiliation.product}` : `via ${affiliation.company}`;
+function viaFor(affiliation: Affiliation): string | null {
+  if (!affiliation.company) return null;
+  if (companyScope(affiliation) === 'product' && affiliation.product) {
+    return `via ${affiliation.company} · ${affiliation.product}`;
+  }
+  if (companyScope(affiliation) === 'all') return `via ${affiliation.company}`;
+  return null;
 }
 
-function withVia(items: Found[], via: string): Found[] {
+function withVia(items: Found[], via: string | null): Found[] {
   return items.map((item) => ({
     ...item,
-    via: item.via ?? via,
+    via: via ? item.via ?? via : item.via ?? null,
     source: item.source === 'site' || item.source === 'web' ? 'changelog' : item.source,
   }));
 }
@@ -435,8 +440,8 @@ async function appStoreVersionHistory(trackId: number, appName: string, year: nu
 }
 
 function scopeFilter(affiliation: Affiliation, found: Found[]): Found[] {
-  if (companyScope(affiliation.role) !== 'product' || !affiliation.product) return found;
-  const tokens = productTokens(affiliation.product).map((t) => t.toLowerCase());
+  if (companyScope(affiliation) !== 'product' || !affiliation.product) return found;
+  const tokens = leadProductTokens(affiliation.product, affiliation.company).map((t) => t.toLowerCase());
   if (!tokens.length) return found;
   return found.filter((item) => {
     const hay = `${item.name} ${item.description} ${item.link ?? ''}`.toLowerCase();
@@ -455,10 +460,10 @@ export async function harvestCompany(opts: {
 }): Promise<CompanyHarvest> {
   const { affiliation, year, env } = opts;
   const slug = companySlug(affiliation.company);
-  if (!slug || companyScope(affiliation.role) === 'none') {
+  if (!slug || companyScope(affiliation) === 'none') {
     return { found: [], spend: emptyXaiSpend(), ran: [], cacheHit: false };
   }
-  const cacheKey = opts.deep ? `company:deep:v3:${year}:${slug}` : `company:v5:${year}:${slug}`;
+  const cacheKey = opts.deep ? `company:deep:v4:${year}:${slug}` : `company:v6:${year}:${slug}`;
   return cached(cacheKey, 7 * 1440 * MIN, async () => {
     const via = viaFor(affiliation);
     const ran: string[] = [];

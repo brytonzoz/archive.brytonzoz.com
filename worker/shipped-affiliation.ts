@@ -14,6 +14,8 @@ export type Affiliation = {
   companyX: string | null;
   companyGithub: string | null;
   companySite: string | null;
+  /** Company came from the typed query ("Tibo from OpenAI"), not an inferred site. */
+  typedCompany: boolean;
 };
 
 export const emptyAffiliation = (): Affiliation => ({
@@ -24,6 +26,7 @@ export const emptyAffiliation = (): Affiliation => ({
   companyX: null,
   companyGithub: null,
   companySite: null,
+  typedCompany: false,
 });
 
 const ROLE_WORD: Record<string, RoleKind> = {
@@ -95,12 +98,14 @@ export function parseAffiliationQuery(text: string): Affiliation {
   if (ceoOf) {
     out.role = ROLE_WORD[ceoOf[1].toLowerCase().replace(/\s+/g, '')] ?? (ceoOf[1].toLowerCase().includes('founder') ? 'founder' : 'lead');
     out.company = cleanText(ceoOf[2], 40);
+    if (out.company) out.typedCompany = true;
     return out;
   }
   const titled = raw.match(/^(.+?)\s+(ceo|founder|co-?founder)$/i);
   if (titled && !/\s/.test(titled[1])) {
     out.role = titled[2].toLowerCase().includes('founder') ? 'founder' : 'ceo';
     out.company = cleanText(titled[1], 40);
+    if (out.company) out.typedCompany = true;
     return out;
   }
   const leadOf = raw.match(/^(.+?)\s+lead\s+(?:of|at|@)\s+(.+)$/i);
@@ -108,6 +113,7 @@ export function parseAffiliationQuery(text: string): Affiliation {
     out.product = cleanText(leadOf[1], 40);
     out.company = cleanText(leadOf[2], 40);
     out.role = 'lead';
+    if (out.company) out.typedCompany = true;
     return out;
   }
   const parts = parsePersonName(raw);
@@ -115,6 +121,7 @@ export function parseAffiliationQuery(text: string): Affiliation {
   out.company = parts.company;
   out.product = parts.product;
   if (parts.company && /^ceo$/i.test(parts.name)) out.role = 'ceo';
+  if (out.company) out.typedCompany = true;
   return out;
 }
 
@@ -177,15 +184,28 @@ export function mergeAffiliation(base: Affiliation, extra: Affiliation): Affilia
     companyX: base.companyX || extra.companyX,
     companyGithub: base.companyGithub || extra.companyGithub,
     companySite: base.companySite || extra.companySite,
+    typedCompany: base.typedCompany || extra.typedCompany,
   };
 }
 
+type ScopeHint = RoleKind | Pick<Affiliation, 'role' | 'product' | 'typedCompany'>;
+
 /** Founders/CEOs get the whole company tape; a lead gets the product they run plus their own.
- *  "Tibo from OpenAI" (role still unknown) also harvests the company — Decisions drops unrelated. */
-export function companyScope(role: RoleKind): 'all' | 'product' | 'none' {
-  if (role === 'founder' || role === 'ceo' || role === 'unknown') return 'all';
+ *  Unknown indie builders do not inherit a company harvest. A typed "from Company" still does. */
+export function companyScope(roleOrAff: ScopeHint): 'all' | 'product' | 'none' {
+  const role = typeof roleOrAff === 'string' ? roleOrAff : roleOrAff.role;
+  const typed = typeof roleOrAff === 'string' ? false : Boolean(roleOrAff.typedCompany);
+  const product = typeof roleOrAff === 'string' ? null : roleOrAff.product;
+  if (role === 'founder' || role === 'ceo') return 'all';
   if (role === 'lead') return 'product';
+  if (typed && product) return 'product';
+  if (typed) return 'all';
   return 'none';
+}
+
+/** Infer a company from a personal site or GitHub org only for CEOs/founders or typed-company queries. */
+export function shouldInferCompany(affiliation: Pick<Affiliation, 'role' | 'typedCompany'>): boolean {
+  return affiliation.role === 'ceo' || affiliation.role === 'founder' || Boolean(affiliation.typedCompany);
 }
 
 /** Cheap xAI / web identity when the typed query has no handle yet. */
@@ -238,6 +258,19 @@ export function productTokens(product: string | null | undefined): string[] {
     .map((part) => part.trim())
     .filter((part) => part.length >= 3 && !/^(the|and|platform|generation)$/i.test(part))
     .slice(0, 4);
+}
+
+/** One primary product a lead owns. "ChatGPT & Codex" at OpenAI → Codex, not ChatGPT. */
+export function leadProductTokens(product: string | null | undefined, company: string | null | undefined = null): string[] {
+  const tokens = productTokens(product);
+  const skip = new Set(companyTokens(company).map((t) => t.toLowerCase()));
+  const filtered = tokens.filter((t) => !skip.has(t.toLowerCase()));
+  const use = filtered.length ? filtered : tokens;
+  return use.slice(-1);
+}
+
+export function primaryProduct(product: string | null | undefined, company: string | null | undefined = null): string | null {
+  return leadProductTokens(product, company)[0] ?? null;
 }
 
 export function identitySearchQuery(who: string, company: string | null, role: RoleKind | string | null): string {

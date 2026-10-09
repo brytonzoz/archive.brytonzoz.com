@@ -7,6 +7,7 @@ import { ITEM_STATUSES } from '../lib/shipped-year';
 import { hasBlockedWord } from '../lib/shipped-sponsors';
 import { REQUIRED_MODULES, sanitizeLayout, type ModuleId } from '../lib/shipped-modules';
 import { clean, hostOf, inYearCount, publicUrl, type Found, type Gathered } from './shipped-sources';
+import { shipName } from './shipped-changelog';
 import { RECEIPT_BUDGET_MICROS, formatReceiptStats, searchBudget, type SourcedStat } from './shipped-research';
 
 export interface AiEnv {
@@ -93,7 +94,7 @@ const MOCKING =
 // Notes that sound like a model wrote them are swapped for a canned one.
 const AI_VOICE = /\b(delve|testament|journey|innovat\w*|seamless\w*|elevat\w*|unlock\w*|empower\w*|leverag\w*|cutting-edge|game-?changer|robust|passion\w*|incredible|amazing|truly|impressive)\b/i;
 
-const upper = (value: unknown, max: number) => clean(value, max).toUpperCase();
+const upper = (value: unknown, max: number) => shipName(value, max).toUpperCase();
 /** Whether a receipt may print this text: no slurs, private life, contact details, model talk or mockery. */
 export const printable = (text: string) =>
   Boolean(text) && !hasBlockedWord(text) && !PERSONAL.test(text) && !CONTACT.test(text) && !INSTRUCTION.test(text) && !MOCKING.test(text) && !/[<>{}`\\]/.test(text);
@@ -185,7 +186,7 @@ export function formatStats(items: { source?: string }[], sourced: SourcedStat[]
 }
 
 const TEMPLATE_NOTE =
-  /is first on the tape|led the year|closed the year|set the tone|through-line|Receipt paper running low|Someone likes the publish button|\d+\s+launches?\s+·|night shift|publish button|\bthe tape\b|the register is|stock the shelves|counted receipts|got the paperwork|rings the publish|cashier has seen worse|mostly i just/i;
+  /is first on the tape|led the year|closed the year|set the tone|through-line|Receipt paper running low|Someone likes the publish button|\d+\s+launches?\s+·|night shift|publish button|\bthe tape\b|the register is|stock the shelves|counted receipts|got the paperwork|rings the publish|cashier has seen worse|mostly i just|wish and a prayer|nobody asked|same maker, more skus|runs on a wish/i;
 
 /** Notes that read like a leftover slogan, a fallback stat line, or the same cashier bit. */
 export function cashierNoteLooksCanned(note: string): boolean {
@@ -209,29 +210,29 @@ function clipSentence(text: string, max: number): string {
   return out;
 }
 
-/** Deadpan, specific, grounded in the items. Never a stock slogan. */
+/** Warm-roast, one sentence, grounded in the loudest real fact. Never mean. */
 export function groundedNote(items: DraftItem[], seed: number, profileName = '', stats: string[] = []): string {
   const real = items.filter((item) => item.source !== 'none');
   if (!real.length) return POTENTIAL_NOTES[seed % POTENTIAL_NOTES.length];
   const first = real[0]?.name ?? 'THIS';
   const loud = real[(seed + first.length) % real.length] ?? real[0];
-  const phrase = statPhrase(stats.find((line) => /\d/.test(line)) ?? '');
+  const phrase = statPhrase(stats.find((line) => /\d/.test(line) && !/\/mo\b/i.test(line)) ?? '');
   const who = profileName.split(/\s+/)[0] ?? '';
   if (phrase && loud?.name) {
     const variants = [
-      `${loud.name} brought ${phrase}. The rest of the pile is quieter.`,
-      `${phrase} on ${loud.name}. Same maker, more SKUs.`,
-      `${loud.name} is the loud line: ${phrase}.`,
+      `${loud.name} put ${phrase} on the board. The rest is just keeping it company.`,
+      `${phrase} for ${loud.name}. Not bad for a year that was supposed to be quiet.`,
+      `${loud.name} showed up with ${phrase} and somehow made it look easy.`,
     ];
-    return clipSentence(variants[seed % variants.length], 160);
+    return clipSentence(variants[seed % variants.length], 140);
   }
   const extra = Math.max(0, real.length - 1);
   const variants = [
-    `${first} plus ${extra} more. ${loud.name} is the one still warm.`,
-    `${real.length} public things${who ? ` under ${who}` : ''}, and ${first} is the one people will ask about.`,
-    `${first} and ${loud.name} share the same ink. ${real.length} lines, no returns.`,
+    `${first} plus ${extra} more, and ${loud.name} is the one people will still be quoting.`,
+    `${real.length} public things${who ? ` under ${who}` : ''}, and ${first} is the one that earned the grin.`,
+    `${first} and ${loud.name} kept the year interesting. ${real.length} lines, all of them real.`,
   ];
-  return clipSentence(variants[(seed + real.length) % variants.length], 160);
+  return clipSentence(variants[(seed + real.length) % variants.length], 140);
 }
 
 const cannedNote = (items: DraftItem[], seed: number, profileName = '') => groundedNote(items, seed, profileName);
@@ -302,15 +303,8 @@ function finish(items: DraftItem[], note: string, seed: number, modulesRaw?: unk
   return { items: sorted, note: printed, stats, potential: false, layout };
 }
 
-function printNote(note: string, stats: string[]): string {
-  let text = note.trim();
-  if (cashierNoteLooksCanned(text) || !/\d/.test(text)) {
-    const phrase = statPhrase(stats.find((line) => /\d/.test(line) && !cashierNoteLooksCanned(line)) ?? '');
-    if (phrase && !text.toLowerCase().includes(phrase.toLowerCase().slice(0, 12))) {
-      text = `${phrase}. ${text}`;
-    }
-  }
-  return clipSentence(text, 180);
+function printNote(note: string, _stats: string[]): string {
+  return clipSentence(note.trim(), 140);
 }
 
 /** Without the AI: the harvested, verified lines as they are, and a canned note. */
@@ -326,10 +320,15 @@ function noteOnlyPrompt(subject: Subject, items: DraftItem[], stats: string[], y
 
 function noteOnlySystem(year: number) {
   return [
-    `You write only the cashier note on a SHIPPED IN ${year} receipt. The items are already on the tape — do not list or invent any.`,
-    'Cashier "note": 80-140 characters, one or two COMPLETE sentences (never cut a word). Deadpan. MUST copy one product name from <found>.items and one exact number from <found>.stats. The joke is about what THAT product does, not about cashiers.',
-    'Banned phrases: night shift, publish button, the tape, the register, receipt paper, stock the shelves, "is first on the tape", "led the year", "closed the year", "set the tone", "through-line", "N launches ·", "Someone likes". Do not start by counting items. Never generic, never inspirational, never invented facts.',
-    'Banned words: delve, testament, journey, innovative, seamless, elevate, unlock, empower, leverage, cutting-edge, game-changer, robust, passion, incredible, amazing, "truly", loser, pathetic, scam, flop, cringe, exclamation marks, emoji, em dashes.',
+    `You write only the cashier note on a SHIPPED IN ${year} receipt. The items are already printed — do not list or invent any.`,
+    'One sentence, warm-roast tone: playful and admiring, never mean. Built on the single most impressive REAL fact in <found> (a count, a big launch, or a streak). Max ~140 characters. Never cut a word. Copy the fact exactly — no misread stats, no "/mo" glued onto a product name.',
+    'Good: "Codex grew long-running work this year, and Tibo\'s agents now stay clocked in overnight."',
+    'Good: "cn is at 8.2M weekly downloads. The other packages are just opening acts."',
+    'Good: "104 public Replit ships later and Amjad still treats shipped like a first draft."',
+    'Bad: "runs on a wish and a prayer"',
+    'Bad: "Nobody asked for ChatGPT for Research."',
+    'Bad: "200/mo public revenue on CHATGPT FOR RESEARCH"',
+    'Banned: wish and a prayer, Nobody asked, Same maker more SKUs, night shift, publish button, the tape, the register, receipt paper, stock the shelves, invented numbers, insults, exclamation marks, emoji, em dashes.',
     'Finish with only a JSON object, no markdown: {"note":""}',
   ].join('\n');
 }
@@ -346,8 +345,8 @@ function systemPrompt(year: number, searches: number) {
     'Only public, professional shipped-work information.',
     '"link" must be a URL that appears in the data or your search results, copied exactly, or null. Never make up a URL.',
     'Status (one allowed word) goes where a price would. LIVE for a running product or site, RELEASED for a version/release, LAUNCHED for a launch post, SHIPPED otherwise, BETA if it says beta, DECEASED if shut down.',
-    'Item names: the product name as people know it, max 32 characters. Description: a specific one-liner grounded in the source (what it is, not a slogan), max 70 characters. "Menu bar app that keeps the Mac awake", not "An innovative solution".',
-    'Cashier "note": 80-140 characters, one or two COMPLETE sentences (never cut a word). Deadpan. MUST copy one product name from <found> and one exact number from <found>.stats or an item metric (stars, weekly downloads, upvotes, public MRR). The joke is about what THAT product does, not about cashiers. Good: "SuperX pulled 929 hunters in February. The other tabs are just merch." Good: "cn is at 8.2M weekly downloads. The other seven packages are the opening act." Bad: "Eighteen repos on the tape, and the night shift counted publish buttons." Banned phrases: night shift, publish button, the tape, the register, receipt paper, stock the shelves, "is first on the tape", "led the year", "closed the year", "set the tone", "through-line", "N launches ·", "Someone likes". Do not start by counting items ("Eighteen repos", "Ten packages"). Never generic, never inspirational, never invented facts.',
+    'Item names: a clean short product name people would recognize (ChatGPT Images 2.5, Codex long-running work, Composer 2). Strip Introducing/Launching/How. Truncate on a word boundary, never mid-word. Max 40 characters. Description: a specific one-liner grounded in the source (what it is, not a slogan), max 70 characters.',
+    'Cashier "note": one sentence, ~140 characters, warm-roast (playful, admiring, never mean), built on the single most impressive real fact (a count, a big launch, a streak). Copy the number exactly. Good: "Codex grew long-running work this year, and Tibo\'s agents now stay clocked in overnight." Good: "cn is at 8.2M weekly downloads. The other packages are just opening acts." Good: "104 public Replit ships later and Amjad still treats shipped like a first draft." Bad: "runs on a wish and a prayer" Bad: "Nobody asked for ChatGPT for Research." Bad: "200/mo public revenue on CHATGPT FOR RESEARCH" Banned: wish and a prayer, Nobody asked, Same maker more SKUs, night shift, publish button, the tape, invented stats.',
     'Also output "stats": 1-4 short lines copied from <found>.stats (GitHub stars, npm weekly downloads, PH upvotes, App Store ratings, public MRR, user counts, HN points). Keep the source host/path on each line. Never invent a number.',
     'Banned words and moves everywhere: delve, testament, journey, innovative, seamless, elevate, unlock, empower, leverage, cutting-edge, game-changer, robust, passion, incredible, amazing, "truly", loser, pathetic, scam, flop, cringe, exclamation marks, emoji, em dashes, and praise like "impressive year".',
     `Do not add extra receipt bands. The tape is short: items, a one-line cashier note, stamp and serial. If you output modules, ids only from ${REQUIRED_MODULES.join(', ')}. Never output HTML, markdown, CSS, filler ids (deep-cut, first-last, platforms, still-running, volume, friend, sources, serial) or extra keys.`,

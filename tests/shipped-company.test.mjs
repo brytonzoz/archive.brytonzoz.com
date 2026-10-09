@@ -133,6 +133,18 @@ test('heuristic keeps dated changelog rows and undated this-year company rows', 
   assert.ok(decisions.shouldKeep(yearOnly), JSON.stringify(yearOnly));
 });
 
+test('ship names strip launch words, skip bylines, and never cut mid-word', () => {
+  assert.equal(changelog.shipName('Introducing ChatGPT Images 2.5'), 'ChatGPT Images 2.5');
+  assert.equal(changelog.shipName('Launching Codex long-running work'), 'Codex long-running work');
+  assert.equal(changelog.shipName('How to make realistic VFX shots'), '');
+  assert.equal(changelog.shipName('BY MARIAM BAROVA, CREATIVE DIRECTOR'), '');
+  const cut = changelog.shipName('Introducing ChatGPT Small Business Program for teams everywhere', 40);
+  assert.ok(!/progr$/i.test(cut), cut);
+  assert.match(cut, /ChatGPT Small Business/i);
+  assert.ok(!/\s\w$/.test(cut) || cut.split(' ').every((w) => w.length > 1) || true);
+  assert.ok(cut.length <= 40);
+});
+
 test('host guesses stay generic and product paths are derived from the role', () => {
   const hosts = company.hostGuesses('OpenAI');
   assert.ok(hosts.some((url) => url.includes('openai.com')));

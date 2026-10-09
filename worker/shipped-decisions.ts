@@ -2,7 +2,7 @@
 // gpt-6-luna. No other OpenAI models or endpoints. Input is $0.10 / 1M tokens; output is free.
 // Docs: https://platform.openai.com/docs/guides/decisions
 import type { Attribution, Affiliation } from './shipped-affiliation';
-import { defaultAttribution } from './shipped-affiliation';
+import { defaultAttribution, leadProductTokens } from './shipped-affiliation';
 import type { Found } from './shipped-sources';
 import { clean } from './shipped-sources';
 
@@ -10,18 +10,31 @@ export const DECISIONS_URL = 'https://api.openai.com/v1/decisions';
 export const DECISIONS_MODEL = 'gpt-6-luna';
 /** $0.10 per 1M input tokens; output is free. */
 const IN_PER_M = 0.1;
-export const KEEP_PRODUCT = 0.7;
+export const KEEP_PRODUCT = 0.72;
 
 export type DecisionsEnv = {
   OPENAI_API_KEY?: string;
   OPENAI_API_BASE?: string;
 };
 
+export const SHIP_KINDS = [
+  { value: 'product_launch', description: 'A new product or app made available to users.' },
+  { value: 'feature', description: 'A user-facing feature added to an existing product.' },
+  { value: 'model', description: 'A model release users can call or use.' },
+  { value: 'release_version', description: 'A numbered version or changelog release users can install.' },
+  { value: 'integration', description: 'An integration users can turn on.' },
+  { value: 'pricing_plan', description: 'A new plan or SKU users can buy.' },
+  { value: 'NOT_A_SHIP', description: 'Tutorial, case study, customer story, research paper, hiring post, opinion, engineering deep dive, event recap, or other non-ship.' },
+] as const;
+
+export type ShipKind = (typeof SHIP_KINDS)[number]['value'];
+
 export type DecisionMark = {
   isRealShip: number;
   inYear: number;
   attribution: Attribution;
   significance: number;
+  kind: ShipKind;
   /** is_real_ship × in_2026 (the keep product). */
   confidence: number;
 };
@@ -65,7 +78,8 @@ const CANDIDATE_QUESTIONS = [
   {
     type: 'predicate',
     name: 'is_real_ship',
-    instructions: 'Is this a real product, feature, release, or launch that actually shipped? Not a tease, hiring post, opinion, retweet, or roadmap item.',
+    instructions:
+      'A ship is a product, feature, model, app, version, or release MADE AVAILABLE to users. Answer yes only for those. Tutorials, how-tos, case studies, customer stories, research papers, hiring posts, opinion, engineering deep dives, event recaps, teasers, roadmaps, and retweets are NOT ships — answer no.',
   },
   {
     type: 'predicate',
@@ -74,8 +88,15 @@ const CANDIDATE_QUESTIONS = [
   },
   {
     type: 'choice',
+    name: 'kind',
+    instructions:
+      'What kind of ship is this? Pick NOT_A_SHIP for tutorials, how-tos, case studies, customer stories, research papers, hiring posts, opinion, engineering deep dives, and event recaps.',
+    choices: SHIP_KINDS,
+  },
+  {
+    type: 'choice',
     name: 'attribution',
-    instructions: 'Who does this ship belong to, given the person and their role?',
+    instructions: 'Who does this ship belong to, given the person and their role? A product lead only gets their product plus things they personally posted that they shipped. A CEO gets company-wide ships.',
     choices: ATTRIBUTION_CHOICES,
   },
   {
@@ -91,9 +112,11 @@ function evidenceOf(item: Found, who: string, affiliation: Affiliation, year: nu
     `Person: ${who}`,
     affiliation.company ? `Company: ${affiliation.company}` : '',
     `Role: ${affiliation.role}${affiliation.product ? ` (leads ${affiliation.product})` : ''}`,
-    affiliation.role === 'unknown' && affiliation.company
-      ? `Note: they were typed as being from ${affiliation.company}. Keep ships they lead, founded, or personally shipped — not every company announcement.`
-      : '',
+    affiliation.role === 'lead' && affiliation.product
+      ? `This person leads ${affiliation.product} only. Other ${affiliation.company ?? 'company'} products are unrelated unless harvest source is github, x, npm, producthunt, appstore, or site (they personally posted it).`
+      : affiliation.role === 'unknown' && affiliation.company
+        ? `Note: they were typed as being from ${affiliation.company}. Keep ships they lead, founded, or personally shipped — not every company announcement.`
+        : '',
     `Year: ${year}`,
     `Candidate: ${item.name}`,
     item.description ? `Description: ${item.description}` : '',
@@ -129,20 +152,52 @@ function pick(answers: Answer[], name: string): Answer | undefined {
   return answers.find((a) => 'name' in a && a.name === name);
 }
 
+const NOT_A_SHIP =
+  /\b(how to|tutorial|case stud(?:y|ies)|customer stor(?:y|ies)|deep dive|event recap|hiring|we.?re hiring|opinion piece|explainer|what we learned|behind the scenes|lessons? from|research paper|whitepaper|preprint|teas(?:e|ing)|coming soon|roadmap|retweet|rt @)\b/i;
+
+export function looksLikeNotAShip(item: { name?: string; description?: string; link?: string | null }): boolean {
+  const name = (item.name ?? '').trim();
+  const hay = `${item.name ?? ''} ${item.description ?? ''} ${item.link ?? ''}`;
+  if (/^by\s+\S/i.test(name)) return true;
+  if (NOT_A_SHIP.test(hay)) return true;
+  if (/^how\s+\w+\s+is\b/i.test(name)) return true;
+  if (/\baccelerating\b/i.test(name) && !/\b(launch|released?|version|v\d)\b/i.test(name)) return true;
+  if (/^[A-Za-z0-9][\w.-]{1,40}\s+builds\b/i.test(name)) return true;
+  if (/\busing\b.{0,48}\bto\s+(search|find|build|make|create|train)\b/i.test(name)) return true;
+  if (/^(rapidly|safely|simply)\s+\w+ing\b/i.test(name)) return true;
+  if (/\/(research|blog)\//i.test(item.link ?? '') && /\b(how |why |tutorial|case |stor(?:y|ies)|accelerat)/i.test(name)) return true;
+  return false;
+}
+
+function scopedAttribution(item: Found, affiliation: Affiliation): Attribution {
+  const tokens = leadProductTokens(affiliation.product, affiliation.company).map((t) => t.toLowerCase());
+  const hay = `${item.name} ${item.description} ${item.link ?? ''}`.toLowerCase();
+  const matchesProduct = tokens.length ? tokens.some((token) => hay.includes(token)) : false;
+  const isLead = affiliation.role === 'lead' || (affiliation.typedCompany && Boolean(affiliation.product));
+  if (isLead && item.via) {
+    return matchesProduct ? 'company-led-by-person' : 'unrelated';
+  }
+  if (item.via) return defaultAttribution(affiliation.role);
+  return 'personal';
+}
+
 export function heuristicMark(item: Found, year: number, affiliation: Affiliation): DecisionMark {
   const name = `${item.name} ${item.description}`.toLowerCase();
   const tease = /\b(teas(e|ing)|coming soon|hiring|we.?re hiring|roadmap|soon|maybe|thinking about|retweet|rt @)\b/i.test(name);
+  const article = looksLikeNotAShip(item);
   const dated = Boolean(item.date && item.date.startsWith(String(year)));
   const thisYear = Boolean(item.thisYear) || dated;
-  const isRealShip = tease ? 0.15 : item.link ? 0.82 : 0.4;
+  const isRealShip = article ? 0.08 : tease ? 0.15 : item.link ? 0.88 : 0.4;
   const changelogYear = (item.source === 'changelog' || item.source === 'company') && thisYear;
   const inYear = dated ? 0.9 : changelogYear ? 0.86 : thisYear ? 0.78 : item.date ? 0.15 : 0.45;
-  const attribution = item.via ? defaultAttribution(affiliation.role) : 'personal';
+  const attribution = scopedAttribution(item, affiliation);
   const significance = Math.min(4, Math.max(0, Math.round(Math.log10(1 + (item.score ?? 1)) * 2)));
-  return { isRealShip, inYear, attribution, significance, confidence: isRealShip * inYear };
+  const kind: ShipKind = article || tease ? 'NOT_A_SHIP' : changelogYear || dated ? 'release_version' : 'feature';
+  return { isRealShip, inYear, attribution, significance, kind, confidence: isRealShip * inYear };
 }
 
 export function shouldKeep(mark: DecisionMark): boolean {
+  if (mark.kind === 'NOT_A_SHIP') return false;
   return mark.isRealShip * mark.inYear >= KEEP_PRODUCT && mark.attribution !== 'unrelated';
 }
 
@@ -151,23 +206,26 @@ function markFromAnswers(answers: Answer[], fallback: DecisionMark): DecisionMar
   const year = pick(answers, 'in_2026');
   const attr = pick(answers, 'attribution');
   const sig = pick(answers, 'significance');
+  const kindAns = pick(answers, 'kind');
   const isRealShip = real?.type === 'predicate' ? real.probability : fallback.isRealShip;
   const inYear = year?.type === 'predicate' ? year.probability : fallback.inYear;
   const attribution = attr?.type === 'choice' && ATTRIBUTION_CHOICES.some((c) => c.value === attr.choice) ? (attr.choice as Attribution) : fallback.attribution;
   const significance = sig?.type === 'score' ? sig.score : fallback.significance;
+  const kind = kindAns?.type === 'choice' && SHIP_KINDS.some((c) => c.value === kindAns.choice) ? (kindAns.choice as ShipKind) : fallback.kind;
   const confidence = (attr?.type === 'choice' ? attr.confidence ?? 0.6 : 0.6) * isRealShip * inYear;
-  return { isRealShip, inYear, attribution, significance, confidence };
+  return { isRealShip, inYear, attribution, significance, kind, confidence };
 }
 
 export function applyMark(item: Found, mark: DecisionMark, via: string | null): Found {
   return {
     ...item,
-    via: mark.attribution === 'personal' ? item.via ?? null : via || item.via,
+    via: mark.attribution === 'personal' ? null : via || item.via,
     confidence: mark.confidence,
     isRealShip: mark.isRealShip,
     inYear: mark.inYear,
     significance: mark.significance,
     attribution: mark.attribution,
+    kind: mark.kind,
     score: item.score + mark.significance * 2 + mark.confidence,
   };
 }

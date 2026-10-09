@@ -118,6 +118,9 @@ test('cashier note and stats are specific to the items, never stock copy', () =>
   assert.match(note, /553|stars/i);
   assert.equal(ai.cashierNoteLooksCanned(note), false);
   assert.equal(ai.cashierNoteLooksCanned('Hallmark passed 30k stars while the night shift counted receipts.'), true);
+  assert.equal(ai.cashierNoteLooksCanned('runs on a wish and a prayer'), true);
+  assert.equal(ai.cashierNoteLooksCanned('Nobody asked for ChatGPT for Research.'), true);
+  assert.equal(ai.cashierNoteLooksCanned('200/mo public revenue. Same maker, more SKUs.'), true);
   const draft = ai.validateDraft(
     {
       items: items.map((item) => ({ name: item.name, description: item.description, date: item.date, status: item.status, link: item.link })),

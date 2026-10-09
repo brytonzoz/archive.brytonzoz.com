@@ -1,12 +1,12 @@
 'use client';
 
-// "Not you? Remove this receipt": sends a takedown request to /admin. Removing takes the receipt down
-// and stops that name, handle or site from being printed again.
+// "Report or remove this receipt": the receipt comes down at once and the report waits in /admin. If it's about
+// the person asking, it stays down and that name, handle or site can't be printed again.
 import React, { useEffect, useRef, useState } from 'react';
 import { receiptNumber } from '../../lib/shipped-year';
 import { Rule, Ticket } from './paper';
 import { useShippedState } from './state';
-import { Turnstile, type TurnstileHandle } from './Turnstile';
+import { HumanCheck, type HumanCheckHandle } from './HumanCheck';
 
 export function RemoveForm() {
   const state = useShippedState();
@@ -16,7 +16,7 @@ export function RemoveForm() {
   const [busy, setBusy] = useState(false);
   const [done, setDone] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const turnstile = useRef<TurnstileHandle>(null);
+  const human = useRef<HumanCheckHandle>(null);
 
   useEffect(() => {
     const value = Number(new URLSearchParams(window.location.search).get('id'));
@@ -26,7 +26,7 @@ export function RemoveForm() {
   async function submit(event: React.FormEvent) {
     event.preventDefault();
     if (!id) return;
-    if (state?.generator.turnstileSiteKey && !token) return setError('One second, checking you’re human…');
+    if (!token) return setError('One second, checking you’re human…');
     setBusy(true);
     setError(null);
     const response = await fetch('/api/shipped/takedown', {
@@ -35,8 +35,8 @@ export function RemoveForm() {
       body: JSON.stringify({ id, reason, token }),
     }).catch(() => null);
     if (response?.ok) setDone(true);
-    else setError(response?.status === 404 ? 'That receipt doesn’t exist.' : 'Couldn’t send that. Try again.');
-    turnstile.current?.reset();
+    else setError(response?.status === 404 ? 'That receipt doesn’t exist.' : response?.status === 429 ? 'Too many reports from here. Try again later.' : 'Couldn’t send that. Try again.');
+    human.current?.reset();
     setBusy(false);
   }
 
@@ -51,13 +51,14 @@ export function RemoveForm() {
       </div>
       {done ? (
         <p className="mt-4 text-center text-[12.5px] leading-relaxed" role="status">
-          Sent. Bryton reviews every request by hand. Once removed, the receipt and its images come down and that name, handle or site
-          can’t be printed again.
+          Done. The receipt, its page and its images are down now. A person reviews every report; if it’s about you, it stays down and
+          that name, handle or site can’t be printed again.
         </p>
       ) : id ? (
         <form className="mt-3 space-y-3" onSubmit={submit} noValidate>
           <p className="text-[12.5px] leading-relaxed">
-            Is receipt #{receiptNumber(id)} about you, but you don’t want it up (or it isn’t you)? Ask for it to be removed.
+            Is receipt #{receiptNumber(id)} about you and you don’t want it up, is it wrong, or is it being used to harass someone? It
+            comes down as soon as you send this.
           </p>
           <label className="block text-[11px] font-semibold tracking-[0.16em]" htmlFor="remove-reason">
             ANYTHING TO ADD? <span className="font-normal opacity-60">(optional)</span>
@@ -71,9 +72,9 @@ export function RemoveForm() {
             onChange={(event) => setReason(event.target.value)}
           />
           <p className="text-[10.5px] text-[#1c1917]/60">Please don’t include contact details; none are needed.</p>
-          {state?.generator.turnstileSiteKey ? <Turnstile ref={turnstile} siteKey={state.generator.turnstileSiteKey} onToken={setToken} /> : null}
+          <HumanCheck ref={human} check={state?.generator.human} onToken={setToken} />
           <button type="submit" className="shipped-button w-full" disabled={busy}>
-            {busy ? 'SENDING…' : 'REQUEST REMOVAL'}
+            {busy ? 'SENDING…' : 'REMOVE IT'}
           </button>
           {error ? (
             <p className="text-center text-[12px] font-semibold" role="alert">
@@ -82,7 +83,7 @@ export function RemoveForm() {
           ) : null}
         </form>
       ) : (
-        <p className="mt-4 text-center text-[12.5px]">Open this page from the “Not you?” link on the receipt.</p>
+        <p className="mt-4 text-center text-[12.5px]">Open this page from the “Report or remove” link on the receipt.</p>
       )}
       <p className="mt-5 text-center text-[12px]">
         <a href="/" className="shipped-link font-semibold">

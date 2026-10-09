@@ -1,273 +1,280 @@
 'use client';
 
+// The sponsor sheet: ten fixed-price slots at the foot of every receipt. Pick a slot, see its one posted
+// price, write a name and a line, add an https link (and maybe a logo), and pay that price to take it. The
+// Worker sets every price and re-checks everything; the checks here are only there to answer as you type.
 import React, { useEffect, useRef, useState } from 'react';
 import { ditherLogo, type DitheredLogo } from '../../lib/dither';
+import { closingLabel } from '../../lib/shipped-event';
 import { money } from '../../lib/shipped-receipt';
-import { SPONSOR_CONFIG, SPONSOR_TIERS, priceCents, validateSponsor, type SponsorTier } from '../../lib/shipped-sponsors';
-import { receiptDate } from '../../lib/shipped';
+import { BID_RULES, HERO_SLOT, limitsFor, slotLabel, validateBid } from '../../lib/shipped-sponsors';
+import type { SponsorSlot } from '../../lib/shipped-year';
+import { HumanCheck, type HumanCheckHandle } from './HumanCheck';
 import { Line, Rule, Ticket } from './paper';
 import { refreshShippedState, useShippedState } from './state';
-import { Turnstile, type TurnstileHandle } from './Turnstile';
-
-const TEXT_LABEL: Record<SponsorTier, string> = {
-  name: 'NAME ON THE LINE',
-  logo: 'NAME UNDER THE LOGO',
-  header: 'PRESENTED BY …',
-};
 
 const ERRORS: Record<string, string> = {
-  'sponsors-closed': 'Sponsor lines are closed right now.',
+  'sponsors-closed': 'Sponsor slots are closed right now.',
+  closed: 'The printer is off. The sponsor block is final.',
+  locked: 'Slots stopped changing hands an hour before close.',
   turnstile: 'Couldn’t check you’re human. Try again.',
   'slow-down': 'Too many tries. Try again in an hour.',
   'checkout-failed': 'Checkout didn’t open. Try again.',
+  'cross-origin': 'Use shipped.brytonzoz.com.',
+  'browser-only': 'Use a browser.',
 };
 
-type Bought = { status: string; text: string; totalCents: number | null; taxCents: number | null; receipt: string | null };
+type Taken = { kind: 'bid'; status: string; slot: number; name: string; cents: number; refundCents: number | null; logoPending: boolean };
 
-const BOUGHT: Record<string, string> = {
-  pending: 'PAID. Your line joins the PAID FOR BY rotation as soon as Bryton approves it. If it isn’t approved, you’re refunded in full automatically.',
-  printed: 'PAID AND APPROVED. Your line is in the PAID FOR BY rotation on shared receipts.',
-  unpaid: 'Checkout didn’t finish, so nothing was charged.',
-  closed: 'That checkout closed before it was paid. Nothing was charged.',
-  refunded: 'This shout-out was refunded.',
-  refunding: 'This shout-out is being refunded.',
+const TAKEN: Record<string, string> = {
+  live: 'PAID. The slot is yours: it’s on every receipt now.',
+  checkout: 'Checking your payment…',
+  failed: 'That checkout closed before it was paid. Nothing was charged.',
+  lost: 'Someone else took that price first (or it moved). You’ve been refunded in full.',
+  outbid: 'Someone took this slot at the next price. Your prorated refund is on its way.',
+  removed: 'This slot was taken down in review and refunded in full.',
+  refunded: 'This slot was refunded.',
 };
 
-export function SponsorDesk({ initialTier = 'name' }: { initialTier?: SponsorTier }) {
+type FieldError = { field: string; message: string } | null;
+
+export function SponsorDesk() {
   const state = useShippedState();
-  const sponsors = state?.sponsors;
-  const [tier, setTier] = useState<SponsorTier>(initialTier);
-  const [text, setText] = useState('');
+  const block = state?.sponsors;
+  const payments = state?.payments;
+  const [slot, setSlot] = useState(HERO_SLOT);
+  const [name, setName] = useState('');
+  const [cta, setCta] = useState('');
   const [url, setUrl] = useState('');
   const [logo, setLogo] = useState<DitheredLogo | null>(null);
+  const [terms, setTerms] = useState(false);
   const [token, setToken] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
-  const [error, setError] = useState<string | null>(null);
+  const [error, setError] = useState<FieldError>(null);
   const [notice, setNotice] = useState<string | null>(null);
-  const [bought, setBought] = useState<Bought | null>(null);
-  const turnstile = useRef<TurnstileHandle>(null);
+  const human = useRef<HumanCheckHandle>(null);
 
   useEffect(() => {
     const query = new URLSearchParams(window.location.search);
-    const result = query.get('sponsor');
-    const checkout = query.get('checkout');
-    if (result === 'cancelled') setNotice('Checkout cancelled. Nothing was charged.');
-    if (result === 'paid' && checkout) {
-      setNotice('Checking your payment…');
-      fetch(`/api/shipped/sponsor/status?checkout=${encodeURIComponent(checkout)}`)
-        .then((response) => (response.ok ? (response.json() as Promise<Bought>) : null))
-        .then((line) => {
-          setBought(line);
-          setNotice(line ? (BOUGHT[line.status] ?? BOUGHT.closed) : 'Couldn’t find that checkout. If you paid, email the address on the refund policy.');
-          refreshShippedState();
-        })
-        .catch(() => setNotice('Couldn’t check your payment. Reload to try again.'));
-    } else if (result) refreshShippedState();
+    const checkout = query.get('bid');
+    if (!checkout || !/^[A-Za-z0-9_-]{6,200}$/.test(checkout)) return;
+    setNotice(TAKEN.checkout);
+    fetch(`/api/shipped/checkout?checkout=${encodeURIComponent(checkout)}`, { cache: 'no-store' })
+      .then((response) => (response.ok ? (response.json() as Promise<Taken>) : null))
+      .then((taken) => {
+        if (!taken || taken.kind !== 'bid') return setNotice('Couldn’t find that checkout. If you paid, email the address on the terms page.');
+        const extra = taken.status === 'live' && taken.logoPending ? ' Your logo shows once it’s approved; your name prints until then.' : '';
+        setNotice(`${slotLabel(taken.slot)} · ${taken.name} · ${money(taken.cents)}. ${TAKEN[taken.status] ?? TAKEN.failed}${extra}`);
+        refreshShippedState();
+      })
+      .catch(() => setNotice('Couldn’t check your payment. Reload to try again.'));
   }, []);
 
-  useEffect(() => () => {
-    if (logo) URL.revokeObjectURL(logo.url);
-  }, [logo]);
+  useEffect(
+    () => () => {
+      if (logo) URL.revokeObjectURL(logo.url);
+    },
+    [logo],
+  );
 
-  const offers = sponsors?.tiers ?? SPONSOR_TIERS.map((t) => ({ tier: t, ...SPONSOR_CONFIG.tiers[t], cents: priceCents(t), available: false }));
-  const fmt = (n: number | undefined) => (n === undefined ? '······' : n.toLocaleString('en-US'));
-  const offer = offers.find((o) => o.tier === tier) ?? offers[0];
-  const open = Boolean(sponsors?.open);
+  const slots = block?.slots ?? [];
+  const picked: SponsorSlot | undefined = slots.find((s) => s.slot === slot);
+  const limits = limitsFor(slot);
+  const open = Boolean(payments?.open) && !block?.frozen;
+  const soldOut = picked ? picked.next > BID_RULES.maxCents : false;
 
   async function pickLogo(event: React.ChangeEvent<HTMLInputElement>) {
     const file = event.target.files?.[0];
     setError(null);
     if (!file) return setLogo(null);
-    if (!/^image\/(png|jpeg|webp|gif)$/.test(file.type) || file.size > 8_000_000) return setError('Use a PNG, JPEG or WebP under 8 MB.');
+    if (!/^image\/(png|jpeg|webp)$/.test(file.type) || file.size > 8_000_000) return setError({ field: 'logo', message: 'Use a PNG, JPEG or WebP under 8 MB.' });
     try {
       setLogo(await ditherLogo(file));
     } catch {
-      setError('Couldn’t print that logo. Try a simpler or smaller image.');
+      setError({ field: 'logo', message: 'Couldn’t print that logo. Try a simpler or smaller image.' });
     }
   }
 
   async function submit(event: React.FormEvent) {
     event.preventDefault();
+    if (!picked) return;
     setError(null);
-    const check = validateSponsor({ tier, text, url: offer.url ? url : null });
-    if (!check.ok) return setError(check.error);
-    if (offer.logo && !logo) return setError('Add a logo.');
-    if (state?.generator.turnstileSiteKey && !token) return setError('One second, checking you’re human…');
+    const check = validateBid({ slot, name, cta, url });
+    if (!check.ok) return setError({ field: check.field, message: check.error });
+    if (!terms) return setError({ field: 'terms', message: 'Please accept the sponsor terms.' });
+    if (!token) return setError({ field: 'form', message: 'One second, checking you’re human…' });
     setBusy(true);
     const form = new FormData();
-    form.set('tier', tier);
-    form.set('text', check.text);
-    if (check.url) form.set('url', check.url);
-    if (offer.logo && logo) form.set('logo', logo.blob, 'logo.png');
-    form.set('token', token ?? '');
+    form.set('slot', String(slot));
+    form.set('name', check.name);
+    form.set('cta', check.cta);
+    form.set('url', check.url);
+    form.set('cents', String(picked.next));
+    form.set('terms', '1');
+    form.set('token', token);
+    if (logo) form.set('logo', logo.blob, 'logo.png');
     try {
-      const response = await fetch('/api/shipped/sponsor', { method: 'POST', body: form });
-      const result = (await response.json().catch(() => ({}))) as { url?: string; error?: string; message?: string };
+      const response = await fetch('/api/shipped/bid', { method: 'POST', body: form });
+      const result = (await response.json().catch(() => ({}))) as { url?: string; error?: string; field?: string; message?: string; price?: number };
       if (response.ok && result.url) {
         window.location.assign(result.url);
         return;
       }
-      setError(result.message ?? ERRORS[result.error ?? ''] ?? 'Something went wrong. Try again.');
+      if (result.error === 'price-changed') refreshShippedState();
+      setError({ field: result.field ?? 'form', message: result.message ?? ERRORS[result.error ?? ''] ?? 'Something went wrong. Try again.' });
     } catch {
-      setError('Something went wrong. Try again.');
+      setError({ field: 'form', message: 'Something went wrong. Try again.' });
     }
-    turnstile.current?.reset();
+    human.current?.reset();
     setBusy(false);
   }
 
+  const fieldError = (field: string) =>
+    error?.field === field ? (
+      <p className="mt-1 text-[11.5px] font-semibold" role="alert">
+        {error.message}
+      </p>
+    ) : null;
+
   return (
-    <Ticket id="sponsor" label="Buy a supporter shout-out">
+    <Ticket id="sponsor" label="Sponsor a slot">
       <header className="text-center">
-        <p className="text-[11px] font-semibold tracking-[0.32em] text-[#1c1917]/70">SUPPORTER DESK</p>
-        <h2 className="mt-2 text-[20px] font-semibold leading-none tracking-[0.2em]">SPONSOR THE RECEIPTS</h2>
+        <p className="text-[11px] font-semibold tracking-[0.32em] text-[#1c1917]/70">SPONSOR DESK</p>
+        <h2 className="mt-2 text-[20px] font-semibold leading-none tracking-[0.2em]">TAKE A SLOT</h2>
         <p className="mt-2 text-[12px] leading-relaxed text-[#1c1917]/75">
-          Your name or logo in the THIS RECEIPT PAID FOR BY block on the Shipped receipts people print and share, plus a downloadable
-          supporter receipt.
+          Ten slots at the foot of every receipt, share image and mailed print, each with its own QR code. One fixed price per slot:
+          what the holder paid plus {money(BID_RULES.incrementCents)}. Pay it and the slot is yours until someone pays the next price.
+          Taken over? You’re refunded for the time you lose. At close, whoever holds a slot keeps it forever.
         </p>
       </header>
       <div className="mt-3 space-y-1 text-[12px]">
-        <Line label="RECEIPTS PRINTED SO FAR" value={fmt(state?.printed)} />
-        <Line label="RECEIPTS SHARED SO FAR" value={fmt(state?.shared)} />
-        <Line
-          label="PRESENTED-BY SLOT"
-          value={sponsors?.presentedNextOpen ? `TAKEN · OPENS ${receiptDate(new Date(sponsors.presentedNextOpen).toISOString())}` : 'OPEN'}
-        />
+        <Line label="RECEIPTS PRINTED SO FAR" value={state ? state.printed.toLocaleString('en-US') : '······'} />
+        <Line label="SLOTS FREEZE" value={state ? closingLabel(state.event.closesAt - BID_RULES.lockMinutes * 60_000) : '······'} />
       </div>
       <div className="mt-2">
         <Rule />
       </div>
 
       {notice ? (
-        <div className="mt-3 border border-dashed border-[#1c1917]/50 p-2.5 text-[12px] leading-relaxed" role="status">
-          <p className="font-semibold">{notice}</p>
-          {bought?.receipt ? (
-            <>
-              {bought.totalCents !== null ? (
-                <p className="mt-1 opacity-75">
-                  Paid {money(bought.totalCents)}
-                  {bought.taxCents ? `, including ${money(bought.taxCents)} tax` : ''}. Stripe emails the payment receipt.
-                </p>
-              ) : null}
-              {/* eslint-disable-next-line @next/next/no-img-element */}
-              <img src={bought.receipt} alt={`Your supporter receipt for “${bought.text}”`} className="mx-auto mt-2 w-full max-w-[240px]" />
-              <a href={bought.receipt} download="shipped-supporter-receipt.png" className="shipped-button mt-2 block w-full text-center">
-                DOWNLOAD YOUR RECEIPT
-              </a>
-            </>
-          ) : null}
-        </div>
+        <p className="mt-3 border border-dashed border-[#1c1917]/50 p-2.5 text-[12px] font-semibold leading-relaxed" role="status">
+          {notice}
+        </p>
       ) : null}
 
       <form className="mt-3 space-y-3" onSubmit={submit} noValidate>
         <fieldset>
-          <legend className="sr-only">Line</legend>
-          <div className="space-y-2">
-            {offers.map((o) => (
-              <label key={o.tier} className={`shipped-choice block text-left ${tier === o.tier ? 'is-on' : ''} ${o.available || !open ? '' : 'opacity-50'}`}>
-                <input type="radio" name="tier" value={o.tier} checked={tier === o.tier} onChange={() => setTier(o.tier)} className="sr-only" disabled={open && !o.available} />
-                <span className="shipped-lead text-[13px] font-semibold tracking-[0.14em]">
-                  <span>{o.label}</span>
+          <legend className="text-[11px] font-semibold tracking-[0.16em]">PICK A SLOT</legend>
+          <div className="mt-1.5 grid grid-cols-2 gap-1.5">
+            {slots.map((s) => (
+              <label key={s.slot} className={`shipped-choice block text-left ${s.slot === HERO_SLOT ? 'col-span-2' : ''} ${slot === s.slot ? 'is-on' : ''}`}>
+                <input type="radio" name="slot" value={s.slot} checked={slot === s.slot} onChange={() => setSlot(s.slot)} className="sr-only" />
+                <span className="shipped-lead text-[12px] font-semibold tracking-[0.1em]">
+                  <span>{slotLabel(s.slot)}</span>
                   <span className="shipped-lead-fill" aria-hidden="true" />
-                  <span className="tabular-nums">{money(o.cents)}</span>
+                  <span className="tabular-nums">{s.next > BID_RULES.maxCents ? 'MAXED' : money(s.next)}</span>
                 </span>
-                <span className="mt-0.5 block text-[11.5px] leading-snug opacity-75">
-                  {o.blurb}
-                  {open && !o.available ? ' Full right now.' : ''}
-                </span>
+                <span className="mt-0.5 block truncate text-[10.5px] opacity-70">{s.house ? 'House ad · open' : `Held by ${s.name}`}</span>
               </label>
             ))}
           </div>
         </fieldset>
 
-        {open ? (
+        {open && picked ? (
           <>
             <div>
-              <label className="block text-[11px] font-semibold tracking-[0.16em]" htmlFor="sponsor-text">
-                {TEXT_LABEL[tier]}
+              <label className="block text-[11px] font-semibold tracking-[0.16em]" htmlFor="sponsor-name">
+                NAME
               </label>
               <input
-                id="sponsor-text"
+                id="sponsor-name"
                 className="shipped-field mt-1 w-full px-2.5 py-2 text-[15px] outline-none"
-                value={text}
-                onChange={(event) => setText(event.target.value)}
-                maxLength={offer.maxText}
+                value={name}
+                onChange={(event) => setName(event.target.value)}
+                maxLength={limits.name}
+                autoComplete="organization"
+              />
+              <p className="mt-1 text-right text-[10.5px] text-[#1c1917]/60">
+                {name.trim().length}/{limits.name}
+              </p>
+              {fieldError('name')}
+            </div>
+            <div>
+              <label className="block text-[11px] font-semibold tracking-[0.16em]" htmlFor="sponsor-cta">
+                ONE LINE <span className="font-normal opacity-60">(no links)</span>
+              </label>
+              <input
+                id="sponsor-cta"
+                className="shipped-field mt-1 w-full px-2.5 py-2 text-[14px] outline-none"
+                value={cta}
+                onChange={(event) => setCta(event.target.value)}
+                maxLength={limits.cta}
                 autoComplete="off"
               />
               <p className="mt-1 text-right text-[10.5px] text-[#1c1917]/60">
-                {text.trim().length}/{offer.maxText}
-                {offer.url ? '' : ' · no links'}
+                {cta.trim().length}/{limits.cta}
               </p>
+              {fieldError('cta')}
+            </div>
+            <div>
+              <label className="block text-[11px] font-semibold tracking-[0.16em]" htmlFor="sponsor-url">
+                LINK <span className="font-normal opacity-60">(https, your own site)</span>
+              </label>
+              <input
+                id="sponsor-url"
+                type="url"
+                inputMode="url"
+                className="shipped-field mt-1 w-full px-2.5 py-2 text-[14px] outline-none"
+                value={url}
+                onChange={(event) => setUrl(event.target.value)}
+                placeholder="https://"
+                maxLength={200}
+              />
+              {fieldError('url')}
+            </div>
+            <div>
+              <label className="block text-[11px] font-semibold tracking-[0.16em]" htmlFor="sponsor-logo">
+                LOGO <span className="font-normal opacity-60">(optional, 1-bit, shown after review)</span>
+              </label>
+              <input id="sponsor-logo" type="file" accept="image/png,image/jpeg,image/webp" onChange={pickLogo} className="mt-1 block w-full text-[12px]" />
+              {logo ? (
+                <div className="mt-2 flex justify-center border border-dashed border-[#1c1917]/30 p-3">
+                  {/* eslint-disable-next-line @next/next/no-img-element */}
+                  <img src={logo.url} width={logo.width} height={logo.height} alt="Your logo as it will print" className="shipped-logo max-h-16 w-auto" />
+                </div>
+              ) : null}
+              {fieldError('logo')}
             </div>
 
-            {offer.url ? (
-              <div>
-                <label className="block text-[11px] font-semibold tracking-[0.16em]" htmlFor="sponsor-url">
-                  LINK <span className="font-normal opacity-60">(optional, https://)</span>
-                </label>
-                <input
-                  id="sponsor-url"
-                  type="url"
-                  inputMode="url"
-                  className="shipped-field mt-1 w-full px-2.5 py-2 text-[14px] outline-none"
-                  value={url}
-                  onChange={(event) => setUrl(event.target.value)}
-                  placeholder="https://"
-                  maxLength={200}
-                />
-              </div>
-            ) : null}
+            <label className="flex items-start gap-2 text-[11.5px] leading-snug">
+              <input type="checkbox" checked={terms} onChange={(event) => setTerms(event.target.checked)} className="mt-0.5" />
+              <span>
+                I’ve read the{' '}
+                <a href="/terms/#sponsors" className="shipped-link" target="_blank" rel="noopener noreferrer">
+                  sponsor rules and refunds
+                </a>
+                . No traffic or scans are promised.
+              </span>
+            </label>
+            {fieldError('terms')}
 
-            {offer.logo ? (
-              <div>
-                <label className="block text-[11px] font-semibold tracking-[0.16em]" htmlFor="sponsor-logo">
-                  LOGO <span className="font-normal opacity-60">(printed in 1-bit)</span>
-                </label>
-                <input id="sponsor-logo" type="file" accept="image/png,image/jpeg,image/webp" onChange={pickLogo} className="mt-1 block w-full text-[12px]" />
-                {logo ? (
-                  <div className="mt-2 flex justify-center border border-dashed border-[#1c1917]/30 p-3">
-                    {/* eslint-disable-next-line @next/next/no-img-element */}
-                    <img src={logo.url} width={logo.width} height={logo.height} alt="Your logo as it will print" className="shipped-logo max-h-20 w-auto" />
-                  </div>
-                ) : null}
-              </div>
-            ) : null}
+            <HumanCheck ref={human} check={state?.generator.human} onToken={setToken} />
 
-            {state?.generator.turnstileSiteKey ? <Turnstile ref={turnstile} siteKey={state.generator.turnstileSiteKey} onToken={setToken} /> : null}
-
-            <button type="submit" className="shipped-button w-full" disabled={busy || !offer.available}>
-              {busy ? 'OPENING CHECKOUT…' : `CHECKOUT · ${money(offer.cents)}`}
+            <button type="submit" className="shipped-button w-full" disabled={busy || soldOut}>
+              {busy ? 'OPENING CHECKOUT…' : soldOut ? 'THIS SLOT IS MAXED' : `TAKE ${slotLabel(slot)} · ${money(picked.next)}`}
             </button>
-            {error ? (
-              <p className="text-center text-[12px] font-semibold" role="alert">
-                {error}
-              </p>
-            ) : null}
-            {sponsors?.taxAtCheckout ? (
-              <p className="text-center text-[11px] text-[#1c1917]/65">Plus sales tax where it applies, worked out at checkout. Paid securely with Stripe.</p>
-            ) : null}
-            {sponsors?.provider === 'stripe' && !sponsors.live ? (
+            {fieldError('form')}
+            <p className="text-center text-[11px] text-[#1c1917]/65">Plus sales tax where it applies, worked out at checkout. Paid securely with Stripe.</p>
+            {payments?.provider === 'stripe' && !payments.live ? (
               <p className="text-center text-[11px] text-[#1c1917]/65">Stripe test mode: use card 4242 4242 4242 4242. No real money moves.</p>
             ) : null}
-            {sponsors?.provider === 'sandbox' ? (
-              <p className="text-center text-[11px] text-[#1c1917]/65">Staging sandbox: checkout is a test page and no money moves.</p>
-            ) : null}
+            {payments?.provider === 'sandbox' ? <p className="text-center text-[11px] text-[#1c1917]/65">Staging sandbox: checkout is a test page and no money moves.</p> : null}
           </>
         ) : (
           <p className="text-center text-[12.5px] font-semibold tracking-[0.12em]" role="status">
-            {state === undefined ? '' : 'SHOUT-OUTS OPEN SOON.'}
+            {state === undefined ? '' : block?.frozen || state?.event.phase === 'closed' ? 'THE SPONSOR BLOCK IS FINAL.' : 'SLOTS ARE CLOSED RIGHT NOW.'}
           </p>
         )}
       </form>
-
-      <p className="mt-4 text-center text-[10.5px] leading-relaxed text-[#1c1917]/60">
-        You’re buying a supporter shout-out: a place in the PAID FOR BY rotation on shared Shipped receipts (their pages and share
-        images) for {SPONSOR_CONFIG.tiers.name.days} days, plus a downloadable receipt image. Not on Bryton’s own receipt. The counts above
-        are what’s happened so far, not a promise: no traffic, clicks, views or impressions are guaranteed, and links are marked
-        sponsored. Nothing runs until Bryton approves it; if it isn’t approved you’re refunded in full automatically.{' '}
-        <a href="/refunds/" className="shipped-link">
-          Refund policy
-        </a>
-      </p>
     </Ticket>
   );
 }

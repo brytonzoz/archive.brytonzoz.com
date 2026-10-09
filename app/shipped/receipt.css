@@ -134,6 +134,37 @@
   font-weight: 600;
 }
 
+.shipped-slot {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 0.25rem;
+  min-width: 0;
+  color: inherit;
+  text-decoration: none;
+}
+
+.shipped-slot:focus-visible {
+  outline: 2px solid var(--ink);
+  outline-offset: 3px;
+}
+
+.shipped-slot-grid {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 0.6rem 0.4rem;
+  margin-top: 0.75rem;
+  border-top: 1px dashed rgba(29, 27, 25, 0.3);
+  padding-top: 0.75rem;
+}
+
+.shipped-qr {
+  display: block;
+  width: 100%;
+  height: auto;
+  image-rendering: pixelated;
+}
+
 .shipped-link {
   color: inherit;
   text-decoration: underline;

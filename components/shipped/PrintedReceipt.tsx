@@ -2,7 +2,7 @@
 
 import React, { useEffect, useMemo, useState } from 'react';
 import { ShippedStage, type Opening } from './ShippedStage';
-import type { Loaded } from './visitor';
+import { OrderNotice, type Loaded } from './visitor';
 
 function readInjected(): Loaded | null {
   const el = document.getElementById('shipped-receipt-data');
@@ -38,10 +38,11 @@ export function PrintedReceiptView() {
 
   return (
     <>
+      <OrderNotice />
       <ShippedStage opening={opening} title="Print your Shipped receipt" />
-      <p className="text-center text-[12px] text-[#f3ead8]/60">
-        <a href="/" className="underline underline-offset-4">
-          See Bryton’s receipt
+      <p className="pb-8 text-center text-[11px] text-[#f3ead8]/45">
+        <a href="/terms/" className="underline underline-offset-4">
+          Terms &amp; privacy
         </a>
       </p>
     </>

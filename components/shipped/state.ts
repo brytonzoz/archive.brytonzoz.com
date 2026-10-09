@@ -1,26 +1,21 @@
 'use client';
 
 import { useEffect, useState } from 'react';
-import type { SponsorTier, TierConfig } from '../../lib/shipped-sponsors';
-
-export type TierOffer = TierConfig & { tier: SponsorTier; cents: number; available: boolean };
+import type { SponsorBlock } from '../../lib/shipped-year';
+import type { EventPhase } from '../../lib/shipped-event';
+import type { HumanCheckConfig } from './HumanCheck';
 
 export type RecentReceipt = { id: number; who: string; count: number; potential: boolean };
 
 export type ShippedState = {
+  event: { name: string; opensAt: number; closesAt: number; phase: EventPhase; now: number };
+  payments: { open: boolean; prints: boolean; provider: string | null; live: boolean; wallet: boolean; printCents: number; lockMinutes: number };
   printed: number;
   shared: number;
+  piled: number;
   recent: RecentReceipt[];
-  generator: { enabled: boolean; demo: boolean; reason: string | null; turnstileSiteKey: string | null; year: number; sources: string[] };
-  sponsors: {
-    open: boolean;
-    reason: string | null;
-    provider?: string | null;
-    live?: boolean;
-    taxAtCheckout?: boolean;
-    presentedNextOpen?: number | null;
-    tiers?: TierOffer[];
-  };
+  generator: { enabled: boolean; demo: boolean; reason: string | null; turnstileSiteKey: string | null; human: HumanCheckConfig; year: number; sources: string[] };
+  sponsors: SponsorBlock;
 };
 
 let pending: Promise<ShippedState | null> | null = null;
@@ -39,7 +34,7 @@ export function refreshShippedState() {
   load().then((state) => listeners.forEach((listener) => listener(state)));
 }
 
-/** One shared fetch of /api/shipped/state for every island on /shipped/. undefined while loading. */
+/** One shared fetch of /api/shipped/state for every island on the page. undefined while loading. */
 export function useShippedState(): ShippedState | null | undefined {
   const [state, setState] = useState<ShippedState | null | undefined>(undefined);
   useEffect(() => {

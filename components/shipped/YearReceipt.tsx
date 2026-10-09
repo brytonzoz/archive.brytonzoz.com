@@ -1,11 +1,14 @@
-// The "SHIPPED IN <year>" receipt. Bryton's own receipt on /shipped/ is printed with it, and so is every
-// visitor's, so his is the template theirs follow (the share images in lib/receipt-svg.ts match it).
-// Set like a real ESC/POS print: no letter-spacing, double-height for the store and the customer, one
-// inverse band, dotted leaders, and the PAID FOR BY box at the foot.
-import React from 'react';
+'use client';
+
+// The "SHIPPED IN <year>" receipt every visitor prints. Set like a real ESC/POS print: no letter-spacing,
+// double-height for the store and the customer, one inverse band, dotted leaders, and the sponsor block at
+// the foot (the share images in lib/receipt-svg.ts match it).
+import React, { useEffect, useState } from 'react';
 import Link from 'next/link';
-import type { PaidBy, PaidFor } from '../../lib/shipped-year';
-import { Barcode, ExternalLink, Line, Rule, Tall } from './paper';
+import { qr } from '../../lib/shipped-qr';
+import { HERO_SLOT } from '../../lib/shipped-sponsors';
+import { QR_PATH, SHIPPED_URL, type SponsorBlock, type SponsorSlot } from '../../lib/shipped-year';
+import { Barcode, Line, Rule, Tall, ExternalLink } from './paper';
 
 export type ViewItem = {
   key: string;
@@ -29,10 +32,8 @@ export type YearReceiptProps = {
   items: ViewItem[];
   count: number;
   note: string;
-  paidFor: PaidFor;
+  sponsors: SponsorBlock | null;
   barcode: string;
-  /** Printed after the items, before the total (Bryton's earlier years). */
-  after?: React.ReactNode;
   /** Small print under the barcode. */
   fine?: React.ReactNode;
   /** Item names and statuses only (the opening example). */
@@ -51,41 +52,60 @@ function ItemName({ item }: { item: ViewItem }) {
   return <ExternalLink href={item.href}>{item.name}</ExternalLink>;
 }
 
-function Sponsor({ entry }: { entry: PaidBy }) {
-  return entry.url ? (
-    <ExternalLink href={entry.url} sponsored>
-      {entry.text}
-    </ExternalLink>
-  ) : (
-    <>{entry.text}</>
+/** The printed QR has to point at whichever host is serving the page (staging prints staging codes). */
+function useOrigin(): string {
+  const [origin, setOrigin] = useState(SHIPPED_URL);
+  useEffect(() => setOrigin(window.location.origin), []);
+  return origin;
+}
+
+function QrCode({ text, label }: { text: string; label: string }) {
+  const code = qr(text);
+  const quiet = 2;
+  const box = code.size + quiet * 2;
+  return (
+    <svg viewBox={`${-quiet} ${-quiet} ${box} ${box}`} className="shipped-qr" role="img" aria-label={label}>
+      <path d={code.path} fill="currentColor" shapeRendering="crispEdges" />
+    </svg>
   );
 }
 
-/** "THIS RECEIPT WAS PAID FOR BY": on Bryton's receipt and every visitor's. */
-export function PaidForBlock({ paidFor }: { paidFor: PaidFor }) {
+function Slot({ slot, origin, hero }: { slot: SponsorSlot; origin: string; hero: boolean }) {
+  const href = QR_PATH(slot.qr);
   return (
-    <section className="shipped-paidby" aria-label="This receipt was paid for by">
-      <p className="shipped-paidby-head">THIS RECEIPT WAS PAID FOR BY</p>
-      {paidFor.presented ? (
-        <p className="mt-2 text-[11px]">
-          PRESENTED BY
-          <br />
-          <Tall className="mt-1 text-[15px] font-semibold">
-            <Sponsor entry={paidFor.presented} />
-          </Tall>
-        </p>
+    <a href={href} target="_blank" rel="sponsored nofollow noopener noreferrer" className="shipped-slot">
+      <span className={hero ? 'w-[96px]' : 'w-[64px]'}>
+        <QrCode text={new URL(href, origin).toString()} label={`QR code for ${slot.name}`} />
+      </span>
+      {slot.logo ? (
+        // eslint-disable-next-line @next/next/no-img-element
+        <img src={slot.logo} alt="" loading="lazy" className={`shipped-logo w-auto ${hero ? 'max-h-10' : 'max-h-6'} max-w-full`} />
       ) : null}
-      <ul className="mt-2 space-y-2">
-        {paidFor.lines.map((entry) => (
-          <li key={entry.key} className="text-[13px] font-semibold leading-snug">
-            {entry.logo ? (
-              // eslint-disable-next-line @next/next/no-img-element
-              <img src={entry.logo} alt="" loading="lazy" className="shipped-logo mx-auto mb-1 max-h-12 w-auto max-w-[70%]" />
-            ) : null}
-            <Sponsor entry={entry} />
-          </li>
-        ))}
-      </ul>
+      <span className={`block break-words font-semibold leading-tight ${hero ? 'text-[14px]' : 'text-[10.5px]'}`}>{slot.name}</span>
+      <span className={`block break-words leading-snug opacity-75 ${hero ? 'text-[11.5px]' : 'text-[9.5px]'}`}>{slot.cta}</span>
+    </a>
+  );
+}
+
+/** The hero slot and the 3×3 grid, each with its own QR code. Every link is marked sponsored. */
+export function SponsorBlockView({ block }: { block: SponsorBlock | null }) {
+  const origin = useOrigin();
+  const hero = block?.slots.find((s) => s.slot === HERO_SLOT);
+  const rest = block?.slots.filter((s) => s.slot !== HERO_SLOT) ?? [];
+  if (!block || !hero) return null;
+  return (
+    <section className="shipped-paidby" aria-label="Sponsors">
+      <p className="shipped-paidby-head">{block.frozen ? 'SPONSORED BY (FINAL)' : 'SPONSORED BY'}</p>
+      <div className="mt-2">
+        <Slot slot={hero} origin={origin} hero />
+      </div>
+      {rest.length ? (
+        <div className="shipped-slot-grid">
+          {rest.map((slot) => (
+            <Slot key={slot.slot} slot={slot} origin={origin} hero={false} />
+          ))}
+        </div>
+      ) : null}
     </section>
   );
 }
@@ -95,9 +115,9 @@ export function YearReceipt(props: YearReceiptProps) {
     <article className="shipped-receipt">
       <header className="text-center">
         <p>
-          <Tall className="text-[15px] font-semibold">BRYTONZOZ.COM</Tall>
+          <Tall className="text-[15px] font-semibold">SHIPPED {props.year}</Tall>
         </p>
-        <p className="mt-1 text-[11px] opacity-75">SHIPPED DEPT. · NEW YORK, NY</p>
+        <p className="mt-1 text-[11px] opacity-75">THE PUBLIC RECEIPT PRINTER</p>
       </header>
 
       <Rule />
@@ -153,8 +173,6 @@ export function YearReceipt(props: YearReceiptProps) {
         ))}
       </ol>
 
-      {props.after}
-
       <Rule heavy />
       <div className="shipped-lead items-end py-1 text-[13px] font-semibold">
         <span>ITEMS SHIPPED</span>
@@ -168,7 +186,7 @@ export function YearReceipt(props: YearReceiptProps) {
         <p className="mt-1 text-[12.5px] leading-[1.5]">{props.note}</p>
       </section>
 
-      <PaidForBlock paidFor={props.paidFor} />
+      <SponsorBlockView block={props.sponsors} />
 
       <footer className="mt-4 text-center text-[11px] leading-relaxed">
         <Barcode value={props.barcode} />

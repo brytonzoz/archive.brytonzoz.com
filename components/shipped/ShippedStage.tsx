@@ -1,23 +1,31 @@
 'use client';
 
-// The top of /shipped/ and /shipped/r/<id>/: one receipt printer on the counter and the self-serve panel next
-// to it. The printer opens with a receipt (Bryton's, or the one the link points at). PRINT YOURS looks the
+// The top of / and /r/<id>/: one receipt printer on the counter and the self-serve panel next to it. The
+// printer opens with a slip (or the receipt the link points at). PRINT YOURS looks the
 // name up, lets the visitor pick if it could be more than one person, tears off whatever is hanging, feeds
 // while the sources are searched, and prints theirs. Jams and an empty roll print a slip instead.
 import React, { useEffect, useRef, useState } from 'react';
 import Link from 'next/link';
 import { track } from '../../lib/analytics';
+import { closingLabel, countdown } from '../../lib/shipped-event';
 import { RECEIPT_PATH, SHIPPED_HOST, readQuery, receiptNumber, type Candidate } from '../../lib/shipped-year';
+import { HumanCheck, type HumanCheckHandle } from './HumanCheck';
 import { Machine, type Job, type Tone } from './Machine';
 import { Line, Rule, Tall } from './paper';
 import { refreshShippedState, useShippedState } from './state';
-import { Turnstile, type TurnstileHandle } from './Turnstile';
-import { ShareBar, VisitorReceipt, type Loaded } from './visitor';
+import { ShareBar, VisitorReceipt, rememberPile, type Loaded } from './visitor';
 
 const ERRORS: Record<string, string> = {
   'invalid-query': 'Type a name, an @handle, a GitHub username or a website.',
   turnstile: 'Couldn’t check you’re human. Try again.',
   'slow-down': 'The print head is hot. Try again in an hour.',
+  busy: 'Lots of people printing. Try again in a few seconds.',
+  printing: 'That receipt is printing right now. Try again in a few seconds.',
+  jammed: 'Paper jam on that one. Try again in a few minutes.',
+  closed: 'The printer is off for good. Receipts already printed still open and share.',
+  'cross-origin': 'Print from shipped.brytonzoz.com.',
+  'browser-only': 'Print from a browser.',
+  'bad-request': 'Something went wrong. Reload and try again.',
   'taken-down': 'That receipt was taken down at its owner’s request.',
   'ai-busy': 'Busy. Try again in a minute.',
   'ai-error': 'Paper jam. Try again.',
@@ -73,7 +81,7 @@ const outOfPaper = (
 );
 
 function openingJob(opening: Opening): Job {
-  if (opening.kind === 'house') return { key: 'house', kind: 'print', label: 'Bryton Zoz: shipped this year', content: opening.content };
+  if (opening.kind === 'house') return { key: 'house', kind: 'print', slip: true, label: 'How it works', content: opening.content };
   if (opening.kind === 'loaded') {
     return { key: `r${opening.loaded.receipt.id}`, kind: 'print', label: `Shipped receipt #${receiptNumber(opening.loaded.receipt.id)}`, content: <VisitorReceipt {...opening.loaded} /> };
   }
@@ -87,6 +95,35 @@ function openingJob(opening: Opening): Job {
     };
   }
   return { key: 'loading', kind: 'feed', label: 'Loading receipt' };
+}
+
+/** "PRINTER SHUTS OFF IN 13d 4h": ticks against the server's clock, not the visitor's. */
+function Countdown() {
+  const state = useShippedState();
+  const [now, setNow] = useState<number | null>(null);
+  const skew = useRef(0);
+  useEffect(() => {
+    if (!state) return;
+    skew.current = state.event.now - Date.now();
+    setNow(Date.now() + skew.current);
+    const timer = window.setInterval(() => setNow(Date.now() + skew.current), 1000);
+    return () => window.clearInterval(timer);
+  }, [state]);
+  if (!state || now === null) return null;
+  const left = state.event.closesAt - now;
+  if (state.event.phase === 'closed' || left <= 0) {
+    return (
+      <p className="shipped-kiosk-status" role="status">
+        THE PRINTER IS OFF. {state.event.name.toUpperCase()} IS ARCHIVED.
+      </p>
+    );
+  }
+  return (
+    <p className="shipped-kiosk-hint" aria-live="off">
+      <span className="font-semibold tabular-nums">PRINTER SHUTS OFF IN {countdown(left)}</span> · {closingLabel(state.event.closesAt)}. Then the pile and
+      the sponsors freeze for good.
+    </p>
+  );
 }
 
 export function ShippedStage({ opening, title }: { opening: Opening; title: React.ReactNode }) {
@@ -104,7 +141,7 @@ export function ShippedStage({ opening, title }: { opening: Opening; title: Reac
   const [tick, setTick] = useState(0);
   const touched = useRef(false);
   const input = useRef<HTMLInputElement>(null);
-  const turnstile = useRef<TurnstileHandle>(null);
+  const human = useRef<HumanCheckHandle>(null);
   const prints = useRef(0);
   const after = useRef<HTMLDivElement>(null);
 
@@ -121,7 +158,8 @@ export function ShippedStage({ opening, title }: { opening: Opening; title: Reac
     return () => window.clearInterval(timer);
   }, [step.name]);
 
-  const empty = generator && !generator.enabled && generator.reason === 'out-of-paper';
+  const closed = state?.event.phase === 'closed' || generator?.reason === 'closed';
+  const empty = generator && !generator.enabled && (generator.reason === 'out-of-paper' || closed);
   const offline = generator && !generator.enabled && !empty;
   const searching = ['WARMING UP', ...Array.from(new Set((generator?.sources ?? ['github', 'appstore', 'hn', 'npm']).map((s) => SEARCHING[s]).filter(Boolean))), 'ITEMIZING'];
 
@@ -158,7 +196,7 @@ export function ShippedStage({ opening, title }: { opening: Opening; title: Reac
   }
 
   async function print(candidate: Candidate) {
-    if (generator?.turnstileSiteKey && !token) return setError('One second, checking you’re human…');
+    if (!token) return setError('One second, checking you’re human…');
     setError(null);
     setTick(0);
     setStep({ name: 'feeding' });
@@ -169,10 +207,10 @@ export function ShippedStage({ opening, title }: { opening: Opening; title: Reac
         headers: { 'content-type': 'application/json' },
         body: JSON.stringify({ subject: { kind: candidate.kind, id: candidate.id, display: candidate.display }, token, listed }),
       });
-      const result = (await response.json().catch(() => ({}))) as { id?: number; error?: string };
-      turnstile.current?.reset();
-      setToken(null);
+      const result = (await response.json().catch(() => ({}))) as { id?: number; pile?: string; error?: string };
+      human.current?.reset();
       if (!response.ok || !result.id) throw new Error(result.error ?? 'ai-error');
+      rememberPile(result.id, result.pile);
       const loaded = await fetch(`/api/shipped/receipts/${result.id}`).then((r) => (r.ok ? (r.json() as Promise<Loaded>) : null));
       if (!loaded) throw new Error('ai-error');
       track({ type: 'open', release: 'shipped', detail: `print-${candidate.kind}` });
@@ -182,7 +220,7 @@ export function ShippedStage({ opening, title }: { opening: Opening; title: Reac
       refreshShippedState();
     } catch (failure) {
       const code = failure instanceof Error ? failure.message : 'ai-error';
-      if (code === 'out-of-paper') {
+      if (code === 'out-of-paper' || code === 'closed') {
         setStep({ name: 'idle' });
         slip('empty', 'Out of paper', outOfPaper, true);
         refreshShippedState();
@@ -222,7 +260,7 @@ export function ShippedStage({ opening, title }: { opening: Opening; title: Reac
   }
 
   const busy = step.name === 'looking' || step.name === 'feeding';
-  const waitingForHuman = Boolean(generator?.turnstileSiteKey) && !token;
+  const waitingForHuman = Boolean(generator?.human) && !token;
   const torn = paper === 'torn' && job.kind === 'print';
 
   // Sharing can't be tabbed to until the receipt is torn off and the bar is showing.
@@ -239,9 +277,11 @@ export function ShippedStage({ opening, title }: { opening: Opening; title: Reac
         </h1>
         <p className="shipped-kiosk-lede">Everything you shipped in {generator?.year ?? 'this year'}, itemized on one receipt. Apps, launches, repos, releases, sites.</p>
 
+        <Countdown />
+
         {empty ? (
           <p className="shipped-kiosk-status" role="status">
-            Out of paper. Receipts already printed still open and share.
+            {closed ? 'The printer is off for good. Receipts already printed still open and share.' : 'Out of paper. Receipts already printed still open and share.'}
           </p>
         ) : offline ? (
           <p className="shipped-kiosk-status" role="status">
@@ -307,7 +347,7 @@ export function ShippedStage({ opening, title }: { opening: Opening; title: Reac
               <span>List it under “Recently printed”</span>
             </label>
 
-            {generator?.turnstileSiteKey ? <Turnstile ref={turnstile} siteKey={generator.turnstileSiteKey} onToken={setToken} theme="dark" appearance="interaction-only" /> : null}
+            <HumanCheck ref={human} check={generator?.enabled ? generator.human : null} onToken={setToken} theme="dark" appearance="interaction-only" />
             {generator?.demo ? <p className="shipped-kiosk-hint">Staging: no AI key here, so receipts print from the free sources only.</p> : null}
           </form>
         )}
@@ -322,7 +362,12 @@ export function ShippedStage({ opening, title }: { opening: Opening; title: Reac
             <dd>{state ? state.shared.toLocaleString('en-US') : '—'}</dd>
           </div>
         </dl>
-        <p className="shipped-kiosk-fine">Public, professional work only. The same name within 7 days reprints the same receipt.</p>
+        <p className="shipped-kiosk-fine">
+          Free. Public, professional work only, and every item links to its source. The same name within 7 days reprints the same receipt.{' '}
+          <a href="/terms/" className="underline">
+            Terms &amp; privacy
+          </a>
+        </p>
       </section>
 
       <div className="shipped-counter">

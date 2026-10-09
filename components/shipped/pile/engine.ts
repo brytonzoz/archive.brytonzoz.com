@@ -1585,6 +1585,9 @@ export class PileEngine {
   dispose() {
     this.disposed = true;
     window.clearTimeout(this.settleTimer);
+    this.held?.texture?.dispose();
+    this.held?.burn?.cancel();
+    this.hand?.texture?.dispose();
     if (this.held) {
       this.held = null;
       this.cb.onOpen(null);
@@ -1592,8 +1595,6 @@ export class PileEngine {
     this.cb.onHandRect(null);
     this.queue.dispose();
     this.slots.forEach((slot) => slot?.burning?.cancel());
-    this.held?.texture?.dispose();
-    this.hand?.texture?.dispose();
     const { scene } = this.o;
     [this.mesh, this.heldMesh, this.handMesh, this.counter, this.contacts, this.lamp, this.lamp.target, this.fill].forEach((object) => scene.remove(object));
     this.geometry.dispose();

@@ -6,6 +6,8 @@
 // that isn't a plain public web page.
 
 const BLOCKED_HOSTS = /(^|\.)(localhost|local|internal|intranet|lan|home|corp|arpa|test|invalid|example|onion)$|^metadata(\.google\.internal)?$|^(instance-data|metadata\.goog)$/i;
+/** Wildcard DNS that answers with whatever IP is in the name (127.0.0.1.nip.io): private addresses by another spelling. */
+const IP_IN_DNS = /(^|\.)(nip\.io|sslip\.io|xip\.io|nip\.direct|traefik\.me|localtest\.me|lvh\.me|vcap\.me|lacolhost\.com|localho\.st|1u\.ms|rbndr\.us)$/i;
 
 export type FetchProblem = 'scheme' | 'credentials' | 'port' | 'ip' | 'host' | 'redirect' | 'too-big' | 'timeout' | 'status' | 'type' | 'network';
 
@@ -32,7 +34,7 @@ export function checkFetchUrl(raw: string | URL): { ok: true; url: URL } | { ok:
   if (url.port && url.port !== '443' && url.port !== '80') return { ok: false, problem: 'port' };
   const host = url.hostname.toLowerCase().replace(/\.$/, '');
   if (host.startsWith('[') || host.includes(':') || isIpv4(host) || looksNumeric(host)) return { ok: false, problem: 'ip' };
-  if (!host.includes('.') || BLOCKED_HOSTS.test(host) || host.length > 253) return { ok: false, problem: 'host' };
+  if (!host.includes('.') || BLOCKED_HOSTS.test(host) || IP_IN_DNS.test(host) || host.length > 253) return { ok: false, problem: 'host' };
   if (!/^[a-z0-9.-]+$/.test(host)) return { ok: false, problem: 'host' };
   url.hash = '';
   return { ok: true, url };

@@ -280,6 +280,12 @@ function normalize(raw: unknown, gathered: Gathered, allowed: Allowed, year: num
     // Every printed line points at a public source a crawler or API actually returned; nothing else prints.
     const source = link ?? publicUrl(match?.link);
     if (!source) continue;
+    // A crawled source (a repo, a launch) backs only the thing it is about, never extra lines pinned to it.
+    const owner = gathered.found.find((found) => found.link && strip(found.link) === strip(source));
+    if (owner) {
+      const ownerKey = loose(owner.name);
+      if (!ownerKey || !(ownerKey === key || ownerKey.includes(key) || key.includes(ownerKey))) continue;
+    }
     const description = typeof item.description === 'string' ? clean(item.description, 90) : '';
     const fallback = clean(match?.description, 90);
     items.push({

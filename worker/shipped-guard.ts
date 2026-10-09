@@ -256,13 +256,14 @@ let switchMemo: { at: number; db: D1Database | null; off: Set<Switch> } | null =
 /** Which parts are switched off: SHIPPED_OFF (wrangler var) plus /admin's flags (cached 5 s per isolate). */
 export async function switchedOff(env: GuardEnv, db: D1Database | null, now = Date.now()): Promise<Set<Switch>> {
   const off = new Set<Switch>((env.SHIPPED_OFF ?? '').split(',').map((s) => s.trim()).filter(isSwitch));
-  if (!db) return off;
-  if (!switchMemo || switchMemo.db !== db || now - switchMemo.at > 5000) {
-    await guardTables(db);
-    const rows = await db.prepare(`SELECT key FROM shipped_flags WHERE key LIKE 'off:%'`).all<{ key: string }>();
-    switchMemo = { at: now, db, off: new Set(rows.results.map((row) => row.key.slice(4)).filter(isSwitch)) };
+  if (db) {
+    if (!switchMemo || switchMemo.db !== db || now - switchMemo.at > 5000) {
+      await guardTables(db);
+      const rows = await db.prepare(`SELECT key FROM shipped_flags WHERE key LIKE 'off:%'`).all<{ key: string }>();
+      switchMemo = { at: now, db, off: new Set(rows.results.map((row) => row.key.slice(4)).filter(isSwitch)) };
+    }
+    for (const name of switchMemo.off) off.add(name);
   }
-  for (const name of switchMemo.off) off.add(name);
   // Switching the whole site off switches everything off.
   if (off.has('site')) for (const name of SWITCHES) off.add(name);
   return off;

@@ -1321,20 +1321,20 @@
 }
 
 .shipped-turnstile {
-  position: absolute;
+  position: fixed;
+  left: 8px;
+  bottom: 8px;
+  z-index: 1;
   width: 300px;
   height: 65px;
-  left: -9999px;
+  opacity: 0;
   overflow: hidden;
   pointer-events: none;
 }
 
 .shipped-turnstile.is-on {
-  position: relative;
-  left: auto;
-  width: min(18.5rem, 100%);
-  height: auto;
-  margin: 8px auto 0;
+  z-index: 80;
+  opacity: 1;
   overflow: visible;
   pointer-events: auto;
 }

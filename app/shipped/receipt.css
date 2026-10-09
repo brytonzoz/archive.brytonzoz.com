@@ -1294,11 +1294,11 @@ html.shipped-focus .shipped-stack > p {
 }
 
 .shipped-printer.is-focus .shipped-printer-body {
-  transform: scale(0.72) translate3d(0, -28%, 0);
-  opacity: 0.28;
+  transform: scale(0.62) translate3d(0, -78%, 0);
+  opacity: 0.18;
   transform-origin: 50% 0;
   pointer-events: none;
-  margin-bottom: -7.5rem;
+  margin-bottom: -11.5rem;
   transition: transform 480ms var(--ease-drawer), opacity 320ms var(--ease-out), margin 480ms var(--ease-drawer);
 }
 
@@ -1537,15 +1537,17 @@ html.shipped-focus .shipped-stack > p {
 .shipped-print-another {
   pointer-events: auto;
   min-height: 44px;
-  padding: 0 12px;
+  padding: 0 14px;
   border: 0;
-  background: transparent;
-  color: rgba(243, 234, 216, 0.7);
+  border-radius: 999px;
+  background: rgba(26, 22, 18, 0.72);
+  box-shadow: 0 8px 20px rgba(0, 0, 0, 0.35);
+  backdrop-filter: blur(12px);
+  -webkit-backdrop-filter: blur(12px);
+  color: rgba(243, 234, 216, 0.86);
   font: inherit;
   font-size: 12px;
   letter-spacing: 0.04em;
-  text-decoration: underline;
-  text-underline-offset: 3px;
 }
 
 .shipped-pill {

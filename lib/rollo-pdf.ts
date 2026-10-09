@@ -27,7 +27,7 @@ export function rgbaToRgb(pixels: Uint8Array, paper: [number, number, number] = 
 export async function rgbFlate(rgb: Uint8Array): Promise<Uint8Array> {
   const stream = new CompressionStream('deflate');
   const writer = stream.writable.getWriter();
-  await writer.write(rgb);
+  await writer.write(rgb as BufferSource);
   await writer.close();
   return new Uint8Array(await new Response(stream.readable).arrayBuffer());
 }

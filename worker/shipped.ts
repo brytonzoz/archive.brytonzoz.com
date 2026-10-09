@@ -720,16 +720,19 @@ const edgeCache = (): Cache | null => (typeof caches !== 'undefined' ? (caches a
 /** Serves a GET from this data center's cache, or makes it, keeps it `seconds`, and serves that. */
 async function cached(request: Request, ctx: ExecutionContext, seconds: number, make: () => Promise<Response>): Promise<Response> {
   const cache = edgeCache();
-  const key = new Request(new URL(request.url).toString().replace(/\?.*$/, ''), { method: 'GET' });
+  const url = new URL(request.url);
+  url.search = '';
+  url.hash = `m${seconds}`;
+  const key = new Request(url.toString(), { method: 'GET' });
   const hit = cache ? await cache.match(key).catch(() => undefined) : undefined;
   if (hit) return hit;
   const response = await make();
-  if (cache && response.status === 200) {
-    const copy = new Response(response.clone().body, response);
-    copy.headers.set('cache-control', `public, max-age=${seconds}`);
-    ctx.waitUntil(cache.put(key, copy).catch(() => undefined));
-  }
-  return response;
+  if (response.status !== 200) return response;
+  const headers = new Headers(response.headers);
+  headers.set('cache-control', `public, max-age=${seconds}`);
+  const copy = new Response(response.clone().body, { status: 200, headers });
+  if (cache) ctx.waitUntil(cache.put(key, copy.clone()).catch(() => undefined));
+  return copy;
 }
 
 // ---- The event, the pile ------------------------------------------------------------------------------

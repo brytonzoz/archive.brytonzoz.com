@@ -187,23 +187,36 @@ export function Machine({ job, display, tone, onPrinted, onTorn, tearSignal = 0,
   );
 
   // Print: shove the paper out from under the head, then let it hang.
-  // After paint, not in layout: reading offsetHeight during commit trips React #329.
+  // Wait until `live` so this never runs in the same turn as mount setState (React #329).
+  // Parent callbacks are deferred: onPrinted/onTorn update ShippedStage during this effect and crash the root.
   useEffect(() => {
-    if (shown.kind !== 'print') return;
+    if (!live || shown.kind !== 'print') return;
     const el = feed.current;
     const p = pull.current;
     if (!el || !p) return;
+    const key = shown.key;
+    let cancelled = false;
+    let shiver: Animation | undefined;
+    const timers: number[] = [];
+    const tell = (printed: boolean, torn: boolean) => {
+      window.setTimeout(() => {
+        if (cancelled) return;
+        if (printed) callbacks.current.onPrinted?.(key);
+        if (torn) callbacks.current.onTorn?.(key);
+      }, 0);
+    };
     p.style.transform = '';
     if (reducedMotion()) {
       const rest = { x: 0, y: REST_Y, r: 0 };
       pos.current = rest;
       p.style.transform = transformOf(rest);
       setPhase('torn');
-      callbacks.current.onPrinted?.(shown.key);
-      callbacks.current.onTorn?.(shown.key);
-      return;
+      tell(true, true);
+      return () => {
+        cancelled = true;
+      };
     }
-    const height = el.offsetHeight;
+    const height = Math.max(1, el.offsetHeight);
     const { frames, duration } = feedFrames(height, shown.key, shown.slip ? 0.45 : shown.fast ? 0.9 : 0.36);
     const animation = el.animate(
       frames.map((frame) => ({
@@ -216,23 +229,22 @@ export function Machine({ job, display, tone, onPrinted, onTorn, tearSignal = 0,
       })),
       { duration, fill: 'both' },
     );
-    const shiver = body.current?.animate(
+    shiver = body.current?.animate(
       [{ transform: 'translateY(0)' }, { transform: 'translateY(0.7px)' }, { transform: 'translateY(-0.3px)' }, { transform: 'translateY(0)' }],
       { duration: 110, iterations: Infinity },
     );
     motorOn();
-    const timers = frames
+    frames
       .filter((frame, i) => i > 0 && frames[i - 1].clipPath !== frame.clipPath)
       .filter((_, i) => i % 2 === 0)
-      .map((frame) => window.setTimeout(tick, frame.offset * duration));
-    let cancelled = false;
+      .forEach((frame) => timers.push(window.setTimeout(tick, frame.offset * duration)));
     animation.finished
       .then(() => {
         if (cancelled) return;
         shiver?.cancel();
         motorOff();
         setPhase('hanging');
-        callbacks.current.onPrinted?.(shown.key);
+        tell(true, false);
       })
       .catch(() => undefined);
     return () => {
@@ -243,7 +255,7 @@ export function Machine({ job, display, tone, onPrinted, onTorn, tearSignal = 0,
     };
     // Only a new job restarts the print; fresh content for the same receipt doesn't.
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [shown.key, shown.kind]);
+  }, [live, shown.key, shown.kind]);
 
   // Hanging: a small nudge so it reads as loose paper, and the hint.
   useEffect(() => {

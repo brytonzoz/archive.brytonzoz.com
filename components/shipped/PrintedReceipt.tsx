@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useLayoutEffect, useMemo, useState } from 'react';
+import React, { useEffect, useMemo, useState } from 'react';
 import { ShippedStage, type Opening } from './ShippedStage';
 import { OrderNotice, type Loaded } from './visitor';
 
@@ -30,10 +30,9 @@ function idFromPath(): number | null {
 export function PrintedReceiptView() {
   const [loaded, setLoaded] = useState<Loaded | null | undefined>(undefined);
 
-  // Layout effect: apply the injected receipt before paint so the first visit never hangs on LOADING.
-  // Hydration still sees `undefined` (same as SSR). The Worker also assigns window.__SHIPPED_RECEIPT__
-  // so a later React head reconcile can't drop the JSON.
-  useLayoutEffect(() => {
+  // After paint: applying the injected receipt during layout (useLayoutEffect) tripped React #329
+  // on /r/ and left the printer on LOADING. Hydration still sees `undefined` (same as SSR).
+  useEffect(() => {
     const injected = readInjected();
     if (injected) {
       setLoaded(injected);

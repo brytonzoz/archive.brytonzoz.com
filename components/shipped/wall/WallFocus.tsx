@@ -35,11 +35,15 @@ export function WallFocus({ receipt, crumpled, reduced, onClose, onCrumple, onUn
   useEffect(() => setOrigin(window.location.origin), []);
 
   useEffect(() => {
+    document.documentElement.classList.add('shipped-wall-focus-open');
     const onKey = (event: KeyboardEvent) => {
       if (event.key === 'Escape') onClose();
     };
     window.addEventListener('keydown', onKey);
-    return () => window.removeEventListener('keydown', onKey);
+    return () => {
+      document.documentElement.classList.remove('shipped-wall-focus-open');
+      window.removeEventListener('keydown', onKey);
+    };
   }, [onClose]);
 
   useEffect(() => {
@@ -208,7 +212,8 @@ export function WallFocus({ receipt, crumpled, reduced, onClose, onCrumple, onUn
           onPointerUp={onPointerUp}
           onPointerCancel={onPointerUp}
         >
-          {ball ? <canvas ref={canvas} className="shipped-wall-focus-canvas" aria-hidden="true" /> : <WallSlip receipt={receipt} />}
+          <canvas ref={canvas} className="shipped-wall-focus-canvas" hidden={!ball} aria-hidden="true" />
+          {ball ? null : <WallSlip receipt={receipt} />}
         </div>
         <div className="shipped-wall-focus-actions">
           <a href={path} className="shipped-button is-big" onPointerDown={press}>

@@ -2076,6 +2076,7 @@ html.shipped-focus .shipped-board {
   color: #1d1b19;
   box-shadow: 0 10px 18px rgba(0, 0, 0, 0.28), 0 1px 0 rgba(255, 255, 255, 0.35) inset;
   font-family: var(--font-receipt), ui-monospace, monospace;
+  clip-path: polygon(1% 1.6%, 4% 0, 12% 1.2%, 28% 0.2%, 46% 1.4%, 63% 0, 81% 1.1%, 96% 0.3%, 99% 2%, 100% 14%, 98.8% 38%, 100% 62%, 98.6% 86%, 99% 98%, 88% 100%, 64% 98.6%, 42% 100%, 18% 98.8%, 2% 100%, 0 86%, 1.2% 58%, 0 28%);
 }
 
 .shipped-wall-slip-kicker,
@@ -2157,10 +2158,13 @@ html.shipped-focus .shipped-board {
   width: 58%;
   aspect-ratio: 1;
   margin: 28% auto 0;
-  border-radius: 46% 54% 50% 50%;
+  border-radius: 58% 42% 61% 39% / 44% 56% 40% 60%;
   background:
-    radial-gradient(circle at 32% 28%, #f7efe2, #d8cbb4 58%, #8c7a62);
-  box-shadow: 0 10px 16px rgba(0, 0, 0, 0.35), inset -6px -8px 12px rgba(60, 40, 20, 0.28);
+    radial-gradient(circle at 28% 24%, #f6eee0 0 18%, transparent 42%),
+    radial-gradient(circle at 72% 38%, #c9b89a 0 16%, transparent 40%),
+    radial-gradient(circle at 40% 70%, #8d7a62 0 14%, transparent 36%),
+    repeating-linear-gradient(118deg, #e7d8c0 0 7px, #cbb79a 7px 10px);
+  box-shadow: 0 10px 16px rgba(0, 0, 0, 0.35), inset -8px -10px 14px rgba(60, 40, 20, 0.32), inset 6px 4px 8px rgba(255, 248, 236, 0.28);
 }
 
 .shipped-wall-focus {
@@ -2171,11 +2175,18 @@ html.shipped-focus .shipped-board {
   place-items: end center;
 }
 
+html.shipped-wall-focus-open .shipped-ticker-pin,
+html.shipped-wall-focus-open .shipped-nav,
+html.shipped-wall-focus-open .shipped-wall-head,
+html.shipped-wall-focus-open .shipped-wall-board {
+  visibility: hidden;
+}
+
 .shipped-wall-focus-scrim {
   position: absolute;
   inset: 0;
   border: 0;
-  background: rgba(8, 6, 4, 0.72);
+  background: rgba(8, 6, 4, 0.88);
 }
 
 .shipped-wall-focus-stage {
@@ -2203,7 +2214,7 @@ html.shipped-focus .shipped-board {
 }
 
 .shipped-wall-focus-paper .shipped-wall-slip {
-  min-height: 22rem;
+  min-height: 16rem;
 }
 
 .shipped-wall-focus-canvas {

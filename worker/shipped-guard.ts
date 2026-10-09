@@ -10,7 +10,7 @@
 //   - security headers and a hash-based CSP for every page on the Shipped host
 // No IP address is ever stored: keys are SHA-256 of the address and the UTC day.
 
-import { BUDGET_ALERTS, CYCLE_BASE_USD, budgetAlertLevel, cycleBounds, cycleCapMicros as capFromSales, cycleRowKey, saleNetCents, type BudgetAlert } from '../lib/shipped-budget';
+import { BUDGET_ALERTS, CYCLE_BASE_USD, budgetAlertLevel, cycleBounds, cycleCapMicros as capFromSales, cycleRowKey, parsePrintPostageCents, saleNetCents, type BudgetAlert } from '../lib/shipped-budget';
 
 export const MINUTE = 60_000;
 export const HOUR = 60 * MINUTE;
@@ -29,6 +29,8 @@ export interface GuardEnv {
   SHIPPED_DAILY_CAP_USD?: string;
   /** Cycle AI budget base in USD (default 180); plus 80% of this cycle's settled sales. */
   SHIPPED_CYCLE_CAP_USD?: string;
+  /** Optional cents of print/postage subtracted from each settled mailed print. Unset = don't subtract. */
+  SHIPPED_PRINT_COST_CENTS?: string;
   /** Receipts generated per UTC day across everyone (default 1500). */
   SHIPPED_DAILY_PRINTS?: string;
   /** Receipts generated per minute across everyone (default 20). */
@@ -270,16 +272,46 @@ export async function netSettledCents(db: D1Database, fromMs: number, toMs: numb
   return bids + prints;
 }
 
-/**
- * This cycle's AI cap. No database still fails closed (nothing to print against).
- * A sales-ledger miss is $0 of income; the $180 base still stands.
- * `SHIPPED_CYCLE_CAP_USD` replaces the $180 base (this cycle's settled sales still add 80%).
- */
+const PRINT_COST_FLAG = 'print-cost-cents';
+
+/** Env var wins when set; otherwise the admin flag; otherwise unset. */
+export async function configuredPrintPostageCents(
+  env: GuardEnv,
+  db: D1Database | null,
+): Promise<{ cents: number | null; fromEnv: boolean }> {
+  const fromEnv = parsePrintPostageCents(env.SHIPPED_PRINT_COST_CENTS);
+  if (fromEnv !== null) return { cents: fromEnv, fromEnv: true };
+  if (!db) return { cents: null, fromEnv: false };
+  await guardTables(db);
+  const row = await db.prepare('SELECT value FROM shipped_flags WHERE key = ?').bind(PRINT_COST_FLAG).first<{ value: string | null }>();
+  return { cents: parsePrintPostageCents(row?.value), fromEnv: false };
+}
+
+/** Cents subtracted from each settled mailed print; 0 when unset. */
+export async function printPostageCents(env: GuardEnv, db: D1Database | null): Promise<number> {
+  return (await configuredPrintPostageCents(env, db)).cents ?? 0;
+}
+
+export async function setPrintPostageCents(db: D1Database, cents: number | null, now = Date.now()): Promise<void> {
+  await guardTables(db);
+  if (cents === null) {
+    await db.prepare('DELETE FROM shipped_flags WHERE key = ?').bind(PRINT_COST_FLAG).run();
+    return;
+  }
+  const n = parsePrintPostageCents(cents);
+  if (n === null) return;
+  await db
+    .prepare(`INSERT INTO shipped_flags (key, value, set_at) VALUES (?, ?, ?) ON CONFLICT(key) DO UPDATE SET value = excluded.value, set_at = excluded.set_at`)
+    .bind(PRINT_COST_FLAG, String(n), now)
+    .run();
+}
+
 export async function cycleBudgetCap(db: D1Database | null, env: GuardEnv, now = Date.now()): Promise<number | null> {
   if (!db) return null;
   const base = num(env.SHIPPED_CYCLE_CAP_USD, CYCLE_BASE_USD, 0, 10_000);
   const cycle = cycleBounds(now);
-  const net = await netSettledCents(db, cycle.startMs, cycle.endMs);
+  const postage = await printPostageCents(env, db);
+  const net = await netSettledCents(db, cycle.startMs, cycle.endMs, postage);
   return capFromSales(base, net);
 }
 

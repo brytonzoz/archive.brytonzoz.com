@@ -45,6 +45,19 @@ export function saleNetCents(amountCents: number, refundCents = 0): number {
   return Math.max(0, Math.max(0, amountCents) - stripeFeeCents(amountCents) - Math.max(0, refundCents));
 }
 
+/**
+ * Optional print/postage cost in cents. Unset / empty / invalid → null (do not invent a number).
+ * When set, that many cents come off each settled $5 mailed print before the 80% carry.
+ */
+export function parsePrintPostageCents(value: unknown): number | null {
+  if (value === undefined || value === null) return null;
+  const text = typeof value === 'number' ? String(value) : String(value).trim();
+  if (text === '') return null;
+  const n = Number(text);
+  if (!Number.isInteger(n) || n < 0 || n > 1_000_000) return null;
+  return n;
+}
+
 /** Highest 50/80/100 alert the spend has reached, or 0. */
 export function budgetAlertLevel(spentMicros: number, capMicros: number): 0 | BudgetAlert {
   if (capMicros <= 0) return 100;

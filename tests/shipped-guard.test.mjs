@@ -130,6 +130,30 @@ test('cycle budget: $180 from the 8th plus 80% of this cycle settled sales; miss
   assert.equal(await guard.netSettledCents(brokenPrints, Date.UTC(2026, 9, 8), Date.UTC(2026, 10, 8)), bidOnly, 'missing print_orders.refund_cents is $0 prints, not a dead cap');
   assert.equal(await guard.cycleBudgetCap(brokenPrints, {}, oct9), budget.cycleCapMicros(180, bidOnly));
 
+  assert.equal(budget.parsePrintPostageCents(''), null);
+  assert.equal(budget.parsePrintPostageCents('  '), null);
+  assert.equal(budget.parsePrintPostageCents(undefined), null);
+  assert.equal(budget.parsePrintPostageCents(80), 80);
+  const five = memoryD1();
+  five.raw.exec(`CREATE TABLE shipped_bids (
+    id INTEGER PRIMARY KEY, status TEXT, amount_cents INTEGER, total_cents INTEGER, refund_cents INTEGER, paid_at INTEGER
+  )`);
+  five.raw.exec(`CREATE TABLE print_orders (
+    id INTEGER PRIMARY KEY, status TEXT, amount_cents INTEGER, total_cents INTEGER, refund_cents INTEGER, paid_at INTEGER
+  )`);
+  five.raw.exec(`INSERT INTO print_orders (status, amount_cents, total_cents, refund_cents, paid_at) VALUES
+    ('to_print', 500, 500, 0, ${thisCycle})`);
+  const printOnly = budget.saleNetCents(500, 0);
+  assert.equal(await guard.netSettledCents(five, Date.UTC(2026, 9, 8), Date.UTC(2026, 10, 8)), printOnly, 'unset postage does not invent a cost');
+  assert.equal(await guard.netSettledCents(five, Date.UTC(2026, 9, 8), Date.UTC(2026, 10, 8), 80), budget.saleNetCents(500, 80));
+  assert.deepEqual(await guard.configuredPrintPostageCents({}, five), { cents: null, fromEnv: false });
+  await guard.setPrintPostageCents(five, 80);
+  assert.deepEqual(await guard.configuredPrintPostageCents({}, five), { cents: 80, fromEnv: false });
+  assert.deepEqual(await guard.configuredPrintPostageCents({ SHIPPED_PRINT_COST_CENTS: '120' }, five), { cents: 120, fromEnv: true }, 'env wins over the admin flag');
+  assert.equal(await guard.cycleBudgetCap(five, {}, oct9), budget.cycleCapMicros(180, budget.saleNetCents(500, 80)));
+  await guard.setPrintPostageCents(five, null);
+  assert.deepEqual(await guard.configuredPrintPostageCents({}, five), { cents: null, fromEnv: false });
+
   assert.deepEqual(await guard.recordBudgetAlerts(db, 90_000_000, 180_000_000, oct9), [50]);
   assert.deepEqual(await guard.recordBudgetAlerts(db, 90_000_000, 180_000_000, oct9), [], 'once per cycle');
   assert.deepEqual(await guard.recordBudgetAlerts(db, 180_000_000, 180_000_000, oct9), [80, 100]);

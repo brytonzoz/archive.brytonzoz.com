@@ -75,6 +75,7 @@ type Data = {
   model: string;
   maxSearches: number;
   capUsd: number;
+  printPostage?: { cents: number | null; fromEnv: boolean };
   budget: { spent: number; reserved: number };
   budgetAlert: 0 | 50 | 80 | 100;
   outOfCreditAt: number | null;
@@ -142,10 +143,15 @@ export function ShippedCard({ password }: { password: string }) {
   const [busy, setBusy] = useState<string | null>(null);
   const [message, setMessage] = useState<string | null>(null);
   const [blockKey, setBlockKey] = useState('');
+  const [postageDraft, setPostageDraft] = useState('');
 
   const load = useCallback(async () => {
     const response = await fetch('/api/admin/shipped', { headers: { authorization: `Bearer ${password}` }, cache: 'no-store' });
-    if (response.ok) setData(await response.json());
+    if (response.ok) {
+      const next = (await response.json()) as Data;
+      setData(next);
+      setPostageDraft(next.printPostage?.cents == null ? '' : String(next.printPostage.cents));
+    }
   }, [password]);
   useEffect(() => {
     load();
@@ -189,8 +195,10 @@ export function ShippedCard({ password }: { password: string }) {
         Printer: {generator} · {data.printed.toLocaleString()} printed · {data.shared.toLocaleString()} shared · {data.views.toLocaleString()} page views
         <br />
         Budget this cycle (resets on the 8th UTC): {usd(data.budget.spent)} spent + {usd(data.budget.reserved)} held for prints in
-        progress, of {usd(cap)} ($180 base + 80% of this cycle&apos;s settled sales after Stripe fees; holds don&apos;t count, refunds subtract). Paid web
-        search at most {data.maxSearches} per receipt.
+        progress, of {usd(cap)} ($180 base + 80% of this cycle&apos;s settled sales after Stripe fees; holds don&apos;t count, refunds
+        subtract
+        {data.printPostage?.cents == null ? '' : `, and ${data.printPostage.cents}¢ print/postage per mailed print`}
+        ). Paid web search at most {data.maxSearches} per receipt.
         <br />
         TinyFish:{' '}
         {data.tinyfish.enabled
@@ -241,6 +249,36 @@ export function ShippedCard({ password }: { password: string }) {
           );
         })}
       </ul>
+      <h3 className="mt-5 text-[14px] font-semibold">Print / postage cost</h3>
+      <p className="text-[12px] text-white/45">
+        Optional cents subtracted from each settled $5 mailed print before the 80% budget carry. Leave blank to leave it
+        unset — nothing is invented. The SHIPPED_PRINT_COST_CENTS var wins when set.
+      </p>
+      <form
+        className="mt-2 flex flex-wrap items-center gap-2"
+        onSubmit={(event) => {
+          event.preventDefault();
+          const trimmed = postageDraft.trim();
+          void act('print-cost', { cents: trimmed === '' ? null : Number(trimmed) });
+        }}
+      >
+        <input
+          type="number"
+          min={0}
+          step={1}
+          inputMode="numeric"
+          className="h-8 w-28 rounded-[8px] bg-white/[0.08] px-2.5 text-[13px] text-white outline-none ring-1 ring-inset ring-white/10"
+          value={postageDraft}
+          placeholder="unset"
+          disabled={Boolean(data.printPostage?.fromEnv)}
+          onChange={(event) => setPostageDraft(event.target.value)}
+        />
+        <span className="text-[12px] text-white/45">cents per mailed print</span>
+        <button type="submit" className={quiet} disabled={Boolean(data.printPostage?.fromEnv)}>
+          {data.printPostage?.fromEnv ? 'set by env' : 'Save'}
+        </button>
+      </form>
+
       {data.outOfCreditAt || data.budget.spent + data.budget.reserved >= cap ? (
         <div className="mt-3 flex flex-wrap items-center justify-between gap-2 rounded-[10px] bg-[#ff9f0a]/15 px-3 py-2 text-[13px] text-[#ffb340]">
           <span>

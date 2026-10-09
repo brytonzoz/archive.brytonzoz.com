@@ -61,7 +61,9 @@ import {
   budgetUsed,
   currentBudgetAlert,
   cycleBudgetCap,
+  configuredPrintPostageCents,
   recordBudgetAlerts,
+  setPrintPostageCents,
   clientIp,
   concurrencySlot,
   guardTables,
@@ -1760,6 +1762,17 @@ export async function adminShipped(request: Request, env: ShippedEnv): Promise<R
       await db.batch([db.prepare(`DELETE FROM shipped_flags WHERE key = 'out-of-credit'`), db.prepare('UPDATE shipped_spend SET reserved_micros = 0 WHERE day = ?').bind(today())]);
       return json({ ok: true });
     }
+    if (body.action === 'print-cost') {
+      const raw = body.cents;
+      if (raw === '' || raw === null || raw === undefined) {
+        await setPrintPostageCents(db, null);
+        return json({ ok: true });
+      }
+      const n = typeof raw === 'number' ? raw : Number(String(raw).trim());
+      if (!Number.isInteger(n) || n < 0 || n > 1_000_000) return json({ error: 'bad-cents' }, 400);
+      await setPrintPostageCents(db, n);
+      return json({ ok: true });
+    }
 
     if (body.action === 'order-shipped') {
       await db.prepare(`UPDATE print_orders SET status = 'shipped', shipped_at = ? WHERE id = ? AND status = 'to_print'`).bind(now, id).run();
@@ -1828,6 +1841,7 @@ export async function adminShipped(request: Request, env: ShippedEnv): Promise<R
       daily: TINYFISH_DAILY,
     },
     capUsd: ((await cycleBudgetCap(db, env)) ?? 0) / 1_000_000,
+    printPostage: await configuredPrintPostageCents(env, db),
     budget: await budgetUsed(db, budgetKey()),
     budgetAlert: await currentBudgetAlert(db),
     printed: t?.printed ?? 0,

@@ -389,7 +389,7 @@ function handWord(cx: number, y: number, word: string, size: number, seed: strin
   const random = prng(seed);
   const advance = charW(size) * 1.04;
   let x = cx - (word.length * advance) / 2;
-  return [...word].map((ch) => {
+  return Array.from(word).map((ch) => {
     const dy = (random() - 0.5) * size * 0.16;
     const rot = (random() - 0.5) * 9;
     const node = `<g transform="translate(${x.toFixed(1)} ${(y + dy).toFixed(1)}) rotate(${rot.toFixed(2)})">${txt(0, 0, ch, size, { weight: 600, fill })}</g>`;

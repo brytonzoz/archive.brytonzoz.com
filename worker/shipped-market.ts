@@ -44,14 +44,21 @@ export async function bump(db: D1Database, name: Counter, by = 1): Promise<numbe
 }
 
 /** Paid $5 mailed prints only: Stripe webhook / paid_at, still to-print or in the mail. Checkout sessions never count. */
-export const MAILED_SETTLED = `status IN ('to_print', 'shipped') AND paid_at IS NOT NULL`;
+export const MAILED_SETTLED = `status IN ('to_print', 'shipped') AND paid_at IS NOT NULL AND COALESCE(kind, 'print') != 'full'`;
 
 export async function mailedPaid(db: D1Database): Promise<number> {
   try {
     const row = await db.prepare(`SELECT COUNT(*) AS n FROM print_orders WHERE ${MAILED_SETTLED}`).first<{ n: number }>();
     return Number(row?.n) || 0;
   } catch {
-    return 0;
+    try {
+      const row = await db
+        .prepare(`SELECT COUNT(*) AS n FROM print_orders WHERE status IN ('to_print', 'shipped') AND paid_at IS NOT NULL`)
+        .first<{ n: number }>();
+      return Number(row?.n) || 0;
+    } catch {
+      return 0;
+    }
   }
 }
 

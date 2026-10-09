@@ -21,7 +21,10 @@ export const XAI_TICKS_PER_USD = 10_000_000_000;
 export const XAI_GAP_BELOW = 6;
 export const XAI_DEFAULT_MAX_POSTS = 10;
 export const XAI_HARD_MAX_POSTS = 25;
+export const XAI_DEEP_MAX_POSTS = 40;
+export const XAI_DEEP_HARD_MAX_POSTS = 50;
 export const XAI_DEFAULT_MONTHLY_USD = 15;
+export const XAI_SALE_ALLOWANCE_USD = 0.3;
 
 export type XaiEnv = {
   XAI_API_KEY?: string;
@@ -29,8 +32,10 @@ export type XaiEnv = {
   SHIPPED_XAI_MODEL?: string;
   XAI_MAX_POSTS?: string;
   SHIPPED_XAI_MAX_POSTS?: string;
+  SHIPPED_XAI_DEEP_MAX_POSTS?: string;
   XAI_MONTHLY_CAP_USD?: string;
   SHIPPED_XAI_MONTHLY_CAP_USD?: string;
+  SHIPPED_FULL_ALLOWANCE_USD?: string;
   xaiMeter?: XaiMeter;
 };
 
@@ -73,6 +78,17 @@ export function xaiMaxPosts(env: XaiEnv): number {
   return Math.min(XAI_HARD_MAX_POSTS, Math.max(0, Math.round(Number(raw)) || 0));
 }
 
+export function xaiDeepMaxPosts(env: XaiEnv): number {
+  const raw = (env as XaiEnv & { SHIPPED_XAI_DEEP_MAX_POSTS?: string }).SHIPPED_XAI_DEEP_MAX_POSTS ?? String(XAI_DEEP_MAX_POSTS);
+  return Math.min(XAI_DEEP_HARD_MAX_POSTS, Math.max(0, Math.round(Number(raw)) || XAI_DEEP_MAX_POSTS));
+}
+
+export function xaiSaleAllowanceUsd(env: XaiEnv): number {
+  const raw = (env as XaiEnv & { SHIPPED_FULL_ALLOWANCE_USD?: string }).SHIPPED_FULL_ALLOWANCE_USD ?? String(XAI_SALE_ALLOWANCE_USD);
+  const n = Number(raw);
+  return Number.isFinite(n) && n > 0 ? Math.min(2, n) : XAI_SALE_ALLOWANCE_USD;
+}
+
 export function xaiMonthlyCapUsd(env: XaiEnv): number {
   const raw = env.XAI_MONTHLY_CAP_USD ?? env.SHIPPED_XAI_MONTHLY_CAP_USD ?? String(XAI_DEFAULT_MONTHLY_USD);
   const n = Number(raw);
@@ -107,6 +123,26 @@ export function xaiShouldGapFill(verified: number, prolific: boolean): boolean {
 export function xaiKeywordQuery(handle: string, year: number): string {
   const who = handle.replace(/^@/, '');
   return `from:${who} (shipped OR launched OR live OR released) since:${year}-01-01`;
+}
+
+/** Per-sale meter for a paid FULL run. Does not touch the free monthly xAI budget. */
+export function saleXaiMeter(maxUsd = XAI_SALE_ALLOWANCE_USD): XaiMeter & { ticks: number; micros: number } {
+  const state = { ticks: 0 };
+  const capTicks = Math.max(0, maxUsd) * XAI_TICKS_PER_USD;
+  return {
+    get ticks() {
+      return state.ticks;
+    },
+    get micros() {
+      return ticksToMicros(state.ticks);
+    },
+    async allow() {
+      return state.ticks < capTicks;
+    },
+    async record(spend) {
+      state.ticks += spend.ticks || spend.costMicros * 10_000;
+    },
+  };
 }
 
 export function memoryXaiMeter(capUsd = XAI_DEFAULT_MONTHLY_USD): XaiMeter & { ticks: number; receipts: number } {
@@ -286,8 +322,11 @@ export async function searchXShips(opts: {
   company?: string | null;
   kind: 'person' | 'company';
   maxPosts?: number;
+  /** Paid full run: up to ~40 posts, billed to the sale meter. */
+  deep?: boolean;
 }): Promise<{ found: Found[]; spend: XaiSpend }> {
-  const posts = Math.min(xaiMaxPosts(opts.env), opts.maxPosts ?? xaiMaxPosts(opts.env));
+  const cap = opts.deep ? xaiDeepMaxPosts(opts.env) : xaiMaxPosts(opts.env);
+  const posts = Math.min(cap, opts.maxPosts ?? cap);
   const handles = [...new Set(opts.handles.map((h) => h.replace(/^@/, '')).filter(Boolean))].slice(0, 4);
   if (!xaiConfigured(opts.env) || posts <= 0 || !handles.length) return { found: [], spend: emptyXaiSpend() };
   const query = xaiKeywordQuery(handles[0], opts.year);
@@ -351,35 +390,75 @@ export async function resolveRoleWithXai(opts: {
   return { ...ident, spend: result.spend };
 }
 
+function addSpend(into: XaiSpend, extra: XaiSpend): XaiSpend {
+  return {
+    inputTokens: into.inputTokens + extra.inputTokens,
+    outputTokens: into.outputTokens + extra.outputTokens,
+    posts: into.posts + extra.posts,
+    profiles: into.profiles + extra.profiles,
+    web: into.web + extra.web,
+    ticks: into.ticks + extra.ticks,
+    costMicros: into.costMicros + extra.costMicros,
+  };
+}
+
 export async function searchPersonAndCompanyX(opts: {
   env: XaiEnv;
   year: number;
   personX: string | null;
   personName: string;
   affiliation: Affiliation;
+  deep?: boolean;
 }): Promise<{ found: Found[]; spend: XaiSpend; ran: string[] }> {
   const ran: string[] = [];
-  const spend = emptyXaiSpend();
+  let spend = emptyXaiSpend();
   const found: Found[] = [];
-  if (!opts.personX) return { found, spend, ran };
-  const row = await searchXShips({
-    env: opts.env,
-    year: opts.year,
-    handles: [opts.personX],
-    who: opts.personName || `@${opts.personX}`,
-    company: opts.affiliation.company,
-    kind: 'person',
-  });
-  found.push(...row.found);
-  Object.assign(spend, {
-    inputTokens: spend.inputTokens + row.spend.inputTokens,
-    outputTokens: spend.outputTokens + row.spend.outputTokens,
-    posts: spend.posts + row.spend.posts,
-    profiles: spend.profiles + row.spend.profiles,
-    web: spend.web + row.spend.web,
-    ticks: spend.ticks + row.spend.ticks,
-    costMicros: spend.costMicros + row.spend.costMicros,
-  });
-  if (row.found.length || row.spend.costMicros) ran.push('xai-person');
+  if (opts.personX) {
+    const row = await searchXShips({
+      env: opts.env,
+      year: opts.year,
+      handles: [opts.personX],
+      who: opts.personName || `@${opts.personX}`,
+      company: opts.affiliation.company,
+      kind: 'person',
+      deep: opts.deep,
+    });
+    found.push(...row.found);
+    spend = addSpend(spend, row.spend);
+    if (row.found.length || row.spend.costMicros) ran.push(opts.deep ? 'xai-person-deep' : 'xai-person');
+  }
   return { found, spend, ran };
+}
+
+/** Extra web gap-fill for a paid full run. Billed to the sale meter. */
+export async function searchWebShips(opts: {
+  env: XaiEnv;
+  year: number;
+  who: string;
+  company?: string | null;
+}): Promise<{ found: Found[]; spend: XaiSpend }> {
+  if (!xaiConfigured(opts.env)) return { found: [], spend: emptyXaiSpend() };
+  const prompt = [
+    `Web gap-fill only. Use web_search (at most 4 calls) for public ${opts.year} ships by ${opts.who}${opts.company ? ` or ${opts.company} while they led it` : ''}.`,
+    `Each ship needs a real public URL (changelog, repo, Product Hunt, App Store, blog). No invented names.`,
+    `JSON only: {"ships":[{"name":"","date":"YYYY-MM-DD or null","url":"https://...","why":""}]}`,
+  ].join('\n');
+  const result = await xaiResponses(opts.env, {
+    input: [{ role: 'user', content: prompt }],
+    tools: [{ type: 'web_search' }],
+    max_turns: 2,
+  });
+  if (!result) return { found: [], spend: emptyXaiSpend() };
+  const found = parseShips(outputText(result.body), opts.year).slice(0, 40);
+  console.log(
+    JSON.stringify({
+      shipped: 'xai-web',
+      who: opts.who,
+      items: found.length,
+      ticks: result.spend.ticks,
+      costUsd: Number(ticksToUsd(result.spend.ticks).toFixed(6)),
+      ...result.spend,
+    }),
+  );
+  return { found, spend: result.spend };
 }

@@ -18,7 +18,10 @@ export function RecentStrip() {
             {/* Share pages are served by the Worker, so this is a full page load on purpose. */}
             <a href={RECEIPT_PATH(receipt.id)} className="shipped-recent-stub">
               <span className="block truncate text-[12px] font-semibold tracking-[0.08em]">{receipt.who.toUpperCase()}</span>
-              <span className="block text-[10.5px] tracking-[0.14em] opacity-70">{receipt.potential ? 'POTENTIAL' : `${receipt.count} SHIPPED`}</span>
+              <span className="block text-[10.5px] tracking-[0.14em] opacity-70">
+                {receipt.full ? 'FULL · ' : ''}
+                {receipt.potential ? 'POTENTIAL' : `${receipt.count} SHIPPED`}
+              </span>
             </a>
           </li>
         ))}

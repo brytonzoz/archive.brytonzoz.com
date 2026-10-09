@@ -5,11 +5,21 @@ import type { SponsorBlock } from '../../lib/shipped-year';
 import type { EventPhase } from '../../lib/shipped-event';
 import type { HumanCheckConfig } from './HumanCheck';
 
-export type RecentReceipt = { id: number; who: string; count: number; potential: boolean };
+export type RecentReceipt = { id: number; who: string; count: number; potential: boolean; full?: boolean };
 
 export type ShippedState = {
   event: { name: string; opensAt: number; closesAt: number; phase: EventPhase; now: number };
-  payments: { open: boolean; prints: boolean; provider: string | null; live: boolean; wallet: boolean; printCents: number; lockMinutes: number };
+  payments: {
+    open: boolean;
+    prints: boolean;
+    provider: string | null;
+    live: boolean;
+    wallet: boolean;
+    printCents: number;
+    fullCents?: number;
+    bundleCents?: number;
+    lockMinutes: number;
+  };
   printed: number;
   shared: number;
   shipped: number;

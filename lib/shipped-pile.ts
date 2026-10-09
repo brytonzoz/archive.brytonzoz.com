@@ -10,6 +10,8 @@ export type PileReceipt = {
   /** ITEMS SHIPPED (1 for a "potential" receipt). */
   count: number;
   potential: boolean;
+  /** Paid full run. */
+  full?: boolean;
   /** First few lines, enough to print a crumpled receipt's face. */
   items: { name: string; status: string }[];
   printedAt: string;

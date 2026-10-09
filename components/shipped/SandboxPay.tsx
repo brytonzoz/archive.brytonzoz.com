@@ -73,7 +73,7 @@ export function SandboxPay() {
             <button type="button" className="shipped-button" onClick={pay} disabled={busy}>
               {busy ? 'PAYING…' : 'PAY (TEST)'}
             </button>
-            <a href={params.kind === 'shipped_print' ? params.back.replace(/\?.*$/, '') : '/#sponsor'} className="shipped-button is-ghost">
+            <a href={params.kind === 'shipped_print' || params.kind === 'shipped_full' || params.kind === 'shipped_bundle' ? params.back.replace(/\?.*$/, '') : '/#sponsor'} className="shipped-button is-ghost">
               CANCEL
             </a>
           </div>

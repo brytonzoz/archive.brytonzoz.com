@@ -539,7 +539,7 @@ export async function assembleReceipt(subject: Subject, gathered: Gathered, year
   const model = env.SHIPPED_MODEL || DEFAULT_MODEL;
   const searches = maxSearches(env);
   const harvested = harvestItems(gathered, year);
-  const xaiRan = gathered.ran.some((tag) => tag === 'xai-gapfill' || tag === 'xai-identity' || tag === 'xai-person');
+  const xaiRan = gathered.ran.some((tag) => tag.startsWith('xai-') && !tag.startsWith('xai-skipped'));
   const allowed = new Allowed();
   for (const item of gathered.found) allowed.add(item.link);
   for (const result of gathered.web) allowed.add(result.url);

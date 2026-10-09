@@ -1,22 +1,38 @@
-// Payments for Shipped 2026 (sponsor bids and $5 mailed prints), behind one small interface so the provider
-// can change without touching the flows in worker/shipped.ts.
+// Payments for Shipped 2026 (sponsor bids, $5 mailed prints, $3 full receipts, $7 bundles),
+// behind one small interface so the provider can change without touching the flows in worker/shipped.ts.
 //
 // stripe: the site's own Stripe account and key (STRIPE_SECRET_KEY, the same one the store uses), with
-//   Stripe Tax. Sessions carry metadata kind=shipped_sponsor or kind=shipped_print plus ref (the bid or
-//   order id); the store never acts on them and this code ignores everything else. express: true makes an
-//   embedded session (ui_mode elements) for the Apple Pay / Google Pay button on our own page. Payment is confirmed when the buyer lands back on /shipped (pulled
-//   from Stripe, no webhook needed); the webhook (/api/shipped/webhook/stripe, signed with
-//   STRIPE_SHIPPED_WEBHOOK_SECRET) adds async payments, expiries and refunds made in the dashboard.
-// sandbox: staging-only stand-in that moves no money (/shipped/sandbox-pay/). Only when
+//   Stripe Tax. Sessions carry metadata kind=shipped_sponsor | shipped_print | shipped_full | shipped_bundle
+//   plus ref (the bid or order id); the store never acts on them and this code ignores everything else.
+//   express: true makes an embedded session (ui_mode elements) for the Apple Pay / Google Pay button on
+//   our own page. Payment is confirmed when the buyer lands back on /shipped (pulled from Stripe, no
+//   webhook needed); the webhook (/api/shipped/webhook/stripe, signed with STRIPE_SHIPPED_WEBHOOK_SECRET)
+//   adds async payments, expiries and refunds made in the dashboard. Holds (unpaid checkouts) never
+//   settle. sandbox: staging-only stand-in that moves no money (/shipped/sandbox-pay/). Only when
 //   SPONSOR_PROVIDER=sandbox is set explicitly, never in production.
+import { BUNDLE_KIND, FULL_KIND } from '../lib/shipped-upgrade';
 import { stripe, verifySignature } from './store';
 
 export const SPONSOR_KIND = 'shipped_sponsor';
 export const PRINT_KIND = 'shipped_print';
-export type PayKind = typeof SPONSOR_KIND | typeof PRINT_KIND;
-/** Stripe Tax product codes: electronically supplied services (an ad slot) and printed matter (a mailed receipt). */
+export { FULL_KIND, BUNDLE_KIND };
+export type PayKind = typeof SPONSOR_KIND | typeof PRINT_KIND | typeof FULL_KIND | typeof BUNDLE_KIND;
+/** Stripe Tax product codes: electronically supplied services (an ad slot or digital full receipt) and printed matter (a mailed receipt). */
 export const SPONSOR_TAX_CODE = 'txcd_10000000';
 export const PRINT_TAX_CODE = 'txcd_99999999';
+export const FULL_TAX_CODE = SPONSOR_TAX_CODE;
+
+export function isPayKind(value: unknown): value is PayKind {
+  return value === SPONSOR_KIND || value === PRINT_KIND || value === FULL_KIND || value === BUNDLE_KIND;
+}
+
+export function payNeedsShipping(kind: PayKind): boolean {
+  return kind === PRINT_KIND || kind === BUNDLE_KIND;
+}
+
+export function payTaxCode(kind: PayKind): string {
+  return payNeedsShipping(kind) ? PRINT_TAX_CODE : kind === FULL_KIND || kind === SPONSOR_KIND ? SPONSOR_TAX_CODE : SPONSOR_TAX_CODE;
+}
 
 export type CheckoutRequest = {
   kind: PayKind;
@@ -132,13 +148,14 @@ function sandboxProvider(env: PayEnv): SponsorProvider {
         return null;
       }
       const checkoutId = typeof body.checkout === 'string' ? body.checkout : '';
-      const kind = body.kind === PRINT_KIND ? PRINT_KIND : SPONSOR_KIND;
+      const kind = isPayKind(body.kind) ? body.kind : SPONSOR_KIND;
       const ref = typeof body.ref === 'string' && /^\d{1,9}$/.test(body.ref) ? body.ref : '';
       const amountCents = Number(body.amount);
       if (!SANDBOX_ID.test(checkoutId) || !ref || !Number.isInteger(amountCents) || typeof body.sig !== 'string') return null;
       if (!sameText(body.sig, await hmac(secret, `${checkoutId}.${kind}.${ref}.${amountCents}`))) return null;
-      const shipping =
-        kind === PRINT_KIND ? { name: 'SANDBOX BUYER', line1: '1 TEST ST', line2: '', city: 'NEW YORK', state: 'NY', postal: '10001', country: 'US' } : null;
+      const shipping = payNeedsShipping(kind)
+        ? { name: 'SANDBOX BUYER', line1: '1 TEST ST', line2: '', city: 'NEW YORK', state: 'NY', postal: '10001', country: 'US' }
+        : null;
       return { type: 'paid', kind, checkoutId, orderId: `sbx_order_${checkoutId.slice(4, 16)}`, ref, currency: 'usd', amountCents, taxCents: 0, totalCents: amountCents, email: null, shipping };
     },
     async refund() {
@@ -189,7 +206,7 @@ function readShipping(session: SponsorSession): ShippingAddress | null {
 
 function sessionEvent(session: SponsorSession): SponsorEvent {
   const kind = session.metadata?.kind;
-  if (kind !== SPONSOR_KIND && kind !== PRINT_KIND) return { type: 'ignored' };
+  if (!isPayKind(kind)) return { type: 'ignored' };
   if (session.status === 'expired') return { type: 'expired', checkoutId: session.id };
   if (session.status !== 'complete' || session.payment_status !== 'paid') return { type: 'unpaid', checkoutId: session.id };
   const total = session.amount_total ?? 0;
@@ -240,7 +257,7 @@ function stripeProvider(env: PayEnv, live: boolean): SponsorProvider {
               currency: 'usd',
               unit_amount: amountCents,
               tax_behavior: 'exclusive',
-              product_data: { name: label, description, tax_code: kind === PRINT_KIND ? PRINT_TAX_CODE : SPONSOR_TAX_CODE, metadata },
+              product_data: { name: label, description, tax_code: payTaxCode(kind), metadata },
             },
           },
         ],

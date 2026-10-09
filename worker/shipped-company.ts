@@ -195,14 +195,17 @@ export async function harvestCompany(opts: {
   affiliation: Affiliation;
   year: number;
   env: CompanyEnv;
+  /** Paid full run: company X search is included and cached separately. */
+  deep?: boolean;
 }): Promise<CompanyHarvest> {
   const { affiliation, year, env } = opts;
   const slug = companySlug(affiliation.company);
   if (!slug || companyScope(affiliation.role) === 'none') {
     return { found: [], spend: emptyXaiSpend(), ran: [], cacheHit: false };
   }
-  // Company lists are shared for 7 days. No xAI here — that is a per-person gap-fill only.
-  return cached(`company:v3:${year}:${slug}`, 7 * 1440 * MIN, async () => {
+  // Company lists are shared for 7 days. Deep harvests (with company X) use their own key.
+  const cacheKey = opts.deep ? `company:deep:v1:${year}:${slug}` : `company:v3:${year}:${slug}`;
+  return cached(cacheKey, 7 * 1440 * MIN, async () => {
     const via = viaFor(affiliation);
     const ran: string[] = [];
     const found: Found[] = [];
@@ -225,6 +228,35 @@ export async function harvestCompany(opts: {
     if (orgItems.length) {
       found.push(...withVia(orgItems, via));
       ran.push(`company-github:${org}`);
+    }
+    if (opts.deep && affiliation.companyX) {
+      try {
+        const { searchXShips } = await import('./shipped-xai');
+        const companyX = await searchXShips({
+          env,
+          year,
+          handles: [affiliation.companyX],
+          who: affiliation.company || affiliation.companyX,
+          company: affiliation.company,
+          kind: 'company',
+          deep: true,
+        });
+        if (companyX.found.length) {
+          found.push(...withVia(companyX.found, via));
+          ran.push(`company-x:${affiliation.companyX}`);
+        }
+        Object.assign(spend, {
+          inputTokens: spend.inputTokens + companyX.spend.inputTokens,
+          outputTokens: spend.outputTokens + companyX.spend.outputTokens,
+          posts: spend.posts + companyX.spend.posts,
+          profiles: spend.profiles + companyX.spend.profiles,
+          web: spend.web + companyX.spend.web,
+          ticks: spend.ticks + companyX.spend.ticks,
+          costMicros: spend.costMicros + companyX.spend.costMicros,
+        });
+      } catch {
+        ran.push('company-x:miss');
+      }
     }
     const scoped =
       companyScope(affiliation.role) === 'product' && affiliation.product

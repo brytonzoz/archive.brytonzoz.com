@@ -129,8 +129,10 @@ export function receiptToDoc(receipt: ThermalReceipt): PrintDoc {
   text(lines, "CASHIER'S NOTE", 'left', { small: true, faint: true });
   text(lines, receipt.note, 'left');
   feed(8);
+  if (receipt.full) text(lines, 'VERIFIED FULL RUN', 'center', { bold: true });
+  else if (receipt.teaser) text(lines, receipt.teaser, 'center', { small: true, faint: true });
   const stamp = receipt.printedAt?.replace('T', ' ').replace(/\.\d+Z$/, ' UTC') ?? receipt.date;
-  lead(lines, `#${receipt.number}${receipt.firstRun ? ' FIRST RUN' : ''}`, stamp, { small: true });
+  lead(lines, `#${receipt.number}${receipt.full ? ' FULL' : receipt.firstRun ? ' FIRST RUN' : ''}`, stamp, { small: true });
   feed(16);
 
   lines.push({ kind: 'box-top' });

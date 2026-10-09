@@ -80,6 +80,8 @@ export function VisitorReceipt({ receipt, sponsors }: Loaded) {
       barcode={`SH${receiptNumber(receipt.id)}`}
       firstRun={isFirstRun(receipt.id)}
       shipScore={receipt.shipScore}
+      full={receipt.full}
+      teaser={receipt.full ? null : receipt.upgrade?.teaser ?? null}
     />
   );
 }
@@ -102,6 +104,7 @@ const ORDER_ERRORS: Record<string, string> = {
   closed: 'The printer is off for good. Prints are closed.',
   turnstile: 'Couldn’t check you’re human. Try again.',
   'slow-down': 'Too many tries. Try again later.',
+  'already-full': 'This receipt already ran the full pass.',
 };
 
 /** $5: this receipt on real thermal paper, mailed (US only). Stripe collects the address and the tax. */
@@ -189,6 +192,81 @@ function MailedPrint({ receipt }: { receipt: Printed }) {
           Terms
         </a>
       </p>
+      <HumanCheck ref={human} check={state?.generator.human} onToken={setToken} theme="dark" appearance={asked ? 'always' : 'execute'} />
+      {error ? (
+        <p className="mt-1 text-[12px] font-semibold text-[#f3ead8]" role="alert">
+          {error}
+        </p>
+      ) : null}
+    </div>
+  );
+}
+
+/** $3 full receipt or $7 bundle. Same checkout pattern as the mailed print. */
+function UpgradePay({ receipt, kind }: { receipt: Printed; kind: 'full' | 'bundle' }) {
+  const state = useShippedState();
+  const human = useRef<HumanCheckHandle>(null);
+  const [token, setToken] = useState<string | null>(null);
+  const [asked, setAsked] = useState(false);
+  const [busy, setBusy] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+  const payments = state?.payments;
+  const cents = kind === 'bundle' ? payments?.bundleCents ?? 700 : payments?.fullCents ?? 300;
+
+  useEffect(() => {
+    const reset = () => {
+      setBusy(false);
+      setAsked(false);
+    };
+    const onPageShow = (event: PageTransitionEvent) => {
+      if (event.persisted) reset();
+    };
+    window.addEventListener('pageshow', onPageShow);
+    return () => window.removeEventListener('pageshow', onPageShow);
+  }, []);
+
+  if (!payments?.prints || receipt.full) return null;
+
+  async function order() {
+    setBusy(true);
+    setError(null);
+    const humanToken = token ?? (await human.current?.execute()) ?? null;
+    if (!humanToken) {
+      setBusy(false);
+      setAsked(true);
+      return setError(ORDER_ERRORS.turnstile);
+    }
+    const response = await fetch('/api/shipped/upgrade', {
+      method: 'POST',
+      headers: { 'content-type': 'application/json' },
+      body: JSON.stringify({ id: receipt.id, kind, token: humanToken }),
+    }).catch(() => null);
+    const result = (await response?.json().catch(() => ({}))) as { url?: string; error?: string } | undefined;
+    if (response?.ok && result?.url) {
+      track({ type: 'open', release: 'shipped', detail: `upgrade-${kind}` });
+      window.location.assign(result.url);
+      return;
+    }
+    setError(ORDER_ERRORS[result?.error ?? ''] ?? 'Checkout didn’t open. Try again.');
+    human.current?.reset();
+    setBusy(false);
+  }
+
+  return (
+    <div className="mt-3 text-center">
+      <button
+        type="button"
+        className={`shipped-button ${kind === 'full' ? '' : 'is-ghost'} w-full${busy ? ' is-busy' : ''}`}
+        onPointerDown={press}
+        onClick={() => void order()}
+        disabled={busy}
+        aria-busy={busy}
+      >
+        {busy ? 'OPENING CHECKOUT…' : kind === 'bundle' ? `FULL + MAILED PRINT · ${money(cents)}` : `FULL RECEIPT · ${money(cents)}`}
+      </button>
+      {kind === 'full' ? (
+        <p className="mt-1 text-[11px] text-[#f3ead8]/55">Deep pass: more X posts, company harvest, extra web. Tax at checkout.</p>
+      ) : null}
       <HumanCheck ref={human} check={state?.generator.human} onToken={setToken} theme="dark" appearance={asked ? 'always' : 'execute'} />
       {error ? (
         <p className="mt-1 text-[12px] font-semibold text-[#f3ead8]" role="alert">
@@ -402,13 +480,23 @@ export function SharePill({
                     4-IN ROLLO
                   </a>
                 </div>
+                {receipt.full ? (
+                  <p className="mt-2 text-center text-[11px] font-semibold tracking-[0.18em]" style={{ color: '#c9a227' }}>
+                    VERIFIED FULL RUN
+                  </p>
+                ) : (
+                  <>
+                    <UpgradePay receipt={receipt} kind="full" />
+                    <UpgradePay receipt={receipt} kind="bundle" />
+                  </>
+                )}
                 <MailedPrint receipt={receipt} />
                 <RemoveMine receipt={receipt} onRemoved={onRemoved} />
               </div>
             </>
           ) : (
             <button type="button" className="shipped-pill-hit" onPointerDown={press} onClick={() => setOpen(true)}>
-              <span aria-hidden="true">↗</span> Share · $5 print
+              <span aria-hidden="true">↗</span> {receipt.full ? 'Share · FULL' : 'Share · full $3'}
             </button>
           )}
         </div>
@@ -417,17 +505,26 @@ export function SharePill({
   );
 }
 
-type OrderStatus = { kind: 'print'; status: string; city: string | null; state: string | null };
+type OrderStatus = {
+  kind: 'print' | 'full' | 'bundle' | 'bid';
+  sale?: string;
+  status: string;
+  city: string | null;
+  state: string | null;
+  full?: boolean;
+  upgrading?: boolean;
+};
 
 const ORDER_STATUS: Record<string, string> = {
   to_print: 'Paid. Your receipt goes on the printer and in the mail within a week.',
+  paid: 'Paid. The full receipt is reprinting now — reload in a minute.',
   shipped: 'Your print is in the mail.',
-  refunded: 'This print order was refunded in full.',
+  refunded: 'This order was refunded in full.',
   checkout: 'Checking your payment…',
   failed: 'That checkout closed before it was paid. Nothing was charged.',
 };
 
-/** /r/<id>/?order=<checkout>: back from the $5 print checkout. */
+/** /r/<id>/?order=<checkout>: back from print / full / bundle checkout. */
 export function OrderNotice() {
   const [message, setMessage] = useState<string | null>(null);
   useEffect(() => {
@@ -437,8 +534,16 @@ export function OrderNotice() {
     fetch(`/api/shipped/checkout?checkout=${encodeURIComponent(checkout)}`, { cache: 'no-store' })
       .then((response) => (response.ok ? (response.json() as Promise<OrderStatus>) : null))
       .then((order) => {
-        if (!order || order.kind !== 'print') return setMessage('Couldn’t find that order. If you paid, email the address on the terms page.');
+        if (!order || order.kind === 'bid') return setMessage('Couldn’t find that order. If you paid, email the address on the terms page.');
         const where = order.city && order.state ? ` Shipping to ${order.city}, ${order.state}.` : '';
+        if (order.kind === 'full' || order.sale === 'full') {
+          if (order.full) return setMessage('Paid. This is the verified full run.');
+          if (order.status === 'paid' || order.upgrading) return setMessage(ORDER_STATUS.paid);
+        }
+        if (order.kind === 'bundle' || order.sale === 'bundle') {
+          const reprint = order.full ? ' The full tape is ready.' : order.upgrading || order.status === 'to_print' ? ' The full tape is reprinting now.' : '';
+          return setMessage((ORDER_STATUS[order.status] ?? ORDER_STATUS.failed) + (order.status === 'to_print' ? where : '') + reprint);
+        }
         setMessage((ORDER_STATUS[order.status] ?? ORDER_STATUS.failed) + (order.status === 'to_print' ? where : ''));
       })
       .catch(() => setMessage('Couldn’t check your payment. Reload to try again.'));

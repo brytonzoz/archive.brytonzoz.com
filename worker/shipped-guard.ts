@@ -252,6 +252,8 @@ async function settledFrom(
  * Holds (checkout) are excluded. A query error counts as $0 of sales, not as a missing cap.
  * `postageCents` is subtracted from each settled mailed print when set (bids are unchanged).
  */
+type OrderSaleRow = { amount: number; refund: number; kind?: string | null };
+
 export async function netSettledCents(db: D1Database, fromMs: number, toMs: number, postageCents = 0): Promise<number> {
   const extra = Number.isFinite(postageCents) && postageCents > 0 ? Math.floor(postageCents) : 0;
   const [bids, prints] = await Promise.all([
@@ -261,13 +263,33 @@ export async function netSettledCents(db: D1Database, fromMs: number, toMs: numb
       fromMs,
       toMs,
     ),
-    settledFrom(
-      db,
-      `SELECT COALESCE(total_cents, amount_cents) AS amount, COALESCE(refund_cents, 0) AS refund FROM print_orders WHERE ${SETTLED} AND paid_at >= ? AND paid_at < ?`,
-      fromMs,
-      toMs,
-      extra,
-    ),
+    (async () => {
+      try {
+        const rows = await db
+          .prepare(
+            `SELECT COALESCE(total_cents, amount_cents) AS amount, COALESCE(refund_cents, 0) AS refund, kind FROM print_orders WHERE ${SETTLED} AND paid_at >= ? AND paid_at < ?`,
+          )
+          .bind(fromMs, toMs)
+          .all<OrderSaleRow>();
+        if (!rows?.results) return 0;
+        let n = 0;
+        for (const row of rows.results) {
+          if (!Number.isFinite(row.amount) || !Number.isFinite(row.refund)) continue;
+          const mailed = !row.kind || row.kind === 'print' || row.kind === 'bundle';
+          n += saleNetCents(row.amount, row.refund + (mailed ? extra : 0));
+        }
+        return Math.max(0, Math.floor(n));
+      } catch {
+        // Older DBs have no kind column: postage applies to every mailed print row (legacy).
+        return settledFrom(
+          db,
+          `SELECT COALESCE(total_cents, amount_cents) AS amount, COALESCE(refund_cents, 0) AS refund FROM print_orders WHERE ${SETTLED} AND paid_at >= ? AND paid_at < ?`,
+          fromMs,
+          toMs,
+          extra,
+        );
+      }
+    })(),
   ]);
   return bids + prints;
 }

@@ -105,6 +105,12 @@ test('long tapes print significance group headers and a faint confidence mark', 
   assert.ok(doc.lines.some((line) => line.kind === 'lead' && String(line.right).includes('~')));
 });
 
+test('a paid full tape prints the verified stamp and FULL serial', () => {
+  const doc = receiptToDoc({ ...RECEIPT, full: true });
+  assert.match(doc.text, /VERIFIED FULL RUN/);
+  assert.match(doc.text, /#000042 FULL/);
+});
+
 test('the plain-text copy carries every item and the note', () => {
   const text = docText(receiptToDoc(RECEIPT).lines);
   assert.match(text, /SHORT: SHIPPED/);

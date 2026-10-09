@@ -48,6 +48,10 @@ export type YearReceiptProps = {
   shipScore?: number;
   /** ISO time the Worker stamped; shown with the serial. */
   printedAt?: string;
+  /** Paid deep pass. */
+  full?: boolean;
+  /** Honest upsell from the free pass. Never a guessed count. */
+  teaser?: string | null;
 };
 
 function ItemName({ item }: { item: ViewItem }) {
@@ -199,9 +203,9 @@ function CashierNote({ note }: { note: string }) {
   );
 }
 
-function Stamp({ number, printed, firstRun }: { number: string; printed?: string; firstRun?: boolean }) {
+function Stamp({ number, printed, firstRun, firstFull }: { number: string; printed?: string; firstRun?: boolean; firstFull?: boolean }) {
   const stamp = printed?.replace('T', ' ').replace(/\.\d+Z$/, ' UTC') ?? '';
-  const serial = `#${number}${firstRun ? ' FIRST RUN' : ''}`;
+  const serial = `#${number}${firstFull ? ' FULL' : firstRun ? ' FIRST RUN' : ''}`;
   return (
     <div className="mt-3 text-[11.5px] tabular-nums">
       <Line label={serial} value={stamp || '—'} />
@@ -240,7 +244,14 @@ export function YearReceipt(props: YearReceiptProps) {
 
       <ItemList props={props} />
       <CashierNote note={props.note} />
-      <Stamp number={props.number} printed={props.printedAt} firstRun={props.firstRun} />
+      {props.full ? (
+        <p className="mt-3 text-center text-[11px] font-semibold tracking-[0.22em]" style={{ color: '#c9a227' }}>
+          VERIFIED FULL RUN
+        </p>
+      ) : props.teaser ? (
+        <p className="mt-3 text-center text-[11.5px] opacity-70">{props.teaser}</p>
+      ) : null}
+      <Stamp number={props.number} printed={props.printedAt} firstRun={props.firstRun} firstFull={props.full} />
 
       <SponsorBlockView block={props.sponsors} />
 

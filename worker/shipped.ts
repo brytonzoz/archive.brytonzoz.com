@@ -15,6 +15,7 @@
 //   GET  /api/shipped/icon/<hash>.png  a receipt line's 1-bit logo (worker/shipped-icons.ts)
 //   POST /api/shipped/bid              multipart { slot, name, cta, url, cents, terms, express, token, logo? } -> checkout at the posted price
 //   POST /api/shipped/print-order      { id, express, token } -> checkout for a mailed thermal print ($5, US)
+//   POST /api/shipped/upgrade          { id, kind: full|bundle, express, token } -> $3 full receipt or $7 bundle
 //   GET  /api/shipped/checkout?checkout=<id>   after paying: confirms with Stripe, says how it went
 //   POST /api/shipped/checkout/cancel  { checkout } the wallet sheet closed unpaid
 //   POST /api/shipped/webhook/<id>     payment provider webhook (worker/shipped-pay.ts; Stripe: /webhook/stripe)
@@ -35,9 +36,20 @@ import { DEFAULT_MODEL, PrintError, assembleReceipt, costMicros, demoReceipt, ma
 import { ICON_HASH, bytesDataUri, iconDataUri, iconKey, reencodeLogo, storeIcon } from './shipped-icons';
 import { houseMark } from './shipped-marks';
 import { yearCardPng, yearRolloPdf, yearRolloPng, yearTallPng, type LogoResolver } from './shipped-og';
-import { PRINT_KIND, SPONSOR_KIND, isProduction, sponsorProvider, type PayEnv, type SponsorEvent } from './shipped-pay';
+import { BUNDLE_KIND, FULL_KIND, PRINT_KIND, SPONSOR_KIND, isProduction, sponsorProvider, type PayEnv, type SponsorEvent } from './shipped-pay';
+import { d1XaiMeter, saleXaiMeter, xaiSaleAllowanceUsd } from './shipped-xai';
+import {
+  BUNDLE_PRICE_CENTS,
+  FULL_PRICE_CENTS,
+  PRINT_PRICE_CENTS,
+  SALE_PRICE_CENTS,
+  isSaleKind,
+  saleNeedsShipping,
+  saleTriggersFull,
+  upgradeOffer,
+  type SaleKind,
+} from '../lib/shipped-upgrade';
 import { brandIcon, candidatesFromIdentity, clean, faviconUrl, gather, hostOf, readSite, resolveIdentity, tinyfishAccess, type SourceEnv } from './shipped-sources';
-import { d1XaiMeter } from './shipped-xai';
 import { TINYFISH_DAILY, type TinyfishKind, type TinyfishMeter } from './shipped-tinyfish';
 import { checkFetchUrl, finalUrl } from './shipped-fetch';
 import {
@@ -212,7 +224,7 @@ const FAILED_FOR = 10 * MINUTE;
 /** Longest a print may hold its locks (gathering + up to three 40 s model calls). */
 const PRINT_LOCK = 3 * MINUTE;
 /** Bump when the share images change, so cached ones are redrawn. */
-const IMAGE_VERSION = 7;
+const IMAGE_VERSION = 8;
 
 const SCHEMA = [
   `CREATE TABLE IF NOT EXISTS shipped_receipts (
@@ -258,6 +270,7 @@ const COLUMNS = [
   ...MARKET_COLUMNS,
   'ALTER TABLE shipped_bids ADD COLUMN serial INTEGER',
   'ALTER TABLE print_orders ADD COLUMN refund_cents INTEGER',
+  'ALTER TABLE print_orders ADD COLUMN kind TEXT',
 ];
 
 async function migrate(db: D1Database) {
@@ -634,6 +647,14 @@ async function generate(
       listed,
       layout: draft.layout,
       shipScore: shipScore({ items: draft.items, potential: draft.potential }),
+      full: false,
+      upgrading: false,
+      upgrade: upgradeOffer({
+        leftover: gathered.leftover ?? 0,
+        leftoverKnown: Boolean(gathered.leftoverKnown),
+        capped: Boolean(gathered.coverageCapped),
+        incomplete: Boolean(gathered.incomplete),
+      }),
     };
     const day = today();
     // Only a new row adds to "printed"; a second print of the same subject the same day replaces the first.
@@ -818,6 +839,7 @@ function pileEntry(row: PileRow): PileReceipt | null {
     who: subjectLabel(receipt.subject),
     count: itemsShipped(receipt),
     potential: receipt.potential,
+    full: Boolean(receipt.full),
     items: receipt.items.slice(0, 6).map((item) => ({ name: item.name, status: item.status })),
     printedAt: receipt.printedAt,
   };
@@ -1210,7 +1232,7 @@ async function settleBid(db: D1Database, env: ShippedEnv, bid: BidRow, paid: Ext
 type OrderRow = {
   id: number;
   receipt_id: number;
-  status: 'checkout' | 'to_print' | 'shipped' | 'refunded' | 'failed';
+  status: 'checkout' | 'to_print' | 'paid' | 'shipped' | 'refunded' | 'failed';
   provider: string;
   checkout_id: string | null;
   order_id: string | null;
@@ -1229,12 +1251,57 @@ type OrderRow = {
   paid_at: number | null;
   shipped_at: number | null;
   note: string | null;
+  kind: SaleKind | null;
 };
 
-export const PRINT_PRICE_CENTS = 500;
+export { PRINT_PRICE_CENTS, FULL_PRICE_CENTS, BUNDLE_PRICE_CENTS };
 
-/** POST /api/shipped/print-order { id, express, token } -> { url } or { clientSecret, id }: the receipt on real thermal paper, mailed (US). */
+const PAY_KIND_FOR: Record<SaleKind, typeof PRINT_KIND | typeof FULL_KIND | typeof BUNDLE_KIND> = {
+  print: PRINT_KIND,
+  full: FULL_KIND,
+  bundle: BUNDLE_KIND,
+};
+
+function saleKindOf(row: Pick<OrderRow, 'kind' | 'amount_cents'>): SaleKind {
+  if (isSaleKind(row.kind)) return row.kind;
+  if (row.amount_cents === FULL_PRICE_CENTS) return 'full';
+  if (row.amount_cents === BUNDLE_PRICE_CENTS) return 'bundle';
+  return 'print';
+}
+
+function checkoutLabel(kind: SaleKind, id: number): string {
+  if (kind === 'full') return `${EVENT_NAME} full receipt #${receiptNumber(id)}`;
+  if (kind === 'bundle') return `${EVENT_NAME} full receipt #${receiptNumber(id)} + mailed print`;
+  return `${EVENT_NAME} receipt #${receiptNumber(id)}, printed and mailed`;
+}
+
+function checkoutDescription(kind: SaleKind, who: string, origin: string): string {
+  if (kind === 'full') {
+    return `Deep pass of ${who}'s ${EVENT_NAME} receipt (X search, company harvest, extra web). Digital only. Tax added at checkout. Terms and refunds: ${origin}/terms/`;
+  }
+  if (kind === 'bundle') {
+    return `Deep pass of ${who}'s receipt plus the same tape on 80mm thermal paper, mailed within the US. Shipping included, tax added at checkout. Terms and refunds: ${origin}/terms/`;
+  }
+  return `${who}'s receipt on 80mm thermal paper, mailed within the US. Shipping included, tax added at checkout. Terms and refunds: ${origin}/terms/`;
+}
+
+/** POST /api/shipped/print-order { id, express, token } -> checkout for a mailed thermal print ($5, US). */
 async function createPrintOrder(request: Request, env: ShippedEnv): Promise<Response> {
+  return createSale(request, env, 'print');
+}
+
+/** POST /api/shipped/upgrade { id, kind: full|bundle, express, token } */
+async function createUpgrade(request: Request, env: ShippedEnv): Promise<Response> {
+  const why = refuseRequest(request, 4096);
+  if (why) return refused(why);
+  const body = await readJson(request);
+  if (!body) return json({ error: 'bad-request' }, 400);
+  const kind = body.kind === 'bundle' ? 'bundle' : body.kind === 'full' ? 'full' : null;
+  if (!kind) return json({ error: 'bad-request' }, 400);
+  return createSale(request, env, kind, body);
+}
+
+async function createSale(request: Request, env: ShippedEnv, kind: SaleKind, body?: Record<string, unknown> | null): Promise<Response> {
   const why = refuseRequest(request, 4096);
   if (why) return refused(why);
   const db = await database(env);
@@ -1242,46 +1309,53 @@ async function createPrintOrder(request: Request, env: ShippedEnv): Promise<Resp
   if (!db || !provider) return json({ error: 'orders-closed' }, 503);
   if ((await switchedOff(env, db)).has('prints')) return json({ error: 'orders-closed' }, 503);
   if (isClosed(env)) return json({ error: 'closed' }, 410);
-  const body = await readJson(request);
-  if (!body) return json({ error: 'bad-request' }, 400);
-  const id = Number(body.id);
+  const parsed = body ?? (await readJson(request));
+  if (!parsed) return json({ error: 'bad-request' }, 400);
+  const id = Number(parsed.id);
   const receipt = Number.isSafeInteger(id) && id > 0 ? await loadReceipt(db, id) : null;
   if (!receipt) return json({ error: 'not-found' }, 404);
+  if (saleTriggersFull(kind) && receipt.full) return json({ error: 'already-full' }, 409);
   if (await overLimit(db, request, 'order')) return json({ error: 'slow-down' }, 429);
-  if (!(await verifyHuman(env, db, body.token, request))) return json({ error: 'turnstile' }, 403);
+  if (!(await verifyHuman(env, db, parsed.token, request))) return json({ error: 'turnstile' }, 403);
+  const amountCents = SALE_PRICE_CENTS[kind];
   const order = await db
-    .prepare(`INSERT INTO print_orders (receipt_id, status, provider, amount_cents, created_at) VALUES (?, 'checkout', ?, ?, ?) RETURNING id`)
-    .bind(id, provider.id, PRINT_PRICE_CENTS, Date.now())
+    .prepare(`INSERT INTO print_orders (receipt_id, status, provider, amount_cents, created_at, kind) VALUES (?, 'checkout', ?, ?, ?, ?) RETURNING id`)
+    .bind(id, provider.id, amountCents, Date.now(), kind)
     .first<{ id: number }>();
   if (!order) return json({ error: 'jammed' }, 500);
   try {
     const origin = shippedOrigin(env, new URL(request.url));
     const checkout = await provider.createCheckout({
-      kind: PRINT_KIND,
+      kind: PAY_KIND_FOR[kind],
       ref: String(order.id),
-      label: `${EVENT_NAME} receipt #${receiptNumber(id)}, printed and mailed`,
-      description: `${subjectLabel(receipt.subject)}'s receipt on 80mm thermal paper, mailed within the US. Shipping included, tax added at checkout. Terms and refunds: ${origin}/terms/`,
-      amountCents: PRINT_PRICE_CENTS,
+      label: checkoutLabel(kind, id),
+      description: checkoutDescription(kind, subjectLabel(receipt.subject), origin),
+      amountCents,
       origin,
       returnPath: `/r/${id}/?order={CHECKOUT_SESSION_ID}`,
       cancelPath: `/r/${id}/`,
       expiresAt: checkoutExpiry(),
-      express: body?.express === true,
-      shipping: true,
-      metadata: { receipt_id: String(id) },
+      express: parsed?.express === true,
+      shipping: saleNeedsShipping(kind),
+      metadata: { receipt_id: String(id), sale: kind },
     });
     await db.prepare('UPDATE print_orders SET checkout_id = ? WHERE id = ?').bind(checkout.checkoutId, order.id).run();
     return json(checkout.clientSecret ? { clientSecret: checkout.clientSecret, id: checkout.checkoutId } : { url: checkout.url, id: checkout.checkoutId });
   } catch (error) {
-    console.error('shipped: print order checkout failed', error instanceof Error ? error.message.slice(0, 200) : 'unknown');
+    console.error('shipped: sale checkout failed', error instanceof Error ? error.message.slice(0, 200) : 'unknown');
     await db.prepare(`UPDATE print_orders SET status = 'failed', note = ? WHERE id = ?`).bind(String(error).slice(0, 200), order.id).run();
     return json({ error: 'checkout-failed' }, 502);
   }
 }
 
-async function settleOrder(db: D1Database, env: ShippedEnv, order: OrderRow, paid: Extract<SponsorEvent, { type: 'paid' }>): Promise<void> {
+async function settleOrder(db: D1Database, env: ShippedEnv, order: OrderRow, paid: Extract<SponsorEvent, { type: 'paid' }>): Promise<boolean> {
+  const kind = saleKindOf(order);
   const ship = paid.shipping;
-  const mismatch = paidAsAsked(paid, order.id, order.amount_cents) ?? (ship && ship.country !== 'US' ? `ships to ${ship.country}` : null);
+  const needsShip = saleNeedsShipping(kind);
+  const mismatch =
+    paidAsAsked(paid, order.id, order.amount_cents) ??
+    (needsShip && ship && ship.country !== 'US' ? `ships to ${ship.country}` : null) ??
+    (needsShip && !ship ? 'missing shipping' : null);
   if (mismatch) {
     console.error(JSON.stringify({ shipped: 'pay-mismatch', order: order.id, mismatch }));
     const provider = sponsorProvider(env);
@@ -1290,19 +1364,102 @@ async function settleOrder(db: D1Database, env: ShippedEnv, order: OrderRow, pai
       .prepare(`UPDATE print_orders SET status = ?, order_id = ?, paid_at = ?, note = ? WHERE id = ? AND status = 'checkout'`)
       .bind(refund.ok ? 'refunded' : 'failed', paid.orderId, Date.now(), `payment didn't match: ${mismatch}${refund.ok ? '' : `; refund failed: ${refund.error ?? ''}`}`.slice(0, 200), order.id)
       .run();
-    return;
+    return false;
   }
+  const nextStatus = needsShip ? 'to_print' : 'paid';
   await db
     .prepare(
-      `UPDATE print_orders SET status = 'to_print', order_id = ?, paid_at = ?, tax_cents = ?, total_cents = ?, email = ?, ship_name = ?, ship_line1 = ?,
+      `UPDATE print_orders SET status = ?, order_id = ?, paid_at = ?, tax_cents = ?, total_cents = ?, email = ?, ship_name = ?, ship_line1 = ?,
        ship_line2 = ?, ship_city = ?, ship_state = ?, ship_postal = ?, ship_country = ? WHERE id = ? AND status = 'checkout'`,
     )
-    .bind(paid.orderId, Date.now(), paid.taxCents, paid.totalCents, paid.email, ship?.name ?? null, ship?.line1 ?? null, ship?.line2 ?? null, ship?.city ?? null, ship?.state ?? null, ship?.postal ?? null, ship?.country ?? null, order.id)
+    .bind(nextStatus, paid.orderId, Date.now(), paid.taxCents, paid.totalCents, paid.email, ship?.name ?? null, ship?.line1 ?? null, ship?.line2 ?? null, ship?.city ?? null, ship?.state ?? null, ship?.postal ?? null, ship?.country ?? null, order.id)
     .run();
+  return saleTriggersFull(kind);
+}
+
+async function markReceiptUpgrading(db: D1Database, id: number): Promise<YearReceipt | null> {
+  const receipt = await loadReceipt(db, id);
+  if (!receipt || receipt.full) return receipt;
+  const next = { ...receipt, upgrading: true };
+  const { id: _id, ...data } = next;
+  await db.prepare('UPDATE shipped_receipts SET data = ? WHERE id = ? AND hidden = 0').bind(JSON.stringify(data), id).run();
+  return next;
+}
+
+/** Paid deep pass: xAI ~40 posts + company harvest + extra web, billed to the $0.30 sale allowance. */
+async function rerunFullReceipt(db: D1Database, env: ShippedEnv, id: number): Promise<void> {
+  if (!(await acquire(db, `full:${id}`, PRINT_LOCK))) return;
+  try {
+    const current = await loadReceipt(db, id);
+    if (!current || current.full) return;
+    const year = current.year || yearOf(env);
+    const meter = saleXaiMeter(xaiSaleAllowanceUsd(env));
+    const gathered = await gather(
+      current.subject,
+      Object.assign(Object.create(env) as typeof env, { xaiMeter: meter }),
+      year,
+      tinyfishMeter(db),
+      { mode: 'full' },
+    );
+    if (gathered.profile.name && !hasBlockedWord(gathered.profile.name)) current.subject.display = clean(gathered.profile.name, 60);
+    const seed = seedOf(subjectKey(current.subject));
+    const draft = env.ANTHROPIC_API_KEY
+      ? await assembleReceipt(current.subject, gathered, year, seed, env, costMicros(env.SHIPPED_MODEL || DEFAULT_MODEL, 4_000, 256, 0))
+      : demoReceipt(gathered, year, seed);
+    const receipt: Omit<YearReceipt, 'id'> = {
+      version: 2,
+      year,
+      subject: current.subject,
+      printedAt: new Date().toISOString(),
+      items: await withLogos(draft.items, env),
+      note: draft.note,
+      stats: draft.stats,
+      potential: draft.potential,
+      demo: current.demo,
+      listed: current.listed,
+      layout: draft.layout,
+      shipScore: shipScore({ items: draft.items, potential: draft.potential }),
+      full: true,
+      upgrading: false,
+      upgrade: { offer: false, teaser: null },
+    };
+    await db
+      .prepare('UPDATE shipped_receipts SET data = ?, input_tokens = COALESCE(input_tokens, 0), output_tokens = COALESCE(output_tokens, 0) WHERE id = ? AND hidden = 0')
+      .bind(JSON.stringify(receipt), id)
+      .run();
+    await dropShareImages(env, id);
+    console.log(
+      JSON.stringify({
+        shipped: 'full-rerun',
+        id,
+        items: receipt.items.length,
+        xaiUsd: Number(((gathered.costs?.xaiMicros ?? 0) / 1_000_000).toFixed(4)),
+        xaiPosts: gathered.costs?.xaiPosts ?? 0,
+        saleTicks: meter.ticks,
+      }),
+    );
+  } catch (error) {
+    console.error('shipped: full rerun failed', error instanceof Error ? error.message.slice(0, 200) : 'unknown');
+    const current = await loadReceipt(db, id);
+    if (current && !current.full) {
+      const { id: _omit, ...data } = { ...current, upgrading: false };
+      await db.prepare('UPDATE shipped_receipts SET data = ? WHERE id = ?').bind(JSON.stringify(data), id).run();
+    }
+  } finally {
+    await release(db, `full:${id}`).catch(() => undefined);
+  }
+}
+
+function queueFullRerun(db: D1Database, env: ShippedEnv, receiptId: number, ctx?: ExecutionContext): void {
+  const work = markReceiptUpgrading(db, receiptId)
+    .then(() => rerunFullReceipt(db, env, receiptId))
+    .catch((error) => console.error('shipped: full queue', error instanceof Error ? error.message.slice(0, 200) : 'unknown'));
+  if (ctx) ctx.waitUntil(work);
+  else void work;
 }
 
 /** One place where payments, expiries and refunds land, from a webhook or the buyer's return. */
-async function applyEvent(db: D1Database, env: ShippedEnv, payEvent: SponsorEvent): Promise<void> {
+async function applyEvent(db: D1Database, env: ShippedEnv, payEvent: SponsorEvent, ctx?: ExecutionContext): Promise<void> {
   const now = Date.now();
   if (payEvent.type === 'paid') {
     if (payEvent.kind === SPONSOR_KIND) {
@@ -1311,7 +1468,10 @@ async function applyEvent(db: D1Database, env: ShippedEnv, payEvent: SponsorEven
       return;
     }
     const order = await db.prepare('SELECT * FROM print_orders WHERE checkout_id = ?').bind(payEvent.checkoutId).first<OrderRow>();
-    if (order && order.status === 'checkout') await settleOrder(db, env, order, payEvent);
+    if (order && order.status === 'checkout') {
+      const runFull = await settleOrder(db, env, order, payEvent);
+      if (runFull) queueFullRerun(db, env, order.receipt_id, ctx);
+    }
   } else if (payEvent.type === 'expired') {
     await db.batch([
       db.prepare(`UPDATE shipped_bids SET status = 'failed', note = 'checkout expired' WHERE checkout_id = ? AND status = 'checkout' AND paid_at IS NULL`).bind(payEvent.checkoutId),
@@ -1323,13 +1483,13 @@ async function applyEvent(db: D1Database, env: ShippedEnv, payEvent: SponsorEven
       .prepare(`UPDATE shipped_bids SET status = 'refunded', ended_at = COALESCE(ended_at, ?), seen_at_end = ${IMPRESSIONS_NOW} WHERE order_id = ? AND status = 'live'`)
       .bind(now, payEvent.orderId)
       .run();
-    await db.prepare(`UPDATE print_orders SET status = 'refunded' WHERE order_id = ? AND status = 'to_print'`).bind(payEvent.orderId).run();
+    await db.prepare(`UPDATE print_orders SET status = 'refunded' WHERE order_id = ? AND status IN ('to_print', 'paid')`).bind(payEvent.orderId).run();
   } else if (payEvent.type === 'refund_failed') {
     await db.prepare(`UPDATE shipped_bids SET note = ? WHERE order_id = ?`).bind(payEvent.reason.slice(0, 200), payEvent.orderId).run();
   }
 }
 
-async function webhook(request: Request, env: ShippedEnv, providerId: string): Promise<Response> {
+async function webhook(request: Request, env: ShippedEnv, providerId: string, ctx?: ExecutionContext): Promise<Response> {
   const db = await database(env);
   const provider = sponsorProvider(env);
   if (!db || !provider || provider.id !== providerId) return json({ error: 'not-found' }, 404);
@@ -1337,12 +1497,12 @@ async function webhook(request: Request, env: ShippedEnv, providerId: string): P
   if (Number(request.headers.get('content-length') ?? 0) > 512_000) return json({ error: 'too-big' }, 413);
   const payEvent = await provider.parseWebhook(request).catch(() => null);
   if (!payEvent) return json({ error: 'invalid-signature' }, 400);
-  await applyEvent(db, env, payEvent);
+  await applyEvent(db, env, payEvent, ctx);
   return json({ received: true, ignored: payEvent.type === 'ignored' || undefined });
 }
 
 /** After checkout (or the wallet sheet): asks Stripe where it stands, applies it, and says how it went. */
-async function checkoutStatus(url: URL, env: ShippedEnv): Promise<Response> {
+async function checkoutStatus(url: URL, env: ShippedEnv, ctx?: ExecutionContext): Promise<Response> {
   const db = await database(env);
   const provider = sponsorProvider(env);
   if (!db || !provider) return json({ error: 'closed' }, 503);
@@ -1355,7 +1515,7 @@ async function checkoutStatus(url: URL, env: ShippedEnv): Promise<Response> {
   if (!bid && !order) return json({ error: 'not-found' }, 404);
   if ((bid?.status === 'checkout' || order?.status === 'checkout') && provider.confirm) {
     try {
-      await applyEvent(db, env, await provider.confirm(checkoutId));
+      await applyEvent(db, env, await provider.confirm(checkoutId), ctx);
       bid = bid ? await readBid() : null;
       order = order ? await readOrder() : null;
     } catch (error) {
@@ -1373,7 +1533,18 @@ async function checkoutStatus(url: URL, env: ShippedEnv): Promise<Response> {
       logoPending: Boolean(bid.logo_key && !bid.logo_ok),
     });
   }
-  return json({ kind: 'print', status: order!.status, receiptId: order!.receipt_id, city: order!.ship_city, state: order!.ship_state });
+  const sale = saleKindOf(order!);
+  const receipt = await loadReceipt(db, order!.receipt_id);
+  return json({
+    kind: sale === 'print' ? 'print' : sale,
+    sale,
+    status: order!.status,
+    receiptId: order!.receipt_id,
+    city: order!.ship_city,
+    state: order!.ship_state,
+    full: Boolean(receipt?.full),
+    upgrading: Boolean(receipt?.upgrading),
+  });
 }
 
 /** POST /api/shipped/checkout/cancel { checkout }: the wallet sheet closed without paying. */
@@ -1448,6 +1619,8 @@ async function state(env: ShippedEnv): Promise<Response> {
     live: provider?.live ?? false,
     wallet: Boolean(provider?.id === 'stripe' && env.STRIPE_PUBLISHABLE_KEY),
     printCents: PRINT_PRICE_CENTS,
+    fullCents: FULL_PRICE_CENTS,
+    bundleCents: BUNDLE_PRICE_CENTS,
     lockMinutes: BID_RULES.lockMinutes,
   };
   const zeros = { printed: 0, shared: 0, shipped: 0, views: 0, piled: 0 };
@@ -1474,7 +1647,9 @@ async function state(env: ShippedEnv): Promise<Response> {
       piled: piled?.n ?? 0,
       recent: recent.results.flatMap((row) => {
         const receipt = JSON.parse(row.data) as YearReceipt;
-        return receipt.version === 2 ? [{ id: row.id, who: subjectLabel(receipt.subject), count: itemsShipped(receipt), potential: receipt.potential }] : [];
+        return receipt.version === 2
+          ? [{ id: row.id, who: subjectLabel(receipt.subject), count: itemsShipped(receipt), potential: receipt.potential, full: Boolean(receipt.full) }]
+          : [];
       }),
       sponsors,
     },
@@ -1669,7 +1844,7 @@ export async function handleShipped(request: Request, env: ShippedEnv, ctx: Exec
   const method = request.method;
   const hook = path.match(/^\/api\/shipped\/webhook\/([a-z0-9-]{1,20})$/);
   // Payment webhooks always land (refunds and expiries must be recorded even with the site switched off).
-  if (hook && method === 'POST') return webhook(request, env, hook[1]);
+  if (hook && method === 'POST') return webhook(request, env, hook[1], ctx);
   if (method === 'OPTIONS') return new Response(null, { status: 405, headers: secure(new Headers({ allow: 'GET, POST' })) });
   if ((await switchedOff(env, env.DB ?? null)).has('site') && path !== '/api/shipped/checkout') return json({ error: 'out-of-paper' }, 503);
 
@@ -1685,7 +1860,8 @@ export async function handleShipped(request: Request, env: ShippedEnv, ctx: Exec
   if (path === '/api/shipped/takedown' && method === 'POST') return takedown(request, env, ctx);
   if (path === '/api/shipped/bid' && method === 'POST') return createBid(request, env);
   if (path === '/api/shipped/print-order' && method === 'POST') return createPrintOrder(request, env);
-  if (path === '/api/shipped/checkout' && method === 'GET') return checkoutStatus(url, env);
+  if (path === '/api/shipped/upgrade' && method === 'POST') return createUpgrade(request, env);
+  if (path === '/api/shipped/checkout' && method === 'GET') return checkoutStatus(url, env, ctx);
   if (path === '/api/shipped/checkout/cancel' && method === 'POST') return cancelCheckout(request, env);
 
   const receipt = path.match(/^\/api\/shipped\/receipts\/(\d{1,9})$/);

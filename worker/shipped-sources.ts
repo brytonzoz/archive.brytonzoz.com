@@ -63,8 +63,10 @@ export interface SourceEnv {
   SHIPPED_XAI_MODEL?: string;
   XAI_MAX_POSTS?: string;
   SHIPPED_XAI_MAX_POSTS?: string;
+  SHIPPED_XAI_DEEP_MAX_POSTS?: string;
   XAI_MONTHLY_CAP_USD?: string;
   SHIPPED_XAI_MONTHLY_CAP_USD?: string;
+  SHIPPED_FULL_ALLOWANCE_USD?: string;
   xaiMeter?: import('./shipped-xai').XaiMeter;
   OPENAI_API_KEY?: string;
   OPENAI_API_BASE?: string;
@@ -146,6 +148,13 @@ export type Gathered = {
   stats?: import('./shipped-research').SourcedStat[];
   gaps?: string[];
   coverageCapped?: boolean;
+  /** Free cheap pass vs paid deep pass. */
+  mode?: 'free' | 'full';
+  /** Candidates we actually saw and did not print. Never a guess. */
+  leftover?: number;
+  leftoverKnown?: boolean;
+  /** Decisions / harvest say the free tape is incomplete. */
+  incomplete?: boolean;
   costs?: { xaiMicros: number; decisionsMicros: number; xaiTicks?: number; xaiHit?: boolean; xaiPosts?: number };
 };
 
@@ -1562,11 +1571,21 @@ function dedupeFound(found: Found[]): Found[] {
     .slice(0, 200);
 }
 
+export type GatherMode = 'free' | 'full';
+
 /** Everything the free sources and TinyFish know, de-duplicated, best first. Cached 24h per identity. */
-export async function gather(subject: Subject, env: SourceEnv, year: number, meter: TinyfishMeter | null = null): Promise<Gathered> {
+export async function gather(
+  subject: Subject,
+  env: SourceEnv,
+  year: number,
+  meter: TinyfishMeter | null = null,
+  opts?: { mode?: GatherMode },
+): Promise<Gathered> {
   const tinyfish = tinyfishAccess(env, meter);
   const resolved = await resolveIdentity(subject, env, tinyfish);
-  return cached(`gather:v9:${year}:${resolved.cacheKey}`, 1440 * MIN, () => gatherFresh(subject, resolved.profile, env, year, meter, tinyfish, resolved.notes));
+  const mode: GatherMode = opts?.mode === 'full' ? 'full' : 'free';
+  const key = mode === 'full' ? `gather:full:v1:${year}:${resolved.cacheKey}` : `gather:v10:${year}:${resolved.cacheKey}`;
+  return cached(key, 1440 * MIN, () => gatherFresh(subject, resolved.profile, env, year, meter, tinyfish, resolved.notes, mode));
 }
 
 async function gatherFresh(
@@ -1577,6 +1596,7 @@ async function gatherFresh(
   meter: TinyfishMeter | null,
   tinyfish: TinyfishAccess,
   notes: string[],
+  mode: GatherMode = 'free',
 ): Promise<Gathered> {
   const ran: string[] = [...notes.filter((n) => n.startsWith('x-profile:') || n.startsWith('github:'))];
   const failed: string[] = notes.filter((n) => n.endsWith(':miss') || n.endsWith(':unresolved'));
@@ -1747,9 +1767,13 @@ async function gatherFresh(
   let decisionsMicros = 0;
   try {
     const { harvestCompany } = await import('./shipped-company');
-    const company = await harvestCompany({ affiliation, year, env });
+    const company = await harvestCompany({ affiliation, year, env, deep: mode === 'full' });
     if (company.found.length) found.push(...company.found);
     ran.push(...company.ran);
+    xaiMicros += company.spend.costMicros;
+    xaiTicks += company.spend.ticks;
+    xaiPosts += company.spend.posts;
+    if (company.spend.ticks || company.spend.costMicros) xaiHit = true;
   } catch {
     failed.push('company-harvest');
   }
@@ -1770,8 +1794,10 @@ async function gatherFresh(
   }
 
   const prolific = Boolean(profile.github || profile.site || affiliation.company || (profile.bio && profile.bio.length > 20));
+  const deep = mode === 'full';
   try {
-    const { searchXShips, resolveRoleWithXai, xaiConfigured, xaiShouldGapFill } = await import('./shipped-xai');
+    const { searchXShips, searchPersonAndCompanyX, searchWebShips, resolveRoleWithXai, xaiConfigured, xaiShouldGapFill, xaiMaxPosts, xaiDeepMaxPosts } =
+      await import('./shipped-xai');
     if (xaiConfigured(env) && !profile.x && !affiliation.company && subject.kind === 'name') {
       const ident = await resolveRoleWithXai({ env, who });
       xaiMicros += ident.spend.costMicros;
@@ -1784,7 +1810,43 @@ async function gatherFresh(
       if (ident.handle) profile.x = ident.handle;
       if (ident.company && !affiliation.company) affiliation.company = ident.company;
     }
-    if (xaiConfigured(env) && xaiShouldGapFill(deduped.length, prolific) && profile.x) {
+    const wantDeep = deep && xaiConfigured(env);
+    const wantGap = !deep && xaiConfigured(env) && xaiShouldGapFill(deduped.length, prolific);
+    if (wantDeep) {
+      const sweep = await searchPersonAndCompanyX({
+        env,
+        year,
+        personX: profile.x,
+        personName: who,
+        affiliation,
+        deep: true,
+      });
+      xaiMicros += sweep.spend.costMicros;
+      xaiTicks += sweep.spend.ticks;
+      xaiPosts += sweep.spend.posts;
+      if (sweep.spend.ticks || sweep.spend.costMicros || sweep.found.length) xaiHit = true;
+      ran.push(...sweep.ran);
+      if (sweep.found.length) found.push(...sweep.found);
+      const web = await searchWebShips({ env, year, who, company: affiliation.company });
+      xaiMicros += web.spend.costMicros;
+      xaiTicks += web.spend.ticks;
+      xaiPosts += web.spend.posts;
+      if (web.spend.ticks || web.spend.costMicros || web.found.length) {
+        xaiHit = true;
+        ran.push('xai-web-deep');
+      }
+      if (web.found.length) found.push(...web.found);
+      if (sweep.found.length || web.found.length) {
+        const { verifyCandidates, dedupeSameShips, sortBySignificance } = await import('./shipped-decisions');
+        const extra = await verifyCandidates({ env, items: [...sweep.found, ...web.found], year, who, affiliation, via });
+        decisionsMicros += extra.spend.costMicros;
+        const same = await dedupeSameShips({ env, items: [...deduped, ...extra.items] });
+        decisionsMicros += same.spend.costMicros;
+        deduped = sortBySignificance(same.items);
+      }
+      const cap = xaiDeepMaxPosts(env);
+      if (xaiPosts >= cap && cap > 0) ran.push('xai-capped:deep');
+    } else if (wantGap && profile.x) {
       const personX = await searchXShips({
         env,
         year,
@@ -1809,23 +1871,40 @@ async function gatherFresh(
         decisionsMicros += same.spend.costMicros;
         deduped = sortBySignificance(same.items);
       }
-    } else if (xaiConfigured(env) && xaiShouldGapFill(deduped.length, prolific) && !profile.x) {
+      const cap = xaiMaxPosts(env);
+      if (xaiPosts >= cap && cap > 0) ran.push('xai-capped:free');
+    } else if (xaiConfigured(env) && wantGap && !profile.x) {
       ran.push('xai-skipped:no-handle');
-    } else if (xaiConfigured(env)) {
+    } else if (xaiConfigured(env) && !deep) {
       ran.push(deduped.length >= 6 ? 'xai-skipped:enough' : 'xai-skipped:not-prolific');
     }
   } catch {
-    failed.push('xai-gapfill');
+    failed.push(deep ? 'xai-deep' : 'xai-gapfill');
   }
 
   stats = mergeStats([pageStats, deduped.flatMap((item) => item.metrics ?? [])]);
+  const finalGaps = detectGaps({ ...draft, found: deduped, stats, profile });
+  // Never invent a leftover count. A number only when we sliced a unique list past MAX_ITEMS.
+  const leftover = 0;
+  const meanConfidence =
+    deduped.length > 0 ? deduped.reduce((sum, item) => sum + (item.confidence ?? 0), 0) / deduped.length : 0;
+  const capped = ran.some((tag) => tag.startsWith('xai-capped')) || leftover > 0;
+  const incomplete =
+    !deep &&
+    (finalGaps.includes('thin-for-prolific') ||
+      ran.includes('xai-skipped:no-handle') ||
+      (deduped.length > 0 && meanConfidence > 0 && meanConfidence < 0.85));
   return {
     ...draft,
     found: deduped,
     profile,
     stats,
-    gaps: detectGaps({ ...draft, found: deduped, stats, profile }),
-    coverageCapped: false,
+    gaps: finalGaps,
+    coverageCapped: capped,
+    mode,
+    leftover,
+    leftoverKnown: leftover > 0,
+    incomplete,
     costs: { xaiMicros, decisionsMicros, xaiTicks, xaiHit, xaiPosts },
     ran,
     failed,

@@ -72,6 +72,12 @@ export type YearReceipt = {
   layout?: string[];
   /** 0–100 from sourced public work on this tape. Never engagement. */
   shipScore?: number;
+  /** Paid deep pass already ran. */
+  full?: boolean;
+  /** Settled payment, reprint in flight. */
+  upgrading?: boolean;
+  /** Honest upsell from the free pass. Absent or offer:false when complete or already full. */
+  upgrade?: { offer: boolean; teaser: string | null };
 };
 
 export type Candidate = Subject & { detail: string };

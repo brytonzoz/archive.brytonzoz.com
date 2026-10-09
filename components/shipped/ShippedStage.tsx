@@ -3,7 +3,7 @@
 // The top of / and /r/<id>/: one receipt printer on the desk. Type a name on its LCD and press PRINT.
 // It looks the name up, lets the visitor pick if it could be more than one person, tears off whatever is
 // hanging, feeds while the sources are searched, and prints theirs. Jams and an empty roll print a slip.
-import React, { useEffect, useRef, useState } from 'react';
+import React, { useEffect, useLayoutEffect, useRef, useState } from 'react';
 import { track } from '../../lib/analytics';
 import { countdown } from '../../lib/shipped-event';
 import { readQuery, receiptNumber, type Candidate } from '../../lib/shipped-year';
@@ -155,7 +155,7 @@ export function ShippedStage({ opening, title }: { opening: Opening; title: Reac
   const [error, setError] = useState<string | null>(null);
   const [job, setJob] = useState<Job>(() => openingJob(opening));
   const [current, setCurrent] = useState<Loaded | null>(opening.kind === 'loaded' ? opening.loaded : null);
-  const [paper, setPaper] = useState<'printing' | 'hanging' | 'torn'>('printing');
+  const [paper, setPaper] = useState<'printing' | 'hanging' | 'torn'>(opening.kind === 'loaded' ? 'torn' : 'printing');
   const [tearSignal, setTearSignal] = useState(0);
   const [tick, setTick] = useState(0);
   const touched = useRef(false);
@@ -175,11 +175,12 @@ export function ShippedStage({ opening, title }: { opening: Opening; title: Reac
     }
   }, []);
 
-  // /shipped/r/<id>/ finds out which receipt it is after the first render.
-  useEffect(() => {
+  // /r/<id>/ injects the receipt before paint; land already torn so the tape is full-screen.
+  useLayoutEffect(() => {
     if (touched.current) return;
     setJob(openingJob(opening));
     setCurrent(opening.kind === 'loaded' ? opening.loaded : null);
+    if (opening.kind === 'loaded') setPaper('torn');
   }, [opening]);
 
   useEffect(() => {
@@ -355,10 +356,11 @@ export function ShippedStage({ opening, title }: { opening: Opening; title: Reac
           tone={tone}
           tearSignal={tearSignal}
           onPrinted={() => {
-            setPaper('hanging');
             if (opening.kind === 'loaded' && !touched.current) {
-              window.setTimeout(() => setTearSignal((n) => n + 1), 120);
+              setPaper('torn');
+              return;
             }
+            setPaper('hanging');
           }}
           onTorn={() => setPaper('torn')}
           paperMax={paperMax}

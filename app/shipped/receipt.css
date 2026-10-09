@@ -787,7 +787,54 @@
 }
 
 .shipped-stage.is-focus {
+  position: relative;
   min-height: 100svh;
+  height: 100svh;
+  gap: 0;
+}
+
+html.shipped-focus,
+html.shipped-focus body {
+  overflow: hidden;
+  height: 100%;
+}
+
+html.shipped-focus .shipped-page {
+  height: 100svh;
+  overflow: hidden;
+  padding-bottom: 0;
+}
+
+html.shipped-focus .shipped-stack {
+  width: 100%;
+  height: 100%;
+  gap: 0;
+  overflow: hidden;
+}
+
+html.shipped-focus .shipped-stack > p {
+  display: none;
+}
+
+.shipped-stage.is-focus .shipped-ticker-pin {
+  position: absolute;
+  left: 0;
+  right: 0;
+  top: 0;
+  z-index: 1;
+  opacity: 0;
+  pointer-events: none;
+  transform: translate3d(0, -16px, 0) scale(0.92);
+  transform-origin: 50% 0;
+  padding-bottom: 0;
+  transition: opacity 280ms var(--ease-out), transform 480ms var(--ease-drawer);
+}
+
+.shipped-stage.is-focus .shipped-counter {
+  flex: 1;
+  min-height: 0;
+  width: 100%;
+  gap: 0;
 }
 
 .shipped-counter {
@@ -1280,25 +1327,63 @@
   }
 }
 
+.shipped-printer.is-focus {
+  flex: 1;
+  min-height: 0;
+  width: 100%;
+  height: 100%;
+}
+
 .shipped-printer.is-focus .shipped-printer-body {
-  transform: scale(0.88) translate3d(0, -8px, 0);
-  opacity: 0.38;
+  position: absolute;
+  left: 50%;
+  top: 0;
+  z-index: 0;
+  width: min(29rem, calc(100% - 32px));
+  transform: translateX(-50%) translate3d(0, -48%, 0) scale(0.72);
+  opacity: 0.22;
   transform-origin: 50% 0;
   pointer-events: none;
+  filter: blur(0.35px);
   transition: transform 480ms var(--ease-drawer), opacity 320ms var(--ease-out);
 }
 
 .shipped-printer.is-focus .shipped-out {
+  position: relative;
+  z-index: 2;
   width: min(26.5rem, 100%);
+  height: 100%;
+  margin-top: 0;
+  padding-top: calc(8px + env(safe-area-inset-top, 0px));
+  display: flex;
+  flex-direction: column;
+}
+
+.shipped-printer.is-focus .shipped-feed,
+.shipped-printer.is-focus .shipped-pull {
+  flex: 1;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+  width: 100%;
 }
 
 .shipped-printer.is-focus .shipped-tilt.is-scroll {
+  flex: 1;
+  min-height: 0;
   max-height: none;
-  padding-bottom: calc(128px + env(safe-area-inset-bottom, 0px));
+  overflow: auto;
+  overscroll-behavior: contain;
+  padding-bottom: calc(148px + env(safe-area-inset-bottom, 0px));
 }
 
 .shipped-printer.is-focus .shipped-pull {
   transform: none !important;
+}
+
+.shipped-printer.is-focus .shipped-stub,
+.shipped-printer.is-focus .shipped-hint {
+  display: none;
 }
 
 .shipped-stub {

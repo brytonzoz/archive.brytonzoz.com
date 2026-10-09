@@ -60,7 +60,8 @@ export type MachineProps = {
 
 type Phase = 'idle' | 'feeding' | 'printing' | 'hanging' | 'tearing' | 'torn';
 
-const phaseFor = (job: Job): Phase => (job.kind === 'feed' ? 'feeding' : job.kind === 'idle' ? 'idle' : 'printing');
+const phaseFor = (job: Job): Phase =>
+  job.kind === 'feed' ? 'feeding' : job.kind === 'idle' ? 'idle' : job.fast ? 'torn' : 'printing';
 type Vec = { x: number; y: number; r: number };
 
 const REST_Y = 30;
@@ -194,7 +195,7 @@ export function Machine({ job, display, tone, onPrinted, onTorn, tearSignal = 0,
     const p = pull.current;
     if (!el || !p) return;
     p.style.transform = '';
-    if (reducedMotion()) {
+    if (reducedMotion() || shown.fast) {
       const rest = { x: 0, y: REST_Y, r: 0 };
       pos.current = rest;
       p.style.transform = transformOf(rest);
@@ -204,7 +205,7 @@ export function Machine({ job, display, tone, onPrinted, onTorn, tearSignal = 0,
       return;
     }
     const height = el.offsetHeight;
-    const { frames, duration } = feedFrames(height, shown.key, shown.slip ? 0.45 : shown.fast ? 0.9 : 0.36);
+    const { frames, duration } = feedFrames(height, shown.key, shown.slip ? 0.45 : 0.36);
     const animation = el.animate(
       frames.map((frame) => ({
         offset: frame.offset,

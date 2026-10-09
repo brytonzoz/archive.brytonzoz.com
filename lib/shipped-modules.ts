@@ -240,16 +240,16 @@ export function receiptModules({ receipt, printed }: ModuleContext): ReceiptModu
     },
   ];
 
-  return MODULE_ORDER.map((id) => modules.find((module) => module.id === id)!);
+  return MODULE_ORDER.map((id) => modules.find((band) => band.id === id)!);
 }
 
 export function receiptBadges(modules: ReceiptModule[]): string[] {
   const seen = new Set<string>();
   const out: string[] = [];
-  for (const module of modules) {
-    if (module.badge && !seen.has(module.badge)) {
-      seen.add(module.badge);
-      out.push(module.badge);
+  for (const band of modules) {
+    if (band.badge && !seen.has(band.badge)) {
+      seen.add(band.badge);
+      out.push(band.badge);
     }
   }
   return out.slice(0, 6);

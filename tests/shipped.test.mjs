@@ -2,7 +2,7 @@ import assert from 'node:assert/strict';
 import { test } from 'node:test';
 import fs from 'node:fs';
 import { SHIPPED_STATUSES, shippedCounts, toItems, yearGroups } from '../lib/shipped.ts';
-import { isGithubLogin, itemDate, itemsShipped, readQuery, shareText, shippedYear, subjectKey, subjectLabel } from '../lib/shipped-year.ts';
+import { isGithubLogin, itemDate, itemsShipped, readQuery, receiptPageTitle, shareText, shareTweet, shippedYear, subjectKey, subjectLabel, xHandle } from '../lib/shipped-year.ts';
 
 const read = (file) => JSON.parse(fs.readFileSync(new URL(file, import.meta.url), 'utf8'));
 const DATA = read('../data/shipped/businesses.json');
@@ -105,6 +105,17 @@ test('item dates and the share text', () => {
   assert.doesNotMatch(shareText(receipt), /@/, 'sharing never tags the person on the receipt');
   assert.equal(itemsShipped({ ...receipt, potential: true, items: [{}] }), 1);
   assert.match(shareText({ ...receipt, potential: true, items: [{}] }), /potential/);
+  assert.equal(receiptPageTitle(receipt), '@levelsio shipped 3 things in 2026 | Shipped');
+  assert.equal(receiptPageTitle({ ...receipt, potential: true, items: [{}] }), '@levelsio: shipped in 2026 (potential) | Shipped');
+  assert.equal(xHandle(receipt), 'levelsio');
+  assert.equal(shareTweet(receipt), '@levelsio shipped 3 things in 2026 🧾');
+  assert.equal(shareTweet({ ...receipt, potential: true, items: [{}] }), '@levelsio shipped nothing public in 2026 🧾');
+  const named = { ...receipt, subject: { kind: 'name', id: 'Marc Lou', display: 'Marc Lou' } };
+  assert.equal(xHandle(named), null);
+  assert.equal(shareTweet(named), 'Marc Lou shipped 3 things in 2026 🧾');
+  const githubWithX = { ...receipt, subject: { kind: 'github', id: 'levelsio', display: 'Pieter Levels', x: 'levelsio' } };
+  assert.equal(xHandle(githubWithX), 'levelsio');
+  assert.equal(shareTweet(githubWithX), '@levelsio shipped 3 things in 2026 🧾');
 });
 
 test('the year is configurable and falls back to this year', () => {
@@ -141,6 +152,114 @@ test('the receipt feed reveals the header first, never the footer', async () => 
     hidden = n;
   }
   assert.equal(hidden, 0);
+});
+
+test('share cards are a 1200×630 desk photo and a 1080×1350 download', async () => {
+  const { yearCardSvg, yearPortraitSvg } = await import('../lib/receipt-svg.ts');
+  const data = {
+    number: '000014',
+    year: 2026,
+    who: 'Marc Lou',
+    date: '09 OCT 2026',
+    items: [
+      { name: 'DataRadar', status: 'LIVE', date: 'FEB 28', description: 'Web analytics', logo: null },
+      { name: 'Ship or Die', status: 'LAUNCHED', date: null, description: 'Community', logo: null },
+      { name: 'TrustMRR', status: 'LIVE', date: null, description: 'Revenue', logo: null },
+    ],
+    count: 6,
+    note: 'Built in public.',
+    sponsors: [{ name: 'Pocket Factory', cta: 'NFC cards', logo: null, qr: { size: 21, path: '' } }],
+    url: 'shipped.brytonzoz.com/r/14/',
+    barcode: [1, 1, 1, 1],
+    shipScore: 72,
+    handle: 'marclou',
+  };
+  const card = yearCardSvg(data);
+  const port = yearPortraitSvg(data);
+  assert.match(card, /width="1200"/);
+  assert.match(card, /height="630"/);
+  assert.match(port, /width="1080"/);
+  assert.match(port, /height="1350"/);
+  assert.match(card, /ITEMS SHIPPED/);
+  assert.match(card, /MARC LOU/);
+  assert.match(card, /DATARADAR/);
+  assert.match(card, /shipped\.brytonzoz\.com/);
+  assert.match(card, /PAID FOR BY/);
+  assert.match(card, /POCKET FACTORY/);
+  assert.match(card, /rotate\(-10/);
+  assert.match(card, /id="desk-callout"/);
+  assert.match(card, /@marclou/);
+  assert.match(card, /scale\(1\.52\)/);
+  const callout = card.slice(card.indexOf('id="desk-callout"'));
+  assert.doesNotMatch(callout, /filter="url\(#(cast|shadow|fiber)"/);
+  assert.doesNotMatch(card, /letter-spacing="0"/, 'letter-spacing at 0 doubles the last glyph in resvg');
+  assert.equal(card.includes('printerLip') || /url\(#chassis\)/.test(card), false, 'card is a desk photo, not the printer template');
+});
+
+test('share pages fill a placeholder instead of appending head scripts', () => {
+  const page = fs.readFileSync(new URL('../app/shipped/r/page.tsx', import.meta.url), 'utf8');
+  const worker = fs.readFileSync(new URL('../worker/shipped.ts', import.meta.url), 'utf8');
+  assert.match(page, /id="shipped-receipt-data"/);
+  assert.match(worker, /#shipped-receipt-data/);
+  assert.match(worker, /isShareBot/);
+  assert.equal(worker.includes("el.append(`<script>window.__SHIPPED_RECEIPT__"), false);
+});
+
+test('the wall crumples only in this browser and pages from the listed pile', async () => {
+  const { isCrumpled, layoutWall, wallColumns, wallGutter, wallPinStyle, writeCrumpled } = await import('../lib/shipped-wall.ts');
+  assert.deepEqual(writeCrumpled([6, 6, 7]), [6, 7]);
+  assert.equal(isCrumpled(6, [6, 7]), true);
+  assert.equal(isCrumpled(14, [6, 7]), false);
+  assert.equal(wallColumns(390), 2);
+  const pin = wallPinStyle(14);
+  assert.ok(pin.rotate >= -3.2 && pin.rotate <= 3.2);
+  assert.ok(pin.kind === 'pin' || pin.kind === 'tape');
+  const phone = 358;
+  const gap = wallGutter(phone);
+  const laid = layoutWall(
+    [
+      { id: 6, items: [{ name: 'A' }, { name: 'B' }] },
+      { id: 7, items: [{ name: 'C' }] },
+    ],
+    new Set([6]),
+    phone,
+    2,
+    gap,
+  );
+  assert.equal(laid.cards.length, 2);
+  assert.ok(laid.height > laid.cards[0].h);
+  const xs = Array.from(new Set(laid.cards.map((card) => Math.round(card.x)))).sort((a, b) => a - b);
+  assert.equal(xs.length, 2);
+  assert.equal(xs[0], gap);
+  for (const card of laid.cards) {
+    assert.ok(card.x >= gap - 0.01, `left gutter ${card.x}`);
+    assert.ok(card.x + card.w <= phone - gap + 0.01, `right overflow ${card.x + card.w}`);
+  }
+  const right = laid.cards.find((card) => Math.round(card.x) === xs[1]);
+  assert.equal(Math.round(phone - (right.x + right.w)), gap);
+  const wall = fs.readFileSync(new URL('../components/shipped/wall/ReceiptWall.tsx', import.meta.url), 'utf8');
+  assert.match(wall, /\/api\/shipped\/pile/);
+  assert.match(wall, /localStorage/);
+  assert.match(wall, /WallSkeleton/);
+  assert.doesNotMatch(wall, /Nothing pinned yet/);
+  assert.doesNotMatch(wall, /shipped-sources|shipped-ai/);
+  const worker = fs.readFileSync(new URL('../worker/shipped.ts', import.meta.url), 'utf8');
+  assert.match(worker, /listed !== false/);
+  assert.match(worker, /wall-opt-out/);
+  assert.match(worker, /unlist-receipt/);
+  assert.match(worker, /reprint-receipt/);
+  const admin = fs.readFileSync(new URL('../components/admin/ShippedCard.tsx', import.meta.url), 'utf8');
+  assert.match(admin, /Off the wall/);
+  assert.match(admin, /Reprint/);
+  const machine = fs.readFileSync(new URL('../components/shipped/Machine.tsx', import.meta.url), 'utf8');
+  assert.match(machine, /Keep it off the wall/);
+  const visitor = fs.readFileSync(new URL('../components/shipped/visitor.tsx', import.meta.url), 'utf8');
+  assert.match(visitor, /Unpin from the wall/);
+  const home = fs.readFileSync(new URL('../app/shipped/page.tsx', import.meta.url), 'utf8');
+  assert.match(home, /ReceiptWall/);
+  assert.doesNotMatch(home, /RecentStrip|ReceiptPile/);
+  const host = fs.readFileSync(new URL('../worker/shipped-host.ts', import.meta.url), 'utf8');
+  assert.match(host, /wall/);
 });
 
 test('the printer mouth and receipt sponsor cells do not share a class (absolute slot must not stack ads on the header)', () => {

@@ -149,13 +149,13 @@ export function ShippedStage({ opening, title }: { opening: Opening; title: Reac
   const state = useShippedState();
   const generator = state?.generator;
   const [query, setQuery] = useState('');
-  const [listed, setListed] = useState(false);
+  const [listed, setListed] = useState(true);
   const [token, setToken] = useState<string | null>(null);
   const [step, setStep] = useState<Step>({ name: 'idle' });
   const [error, setError] = useState<string | null>(null);
   const [job, setJob] = useState<Job>(() => openingJob(opening));
   const [current, setCurrent] = useState<Loaded | null>(opening.kind === 'loaded' ? opening.loaded : null);
-  const [paper, setPaper] = useState<'printing' | 'hanging' | 'torn'>(opening.kind === 'loaded' ? 'torn' : 'printing');
+  const [paper, setPaper] = useState<'printing' | 'hanging' | 'torn'>('printing');
   const [tearSignal, setTearSignal] = useState(0);
   const [tick, setTick] = useState(0);
   const touched = useRef(false);
@@ -169,19 +169,17 @@ export function ShippedStage({ opening, title }: { opening: Opening; title: Reac
 
   useEffect(() => {
     try {
-      setListed(window.localStorage.getItem('shipped-pile') === 'on');
+      setListed(window.localStorage.getItem('shipped-wall-off') !== '1');
     } catch {
-      // Private mode: PILE lasts for this page only.
+      // Private mode: the choice lasts for this page only.
     }
   }, []);
 
-  // /r/<id>/ injects after the first render. Apply the job after paint so we never
-  // read layout during commit (React #329). Fast jobs skip the feed and land torn.
+  // /shipped/r/<id>/ finds out which receipt it is after the first render.
   useEffect(() => {
     if (touched.current) return;
     setJob(openingJob(opening));
     setCurrent(opening.kind === 'loaded' ? opening.loaded : null);
-    if (opening.kind === 'loaded') setPaper('torn');
   }, [opening]);
 
   useEffect(() => {
@@ -357,11 +355,10 @@ export function ShippedStage({ opening, title }: { opening: Opening; title: Reac
           tone={tone}
           tearSignal={tearSignal}
           onPrinted={() => {
-            if (opening.kind === 'loaded' && !touched.current) {
-              setPaper('torn');
-              return;
-            }
             setPaper('hanging');
+            if (opening.kind === 'loaded' && !touched.current) {
+              window.setTimeout(() => setTearSignal((n) => n + 1), 120);
+            }
           }}
           onTorn={() => setPaper('torn')}
           paperMax={paperMax}
@@ -384,7 +381,7 @@ export function ShippedStage({ opening, title }: { opening: Opening; title: Reac
                   onListed: (value) => {
                     setListed(value);
                     try {
-                      window.localStorage.setItem('shipped-pile', value ? 'on' : 'off');
+                      window.localStorage.setItem('shipped-wall-off', value ? '0' : '1');
                     } catch {
                       // Private mode: the choice lasts for this page only.
                     }

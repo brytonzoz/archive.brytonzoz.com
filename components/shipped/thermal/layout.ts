@@ -13,7 +13,7 @@ function groupBySignificance(items: ThermalItem[]): { key: string; label: string
     list.push(item);
     buckets.set(band, list);
   }
-  return [...buckets.keys()]
+  return Array.from(buckets.keys())
     .sort((a, b) => b - a)
     .map((band) => ({ key: String(band), label: SIG_LABELS[band], items: buckets.get(band) ?? [] }));
 }

@@ -1,8 +1,8 @@
 import React from 'react';
 import type { Metadata } from 'next';
 import { HouseSlip } from '../../components/shipped/HouseSlip';
-import { RecentStrip } from '../../components/shipped/RecentStrip';
 import { ShippedStage } from '../../components/shipped/ShippedStage';
+import { ReceiptWall } from '../../components/shipped/wall';
 import { SponsorBoard } from '../../components/shipped/SponsorBoard';
 import { SponsorDesk } from '../../components/shipped/SponsorDesk';
 import { SHIPPED_OG_IMAGE } from '../../lib/shipped';
@@ -59,7 +59,7 @@ export default function ShippedPage() {
       <ShippedStage opening={{ kind: 'house', content: <HouseSlip /> }} title="Print yours" />
       <SponsorBoard />
       <SponsorDesk />
-      <RecentStrip />
+      <ReceiptWall />
       <p className="pb-8 text-center text-[11px] text-[#f3ead8]/45">
         A free public offering by{' '}
         <a href="https://brytonzoz.com/about/" target="_blank" rel="noopener noreferrer" className="underline underline-offset-4">

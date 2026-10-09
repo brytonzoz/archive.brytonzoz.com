@@ -22,7 +22,7 @@ export const metadata: Metadata = {
     url: `${SHIPPED_URL}/r/`,
     siteName: 'Shipped 2026',
     type: 'website',
-    images: [{ url: `${SHIPPED_URL}${SHIPPED_OG_IMAGE}`, width: 1200, height: 675, alt: ALT }],
+    images: [{ url: `${SHIPPED_URL}${SHIPPED_OG_IMAGE}`, width: 1200, height: 630, alt: ALT }],
   },
   twitter: {
     card: 'summary_large_image',
@@ -33,5 +33,11 @@ export const metadata: Metadata = {
 };
 
 export default function PrintedReceiptPage() {
-  return <PrintedReceiptView />;
+  return (
+    <>
+      {/* Worker fills this with the receipt. suppressHydrationWarning: the text is rewritten per id. */}
+      <script id="shipped-receipt-data" type="application/json" suppressHydrationWarning dangerouslySetInnerHTML={{ __html: 'null' }} />
+      <PrintedReceiptView />
+    </>
+  );
 }

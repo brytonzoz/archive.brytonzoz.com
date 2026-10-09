@@ -1,6 +1,6 @@
 // Shipped's own host (SHIPPED_HOST: shipped.brytonzoz.com, shipped-staging.brytonzoz.com on staging). The
 // static build keeps the app under /shipped/, so on that host the root maps onto it: / is the printer,
-// /r/<id>/ a receipt (+ og.png, receipt.png, rollo.png, rollo.pdf), /terms/ (terms, refunds, privacy; /refunds/ too), /remove/,
+// /r/<id>/ a receipt (+ og.png, receipt.png, rollo.png, rollo.pdf), /wall/, /terms/ (terms, refunds, privacy; /refunds/ too), /remove/,
 // /sandbox-pay/, and /q/<key> (a printed QR code). Every response gets the security headers and pages a CSP
 // (worker/shipped-guard.ts). With the "site" kill switch on, every page is the out-of-paper notice. On every other host
 // /shipped/* answers with a 301 to the same path on SHIPPED_HOST, so old links keep working.
@@ -12,7 +12,7 @@ import { SHIPPED_URL } from '../lib/shipped-year';
 import shareImages from '../lib/share-images.json';
 
 const NOINDEX = 'noindex, nofollow, noarchive';
-const PAGES = /^\/(?:(lab|refunds|remove|sandbox-pay|terms)(?:\/.*)?)?$/;
+const PAGES = /^\/(?:(lab|refunds|remove|sandbox-pay|terms|wall)(?:\/.*)?)?$/;
 /** Static files the app itself loads from /shipped/ (Bryton's dithered logos). */
 const OWN_FILES = /^\/shipped\/logos\//;
 
@@ -29,7 +29,7 @@ function noindex(response: Response): Response {
 /** Author / keywords / creator / Twitter handles inherited from brytonzoz.com's root layout. */
 const DROP_META = new Set(['author', 'creator', 'keywords', 'publisher', 'twitter:creator', 'twitter:site']);
 
-/** Strip Bryton's JSON-LD and author tags; keep only the small made-by credit in the page body. */
+/** Strip leftover author tags; JSON-LD is client-only and already skipped on this host. Keep the made-by credit. */
 function debrand(response: Response): Response {
   if (!(response.headers.get('content-type') ?? '').includes('text/html')) return response;
   return new HTMLRewriter()
@@ -43,10 +43,6 @@ function debrand(response: Response): Response {
         const name = (el.getAttribute('name') ?? el.getAttribute('property') ?? '').toLowerCase();
         if (DROP_META.has(name)) el.remove();
         else if (name === 'apple-mobile-web-app-title' || name === 'application-name') el.setAttribute('content', SHIPPED_APP_TITLE);
-        else if (name === 'apple-mobile-web-app-capable') {
-          el.setAttribute('name', 'mobile-web-app-capable');
-          el.setAttribute('content', 'yes');
-        }
       },
     })
     .transform(response);

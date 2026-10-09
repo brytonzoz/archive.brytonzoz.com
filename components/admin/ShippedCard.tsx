@@ -454,19 +454,36 @@ export function ShippedCard({ password }: { password: string }) {
       </form>
 
       <h3 className="mt-5 text-[14px] font-semibold">Printed receipts</h3>
+      <p className="mt-1 text-[12px] text-white/45">Off the wall hides a pin without deleting. Reprint re-runs the pipeline on that same receipt.</p>
       {data.receipts.length ? (
         <ul className="mt-2 space-y-2">
           {data.receipts.map((receipt) => (
-            <li key={receipt.id} className="flex items-center gap-3 text-[13px]">
+            <li key={receipt.id} className="flex flex-wrap items-center gap-2 text-[13px]">
               <a href={`/shipped/r/${receipt.id}/`} target="_blank" rel="noopener noreferrer" className={`min-w-0 flex-1 truncate ${receipt.hidden ? 'text-white/40 line-through' : 'text-white/85'}`}>
                 #{receiptNumber(receipt.id)} {receipt.login}{' '}
                 <span className="text-white/45">
                   · {receipt.mode}
                   {receipt.demo ? ' · demo' : ''}
-                  {receipt.listed ? ' · listed' : ''} · {usd(receipt.cost_micros ?? 0)}
+                  {receipt.listed ? ' · on the wall' : ' · off the wall'} · {usd(receipt.cost_micros ?? 0)}
                   {receipt.searches ? ` · ${receipt.searches} searches` : ''} · {receipt.shares} shares · {receipt.views} views · {when(receipt.created_at)}
                 </span>
               </a>
+              <button
+                type="button"
+                disabled={isBusy(receipt.listed ? 'unlist-receipt' : 'list-receipt', { id: receipt.id })}
+                onClick={() => act(receipt.listed ? 'unlist-receipt' : 'list-receipt', { id: receipt.id })}
+                className={quiet}
+              >
+                {receipt.listed ? 'Off the wall' : 'On the wall'}
+              </button>
+              <button
+                type="button"
+                disabled={isBusy('reprint-receipt', { id: receipt.id })}
+                onClick={() => window.confirm(`Reprint #${receiptNumber(receipt.id)} ${receipt.login} in place?`) && act('reprint-receipt', { id: receipt.id })}
+                className={quiet}
+              >
+                {isBusy('reprint-receipt', { id: receipt.id }) ? 'Reprinting…' : 'Reprint'}
+              </button>
               <button
                 type="button"
                 disabled={isBusy(receipt.hidden ? 'show-receipt' : 'hide-receipt', { id: receipt.id })}

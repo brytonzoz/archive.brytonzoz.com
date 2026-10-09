@@ -5,7 +5,7 @@
 //   GET  /api/shipped/state            event window, counters, generator, payments, the sponsor block
 //   GET  /api/shipped/proof            PRINTED / SHARED / MAILED / VIEWS and how they are counted (starts at 0)
 //   POST /api/shipped/lookup           { q } -> { candidates, auto } (who did they mean?)
-//   POST /api/shipped/print            { subject, token, listed } -> { id, pile } (same subject within 7 days: cached)
+//   POST /api/shipped/print            { subject, token, listed? } -> { id, pile } (listed defaults on; listed:false keeps it off the wall)
 //   GET  /api/shipped/pile             the pile (lib/shipped-pile.ts); POST { id, token } tosses a receipt on
 //   POST /api/shipped/shared           { id, how } share counter (sendBeacon)
 //   POST /api/shipped/seen             { id } sponsor-block impression (once per visitor/receipt/day)
@@ -23,7 +23,7 @@
 //   GET  /api/shipped/mark/<slot>      house-ad color mark (Brandfetch / favicon, same-origin)
 //   GET  /q/<key>                      a printed QR code -> the slot's link (counts scans; worker/shipped-host.ts)
 //   GET  /shipped/r/<id>/              share page: the static shell with this receipt's tags and data
-//   GET  /shipped/r/<id>/og.png        the 1200×675 card for X        (?download=1 to save it)
+//   GET  /shipped/r/<id>/og.png        the 1200×630 card for X        (?download=1 to save it)
 //   GET  /shipped/r/<id>/receipt.png   the whole receipt as one image (?download=1 to save it)
 //   GET  /shipped/r/<id>/rollo.pdf     4-inch Rollo PDF (812 dots / 203 dpi, ?download=1)
 //   GET  /shipped/r/<id>/rollo.png     4-inch Rollo PNG (same layout)
@@ -120,6 +120,7 @@ import {
   itemsShipped,
   readQuery,
   receiptNumber,
+  receiptPageTitle,
   shareText,
   shippedYear,
   subjectKey,
@@ -224,14 +225,14 @@ const FAILED_FOR = 10 * MINUTE;
 /** Longest a print may hold its locks (gathering + up to three 40 s model calls). */
 const PRINT_LOCK = 3 * MINUTE;
 /** Bump when the share images change, so cached ones are redrawn. */
-const IMAGE_VERSION = 8;
+const IMAGE_VERSION = 11;
 
 const SCHEMA = [
   `CREATE TABLE IF NOT EXISTS shipped_receipts (
     id INTEGER PRIMARY KEY AUTOINCREMENT, login TEXT NOT NULL, login_key TEXT NOT NULL, day TEXT NOT NULL,
     mode TEXT NOT NULL, data TEXT NOT NULL, demo INTEGER NOT NULL DEFAULT 0, hidden INTEGER NOT NULL DEFAULT 0,
     model TEXT, input_tokens INTEGER, output_tokens INTEGER, cost_micros INTEGER, created_at INTEGER NOT NULL,
-    searches INTEGER, listed INTEGER NOT NULL DEFAULT 0, shares INTEGER NOT NULL DEFAULT 0, views INTEGER NOT NULL DEFAULT 0)`,
+    searches INTEGER, listed INTEGER NOT NULL DEFAULT 1, shares INTEGER NOT NULL DEFAULT 0, views INTEGER NOT NULL DEFAULT 0)`,
   'CREATE UNIQUE INDEX IF NOT EXISTS shipped_receipts_daily ON shipped_receipts (login_key, day, mode)',
   'CREATE INDEX IF NOT EXISTS shipped_receipts_key ON shipped_receipts (login_key, hidden)',
   `CREATE TABLE IF NOT EXISTS shipped_takedowns (
@@ -285,6 +286,15 @@ async function migrate(db: D1Database) {
       });
   }
   await db.batch(MARKET_SCHEMA.map((sql) => db.prepare(sql)));
+  // One-time: the wall used to be opt-in. Every receipt that was not taken down goes on the wall.
+  const backfilled = await db.prepare(`SELECT 1 AS x FROM shipped_flags WHERE key = 'wall-opt-out'`).first();
+  if (!backfilled) {
+    await db.prepare('UPDATE shipped_receipts SET listed = 1 WHERE hidden = 0').run();
+    await db
+      .prepare(`INSERT INTO shipped_flags (key, value, set_at) VALUES ('wall-opt-out', '1', ?) ON CONFLICT(key) DO NOTHING`)
+      .bind(Date.now())
+      .run();
+  }
 }
 
 let schemaReady: Promise<unknown> | null = null;
@@ -564,7 +574,7 @@ async function print(request: Request, env: ShippedEnv, ctx: ExecutionContext): 
     const slot = await concurrencySlot(db, env, PRINT_LOCK);
     if (!slot) return json({ error: 'busy', retryAfter: 10 }, 503);
     held.push(slot);
-    return await generate(request, env, ctx, db, subject, key, year, mode, state, body.listed === true, (micros) => {
+    return await generate(request, env, ctx, db, subject, key, year, mode, state, body.listed !== false, (micros) => {
       reserved = micros;
     });
   } finally {
@@ -634,10 +644,11 @@ async function generate(
         throw error;
       }
     }
+    const x = (gathered.profile.x && isXHandle(gathered.profile.x) ? gathered.profile.x : subject.kind === 'x' ? subject.id : null) || null;
     const receipt: Omit<YearReceipt, 'id'> = {
       version: 2,
       year,
-      subject,
+      subject: { ...subject, x },
       printedAt: new Date().toISOString(),
       items: await withLogos(draft.items, env),
       note: draft.note,
@@ -793,19 +804,29 @@ async function purgeReceipt(env: ShippedEnv, id: number, origin?: string): Promi
 /** The data center's cache (absent in tests and local dev). */
 const edgeCache = (): Cache | null => (typeof caches !== 'undefined' ? (caches as unknown as { default: Cache }).default : null);
 
+/** Link-preview crawlers. Browsers hydrate React; rewriting <title>/og on those documents crashes the root. */
+function isShareBot(request: Request): boolean {
+  return /googlebot|bingbot|slurp|duckduckbot|baiduspider|yandex|facebookexternalhit|facebot|twitterbot|slackbot|discordbot|telegrambot|whatsapp|linkedinbot|pinterest|applebot|preview|embedly|iframely|opengraph|vkshare|skypeuripreview|redditbot|quora|outbrain/i.test(
+    request.headers.get('user-agent') ?? '',
+  );
+}
+
 /** Serves a GET from this data center's cache, or makes it, keeps it `seconds`, and serves that. */
-async function cached(request: Request, ctx: ExecutionContext, seconds: number, make: () => Promise<Response>): Promise<Response> {
+async function cached(request: Request, ctx: ExecutionContext, seconds: number, make: () => Promise<Response>, salt = ''): Promise<Response> {
   const cache = edgeCache();
-  const key = new Request(new URL(request.url).toString().replace(/\?.*$/, ''), { method: 'GET' });
+  const url = new URL(request.url);
+  url.search = '';
+  url.hash = `m${seconds}${salt}`;
+  const key = new Request(url.toString(), { method: 'GET' });
   const hit = cache ? await cache.match(key).catch(() => undefined) : undefined;
   if (hit) return hit;
   const response = await make();
-  if (cache && response.status === 200) {
-    const copy = new Response(response.clone().body, response);
-    copy.headers.set('cache-control', `public, max-age=${seconds}`);
-    ctx.waitUntil(cache.put(key, copy).catch(() => undefined));
-  }
-  return response;
+  if (response.status !== 200) return response;
+  const headers = new Headers(response.headers);
+  headers.set('cache-control', `public, max-age=${seconds}`);
+  const copy = new Response(response.clone().body, { status: 200, headers });
+  if (cache) ctx.waitUntil(cache.put(key, copy.clone()).catch(() => undefined));
+  return copy;
 }
 
 // ---- The event, the pile ------------------------------------------------------------------------------
@@ -1755,7 +1776,7 @@ async function dropShareImages(env: ShippedEnv, id: number) {
 
 const attr = (value: string) => ({ element: (el: Element) => void el.setAttribute('content', value) });
 
-async function sharePage(request: Request, env: ShippedEnv & { ASSETS: Fetcher }, ctx: ExecutionContext, id: number): Promise<Response> {
+async function sharePage(request: Request, env: ShippedEnv & { ASSETS: Fetcher }, ctx: ExecutionContext, id: number, bots: boolean): Promise<Response> {
   const url = new URL(request.url);
   const shell = await env.ASSETS.fetch(new Request(new URL('/shipped/r/', url)));
   const db = await database(env);
@@ -1779,34 +1800,31 @@ async function sharePage(request: Request, env: ShippedEnv & { ASSETS: Fetcher }
   // JSON inside a <script> data block: "<" escaped so nothing in a receipt can close the tag.
   const payload = JSON.stringify({ receipt, sponsors }).replace(/</g, '\\u003c').replace(/\u2028/g, '\\u2028').replace(/\u2029/g, '\\u2029');
   const who = subjectLabel(receipt.subject);
-  const n = itemsShipped(receipt);
-  const title = receipt.potential ? `${who}: shipped in ${receipt.year} (potential) | Shipped` : `${who} shipped ${n} thing${n === 1 ? '' : 's'} in ${receipt.year} | Shipped`;
+  const title = receiptPageTitle(receipt);
   const description = `${shareText(receipt).replace(/:$/, '.')} Print yours at ${SHIPPED_HOST}.`;
   const page = new URL(RECEIPT_PATH(receipt.id), url).toString();
   const image = new URL(CARD_PATH(receipt.id), url).toString();
   const alt = `A printed receipt: what ${who} shipped in ${receipt.year}, one line per item`;
 
-  return new HTMLRewriter()
-    .on('title', { element: (el) => void el.setInnerContent(title) })
-    .on('meta[name="description"]', attr(description))
-    .on('meta[property="og:title"]', attr(title))
-    .on('meta[property="og:description"]', attr(description))
-    .on('meta[property="og:url"]', attr(page))
-    .on('meta[property="og:image"]', attr(image))
-    .on('meta[property="og:image:alt"]', attr(alt))
-    .on('meta[name="twitter:title"]', attr(title))
-    .on('meta[name="twitter:description"]', attr(description))
-    .on('meta[name="twitter:image"]', attr(image))
-    .on('meta[name="twitter:image:alt"]', attr(alt))
-    .on('link[rel="canonical"]', { element: (el) => void el.setAttribute('href', page) })
-    .on('head', {
-      element: (el) => {
-        el.append(`<script id="shipped-receipt-data" type="application/json">${payload}</script>`, { html: true });
-        // Executable so the receipt survives if React later reconciles <head> and drops the JSON tag.
-        el.append(`<script>window.__SHIPPED_RECEIPT__=${payload}</script>`, { html: true });
-      },
-    })
-    .transform(new Response(shell.body, { status: 200, headers }));
+  // Fill the shell's JSON tag. Do not append extra <head> scripts — that crashes React hydrate (#329)
+  // when this tab already ran the printer. Bots get title/og rewrites; browsers set document.title.
+  let rewriter = new HTMLRewriter().on('#shipped-receipt-data', { element: (el) => void el.setInnerContent(payload) });
+  if (bots) {
+    rewriter = rewriter
+      .on('title', { element: (el) => void el.setInnerContent(title) })
+      .on('meta[name="description"]', attr(description))
+      .on('meta[property="og:title"]', attr(title))
+      .on('meta[property="og:description"]', attr(description))
+      .on('meta[property="og:url"]', attr(page))
+      .on('meta[property="og:image"]', attr(image))
+      .on('meta[property="og:image:alt"]', attr(alt))
+      .on('meta[name="twitter:title"]', attr(title))
+      .on('meta[name="twitter:description"]', attr(description))
+      .on('meta[name="twitter:image"]', attr(image))
+      .on('meta[name="twitter:image:alt"]', attr(alt))
+      .on('link[rel="canonical"]', { element: (el) => void el.setAttribute('href', page) });
+  }
+  return rewriter.transform(new Response(shell.body, { status: 200, headers }));
 }
 
 /** /shipped/r/<id>/, its og.png, receipt.png, rollo.png and rollo.pdf. Anything else under /shipped/r/ is the static shell. Edge-cached briefly. */
@@ -1823,7 +1841,8 @@ export async function handleShippedPage(request: Request, env: ShippedEnv & { AS
     if (url.searchParams.has('download')) return shareImage(request, env, ctx, id, kind);
     return cached(request, ctx, 300, () => shareImage(request, env, ctx, id, kind));
   }
-  return cached(request, ctx, 60, () => sharePage(request, env, ctx, id));
+  const bots = isShareBot(request);
+  return cached(request, ctx, 60, () => sharePage(request, env, ctx, id, bots), bots ? 'b' : 'd');
 }
 
 /** The whole site switched off: one plain page, no app, no data. */
@@ -1942,6 +1961,111 @@ async function settleOpenCheckouts(db: D1Database, env: ShippedEnv, now: number)
   }
 }
 
+async function dropListedCache(env: ShippedEnv, id?: number) {
+  const cache = edgeCache();
+  if (!cache) return;
+  const origins = new Set([env.SHIPPED_HOST ? `https://${env.SHIPPED_HOST}` : null, SHIPPED_URL].filter((o): o is string => Boolean(o)));
+  const paths = ['/api/shipped/state', '/api/shipped/pile', ...(id ? [`/api/shipped/receipts/${id}`] : [])];
+  await Promise.all([...origins].flatMap((origin) => paths.map((path) => cache.delete(new Request(new URL(path, origin))).catch(() => false))));
+}
+
+function subjectFromReceipt(data: YearReceipt): Subject | null {
+  const subject = data.subject;
+  if (!subject || (subject.kind !== 'github' && subject.kind !== 'x' && subject.kind !== 'domain' && subject.kind !== 'name')) return null;
+  if (typeof subject.id !== 'string' || !subject.id) return null;
+  return { kind: subject.kind, id: subject.id, display: typeof subject.display === 'string' && subject.display ? subject.display : subject.id, x: subject.x };
+}
+
+/** Re-run gather + assemble for an existing row. Same id; listed/hidden stay as they are. */
+async function reprintReceipt(env: ShippedEnv, db: D1Database, id: number): Promise<Response> {
+  const row = await db
+    .prepare('SELECT id, data, listed, hidden, login_key, mode FROM shipped_receipts WHERE id = ?')
+    .bind(id)
+    .first<{ id: number; data: string; listed: number; hidden: number; login_key: string; mode: string }>();
+  if (!row) return json({ error: 'not-found' }, 404);
+  let current: YearReceipt;
+  try {
+    current = JSON.parse(row.data) as YearReceipt;
+  } catch {
+    return json({ error: 'bad-receipt' }, 400);
+  }
+  const subject = subjectFromReceipt(current);
+  if (!subject) return json({ error: 'bad-receipt' }, 400);
+  const year = current.year || yearOf(env);
+  const state = await generatorState(env, db);
+  if (!state.enabled) return json({ error: state.reason ?? 'off' }, 503);
+  const slot = await concurrencySlot(db, env, PRINT_LOCK);
+  if (!slot) return json({ error: 'busy' }, 503);
+  let reserved = 0;
+  try {
+    const gathered = await gather(subject, env, year, tinyfishMeter(db));
+    if (subject.kind === 'github' && gathered.profile.name && !hasBlockedWord(gathered.profile.name)) subject.display = clean(gathered.profile.name, 60);
+    let model: string | null = null;
+    let usage = { input: 0, output: 0, searches: 0, cost: 0 };
+    let draft;
+    if (state.demo) {
+      draft = demoReceipt(gathered, year, seedOf(row.login_key));
+    } else {
+      model = env.SHIPPED_MODEL || DEFAULT_MODEL;
+      const worst = worstCaseMicros(model, promptFor(subject, gathered, year).length, maxSearches(env));
+      const cap = await cycleBudgetCap(db, env);
+      if (cap === null) return json({ error: 'out-of-paper' }, 503);
+      if (!(await reserveBudget(db, cap, worst, budgetKey()))) return json({ error: 'out-of-paper' }, 503);
+      reserved = worst;
+      try {
+        const result = await assembleReceipt(subject, gathered, year, seedOf(row.login_key), env, worst);
+        draft = result;
+        usage = { input: result.inputTokens, output: result.outputTokens, searches: result.searches, cost: result.costMicros };
+        reserved = 0;
+        await settleBudget(db, worst, usage.cost, budgetKey());
+      } catch (error) {
+        const spent = error as { costMicros?: number };
+        reserved = 0;
+        await settleBudget(db, worst, spent.costMicros && spent.costMicros > 0 ? spent.costMicros : worst, budgetKey());
+        await recordSpend(db, false, 0, 0, 0);
+        if (error instanceof PrintError && error.code === 'out-of-credit') {
+          await setOutOfCredit(db);
+          return json({ error: 'out-of-paper' }, 503);
+        }
+        throw error;
+      }
+    }
+    const x = (gathered.profile.x && isXHandle(gathered.profile.x) ? gathered.profile.x : subject.kind === 'x' ? subject.id : null) || null;
+    const receipt: YearReceipt = {
+      ...current,
+      id: row.id,
+      version: 2,
+      year,
+      subject: { ...subject, x },
+      printedAt: new Date().toISOString(),
+      items: await withLogos(draft.items, env),
+      note: draft.note,
+      potential: draft.potential,
+      demo: state.demo,
+      listed: row.listed === 1,
+      layout: draft.layout,
+      shipScore: shipScore({ items: draft.items, potential: draft.potential }),
+    };
+    await db
+      .prepare(
+        `UPDATE shipped_receipts SET login = ?, data = ?, demo = ?, model = ?, input_tokens = ?, output_tokens = ?, searches = ?, cost_micros = ? WHERE id = ?`,
+      )
+      .bind(subjectLabel(subject), JSON.stringify(receipt), state.demo ? 1 : 0, model, usage.input, usage.output, usage.searches, usage.cost, row.id)
+      .run();
+    if (!state.demo) await recordSpend(db, true, usage.input, usage.output, usage.searches);
+    await dropShareImages(env, row.id).catch(() => undefined);
+    await dropListedCache(env, row.id);
+    return json({ ok: true, id: row.id });
+  } catch (error) {
+    if (error instanceof PrintError) return json({ error: error.code }, error.status);
+    console.error('shipped: reprint failed', error instanceof Error ? error.message : 'unknown');
+    return json({ error: 'jammed' }, 500);
+  } finally {
+    await release(db, slot).catch(() => undefined);
+    if (reserved) await settleBudget(db, reserved, 0, budgetKey()).catch(() => undefined);
+  }
+}
+
 // ---- Admin (/admin, behind the password check in worker/metrics.ts) --------------------------------
 
 async function hideReceipts(db: D1Database, env: ShippedEnv, key: string) {
@@ -1983,6 +2107,21 @@ export async function adminShipped(request: Request, env: ShippedEnv): Promise<R
       if (hidden) await purgeReceipt(env, id);
       return json({ ok: true });
     }
+    if (body.action === 'unlist-receipt' || body.action === 'list-receipt') {
+      const listed = body.action === 'list-receipt' ? 1 : 0;
+      const row = await db.prepare('SELECT data FROM shipped_receipts WHERE id = ?').bind(id).first<{ data: string }>();
+      if (!row) return json({ error: 'not-found' }, 404);
+      let data: YearReceipt;
+      try {
+        data = { ...(JSON.parse(row.data) as YearReceipt), listed: listed === 1 };
+      } catch {
+        return json({ error: 'bad-receipt' }, 400);
+      }
+      await db.prepare('UPDATE shipped_receipts SET listed = ?, data = ? WHERE id = ?').bind(listed, JSON.stringify(data), id).run();
+      await dropListedCache(env, id);
+      return json({ ok: true, listed: listed === 1 });
+    }
+    if (body.action === 'reprint-receipt') return reprintReceipt(env, db, id);
     if (body.action === 'remove-takedown' || body.action === 'dismiss-takedown') {
       const ask = await db.prepare(`SELECT * FROM shipped_takedowns WHERE id = ?`).bind(id).first<{ receipt_id: number; subject_key: string; status: string }>();
       if (!ask) return json({ error: 'not-found' }, 404);

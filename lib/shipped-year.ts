@@ -49,6 +49,8 @@ export type Subject = {
   id: string;
   /** What the receipt is made out to. */
   display: string;
+  /** Resolved X handle (no @), when a source already knew it. Never invented. */
+  x?: string | null;
 };
 
 export type YearReceipt = {
@@ -66,7 +68,7 @@ export type YearReceipt = {
   potential: boolean;
   /** Printed without the AI (no key): free sources only, a canned note. */
   demo: boolean;
-  /** Listed in "recently printed" (the printer opted in). */
+  /** On the wall. Default true; the printer can keep it off. */
   listed: boolean;
   /** Print order of the 12 modules (ids only; content is always derived). */
   layout?: string[];
@@ -155,7 +157,7 @@ export function groupItemsBySignificance<T extends { significance?: number }>(it
     list.push(item);
     buckets.set(band, list);
   }
-  return [...buckets.keys()]
+  return Array.from(buckets.keys())
     .sort((a, b) => b - a)
     .map((band) => ({ key: String(band), label: SIGNIFICANCE_LABELS[band], items: buckets.get(band) ?? [] }));
 }
@@ -170,7 +172,7 @@ export function groupItemsByMonth<T extends { date: string | null }>(items: T[])
     list.push(item);
     buckets.set(key, list);
   }
-  const keys = [...buckets.keys()].sort((a, b) => (a === 'undated' ? 1 : b === 'undated' ? -1 : a.localeCompare(b)));
+  const keys = Array.from(buckets.keys()).sort((a, b) => (a === 'undated' ? 1 : b === 'undated' ? -1 : a.localeCompare(b)));
   return keys.map((key) => {
     if (key === 'undated') return { key, label: 'UNDATED', items: buckets.get(key) ?? [] };
     const month = MONTHS_LONG[Number(key.slice(5, 7)) - 1] ?? key;
@@ -190,6 +192,32 @@ export function shareText(receipt: Pick<YearReceipt, 'items' | 'potential' | 'su
   if (receipt.potential) return `I shipped nothing public in ${receipt.year} — the receipt itemized my potential instead. Print yours:`;
   const n = receipt.items.length;
   return `I shipped ${n} thing${n === 1 ? '' : 's'} in ${receipt.year}. Receipt attached.`;
+}
+
+/** X handle already on the receipt (typed as X, or persisted from a source). Never guessed. */
+export function xHandle(receipt: Pick<YearReceipt, 'subject'>): string | null {
+  const { subject } = receipt;
+  if (subject.kind === 'x' && isXHandle(subject.id)) return subject.id;
+  if (subject.x && isXHandle(subject.x)) return subject.x;
+  return null;
+}
+
+/** POST TO X prefills this. Tags the person when the receipt has a resolved handle. */
+export function shareTweet(receipt: Pick<YearReceipt, 'items' | 'potential' | 'subject' | 'year'>): string {
+  const n = itemsShipped(receipt);
+  const things = receipt.potential ? 'nothing public' : `${n} thing${n === 1 ? '' : 's'}`;
+  const handle = xHandle(receipt);
+  const who = handle ? `@${handle}` : subjectLabel(receipt.subject);
+  return `${who} shipped ${things} in ${receipt.year} 🧾`;
+}
+
+/** Browser tab / og:title for a printed receipt. Crawlers read this; the printer sets document.title after hydrate. */
+export function receiptPageTitle(receipt: Pick<YearReceipt, 'items' | 'potential' | 'subject' | 'year'>): string {
+  const who = subjectLabel(receipt.subject);
+  const n = itemsShipped(receipt);
+  return receipt.potential
+    ? `${who}: shipped in ${receipt.year} (potential) | Shipped`
+    : `${who} shipped ${n} thing${n === 1 ? '' : 's'} in ${receipt.year} | Shipped`;
 }
 
 const GITHUB_LOGIN = /^[a-z\d](?:[a-z\d]|-(?=[a-z\d])){0,38}$/i;

@@ -15,7 +15,7 @@
     "not_found_handling": "404-page",
     "run_worker_first": [
       "/audio/*", "/api/*", "/go/*",
-      "/", "/robots.txt", "/manifest.webmanifest", "/manifest.json", "/r/*", "/refunds", "/refunds/*", "/remove", "/remove/*", "/sandbox-pay", "/sandbox-pay/*", "/terms", "/terms/*", "/q/*", "/lab", "/lab/*",
+      "/", "/robots.txt", "/manifest.webmanifest", "/manifest.json", "/r/*", "/refunds", "/refunds/*", "/remove", "/remove/*", "/sandbox-pay", "/sandbox-pay/*", "/terms", "/terms/*", "/q/*", "/lab", "/lab/*", "/wall", "/wall/*",
       "/shipped", "/shipped/*"
     ]
   },

@@ -6,6 +6,7 @@ import { SHIPPED_OG_IMAGE } from '../../lib/shipped';
 import { EVENT_NAME } from '../../lib/shipped-event';
 import { SHIPPED_URL } from '../../lib/shipped-year';
 import shareImages from '../../lib/share-images.json';
+import { ShippedNav } from '../../components/shipped/ShippedNav';
 import './receipt.css';
 
 const uiSans = Inter({
@@ -88,7 +89,10 @@ export const viewport: Viewport = {
 export default function ShippedLayout({ children }: { children: React.ReactNode }) {
   return (
     <div className={`${uiSans.variable} ${receiptMono.variable} ${uiSans.className} shipped-page`}>
-      <div className="shipped-stack">{children}</div>
+      <div className="shipped-stack">
+        <ShippedNav />
+        {children}
+      </div>
     </div>
   );
 }

@@ -4,6 +4,7 @@
 import React, { useEffect, useRef, useState } from 'react';
 import { track } from '../../lib/analytics';
 import { receiptDate } from '../../lib/shipped';
+import { WALL_PATH } from '../../lib/shipped-wall';
 import { money } from '../../lib/shipped-receipt';
 import { isFirstRun } from '../../lib/shipped-modules';
 import {
@@ -15,6 +16,7 @@ import {
   itemsShipped,
   receiptNumber,
   shareText,
+  shareTweet,
   subjectLabel,
   type SponsorBlock,
   type YearReceipt as Printed,
@@ -277,6 +279,38 @@ function UpgradePay({ receipt, kind }: { receipt: Printed; kind: 'full' | 'bundl
   );
 }
 
+/** The browser that printed it can take it off the wall without deleting the page. */
+function UnpinMine({ receipt }: { receipt: Printed }) {
+  const [pile, setPile] = useState<string | null>(null);
+  const [listed, setListed] = useState(receipt.listed !== false);
+  const [busy, setBusy] = useState(false);
+  useEffect(() => setPile(pileTokenFor(receipt.id)), [receipt.id]);
+  if (!pile) return null;
+  if (!listed) {
+    return <p className="mt-2 text-center text-[11px] text-[#f3ead8]/55">Off the wall.</p>;
+  }
+  async function unpin() {
+    setBusy(true);
+    const response = await fetch('/api/shipped/pile', {
+      method: 'POST',
+      headers: { 'content-type': 'application/json' },
+      body: JSON.stringify({ id: receipt.id, token: pile, off: true }),
+    }).catch(() => null);
+    if (response?.ok) {
+      setListed(false);
+      refreshShippedState();
+    }
+    setBusy(false);
+  }
+  return (
+    <p className="mt-2 text-center text-[11px] text-[#f3ead8]/55">
+      <button type="button" className="underline" onClick={() => void unpin()} disabled={busy}>
+        {busy ? 'Unpinning…' : 'Unpin from the wall'}
+      </button>
+    </p>
+  );
+}
+
 /** The browser that printed a receipt can take it down at once (no review, nothing else blocked). */
 function RemoveMine({ receipt, onRemoved }: { receipt: Printed; onRemoved?: () => void }) {
   const [pile, setPile] = useState<string | null>(null);
@@ -349,9 +383,10 @@ export function SharePill({
   const path = RECEIPT_PATH(receipt.id);
   const [origin, setOrigin] = useState('');
   useEffect(() => setOrigin(window.location.origin), []);
+  const tweet = shareTweet(receipt);
   const intent = origin
-    ? `https://x.com/intent/post?text=${encodeURIComponent(shareText(receipt))}&url=${encodeURIComponent(`${origin}${path}`)}`
-    : `https://x.com/intent/post?text=${encodeURIComponent(shareText(receipt))}`;
+    ? `https://x.com/intent/post?text=${encodeURIComponent(tweet)}&url=${encodeURIComponent(`${origin}${path}`)}`
+    : `https://x.com/intent/post?text=${encodeURIComponent(tweet)}`;
 
   const close = () => {
     setOpen(false);
@@ -472,6 +507,9 @@ export function SharePill({
                 <a href={intent} target="_blank" rel="noopener noreferrer" className="shipped-button is-ghost" onPointerDown={press} onClick={() => beacon(receipt.id, 'x')}>
                   POST TO X
                 </a>
+                <a href={WALL_PATH} className="shipped-button is-ghost" onPointerDown={press}>
+                  THE WALL
+                </a>
                 <div className="shipped-share-row">
                   <button type="button" className={`shipped-button is-ghost${copied ? ' is-copied' : ''}`} onPointerDown={press} onClick={() => void copyLink()}>
                     {copied ? 'COPIED' : 'COPY LINK'}
@@ -491,6 +529,7 @@ export function SharePill({
                   </>
                 )}
                 <MailedPrint receipt={receipt} />
+                <UnpinMine receipt={receipt} />
                 <RemoveMine receipt={receipt} onRemoved={onRemoved} />
               </div>
             </>

@@ -10,7 +10,7 @@
     "build": "next build",
     "start": "next start",
     "lint": "next lint",
-    "test:motion": "node --experimental-strip-types --test tests/*.test.mjs",
+    "test": "node --experimental-transform-types --no-warnings --test tests/*.test.mjs",
     "preview": "npm run build && wrangler dev",
     "deploy:staging": "npm run build && wrangler deploy --env staging",
     "deploy": "npm run build && wrangler deploy --env=\"\"",
@@ -19,7 +19,7 @@
   },
   "dependencies": {
     "autoprefixer": "^10.4.21",
-    "next": "^14.0.4",
+    "next": "^14.2.35",
     "postcss": "^8.5.5",
     "qrcode-generator": "^1.5.2",
     "react": "^18.3.1",

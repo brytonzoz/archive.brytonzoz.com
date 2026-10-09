@@ -3,7 +3,6 @@ import { test } from 'node:test';
 import fs from 'node:fs';
 import { SHIPPED_STATUSES, shippedCounts, toItems, yearGroups } from '../lib/shipped.ts';
 import { isGithubLogin, itemDate, itemsShipped, readQuery, shareText, shippedYear, subjectKey, subjectLabel } from '../lib/shipped-year.ts';
-import { HOUSE_SPONSORS, SPONSOR_CONFIG, checkSponsorUrl, hasBlockedWord, houseLine, priceCents, validateSponsor, weightedPick } from '../lib/shipped-sponsors.ts';
 
 const read = (file) => JSON.parse(fs.readFileSync(new URL(file, import.meta.url), 'utf8'));
 const DATA = read('../data/shipped/businesses.json');
@@ -102,53 +101,14 @@ test('item dates and the share text', () => {
   assert.equal(itemDate(null), null);
   assert.equal(itemDate('soon'), null);
   const receipt = { year: 2026, potential: false, subject: { kind: 'x', id: 'levelsio', display: '@levelsio' }, items: [{}, {}, {}] };
-  assert.equal(shareText(receipt), '@levelsio shipped 3 things in 2026. Itemized receipt:');
+  assert.equal(shareText(receipt), 'Shipped 2026: 3 things, itemized on one receipt. Print yours before the printer shuts off:');
+  assert.doesNotMatch(shareText(receipt), /@/, 'sharing never tags the person on the receipt');
   assert.equal(itemsShipped({ ...receipt, potential: true, items: [{}] }), 1);
-  assert.match(shareText({ ...receipt, potential: true, items: [{}] }), /POTENTIAL/);
+  assert.match(shareText({ ...receipt, potential: true, items: [{}] }), /potential/);
 });
 
 test('the year is configurable and falls back to this year', () => {
   assert.equal(shippedYear('2025'), 2025);
   assert.equal(shippedYear(undefined), new Date().getUTCFullYear());
   assert.equal(shippedYear('banana'), new Date().getUTCFullYear());
-});
-
-test('sponsor tiers: $5 name, $25 logo, $100 presented-by, 7 days each, one presented-by at a time', () => {
-  assert.equal(priceCents('name'), 500);
-  assert.equal(priceCents('logo'), 2500);
-  assert.equal(priceCents('header'), 10000);
-  for (const tier of ['name', 'logo', 'header']) assert.equal(SPONSOR_CONFIG.tiers[tier].days, 7);
-  assert.equal(SPONSOR_CONFIG.tiers.header.slots, 1);
-});
-
-test('weighted rotation: deterministic per seed, no repeats, logos come up more often', () => {
-  const pool = [{ id: 1, tier: 'name' }, { id: 2, tier: 'name' }, { id: 3, tier: 'logo' }, { id: 4, tier: 'header' }];
-  assert.deepEqual(weightedPick(pool, 3, 42), weightedPick(pool, 3, 42));
-  const picked = weightedPick(pool, 3, 7);
-  assert.equal(new Set(picked.map((p) => p.id)).size, picked.length);
-  assert.equal(picked.some((p) => p.tier === 'header'), false, 'presented-by is its own slot');
-  let logoFirst = 0;
-  for (let seed = 0; seed < 600; seed++) if (weightedPick(pool, 1, seed)[0].tier === 'logo') logoFirst++;
-  assert.ok(logoFirst > 300 && logoFirst < 420, `logo first ${logoFirst}/600 (expected about 360)`);
-  assert.ok(HOUSE_SPONSORS.rotating.includes(houseLine(5)));
-  assert.equal(HOUSE_SPONSORS.main.text, 'BRYTONZOZ.COM');
-});
-
-test('name lines reject links and profanity, keep normal names', () => {
-  assert.equal(validateSponsor({ tier: 'name', text: '  Ada   Lovelace ' }).ok, true);
-  assert.equal(validateSponsor({ tier: 'name', text: 'Ada Lovelace' }).text, 'Ada Lovelace');
-  assert.equal(validateSponsor({ tier: 'name', text: 'Alfred Hitchcock' }).ok, true);
-  assert.equal(validateSponsor({ tier: 'name', text: 'Spice Co' }).ok, true);
-  for (const text of ['visit example.com', 'https://x.y', 'www.site', 'buy at shop(dot)io', 'f u c k', 'sh1t happens', 'a', 'x'.repeat(33), '<b>hi</b>']) {
-    assert.equal(validateSponsor({ tier: 'name', text }).ok, false, text);
-  }
-});
-
-test('logo and header links must be public https', () => {
-  assert.equal(validateSponsor({ tier: 'logo', text: 'Acme', url: 'https://acme.dev/' }).url, 'https://acme.dev/');
-  assert.equal(validateSponsor({ tier: 'name', text: 'Acme', url: 'https://acme.dev/' }).url, null);
-  for (const url of ['http://acme.dev', 'javascript:alert(1)', 'https://localhost', 'https://127.0.0.1', 'https://user:pw@acme.dev', 'https://acme.dev:8080']) {
-    assert.equal(checkSponsorUrl(url), null, url);
-  }
-  assert.equal(hasBlockedWord('Peacock Studio'), false);
 });

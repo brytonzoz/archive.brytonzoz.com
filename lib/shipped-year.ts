@@ -52,6 +52,8 @@ export type YearReceipt = {
   items: YearItem[];
   /** The cashier's one-liner at the bottom. */
   note: string;
+  /** Proven count lines (e.g. "7 launches · 3 on Product Hunt"), when the tape has them. */
+  stats?: string[];
   /** Nothing public was found: the receipt itemizes potential instead. */
   potential: boolean;
   /** Printed without the AI (no key): free sources only, a canned note. */

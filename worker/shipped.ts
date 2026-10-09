@@ -36,7 +36,7 @@ import { ICON_HASH, bytesDataUri, iconDataUri, iconKey, reencodeLogo, storeIcon 
 import { houseMark } from './shipped-marks';
 import { yearCardPng, yearRolloPdf, yearRolloPng, yearTallPng, type LogoResolver } from './shipped-og';
 import { PRINT_KIND, SPONSOR_KIND, isProduction, sponsorProvider, type PayEnv, type SponsorEvent } from './shipped-pay';
-import { brandIcon, clean, faviconUrl, gather, githubUser, hostOf, readSite, searchGithubUsers, tinyfishAccess, type SourceEnv } from './shipped-sources';
+import { brandIcon, candidatesFromIdentity, clean, faviconUrl, gather, hostOf, readSite, resolveIdentity, tinyfishAccess, type SourceEnv } from './shipped-sources';
 import { TINYFISH_DAILY, type TinyfishKind, type TinyfishMeter } from './shipped-tinyfish';
 import { checkFetchUrl, finalUrl } from './shipped-fetch';
 import {
@@ -390,33 +390,20 @@ async function lookup(request: Request, env: ShippedEnv): Promise<Response> {
   if (off.has('generate') || isClosed(env)) return json({ error: isClosed(env) ? 'closed' : 'out-of-paper' }, 503);
   if (await overLimit(db, request, 'lookup')) return json({ error: 'slow-down' }, 429);
 
-  const candidates: Candidate[] = [];
-  if (query.kind === 'domain') {
-    candidates.push({ kind: 'domain', id: query.value, display: query.value, detail: 'Website' });
-  } else if (query.kind === 'handle') {
-    const handle = query.value;
-    let user = null;
-    let unsure = false;
-    try {
-      user = await githubUser(handle, env, tinyfishAccess(env, tinyfishMeter(db)));
-    } catch {
-      unsure = true;
-    }
-    if (user) {
-      const detail = [`GitHub · ${user.repos} public repos`, user.x ? `@${user.x} on X` : null].filter(Boolean).join(' · ');
-      candidates.push({ kind: 'github', id: user.login, display: user.name || `@${user.login}`, detail });
-    } else if (unsure && isGithubLogin(handle)) {
-      candidates.push({ kind: 'github', id: handle, display: `@${handle}`, detail: 'GitHub' });
-    }
-    // Same person on both: the GitHub profile already links the X handle.
-    if (isXHandle(handle) && user?.x?.toLowerCase() !== handle.toLowerCase()) {
-      candidates.push({ kind: 'x', id: handle, display: `@${handle}`, detail: 'X / Twitter handle' });
-    }
-  } else {
-    const people = await searchGithubUsers(query.value, env, tinyfishAccess(env, tinyfishMeter(db))).catch(() => []);
-    for (const person of people.slice(0, 3)) candidates.push({ kind: 'github', id: person.login, display: query.value, detail: `GitHub @${person.login}` });
-    candidates.push({ kind: 'name', id: query.value, display: query.value, detail: people.length ? 'Search the web for this name' : 'Name or brand' });
-  }
+  const seed: Subject =
+    query.kind === 'domain'
+      ? { kind: 'domain', id: query.value, display: query.value }
+      : query.kind === 'handle'
+        ? { kind: isGithubLogin(query.value) && !isXHandle(query.value) ? 'github' : 'x', id: query.value, display: `@${query.value}` }
+        : { kind: 'name', id: query.value, display: query.value };
+  const resolved = await resolveIdentity(seed, env, tinyfishAccess(env, tinyfishMeter(db))).catch(() => null);
+  const candidates: Candidate[] = resolved
+    ? candidatesFromIdentity(seed, resolved)
+    : query.kind === 'domain'
+      ? [{ kind: 'domain', id: query.value, display: query.value, detail: 'Website' }]
+      : query.kind === 'handle' && isXHandle(query.value)
+        ? [{ kind: 'x', id: query.value, display: `@${query.value}`, detail: 'X / Twitter handle' }]
+        : [{ kind: 'name', id: query.value, display: query.value, detail: 'Name or brand' }];
   const safe = candidates.filter((c) => !hasBlockedWord(c.id) && !hasBlockedWord(c.display) && (c.kind !== 'domain' || publicDomain(c.id))).slice(0, 4);
   if (!safe.length) return json({ error: 'invalid-query' }, 400);
   return json({ candidates: safe, auto: safe.length === 1 });
@@ -496,11 +483,21 @@ async function print(request: Request, env: ShippedEnv, ctx: ExecutionContext): 
   const mode = modeOf(year);
   if (await blocked(db, key)) return json({ error: 'taken-down' }, 410);
   // Already printed this week: the same receipt again, free, even while the machine is out of paper.
+  // Empty / potential tapes are not locked — identity misses used to cache "YOUR POTENTIAL" for 7 days.
   const cached = await db
-    .prepare('SELECT id FROM shipped_receipts WHERE login_key = ? AND mode = ? AND demo = ? AND hidden = 0 AND created_at > ? ORDER BY id DESC LIMIT 1')
+    .prepare('SELECT id, data FROM shipped_receipts WHERE login_key = ? AND mode = ? AND demo = ? AND hidden = 0 AND created_at > ? ORDER BY id DESC LIMIT 1')
     .bind(key, mode, env.ANTHROPIC_API_KEY ? 0 : 1, Date.now() - CACHE_DAYS * DAY)
-    .first<{ id: number }>();
-  if (cached) return json({ id: cached.id, cached: true, pile: await pileToken(env, cached.id) });
+    .first<{ id: number; data: string }>();
+  if (cached) {
+    const prior = (() => {
+      try {
+        return JSON.parse(cached.data) as { potential?: boolean };
+      } catch {
+        return null;
+      }
+    })();
+    if (!prior?.potential) return json({ id: cached.id, cached: true, pile: await pileToken(env, cached.id) });
+  }
   const recentFailure = await db.prepare('SELECT 1 AS x FROM shipped_locks WHERE key = ? AND until > ?').bind(`failed:${key}`, Date.now()).first();
   if (recentFailure) return json({ error: 'jammed', retryAfter: Math.round(FAILED_FOR / 1000) }, 503);
   const state = await generatorState(env, db, off);
@@ -545,7 +542,7 @@ async function generate(
   const seed = seedOf(key);
   try {
     const gathered = await gather(subject, env, year, tinyfishMeter(db));
-    if (subject.kind === 'github' && gathered.profile.name && !hasBlockedWord(gathered.profile.name)) subject.display = clean(gathered.profile.name, 60);
+    if (gathered.profile.name && !hasBlockedWord(gathered.profile.name)) subject.display = clean(gathered.profile.name, 60);
     let model: string | null = null;
     let usage = { input: 0, output: 0, searches: 0, cost: 0 };
     let draft;
@@ -594,6 +591,7 @@ async function generate(
       printedAt: new Date().toISOString(),
       items: await withLogos(draft.items, env),
       note: draft.note,
+      stats: draft.stats,
       potential: draft.potential,
       demo: state.demo,
       listed,
@@ -620,7 +618,7 @@ async function generate(
     if (!replaces) {
       await bump(db, 'printed');
     }
-    console.log(JSON.stringify({ shipped: 'print', id: inserted.id, kind: subject.kind, items: receipt.items.length, potential: receipt.potential, ran: gathered.ran, failed: gathered.failed, costMicros: usage.cost }));
+    console.log(JSON.stringify({ shipped: 'print', id: inserted.id, kind: subject.kind, items: receipt.items.length, potential: receipt.potential, ran: gathered.ran, failed: gathered.failed, costMicros: usage.cost, costUsd: Number((usage.cost / 1_000_000).toFixed(4)), searches: usage.searches }));
     return json({ id: inserted.id, pile: await pileToken(env, inserted.id) });
   } catch (error) {
     if (error instanceof PrintError) return json({ error: error.code, ...(error.detail && !isProduction(env) ? { detail: error.detail } : {}) }, error.status);

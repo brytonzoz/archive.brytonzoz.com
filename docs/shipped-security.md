@@ -35,7 +35,7 @@ Other dials (all `vars` in `wrangler.jsonc`, defaults in brackets):
 | `SHIPPED_DAILY_PRINTS` [1500] | New receipts per UTC day across everyone. |
 | `SHIPPED_PRINTS_PER_MINUTE` [20] | New receipts per minute across everyone. |
 | `SHIPPED_MAX_CONCURRENT` [6, max 50] | Receipts generating at the same moment. |
-| `SHIPPED_MAX_SEARCHES` [2, max 2] | Web searches the model may run per receipt. |
+| `SHIPPED_MAX_SEARCHES` [3, max 3] | Web searches the model may run per receipt (only when deterministic sources found fewer than 4 items). |
 | `SHIPPED_POW_BITS` [16, 8 to 24] | Proof-of-work difficulty, used only when Turnstile keys are missing. |
 | `SHIPPED_CLOSES_AT` | When the event closes; after it the pile and sponsors freeze and generation returns 410. |
 | `SAFE_BROWSING_KEY` (secret, optional) | Google Safe Browsing check for sponsor links. Without it the built-in blocklist still applies. |
@@ -51,7 +51,7 @@ Other dials (all `vars` in `wrangler.jsonc`, defaults in brackets):
 | Draining TinyFish | Daily metered quotas per call type (`TINYFISH_DAILY`); past them the sources fall back to free APIs. |
 | Re-running the same name | One receipt per subject per 7 days: the same name/handle/domain returns the cached receipt with no upstream calls (works even while out of paper). One print per subject and per visitor at a time (D1 locks); a failed subject is paused briefly instead of retried. |
 | Huge inputs | Input capped at 80 characters and normalized (control and bidi characters removed); JSON bodies capped before parsing (`readJsonCapped`); multipart (logo) bodies capped by length. |
-| Slow or hanging upstreams | Every outbound call has a timeout (AbortSignal); the model has a turn cap and a token ceiling. Nothing loops or fans out: searches ≤ 2, sources per receipt fixed, redirects ≤ 3. |
+| Slow or hanging upstreams | Every outbound call has a timeout (AbortSignal); the model has a turn cap and a token ceiling. Nothing loops or fans out: searches ≤ 3, sources per receipt fixed, redirects ≤ 3. |
 | Bots and scripts | Turnstile on generate, sponsor checkout and print checkout when the keys exist (verified server-side, single use); otherwise an HMAC-signed, single-use proof-of-work puzzle. Script user agents (curl, python, headless Chrome) and cross-origin POSTs are refused before any work. |
 
 ## 2. Prompt injection

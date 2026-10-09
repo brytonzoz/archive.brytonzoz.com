@@ -10,11 +10,22 @@
 //   PRODUCTHUNT_SECRET    client_credentials grant, cached until it expires (PRODUCTHUNT_TOKEN also works)
 //   TINYFISH_API_KEY      TinyFish Search + Fetch (free endpoints only)
 //   BRANDFETCH_API        Brandfetch Brand API: a brand's real icon before the site's own icon or favicon
-import type { ItemSource, ItemStatus, Subject } from '../lib/shipped-year';
+import type { Candidate, ItemSource, ItemStatus, Subject } from '../lib/shipped-year';
 import { isDomain, isGithubLogin, isXHandle } from '../lib/shipped-year';
 import { hasBlockedWord } from '../lib/shipped-sponsors';
 import { tinyfishFetch, tinyfishSearch, type TinyfishMeter, type TinyfishPage } from './shipped-tinyfish';
 import { safeFetch } from './shipped-fetch';
+import {
+  extraSitePaths,
+  handleVariants,
+  mergeSites,
+  parsePersonName,
+  productNameFromHost,
+  readXProfile,
+  scoreGithubMatch,
+  urlsFromText,
+  type XProfile,
+} from './shipped-identity';
 
 export interface SourceEnv {
   GITHUB_TOKEN?: string;
@@ -25,10 +36,14 @@ export interface SourceEnv {
   BRANDFETCH_API?: string;
 }
 
+export type DateConfidence = 'exact' | 'year' | 'inferred' | 'unknown';
+
 export type Found = {
   name: string;
   description: string;
   date: string | null;
+  /** How sure we are the date is this year's ship date. Missing date is `unknown`, not a drop. */
+  dateConfidence?: DateConfidence;
   link: string | null;
   /** Remote image to dither into the logo (app icon, favicon, og:image). */
   icon: string | null;
@@ -44,8 +59,33 @@ export type WebResult = { title: string; url: string; snippet: string; date: str
 
 export type SiteInfo = { url: string; title: string; description: string; icon: string | null; text: string; links: { text: string; url: string }[] };
 
-/** What the subject is, filled in as sources learn it (GitHub tells us their name, site and X handle). */
-export type Profile = { name: string; bio: string; site: string | null; x: string | null; github: string | null };
+/** What the subject is, filled in as sources learn it (GitHub, X bio, personal sites). */
+export type Profile = {
+  name: string;
+  bio: string;
+  site: string | null;
+  x: string | null;
+  github: string | null;
+  /** Every personal / company site we should crawl (homepage, X website, bio URLs). */
+  sites?: string[];
+  phUsers?: string[];
+  npmUsers?: string[];
+};
+
+export const emptyProfile = (): Profile => ({
+  name: '',
+  bio: '',
+  site: null,
+  x: null,
+  github: null,
+  sites: [],
+  phUsers: [],
+  npmUsers: [],
+});
+
+const sitesOf = (profile: Profile) => profile.sites ?? [];
+const phUsersOf = (profile: Profile) => profile.phUsers ?? [];
+const npmUsersOf = (profile: Profile) => profile.npmUsers ?? [];
 
 /** A page TinyFish read for us (their site, a launch post), cut down for the prompt. */
 export type PageInfo = { url: string; title: string; description: string; published: string | null; text: string };
@@ -372,6 +412,7 @@ const github: SourceProvider = {
         source: 'github',
         status: row?.homepage ? 'LIVE' : 'SHIPPED',
         score: 2 + Math.log10(1 + (row?.stars ?? 0)) * 2 + (row?.homepage ? 1 : 0),
+        dateConfidence: date ? 'exact' : 'year',
         thisYear: true,
       });
     }
@@ -392,6 +433,7 @@ const github: SourceProvider = {
         source: 'github',
         status: 'RELEASED',
         score: 2 + Math.log10(1 + (row?.stars ?? 0)) * 2,
+        dateConfidence: event.date ? 'exact' : 'unknown',
       });
     }
     // With API room left, the most starred older repos still pushed this year may have releases the feed missed.
@@ -422,6 +464,7 @@ const github: SourceProvider = {
           source: 'github',
           status: 'RELEASED',
           score: 2 + Math.log10(1 + row.stars) * 2,
+          dateConfidence: 'exact',
         });
       });
     }
@@ -429,30 +472,38 @@ const github: SourceProvider = {
   },
 };
 
-/** App Store apps by this developer, released this year (with their icons). */
+/** App Store apps by this developer, first released or updated this year (with their icons). */
 const appStore: SourceProvider = {
   id: 'appstore',
-  enabled: ({ subject, profile }) => subject.kind !== 'github' || Boolean(profile.name),
+  enabled: ({ subject, profile }) => Boolean(profile.name || (subject.kind !== 'github' && subject.display.replace(/^@/, '').length >= 3)),
   async run({ subject, profile, year }) {
     const term = subject.kind === 'domain' ? subject.id.split('.')[0] : profile.name || subject.display.replace(/^@/, '');
-    if (loose(term).length < 3) return [];
+    if (loose(term).length < 3 || /^@/.test(term)) return [];
     const data = await getJson<{ results?: Record<string, unknown>[] }>(
       `https://itunes.apple.com/search?term=${encodeURIComponent(term)}&entity=software&attribute=softwareDeveloper&limit=50&country=us`,
     );
     const want = loose(term);
     const site = subject.kind === 'domain' ? subject.id : hostOf(profile.site);
+    const sites = new Set([site, ...sitesOf(profile).map((url) => hostOf(url))].filter((h): h is string => Boolean(h)));
     return (data.results ?? [])
       .filter((app) => {
         const dev = loose(String(app.artistName ?? '')) + '|' + loose(String(app.sellerName ?? ''));
         const sellerHost = hostOf(publicUrl(app.sellerUrl));
-        return dev.includes(want) || (site && sellerHost === site);
+        return dev.includes(want) || (sellerHost && sites.has(sellerHost));
       })
-      .filter((app) => inYear(day(app.releaseDate), year))
+      .map((app) => {
+        const released = day(app.releaseDate);
+        const updated = day(app.currentVersionReleaseDate);
+        const date = inYear(released, year) ? released : inYear(updated, year) ? updated : null;
+        return { app, date };
+      })
+      .filter((row) => inYear(row.date, year))
       .slice(0, 8)
-      .map((app): Found => ({
+      .map(({ app, date }): Found => ({
         name: clean(app.trackName, 60),
         description: clean(String(app.description ?? '').split(/[.\n]/)[0], 140) || clean(app.primaryGenreName, 40),
-        date: day(app.releaseDate),
+        date,
+        dateConfidence: 'exact',
         link: publicUrl(String(app.trackViewUrl ?? '').split('?')[0]),
         icon: publicUrl(app.artworkUrl512 ?? app.artworkUrl100),
         source: 'appstore',
@@ -462,30 +513,43 @@ const appStore: SourceProvider = {
   },
 };
 
-/** Show HN / Launch HN posts by this handle (or about this domain) this year. */
+/** Show HN / Launch HN posts by this handle, or stories about their sites / name, this year. */
 const hackerNews: SourceProvider = {
   id: 'hn',
-  enabled: ({ subject, profile }) => subject.kind === 'domain' || Boolean(profile.github || profile.x),
+  enabled: ({ subject, profile }) => subject.kind === 'domain' || Boolean(profile.github || profile.x || profile.name || sitesOf(profile).length),
   async run({ subject, profile, year }) {
     const start = Math.floor(Date.UTC(year, 0, 1) / 1000);
     const end = Math.floor(Date.UTC(year + 1, 0, 1) / 1000);
     const handles = [...new Set([profile.github, profile.x].filter((h): h is string => Boolean(h)).map((h) => h.toLowerCase()))];
-    const urls =
-      subject.kind === 'domain'
-        ? [`https://hn.algolia.com/api/v1/search?query=${encodeURIComponent(subject.id)}&restrictSearchableAttributes=url&tags=story&numericFilters=created_at_i>${start},created_at_i<${end},points>3&hitsPerPage=10`]
-        : handles.map((h) => `https://hn.algolia.com/api/v1/search_by_date?tags=(show_hn,launch_hn),author_${encodeURIComponent(h)}&numericFilters=created_at_i>${start},created_at_i<${end}&hitsPerPage=15`);
-    const pages = await Promise.allSettled(urls.map((url) => getJson<{ hits?: Record<string, unknown>[] }>(url)));
+    const domains = [
+      subject.kind === 'domain' ? subject.id : null,
+      ...sitesOf(profile).map((url) => hostOf(url)),
+    ].filter((h): h is string => Boolean(h));
+    const urls = [
+      ...handles.map((h) => `https://hn.algolia.com/api/v1/search_by_date?tags=(show_hn,launch_hn),author_${encodeURIComponent(h)}&numericFilters=created_at_i>${start},created_at_i<${end}&hitsPerPage=15`),
+      ...domains.slice(0, 3).map((d) => `https://hn.algolia.com/api/v1/search?query=${encodeURIComponent(d)}&restrictSearchableAttributes=url&tags=story&numericFilters=created_at_i>${start},created_at_i<${end},points>3&hitsPerPage=8`),
+    ];
+    if (profile.name && loose(profile.name).length >= 4) {
+      urls.push(
+        `https://hn.algolia.com/api/v1/search?query=${encodeURIComponent(profile.name)}&tags=(show_hn,launch_hn)&numericFilters=created_at_i>${start},created_at_i<${end}&hitsPerPage=8`,
+      );
+    }
+    const pages = await Promise.allSettled(urls.slice(0, 6).map((url) => getJson<{ hits?: Record<string, unknown>[] }>(url)));
     const found: Found[] = [];
+    const want = [profile.name, profile.x, profile.github, ...domains].filter(Boolean).map((v) => loose(String(v)));
     for (const page of pages) {
       if (page.status !== 'fulfilled') continue;
       for (const hit of page.value.hits ?? []) {
         const title = String(hit.title ?? '').replace(/^(show|launch) hn:\s*/i, '');
+        const hay = loose(`${title} ${hit.author ?? ''} ${hit.url ?? ''}`);
+        if (want.length && !want.some((w) => w.length >= 3 && hay.includes(w))) continue;
         const [name, ...rest] = title.split(/\s+[–—-]\s+|:\s+/);
         const link = publicUrl(hit.url) ?? publicUrl(`https://news.ycombinator.com/item?id=${hit.objectID}`);
         found.push({
           name: clean(name, 60),
           description: clean(rest.join(' - '), 140) || 'Posted to Hacker News.',
           date: day(hit.created_at),
+          dateConfidence: 'exact',
           link,
           icon: hit.url ? faviconUrl(String(hit.url)) : null,
           source: 'hn',
@@ -501,12 +565,19 @@ const hackerNews: SourceProvider = {
 /** npm packages this handle maintains that were published this year. */
 const npm: SourceProvider = {
   id: 'npm',
-  enabled: ({ profile }) => Boolean(profile.github),
+  enabled: ({ profile }) => Boolean(npmUsersOf(profile).length || profile.github || profile.x),
   async run({ profile, year }) {
-    const data = await getJson<{ objects?: { package: Record<string, unknown>; score?: { final?: number } }[] }>(
-      `https://registry.npmjs.org/-/v1/search?text=maintainer:${encodeURIComponent(profile.github!.toLowerCase())}&size=50`,
+    const listed = npmUsersOf(profile);
+    const users = [...new Set((listed.length ? listed : [profile.github, profile.x]).filter((h): h is string => Boolean(h)).map((h) => h.toLowerCase()))].slice(0, 3);
+    const pages = await Promise.allSettled(
+      users.map((user) =>
+        getJson<{ objects?: { package: Record<string, unknown>; score?: { final?: number } }[] }>(
+          `https://registry.npmjs.org/-/v1/search?text=maintainer:${encodeURIComponent(user)}&size=50`,
+        ),
+      ),
     );
-    return (data.objects ?? [])
+    const objects = pages.flatMap((page) => (page.status === 'fulfilled' ? page.value.objects ?? [] : []));
+    return objects
       .filter((entry) => inYear(day(entry.package.date), year))
       .sort((a, b) => (b.score?.final ?? 0) - (a.score?.final ?? 0))
       .slice(0, 5)
@@ -514,6 +585,7 @@ const npm: SourceProvider = {
         name: clean(pkg.name, 60),
         description: clean(pkg.description, 140),
         date: day(pkg.date),
+        dateConfidence: 'exact',
         link: publicUrl((pkg.links as Record<string, unknown> | undefined)?.npm),
         icon: null,
         source: 'npm',
@@ -548,32 +620,41 @@ async function productHuntAuth(env: SourceEnv): Promise<string | null> {
 /** Product Hunt launches the subject made (needs PRODUCTHUNT_KEY + PRODUCTHUNT_SECRET, or PRODUCTHUNT_TOKEN). */
 const productHunt: SourceProvider = {
   id: 'producthunt',
-  enabled: ({ env, profile }) => Boolean((env.PRODUCTHUNT_TOKEN || (env.PRODUCTHUNT_KEY && env.PRODUCTHUNT_SECRET)) && (profile.x || profile.github)),
+  enabled: ({ env, profile }) =>
+    Boolean((env.PRODUCTHUNT_TOKEN || (env.PRODUCTHUNT_KEY && env.PRODUCTHUNT_SECRET)) && (phUsersOf(profile).length || profile.x || profile.github)),
   async run({ env, profile, year }) {
-    const username = (profile.x || profile.github)!;
     const token = await productHuntAuth(env);
     if (!token) throw new SourceError('no-token');
-    const data = await getJson<{ data?: { user?: { madePosts?: { edges?: { node: Record<string, unknown> }[] } } } }>('https://api.producthunt.com/v2/api/graphql', {
-      method: 'POST',
-      headers: { authorization: `Bearer ${token}`, 'content-type': 'application/json' },
-      body: JSON.stringify({
-        query: 'query($u:String!){user(username:$u){madePosts(first:20){edges{node{name tagline createdAt url website thumbnail{url}}}}}}',
-        variables: { u: username },
-      }),
-    });
-    return (data.data?.user?.madePosts?.edges ?? [])
+    const listed = phUsersOf(profile);
+    const usernames = [...new Set((listed.length ? listed : [profile.x, profile.github]).filter((h): h is string => Boolean(h)))].slice(0, 3);
+    const pages = await Promise.allSettled(
+      usernames.map((username) =>
+        getJson<{ data?: { user?: { madePosts?: { edges?: { node: Record<string, unknown> }[] } } } }>('https://api.producthunt.com/v2/api/graphql', {
+          method: 'POST',
+          headers: { authorization: `Bearer ${token}`, 'content-type': 'application/json' },
+          body: JSON.stringify({
+            query: 'query($u:String!){user(username:$u){madePosts(first:20){edges{node{name tagline createdAt url website thumbnail{url}}}}}}',
+            variables: { u: username },
+          }),
+        }),
+      ),
+    );
+    return pages
+      .flatMap((page) => (page.status === 'fulfilled' ? page.value.data?.user?.madePosts?.edges ?? [] : []))
       .map((edge) => edge.node)
-      .filter((post) => inYear(day(post.createdAt), year))
+      .filter((post) => inYear(day(post.createdAt), year) || !post.createdAt)
       .map((post): Found => ({
         name: clean(post.name, 60),
         description: clean(post.tagline, 140),
         date: day(post.createdAt),
-        link: publicUrl(post.url),
+        dateConfidence: inYear(day(post.createdAt), year) ? 'exact' : day(post.createdAt) ? 'exact' : 'unknown',
+        link: publicUrl(post.url) ?? publicUrl(post.website as string),
         icon: publicUrl((post.thumbnail as Record<string, unknown> | undefined)?.url),
         source: 'producthunt',
         status: 'LAUNCHED',
         score: 5,
-      }));
+      }))
+      .filter((item) => !item.date || inYear(item.date, year));
   },
 };
 
@@ -768,49 +849,286 @@ export async function searchGithubUsers(name: string, env: SourceEnv, tinyfish: 
   });
 }
 
-/** Under 2 of these and Claude may spend its 2 paid searches. */
-export const inYearCount = (gathered: Gathered, year: number) => gathered.found.filter((item) => item.thisYear || inYear(item.date, year)).length;
+/** Count items we can treat as this year's work (dated, marked thisYear, or undated-but-attributed). */
+export const inYearCount = (gathered: Gathered, year: number) =>
+  gathered.found.filter((item) => item.thisYear || inYear(item.date, year) || (!item.date && item.dateConfidence !== 'exact')).length;
 
-/** Everything the free sources and TinyFish know, de-duplicated, best first. */
-export async function gather(subject: Subject, env: SourceEnv, year: number, meter: TinyfishMeter | null = null): Promise<Gathered> {
-  const profile: Profile = { name: '', bio: '', site: null, x: null, github: null };
+export type ResolvedIdentity = { profile: Profile; notes: string[]; cacheKey: string };
+
+function finishProfile(profile: Profile): Profile {
+  const sites = mergeSites(sitesOf(profile), [profile.site]);
+  const handles = [profile.x, profile.github].filter((h): h is string => Boolean(h));
+  return {
+    ...profile,
+    site: profile.site || sites[0] || null,
+    sites,
+    phUsers: [...new Set([...(profile.phUsers ?? []), ...handles])],
+    npmUsers: [...new Set([...(profile.npmUsers ?? []), ...handles])],
+  };
+}
+
+export function identityCacheKey(profile: Profile, subject: Subject): string {
+  return [subject.kind, subject.id, profile.github, profile.x, hostOf(profile.site), loose(profile.name)]
+    .filter(Boolean)
+    .join('|')
+    .toLowerCase();
+}
+
+async function bestGithubFor(
+  opts: { wantX?: string | null; wantName?: string | null; wantSite?: string | null; wantCompany?: string | null; logins: string[] },
+  env: SourceEnv,
+  tinyfish: TinyfishAccess,
+): Promise<GithubUser | null> {
+  const seen = new Set<string>();
+  let best: { user: GithubUser; score: number } | null = null;
+  for (const login of opts.logins) {
+    if (!isGithubLogin(login) || seen.has(login.toLowerCase())) continue;
+    seen.add(login.toLowerCase());
+    const user = await githubUser(login, env, tinyfish).catch(() => null);
+    if (!user) continue;
+    const score = scoreGithubMatch({ user, wantX: opts.wantX, wantName: opts.wantName, wantSite: opts.wantSite, wantCompany: opts.wantCompany });
+    if (score < 8) continue;
+    if (!best || score > best.score) best = { user, score };
+  }
+  return best?.user ?? null;
+}
+
+/** Expand a typed subject to GitHub, X, sites, PH/npm usernames. Cached 24h. */
+export async function resolveIdentity(subject: Subject, env: SourceEnv, tinyfish: TinyfishAccess = null): Promise<ResolvedIdentity> {
+  return cached(`id:v1:${subject.kind}:${subject.id.toLowerCase()}:${loose(subject.display)}`, 1440 * MIN, () => resolveIdentityFresh(subject, env, tinyfish));
+}
+
+async function resolveIdentityFresh(subject: Subject, env: SourceEnv, tinyfish: TinyfishAccess): Promise<ResolvedIdentity> {
+  const notes: string[] = [];
+  const profile = emptyProfile();
   if (subject.kind === 'github') profile.github = subject.id;
   if (subject.kind === 'x') profile.x = subject.id;
   if (subject.kind === 'domain' && isDomain(subject.id)) profile.site = `https://${subject.id}/`;
   if (subject.kind === 'name') profile.name = subject.display;
 
-  const ran: string[] = [];
-  const failed: string[] = [];
-  const tinyfish = tinyfishAccess(env, meter);
-  // An X handle borrows the same-named GitHub account only when that account lists this handle.
-  if (subject.kind === 'x' && isGithubLogin(subject.id)) {
-    const user = await githubUser(subject.id, env, tinyfish).catch(() => null);
-    if (user?.x && user.x.toLowerCase() === subject.id.toLowerCase()) profile.github = subject.id;
-  }
-  if (profile.github) {
-    try {
-      const user = await githubUser(profile.github, env, tinyfish);
-      if (user) {
-        profile.name ||= user.name;
-        profile.bio ||= user.bio;
-        profile.site ||= user.blog;
-        profile.x ||= user.x;
+  const xHandle = profile.x || (subject.kind !== 'domain' && isXHandle(subject.id) ? subject.id : null);
+  const fetchXPage = tinyfish
+    ? async (url: string) => {
+        const page = await tinyfishPage(url, tinyfish).catch(() => null);
+        return page ? { title: page.title, description: page.description, text: page.text, links: page.links } : null;
       }
-    } catch {
-      failed.push('github-profile');
+    : undefined;
+  const xProfile: XProfile | null = xHandle
+    ? await cached(`x:${xHandle.toLowerCase()}`, 1440 * MIN, () => readXProfile(xHandle, fetchXPage)).catch(() => null)
+    : null;
+  if (xProfile) {
+    notes.push(`x-profile:${xProfile.handle}`);
+    profile.x = xProfile.handle;
+    profile.name ||= xProfile.name;
+    profile.bio ||= xProfile.bio;
+    profile.site ||= xProfile.site;
+    profile.sites = mergeSites(profile.sites, xProfile.urls, [xProfile.site]);
+  } else if (xHandle) notes.push('x-profile:miss');
+
+  const parts = subject.kind === 'name' ? parsePersonName(subject.display) : { name: profile.name, company: null, tokens: profile.name ? [profile.name] : [] };
+  if (parts.company) notes.push(`name-parse:${parts.name}|${parts.company}`);
+
+  const variantLogins = handleVariants(subject.id);
+  const searchTerms = [
+    parts.name && parts.name !== subject.display ? parts.name : null,
+    parts.company ? `${parts.name} ${parts.company}` : null,
+    profile.name && profile.name !== subject.id ? profile.name : null,
+    subject.kind === 'name' ? subject.display : null,
+  ].filter((t): t is string => Boolean(t && t.length >= 2));
+
+  const searched: string[] = [];
+  for (const term of searchTerms.slice(0, 3)) {
+    const people = await searchGithubUsers(term, env, tinyfish).catch(() => []);
+    notes.push(`gh-search:${term}=${people.map((p) => p.login).join(',') || 'none'}`);
+    searched.push(...people.map((p) => p.login));
+  }
+
+  const tryLogins = [...variantLogins, ...searched, profile.github].filter((l): l is string => Boolean(l));
+  const matched = await bestGithubFor(
+    { wantX: profile.x, wantName: profile.name || parts.name, wantSite: profile.site, wantCompany: parts.company, logins: tryLogins },
+    env,
+    tinyfish,
+  );
+  if (matched) {
+    notes.push(`github:${matched.login} repos=${matched.repos}`);
+    profile.github = matched.login;
+    profile.name ||= matched.name;
+    profile.bio ||= matched.bio;
+    profile.site ||= matched.blog;
+    profile.x ||= matched.x;
+    if (matched.blog) profile.sites = mergeSites(profile.sites, [matched.blog]);
+  } else if (profile.github) {
+    const user = await githubUser(profile.github, env, tinyfish).catch(() => null);
+    if (user) {
+      profile.name ||= user.name;
+      profile.bio ||= user.bio;
+      profile.site ||= user.blog;
+      profile.x ||= user.x;
+      if (user.blog) profile.sites = mergeSites(profile.sites, [user.blog]);
+    } else notes.push('github-profile:miss');
+  } else notes.push('github:unresolved');
+
+  if (profile.bio) profile.sites = mergeSites(profile.sites, urlsFromText(profile.bio));
+  const finished = finishProfile(profile);
+  notes.push(`sites:${finished.sites.map((u) => hostOf(u)).join(',') || 'none'}`);
+  return { profile: finished, notes, cacheKey: identityCacheKey(finished, subject) };
+}
+
+/** Lookup cards: one person when we could stitch surfaces; otherwise the old fallbacks. */
+export function candidatesFromIdentity(subject: Subject, resolved: ResolvedIdentity): Candidate[] {
+  const { profile } = resolved;
+  const surfaces = [
+    profile.github ? `GitHub @${profile.github}` : null,
+    profile.x ? `@${profile.x} on X` : null,
+    profile.site ? hostOf(profile.site) : null,
+  ].filter(Boolean);
+  const detail = surfaces.join(' · ') || (subject.kind === 'name' ? 'Name or brand' : subject.kind === 'domain' ? 'Website' : 'Public handle');
+  if (profile.github) {
+    return [{ kind: 'github', id: profile.github, display: profile.name || `@${profile.github}`, detail }];
+  }
+  if (profile.x) {
+    return [{ kind: 'x', id: profile.x, display: profile.name || `@${profile.x}`, detail }];
+  }
+  if (subject.kind === 'domain') {
+    return [{ kind: 'domain', id: subject.id, display: subject.display || subject.id, detail: 'Website' }];
+  }
+  return [{ kind: 'name', id: subject.id, display: subject.display || subject.id, detail }];
+}
+
+const NAV_LINK = /^(home|about|blog|contact|login|sign ?in|privacy|terms|careers|jobs|pricing|docs|support|twitter|github|x|linkedin|instagram)$/i;
+
+function yearMention(text: string, year: number): boolean {
+  return new RegExp(`\\b${year}\\b`).test(text);
+}
+
+/** Lift the person's own sites, X bio products, and year-scoped search hits into Found items. */
+export function itemsFromWebEvidence(opts: {
+  profile: Profile;
+  site: SiteInfo | null;
+  pages: PageInfo[];
+  web: WebResult[];
+  year: number;
+}): Found[] {
+  const { profile, site, pages, web, year } = opts;
+  const own = new Set([hostOf(profile.site), ...sitesOf(profile).map((u) => hostOf(u))].filter((h): h is string => Boolean(h)));
+  const found: Found[] = [];
+  const add = (item: Found) => {
+    if (!item.name || hasBlockedWord(item.name)) return;
+    if (item.date && !inYear(item.date, year)) return;
+    found.push(item);
+  };
+
+  const considerLink = (text: string, url: string, source: Found['source'], score: number, date: string | null, confidence: DateConfidence) => {
+    const host = hostOf(url);
+    if (!host || SKIP_PAGES.test(host) || NAV_LINK.test(text)) return;
+    const name = clean(text, 40) || productNameFromHost(host);
+    if (!name || name.length < 2) return;
+    add({
+      name,
+      description: own.has(host) ? clean(`Listed on ${hostOf(profile.site) ?? 'their site'}`, 140) : clean(`Public page on ${host}`, 140),
+      date,
+      dateConfidence: date ? 'exact' : confidence,
+      link: url,
+      icon: faviconUrl(url),
+      source,
+      status: 'LIVE',
+      score,
+      thisYear: !date && confidence !== 'exact',
+    });
+  };
+
+  if (site) {
+    for (const link of site.links) {
+      const url = publicUrl(link.url);
+      if (!url) continue;
+      const host = hostOf(url);
+      const ownHost = hostOf(site.url);
+      if (!host) continue;
+      const external = host !== ownHost;
+      const projectPath = /\/(projects?|now|changelog|shipped|launches?|apps?)\b/i.test(url);
+      if (external || projectPath) considerLink(link.text, url, 'site', external ? 4 : 2, null, 'unknown');
     }
   }
+
+  for (const url of sitesOf(profile)) {
+    const host = hostOf(url);
+    if (!host || host === hostOf(profile.site)) continue;
+    considerLink(productNameFromHost(host), url, 'web', 4.5, null, 'unknown');
+  }
+
+  for (const hit of web) {
+    if (hit.date && !inYear(hit.date, year)) continue;
+    const dated = inYear(hit.date, year);
+    considerLink(hit.title, hit.url, 'web', dated ? 5 : 3, dated ? hit.date : null, dated ? 'exact' : 'inferred');
+  }
+
+  for (const page of pages) {
+    const dated = inYear(page.published, year) ? page.published : yearMention(page.text, year) || yearMention(page.title, year) ? `${year}-01` : null;
+    const host = hostOf(page.url);
+    if (!host || SKIP_PAGES.test(host)) continue;
+    if (own.has(host) && /\/(now|projects?|changelog|shipped)\b/i.test(page.url)) continue;
+    considerLink(page.title || productNameFromHost(host), page.url, own.has(host) ? 'site' : 'web', 3.5, dated, dated ? 'inferred' : 'unknown');
+  }
+
+  return found;
+}
+
+function dedupeFound(found: Found[]): Found[] {
+  const seen = new Set<string>();
+  return found
+    .filter((item) => item.name && !hasBlockedWord(item.name))
+    .sort((a, b) => b.score - a.score)
+    .filter((item) => {
+      const key = loose(item.name.replace(/\s+v?\d+(\.\d+)*$/, ''));
+      if (!key || seen.has(key)) return false;
+      seen.add(key);
+      return true;
+    })
+    .slice(0, 30);
+}
+
+/** Everything the free sources and TinyFish know, de-duplicated, best first. Cached 24h per identity. */
+export async function gather(subject: Subject, env: SourceEnv, year: number, meter: TinyfishMeter | null = null): Promise<Gathered> {
+  const tinyfish = tinyfishAccess(env, meter);
+  const resolved = await resolveIdentity(subject, env, tinyfish);
+  return cached(`gather:v3:${year}:${resolved.cacheKey}`, 1440 * MIN, () => gatherFresh(subject, resolved.profile, env, year, meter, tinyfish, resolved.notes));
+}
+
+async function gatherFresh(
+  subject: Subject,
+  profile: Profile,
+  env: SourceEnv,
+  year: number,
+  meter: TinyfishMeter | null,
+  tinyfish: TinyfishAccess,
+  notes: string[],
+): Promise<Gathered> {
+  const ran: string[] = [...notes.filter((n) => n.startsWith('x-profile:') || n.startsWith('github:'))];
+  const failed: string[] = notes.filter((n) => n.endsWith(':miss') || n.endsWith(':unresolved'));
 
   const ctx: SourceContext = { subject, profile, year, env, tinyfish };
   const key = tinyfish?.key ?? null;
   const who = profile.name || subject.display;
   const handle = profile.x ? ` OR "@${profile.x}"` : '';
+  const siteHosts = sitesOf(profile)
+    .map((url) => hostOf(url))
+    .filter((h): h is string => Boolean(h))
+    .slice(0, 4)
+    .join(' OR ');
   const queries = key
-    ? [`"${who}"${handle} launched OR shipped OR released ${year}`, `"${who}" ${year} app OR "Show HN" OR "Product Hunt" OR open source`]
+    ? [
+        `"${who}"${handle} launched OR shipped OR released ${year}`,
+        `"${who}" ${year} app OR "Show HN" OR "Product Hunt" OR open source`,
+        siteHosts ? `${siteHosts} launched OR changelog OR shipped ${year}` : '',
+      ].filter(Boolean)
     : [];
-  const [results, site, searched] = await Promise.all([
+
+  const homepage = profile.site;
+  const extraHomes = sitesOf(profile).filter((url) => hostOf(url) !== hostOf(homepage)).slice(0, 5);
+  const [results, site, extraSites, searched] = await Promise.all([
     Promise.allSettled(SOURCES.filter((source) => source.enabled(ctx)).map(async (source) => ({ id: source.id, found: await source.run(ctx) }))),
-    profile.site ? readSite(profile.site).catch(() => null) : Promise.resolve(null),
+    homepage ? readSite(homepage).catch(() => null) : Promise.resolve(null),
+    Promise.all(extraHomes.map((url) => readSite(url).catch(() => null))),
     Promise.all(
       queries.map((query) =>
         tinyfishSearch(query, year, key!, meter!).catch((error) => {
@@ -821,6 +1139,7 @@ export async function gather(subject: Subject, env: SourceEnv, year: number, met
     ),
   ]);
   if (site) ran.push('site');
+  if (extraSites.some(Boolean)) ran.push('sites');
 
   const web: WebResult[] = [];
   for (const row of searched.flat()) {
@@ -829,17 +1148,21 @@ export async function gather(subject: Subject, env: SourceEnv, year: number, met
   }
   if (queries.length) ran.push('tinyfish-search');
 
-  // TinyFish Fetch reads their site (rendered, so JS-only sites work) and the best launch pages.
   let pages: PageInfo[] = [];
+  const crawlTargets = [
+    homepage,
+    ...sitesOf(profile),
+    ...(homepage ? extraSitePaths(homepage).slice(1, 4) : []),
+    ...web.map((w) => w.url),
+  ]
+    .map((url) => publicUrl(url))
+    .filter((url): url is string => Boolean(url) && !SKIP_PAGES.test(hostOf(url) ?? ''))
+    .filter((url, i, all) => all.findIndex((u) => hostOf(u) === hostOf(url) && u.replace(/\/+$/, '') === url.replace(/\/+$/, '')) === i);
+
   if (key) {
-    const targets = [profile.site, ...web.map((w) => w.url)]
-      .map((url) => publicUrl(url))
-      .filter((url): url is string => Boolean(url) && !SKIP_PAGES.test(hostOf(url) ?? ''))
-      .filter((url, i, all) => all.indexOf(url) === i)
-      .slice(0, 5);
     try {
-      pages = (await tinyfishFetch(targets, key, meter!)).map(toPage).filter((page): page is PageInfo => Boolean(page));
-      if (targets.length) ran.push('tinyfish-fetch');
+      pages = (await tinyfishFetch(crawlTargets.slice(0, 8), key, meter!)).map(toPage).filter((page): page is PageInfo => Boolean(page));
+      if (crawlTargets.length) ran.push('tinyfish-fetch');
     } catch (error) {
       failed.push(`tinyfish-fetch:${(error as Error).message}`);
     }
@@ -852,16 +1175,20 @@ export async function gather(subject: Subject, env: SourceEnv, year: number, met
       found.push(...settled.value.found);
     } else failed.push(settled.reason instanceof SourceError ? settled.reason.code : 'error');
   }
-  const seen = new Set<string>();
-  const unique = found
-    .filter((item) => item.name && !hasBlockedWord(item.name))
-    .sort((a, b) => b.score - a.score)
-    .filter((item) => {
-      const key = loose(item.name.replace(/\s+v?\d+(\.\d+)*$/, ''));
-      if (!key || seen.has(key)) return false;
-      seen.add(key);
-      return true;
-    })
-    .slice(0, 30);
-  return { found: unique, web: web.slice(0, 12), pages, site, profile, ran, failed };
+
+  const ownPages = extraSites.filter((page): page is SiteInfo => Boolean(page));
+  for (const extra of ownPages) {
+    found.push(
+      ...itemsFromWebEvidence({
+        profile,
+        site: extra,
+        pages: [],
+        web: [],
+        year,
+      }),
+    );
+  }
+  found.push(...itemsFromWebEvidence({ profile, site, pages, web, year }));
+
+  return { found: dedupeFound(found), web: web.slice(0, 12), pages, site, profile, ran, failed };
 }

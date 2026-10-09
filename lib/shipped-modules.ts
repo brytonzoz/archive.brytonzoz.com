@@ -171,7 +171,7 @@ export function catalogModules({ receipt, printed }: ModuleContext): ReceiptModu
     {
       id: 'cashier',
       title: "CASHIER'S NOTE",
-      lines: [receipt.note],
+      lines: [receipt.note, ...(receipt.stats ?? []).filter((line) => line && line !== receipt.note)].slice(0, 4),
       rarity: 'common',
       badge: null,
     },

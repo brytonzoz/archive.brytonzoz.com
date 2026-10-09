@@ -35,7 +35,7 @@ test('schema: only documented keys, only sourced items, only links the sources r
     [],
     2026,
   );
-  assert.deepEqual(Object.keys(draft).sort(), ['items', 'layout', 'note', 'potential']);
+  assert.deepEqual(Object.keys(draft).sort(), ['items', 'layout', 'note', 'potential', 'stats']);
   assert.ok(Array.isArray(draft.layout));
   assert.ok(draft.layout.every((id) => typeof id === 'string' && !/[<>]/.test(id)));
   assert.deepEqual(draft.items.map((item) => item.name), ['KEEPAWAKE']);

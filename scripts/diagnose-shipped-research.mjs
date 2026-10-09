@@ -12,9 +12,10 @@ const {
   SOURCES,
   gather,
   githubUser,
-  searchGithubUsers,
   inYearCount,
   tinyfishAccess,
+  resolveIdentity,
+  candidatesFromIdentity,
 } = await import('../worker/shipped-sources.ts');
 const { demoReceipt, SEARCH_BELOW, maxSearches } = await import('../worker/shipped-ai.ts');
 
@@ -97,49 +98,22 @@ function seedProfile(subject) {
 
 async function resolveLikeWorker(query) {
   const parsed = readQuery(query);
-  const candidates = [];
-  const notes = [];
-  if (!parsed) return { parsed: null, candidates, notes: ['readQuery rejected the input'] };
-  if (parsed.kind === 'domain') {
-    candidates.push({ kind: 'domain', id: parsed.value, display: parsed.value, detail: 'Website' });
-  } else if (parsed.kind === 'handle') {
-    const handle = parsed.value;
-    const user = await timed('githubUser', () => githubUser(handle, env, tinyfishAccess(env, tinyfishMeter)));
-    notes.push({ githubUser: user.ok ? user.value : user.error, ms: user.ms });
-    if (user.ok && user.value) {
-      const u = user.value;
-      candidates.push({
-        kind: 'github',
-        id: u.login,
-        display: u.name || `@${u.login}`,
-        detail: [`GitHub · ${u.repos} public repos`, u.x ? `@${u.x} on X` : null].filter(Boolean).join(' · '),
-        profileHint: u,
-      });
-      if (u.x && u.x.toLowerCase() !== handle.toLowerCase()) {
-        notes.push(`GitHub @${u.login} lists X @${u.x}, not the typed @${handle}`);
-      }
-    } else if (user.ok && !user.value) {
-      notes.push(`No GitHub user named ${handle}`);
-    }
-    const linked = user.ok && user.value?.x?.toLowerCase() === handle.toLowerCase();
-    if (/^[a-z0-9_]{1,15}$/i.test(handle) && !linked) {
-      candidates.push({ kind: 'x', id: handle, display: `@${handle}`, detail: 'X / Twitter handle' });
-      if (user.ok && user.value) notes.push('X candidate added because GitHub profile does not list this handle');
-    }
-  } else {
-    const people = await timed('searchGithubUsers', () => searchGithubUsers(parsed.value, env, tinyfishAccess(env, tinyfishMeter)));
-    notes.push({ searchGithubUsers: people.ok ? people.value : people.error, ms: people.ms });
-    for (const person of (people.value ?? []).slice(0, 3)) {
-      candidates.push({ kind: 'github', id: person.login, display: parsed.value, detail: `GitHub @${person.login}` });
-    }
-    candidates.push({
-      kind: 'name',
-      id: parsed.value,
-      display: parsed.value,
-      detail: (people.value ?? []).length ? 'Search the web for this name' : 'Name or brand',
-    });
-  }
-  return { parsed, candidates, notes };
+  if (!parsed) return { parsed: null, candidates: [], notes: ['readQuery rejected the input'] };
+  const seed =
+    parsed.kind === 'domain'
+      ? { kind: 'domain', id: parsed.value, display: parsed.value }
+      : parsed.kind === 'handle'
+        ? { kind: 'x', id: parsed.value, display: `@${parsed.value}` }
+        : { kind: 'name', id: parsed.value, display: parsed.value };
+  const resolved = await timed('resolveIdentity', () => resolveIdentity(seed, env, tinyfishAccess(env, tinyfishMeter)));
+  if (!resolved.ok) return { parsed, candidates: [], notes: [resolved.error], seed };
+  return {
+    parsed,
+    candidates: candidatesFromIdentity(seed, resolved.value),
+    notes: resolved.value.notes,
+    profile: resolved.value.profile,
+    identityMs: resolved.ms,
+  };
 }
 
 async function runSources(subject, profile) {

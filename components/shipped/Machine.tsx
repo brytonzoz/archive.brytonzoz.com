@@ -7,7 +7,7 @@
 // it, or press TEAR. The tear is a spring seeded with the hand's velocity, the receipt settles on the
 // counter, and the stub left in the slot is the other half of the tear. A torn receipt tilts toward a mouse.
 // prefers-reduced-motion: the receipt is already printed and torn, nothing moves.
-import React, { useCallback, useEffect, useLayoutEffect, useRef, useState } from 'react';
+import React, { useCallback, useEffect, useRef, useState } from 'react';
 import { press } from './feel';
 import { Ticket } from './paper';
 import { feedFrames, rubber, spring, springStep, stubClip, tornEdge, type SpringConfig } from './physics';
@@ -68,7 +68,6 @@ const SETTLE = spring(0.38, 0.32);
 const SNAP_BACK = spring(0.32, 0.08);
 const TILT = spring(0.35, 0);
 
-const useIsoLayoutEffect = typeof window === 'undefined' ? useEffect : useLayoutEffect;
 
 function reducedMotion() {
   return typeof window !== 'undefined' && !!window.matchMedia?.('(prefers-reduced-motion: reduce)').matches;
@@ -186,7 +185,8 @@ export function Machine({ job, display, tone, onPrinted, onTorn, tearSignal = 0,
   );
 
   // Print: shove the paper out from under the head, then let it hang.
-  useIsoLayoutEffect(() => {
+  // After paint, not in layout: reading offsetHeight during commit trips React #329.
+  useEffect(() => {
     if (shown.kind !== 'print') return;
     const el = feed.current;
     const p = pull.current;

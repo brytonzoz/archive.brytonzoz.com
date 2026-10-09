@@ -119,9 +119,9 @@ export const Turnstile = forwardRef<TurnstileHandle, TurnstileProps>(function Tu
           appearance: visible ? 'always' : 'interaction-only',
           execution: visible ? 'render' : 'execute',
           size: visible ? 'flexible' : 'compact',
-          callback: (value: string) => emit(value),
-          'expired-callback': () => emit(null),
-          'error-callback': () => emit(null),
+          callback: (value: string) => queueMicrotask(() => emit(value)),
+          'expired-callback': () => queueMicrotask(() => emit(null)),
+          'error-callback': () => queueMicrotask(() => emit(null)),
         });
       })
       .catch(() => emit(null));

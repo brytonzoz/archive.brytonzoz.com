@@ -176,7 +176,8 @@ export function SponsorBoard() {
         onClick={() => setOpen((v) => !v)}
       >
         <span className="shipped-board-toggle-copy">
-          Sponsors · {SLOT_COUNT} spots · from {from}
+          <span className="shipped-board-toggle-lead">Sponsors · {SLOT_COUNT} spots</span>
+          <span className="shipped-board-toggle-from">from {from}</span>
         </span>
         <span className="shipped-board-marks" aria-hidden>
           {slots.map((slot) => (

@@ -235,17 +235,28 @@
 }
 
 .shipped-board-toggle-copy {
+  display: flex;
+  align-items: baseline;
+  gap: 8px;
   flex: 1 1 auto;
   min-width: 0;
   font-size: 13px;
   font-weight: 500;
   letter-spacing: -0.01em;
-  font-variant-numeric: tabular-nums;
-  font-feature-settings: 'tnum' 1;
   color: rgba(243, 234, 216, 0.88);
-  white-space: nowrap;
+}
+
+.shipped-board-toggle-lead {
+  min-width: 0;
   overflow: hidden;
   text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.shipped-board-toggle-from {
+  flex: none;
+  font-variant-numeric: tabular-nums lining-nums;
+  font-feature-settings: 'tnum' 1, 'lnum' 1;
 }
 
 .shipped-board-marks {

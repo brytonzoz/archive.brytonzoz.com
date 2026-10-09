@@ -63,7 +63,7 @@ const NOTES = [
   'Ship count verified by the night shift.',
 ];
 
-const SPONSOR_LINES = ['BRYTONZOZ.COM', 'MOPKIN', 'HABITUIZE', 'POCKET FACTORY'];
+const SPONSOR_LINES = ['POCKET FACTORY', 'MOPKIN', 'HABITUIZE', 'ENTRELABZ'];
 
 /** A deterministic fictional receipt; `n` picks the person and the items. */
 export function sampleReceipt(n: number, year = 2026): ThermalReceipt {

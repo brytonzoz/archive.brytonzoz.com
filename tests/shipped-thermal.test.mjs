@@ -16,7 +16,7 @@ const RECEIPT = {
   count: 2,
   note: 'Proof over hype.',
   presented: null,
-  paidBy: ['BRYTONZOZ.COM', 'MOPKIN'],
+  paidBy: ['POCKET FACTORY', 'MOPKIN'],
   barcode: 'BZ000042',
 };
 
@@ -39,7 +39,7 @@ test('the print job follows YearReceipt: store, inverse band, customer, items, t
   assert.equal(doc.seed, 'r42');
   const first = doc.lines[0];
   assert.equal(first.kind, 'text');
-  assert.equal(first.text, 'BRYTONZOZ.COM');
+  assert.equal(first.text, 'SHIPPED 2026');
   assert.ok(first.tall);
   assert.ok(doc.lines.some((line) => line.kind === 'text' && line.invert && line.text === 'SHIPPED IN 2026'));
   assert.ok(doc.lines.some((line) => line.kind === 'text' && line.tall && line.text === 'ADA SHIPS'));

@@ -20,7 +20,7 @@ const RECEIPT = {
   count: 2,
   note: 'Proof over hype.',
   presented: null,
-  paidBy: ['BRYTONZOZ.COM', 'MOPKIN'],
+  paidBy: ['POCKET FACTORY', 'MOPKIN'],
   barcode: 'BZ000042',
 };
 

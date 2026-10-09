@@ -65,8 +65,8 @@ export function receiptToDoc(receipt: ThermalReceipt): PrintDoc {
   const lines: PrintLine[] = [];
   const feed = (dots: number, boxed = false) => lines.push({ kind: 'feed', dots, boxed });
 
-  text(lines, 'BRYTONZOZ.COM', 'center', { bold: true, tall: true });
-  text(lines, 'SHIPPED DEPT. · NEW YORK, NY', 'center', { small: true, faint: true });
+  text(lines, `SHIPPED ${receipt.year}`, 'center', { bold: true, tall: true });
+  text(lines, 'THE PUBLIC RECEIPT PRINTER', 'center', { small: true, faint: true });
   lines.push({ kind: 'rule' });
   lead(lines, 'DATE', receipt.date);
   lead(lines, 'RECEIPT', `#${receipt.number}`);

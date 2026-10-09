@@ -440,7 +440,8 @@ export const INERT_CSP = "default-src 'none'; img-src 'self' data:; style-src 'u
 export function cspFor(scriptHashes: string[]): string {
   return [
     "default-src 'self'",
-    `script-src 'self' ${scriptHashes.map((hash) => `'sha256-${hash}'`).join(' ')} https://challenges.cloudflare.com https://js.stripe.com https://static.cloudflareinsights.com`.replace(/\s+/g, ' '),
+    // 'wasm-unsafe-eval' lets the pile's physics (Rapier) compile WebAssembly; JS eval stays blocked.
+    `script-src 'self' 'wasm-unsafe-eval' ${scriptHashes.map((hash) => `'sha256-${hash}'`).join(' ')} https://challenges.cloudflare.com https://js.stripe.com https://static.cloudflareinsights.com`.replace(/\s+/g, ' '),
     "style-src 'self' 'unsafe-inline'",
     "img-src 'self' data: blob: https://*.stripe.com",
     "font-src 'self' data:",

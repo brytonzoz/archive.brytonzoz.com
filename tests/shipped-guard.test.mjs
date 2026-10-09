@@ -154,7 +154,7 @@ test('every page gets strict headers and a CSP without unsafe-inline scripts', a
   const csp = page.headers.get('content-security-policy');
   assert.match(csp, /frame-ancestors 'none'/);
   assert.match(csp, /script-src [^;]*'sha256-/);
-  assert.doesNotMatch(csp.match(/script-src[^;]*/)[0], /unsafe-inline|unsafe-eval/);
+  assert.doesNotMatch(csp.match(/script-src[^;]*/)[0], /unsafe-inline|'unsafe-eval'/, 'only WebAssembly compiling is allowed, never JS eval');
   assert.match(csp, /object-src 'none'/);
   assert.match(page.headers.get('strict-transport-security'), /max-age=\d{8}/);
   assert.equal(page.headers.get('x-frame-options'), 'DENY');

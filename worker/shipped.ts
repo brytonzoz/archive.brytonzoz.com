@@ -196,7 +196,7 @@ const FAILED_FOR = 10 * MINUTE;
 /** Longest a print may hold its locks (gathering + up to three 40 s model calls). */
 const PRINT_LOCK = 3 * MINUTE;
 /** Bump when the share images change, so cached ones are redrawn. */
-const IMAGE_VERSION = 9;
+const IMAGE_VERSION = 10;
 
 const SCHEMA = [
   `CREATE TABLE IF NOT EXISTS shipped_receipts (

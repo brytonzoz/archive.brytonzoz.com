@@ -254,6 +254,8 @@ export type YearOg = {
   modules?: { id: string; title: string; lines: string[] }[];
   shipScore?: number;
   printedAt?: string;
+  /** Resolved X handle (no @). Shown on the OG sticky when we already have it. */
+  handle?: string | null;
 };
 
 function qrMark(x: number, y: number, width: number, code: { size: number; path: string }) {
@@ -375,10 +377,74 @@ function photoReceipt(data: YearOg, limit: number, withDesc: boolean): { body: s
   return { body: body.join(''), height: y + 22 };
 }
 
-/** The X card (1200×630): a photo of the torn receipt on the dark desk. */
+/** Irregular sticky-note outline — same torn language as the receipt. */
+function stickyPath(width: number, height: number, seed: string): string {
+  const random = prng(seed);
+  const j = (span: number) => (random() - 0.5) * span;
+  return `M${j(8).toFixed(1)},${(10 + j(6)).toFixed(1)} L${(width + j(8)).toFixed(1)},${j(10).toFixed(1)} L${(width + j(6)).toFixed(1)},${(height + j(8)).toFixed(1)} L${j(8).toFixed(1)},${(height - 3 + j(6)).toFixed(1)} Z`;
+}
+
+/** One word with a little wobble so it reads as written, not typeset. Avoids letter-spacing (resvg doubles the last glyph). */
+function handWord(cx: number, y: number, word: string, size: number, seed: string, fill = INK): string {
+  const random = prng(seed);
+  const advance = charW(size) * 1.04;
+  let x = cx - (word.length * advance) / 2;
+  return [...word].map((ch) => {
+    const dy = (random() - 0.5) * size * 0.16;
+    const rot = (random() - 0.5) * 9;
+    const node = `<g transform="translate(${x.toFixed(1)} ${(y + dy).toFixed(1)}) rotate(${rot.toFixed(2)})">${txt(0, 0, ch, size, { weight: 600, fill })}</g>`;
+    x += advance;
+    return node;
+  }).join('');
+}
+
+function handleTape(handle: string, seed: string): string {
+  const label = fit(`@${handle}`, 16);
+  const width = Math.max(168, charW(18) * label.length + 40);
+  const height = 44;
+  const d = stickyPath(width, height, `${seed}:tape`);
+  return [
+    `<path d="${d}" transform="translate(5 8)" fill="#000" opacity="0.32" filter="url(#shadow)"/>`,
+    `<path d="${d}" fill="#efe4c4"/>`,
+    `<path d="${d}" filter="url(#fiber)" opacity="0.26"/>`,
+    `<path d="${d}" fill="url(#tape)"/>`,
+    `<g transform="translate(${(width / 2 - 30).toFixed(1)} -8) rotate(-6 30 8)"><rect x="0" y="0" width="60" height="18" fill="url(#tape)"/><rect x="0" y="0" width="60" height="18" fill="none" stroke="#7a5a20" stroke-opacity="0.2"/></g>`,
+    txt(width / 2, 30, label, 18, { weight: 600, anchor: 'middle' }),
+  ].join('');
+}
+
+/** Right-side desk props: a foxed sticky with the count, handle taped against it when we have one. */
+function deskCallout(data: YearOg): string {
+  const n = String(data.count);
+  const numberSize = n.length > 2 ? 72 : n.length > 1 ? 96 : 120;
+  const w = 300;
+  const h = 268;
+  const d = stickyPath(w, h, `sticky:${data.number}`);
+  const fold = `M${w - 36},2 L${w + 2},38 L${w - 28},44 Z`;
+  const sticky = [
+    `<path d="${d}" transform="translate(14 22)" fill="#000" opacity="0.42" filter="url(#cast)"/>`,
+    `<path d="${d}" transform="translate(4 7)" fill="#000" opacity="0.26" filter="url(#shadow)"/>`,
+    `<path d="${d}" fill="#e0c056"/>`,
+    `<path d="${d}" filter="url(#fiber)" opacity="0.36"/>`,
+    `<path d="${d}" fill="url(#fox)"/>`,
+    `<path d="${fold}" fill="#c9a43a" opacity="0.55"/>`,
+    `<g transform="translate(${w / 2 - 52} -11) rotate(8 52 11)"><rect x="0" y="0" width="104" height="24" fill="url(#tape)"/><rect x="0" y="0" width="104" height="24" fill="none" stroke="#7a5a20" stroke-opacity="0.2"/></g>`,
+    `<circle cx="${w / 2}" cy="11" r="8" fill="#b8362a"/>`,
+    `<circle cx="${w / 2 - 1.8}" cy="8.8" r="2.6" fill="#fff" opacity="0.4"/>`,
+    `<g transform="translate(${w / 2} ${64 + numberSize}) rotate(-4.6)">${txt(0, 0, n, numberSize, { weight: 600, anchor: 'middle' })}</g>`,
+    `<g transform="skewX(-8)">${handWord(w / 2 + 14, 64 + numberSize + 40, 'shipped', 26, `hand:${data.number}`)}</g>`,
+  ].join('');
+  const handle = data.handle
+    ? `<g transform="translate(778 392) rotate(-9.4 90 22)">${handleTape(data.handle, `h:${data.number}`)}</g>`
+    : '';
+  return `<g id="desk-callout"><g transform="translate(792 118) rotate(12.2 ${w / 2} ${h / 2})">${sticky}</g>${handle}</g>`;
+}
+
+/** The X card (1200×630): receipt offset left, sticky count (and taped handle) filling the right. */
 export function yearCardSvg(data: YearOg): string {
   const { body, height } = photoReceipt(data, 4, false);
-  return scene(1200, 630, sheet(height, body, `translate(390 18) rotate(-9.2 200 ${Math.round(height / 2)}) scale(1.42)`, `card:${data.number}`, { soft: true, photo: true }));
+  const receipt = sheet(height, body, `translate(28 18) rotate(-10.6 200 ${Math.round(height / 2)}) scale(1.52)`, `card:${data.number}`, { soft: true, photo: true });
+  return scene(1200, 630, `${receipt}${deskCallout(data)}`);
 }
 
 /** Share-image download (1080×1350): same photo, taller, a little more of the tape. */

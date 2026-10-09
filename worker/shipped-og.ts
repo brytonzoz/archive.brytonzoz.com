@@ -9,7 +9,7 @@ import { pdfFromRgb, rgbFlate, rgbaToRgb } from '../lib/rollo-pdf';
 import { receiptBarcodeUnits, receiptDate } from '../lib/shipped';
 import { isFirstRun, receiptModules } from '../lib/shipped-modules';
 import { qr } from '../lib/shipped-qr';
-import { itemDate, itemsShipped, receiptNumber, subjectLabel, QR_PATH, RECEIPT_PATH, type SponsorBlock, type YearReceipt } from '../lib/shipped-year';
+import { itemDate, itemsShipped, receiptNumber, subjectLabel, xHandle, QR_PATH, RECEIPT_PATH, type SponsorBlock, type YearReceipt } from '../lib/shipped-year';
 
 let ready: Promise<void> | null = null;
 
@@ -79,6 +79,7 @@ async function yearOg(receipt: YearReceipt, block: SponsorBlock, origin: string,
     modules: modules.map((band) => ({ id: band.id, title: band.title, lines: band.lines })),
     shipScore: receipt.shipScore,
     printedAt: receipt.printedAt,
+    handle: xHandle(receipt),
   };
 }
 

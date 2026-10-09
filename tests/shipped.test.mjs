@@ -172,6 +172,7 @@ test('share cards are a 1200×630 desk photo and a 1080×1350 download', async (
     url: 'shipped.brytonzoz.com/r/14/',
     barcode: [1, 1, 1, 1],
     shipScore: 72,
+    handle: 'marclou',
   };
   const card = yearCardSvg(data);
   const port = yearPortraitSvg(data);
@@ -185,7 +186,10 @@ test('share cards are a 1200×630 desk photo and a 1080×1350 download', async (
   assert.match(card, /shipped\.brytonzoz\.com/);
   assert.match(card, /PAID FOR BY/);
   assert.match(card, /POCKET FACTORY/);
-  assert.match(card, /rotate\(-9/);
+  assert.match(card, /rotate\(-10/);
+  assert.match(card, /id="desk-callout"/);
+  assert.match(card, /@marclou/);
+  assert.match(card, /scale\(1\.52\)/);
   assert.doesNotMatch(card, /letter-spacing="0"/, 'letter-spacing at 0 doubles the last glyph in resvg');
   assert.equal(card.includes('printerLip') || /url\(#chassis\)/.test(card), false, 'card is a desk photo, not the printer template');
 });

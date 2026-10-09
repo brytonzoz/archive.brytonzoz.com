@@ -56,9 +56,9 @@ export const metadata: Metadata = {
 export default function ShippedPage() {
   return (
     <>
+      <ShippedStage opening={{ kind: 'house', content: <HouseSlip /> }} title="Print yours" />
       <SponsorBoard />
       <SponsorDesk />
-      <ShippedStage opening={{ kind: 'house', content: <HouseSlip /> }} title="Print yours" />
       <RecentStrip />
       <p className="pb-8 text-center text-[11px] text-[#f3ead8]/45">
         A free public offering by{' '}

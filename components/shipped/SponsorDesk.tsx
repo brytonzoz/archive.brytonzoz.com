@@ -59,14 +59,14 @@ export function SponsorDesk() {
   const human = useRef<HumanCheckHandle>(null);
 
   useEffect(() => {
-    if (pick.open) {
+    if (pick.open === 'form') {
       setSlot(pick.slot);
       setCents(pick.cents);
     }
   }, [pick.open, pick.slot, pick.cents]);
 
   useEffect(() => {
-    if (!pick.open) return;
+    if (pick.open !== 'form') return;
     const onKey = (event: KeyboardEvent) => {
       if (event.key === 'Escape') closeSponsor();
     };
@@ -166,7 +166,7 @@ export function SponsorDesk() {
       </p>
     ) : null;
 
-  if (!pick.open) return null;
+  if (pick.open !== 'form') return null;
 
   return (
     <div className="shipped-sheet" role="dialog" aria-modal="true" aria-labelledby="sponsor-sheet-title">

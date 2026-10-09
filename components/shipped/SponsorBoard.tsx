@@ -1,16 +1,16 @@
 'use client';
 
-// The first thing on /: a live bidding board. Hero on top, 3×3 under it. Each slot shows who
-// holds it (logo or name), HOUSE AD · $0 · bid $1 until someone pays, then the holder's bid, and
-// Lowest bid / Highest bid buttons. Tapping opens the bid sheet. The printer sits under this.
-import React, { useEffect, useState } from 'react';
+// Collapsed by default: one rail (“Sponsors · 10 spots · from $1”) with a row of marks.
+// Opens into a compact list — logo, name, price, one Bid — with a height spring.
+import React, { useEffect, useId, useState } from 'react';
 import { countdown } from '../../lib/shipped-event';
 import { moneyShort } from '../../lib/shipped-receipt';
-import { BID_RULES, HERO_SLOT, HOUSE_SLOTS, bidRange, slotLabel, sponsorTag, takeoversOpen } from '../../lib/shipped-sponsors';
+import { BID_RULES, HERO_SLOT, HOUSE_SLOTS, SLOT_COUNT, bidRange, slotLabel, sponsorTag, takeoversOpen } from '../../lib/shipped-sponsors';
 import type { SponsorSlot } from '../../lib/shipped-year';
-import { openSponsor } from './sponsor-pick';
-import { useShippedState } from './state';
+import { press } from './feel';
 import { Ticker } from './Ticker';
+import { chooseSponsor, closeSponsor, openSponsor, useSponsorPick } from './sponsor-pick';
+import { useShippedState } from './state';
 
 function housePreview(slot: number): SponsorSlot {
   const ad = HOUSE_SLOTS[slot];
@@ -38,60 +38,109 @@ function housePreview(slot: number): SponsorSlot {
 
 const PREVIEW = HOUSE_SLOTS.map((_, slot) => housePreview(slot));
 
-function SlotFace({ slot, hero }: { slot: SponsorSlot; hero: boolean }) {
+function Mark({ slot }: { slot: SponsorSlot }) {
+  if (slot.logo) {
+    // eslint-disable-next-line @next/next/no-img-element
+    return <img src={slot.logo} alt="" className="shipped-mark-logo" />;
+  }
+  const letter = (slot.name.trim()[0] || '?').toUpperCase();
   return (
-    <div className={`shipped-board-face${hero ? ' is-hero' : ''}`}>
-      {slot.logo ? (
-        // eslint-disable-next-line @next/next/no-img-element
-        <img src={slot.logo} alt="" className="shipped-board-logo" />
-      ) : (
-        <p className="shipped-board-name">{slot.name}</p>
-      )}
-      <p className="shipped-board-cta">{slot.cta}</p>
-      <p className="shipped-board-held">
-        {slot.house
-          ? `HOUSE AD · ${moneyShort(0)} · bid ${moneyShort(slot.next)}`
-          : `${slot.serial ? `${sponsorTag(slot.serial)} · ` : ''}${moneyShort(slot.cents)}`}
-      </p>
-    </div>
+    <span className="shipped-mark" aria-hidden>
+      {letter}
+    </span>
   );
 }
 
-function BidButtons({ slot, open, frozen, now }: { slot: SponsorSlot; open: boolean; frozen: boolean; now: number | null }) {
+function BidButton({ slot, open, frozen, now }: { slot: SponsorSlot; open: boolean; frozen: boolean; now: number | null }) {
   const maxed = slot.next > BID_RULES.maxCents;
   const cooling = Boolean(now && slot.cooldownUntil && now < slot.cooldownUntil);
   const slotClosed = Boolean(now && slot.closesAt && !takeoversOpen(now, slot.closesAt));
   const disabled = !open || frozen || maxed || cooling || slotClosed;
   const wait = cooling && now && slot.cooldownUntil ? Math.max(1, Math.ceil((slot.cooldownUntil - now) / 1000)) : 0;
-  if (frozen || slotClosed) {
-    return (
-      <button type="button" className="shipped-board-take" disabled>
-        Board is final
-      </button>
-    );
-  }
-  if (maxed) {
-    return (
-      <button type="button" className="shipped-board-take" disabled>
-        This spot is maxed
-      </button>
-    );
-  }
-  if (cooling) {
-    return (
-      <button type="button" className="shipped-board-take" disabled>
-        Just taken · {wait}s
-      </button>
-    );
-  }
+  let label = 'Bid';
+  if (frozen || slotClosed) label = 'Final';
+  else if (maxed) label = 'Maxed';
+  else if (cooling) label = `${wait}s`;
   return (
-    <div className="shipped-board-bids">
-      <button type="button" className="shipped-board-take" disabled={disabled} onClick={() => openSponsor(slot.slot, slot.next)}>
-        Lowest bid {moneyShort(slot.next)}
-      </button>
-      <button type="button" className="shipped-board-take is-high" disabled={disabled} onClick={() => openSponsor(slot.slot, slot.maxNext)}>
-        Highest bid {moneyShort(slot.maxNext)}
-      </button>
+    <button
+      type="button"
+      className="shipped-slot-bid"
+      disabled={disabled}
+      onPointerDown={press}
+      onClick={() => chooseSponsor(slot.slot)}
+    >
+      {label}
+    </button>
+  );
+}
+
+function SlotRow({ slot, open, frozen, now }: { slot: SponsorSlot; open: boolean; frozen: boolean; now: number | null }) {
+  const hero = slot.slot === HERO_SLOT;
+  const price = slot.house ? moneyShort(slot.next) : moneyShort(slot.cents);
+  return (
+    <li className={`shipped-slot-row${hero ? ' is-hero' : ''}`}>
+      <Mark slot={slot} />
+      <div className="shipped-slot-meta">
+        <p className="shipped-slot-name">
+          {hero ? <span className="shipped-slot-kicker">Hero</span> : null}
+          {slot.name}
+        </p>
+        <p className="shipped-slot-price">
+          {slot.house ? `from ${price}` : slot.serial ? `${sponsorTag(slot.serial)} · ${price}` : price}
+        </p>
+      </div>
+      <BidButton slot={slot} open={open} frozen={frozen} now={now} />
+    </li>
+  );
+}
+
+function BidChoose({ slots }: { slots: SponsorSlot[] }) {
+  const pick = useSponsorPick();
+  const slot = slots.find((s) => s.slot === pick.slot) ?? slots[0];
+  useEffect(() => {
+    if (pick.open !== 'choose') return;
+    const onKey = (event: KeyboardEvent) => {
+      if (event.key === 'Escape') closeSponsor();
+    };
+    const prev = document.body.style.overflow;
+    document.body.style.overflow = 'hidden';
+    window.addEventListener('keydown', onKey);
+    return () => {
+      document.body.style.overflow = prev;
+      window.removeEventListener('keydown', onKey);
+    };
+  }, [pick.open]);
+  if (pick.open !== 'choose' || !slot) return null;
+  const same = slot.next === slot.maxNext;
+  return (
+    <div className="shipped-sheet shipped-sheet-choose" role="dialog" aria-modal="true" aria-labelledby="shipped-bid-choose-title">
+      <button type="button" className="shipped-sheet-backdrop" aria-label="Close" onClick={closeSponsor} />
+      <div className="shipped-choose">
+        <p className="shipped-choose-kicker">{slotLabel(slot.slot)}</p>
+        <h2 id="shipped-bid-choose-title" className="shipped-choose-title">
+          {slot.name}
+        </h2>
+        <p className="shipped-choose-cta">{slot.cta}</p>
+        <div className="shipped-choose-actions">
+          {same ? (
+            <button type="button" className="shipped-choose-go" onPointerDown={press} onClick={() => openSponsor(slot.slot, slot.next)}>
+              Bid {moneyShort(slot.next)}
+            </button>
+          ) : (
+            <>
+              <button type="button" className="shipped-choose-go" onPointerDown={press} onClick={() => openSponsor(slot.slot, slot.next)}>
+                Lowest {moneyShort(slot.next)}
+              </button>
+              <button type="button" className="shipped-choose-go is-quiet" onPointerDown={press} onClick={() => openSponsor(slot.slot, slot.maxNext)}>
+                Highest {moneyShort(slot.maxNext)}
+              </button>
+            </>
+          )}
+        </div>
+        <button type="button" className="shipped-choose-cancel" onClick={closeSponsor}>
+          Cancel
+        </button>
+      </div>
     </div>
   );
 }
@@ -99,11 +148,11 @@ function BidButtons({ slot, open, frozen, now }: { slot: SponsorSlot; open: bool
 export function SponsorBoard() {
   const state = useShippedState();
   const slots = state?.sponsors.slots.length ? state.sponsors.slots : PREVIEW;
-  const hero = slots.find((s) => s.slot === HERO_SLOT) ?? PREVIEW[0];
-  const rest = slots.filter((s) => s.slot !== HERO_SLOT);
   const frozen = Boolean(state?.sponsors.frozen);
-  const open = Boolean(state?.payments.open) && !frozen;
+  const paymentsOpen = Boolean(state?.payments.open) && !frozen;
   const [now, setNow] = useState<number | null>(null);
+  const [open, setOpen] = useState(false);
+  const panelId = useId();
 
   useEffect(() => {
     if (!state) return;
@@ -115,36 +164,44 @@ export function SponsorBoard() {
 
   const left = state && now !== null ? state.event.closesAt - now : 0;
   const closed = Boolean(state && (state.event.phase === 'closed' || left <= 0));
+  const from = moneyShort(Math.min(...slots.map((s) => s.next)));
 
   return (
-    <section className="shipped-board" id="board" aria-labelledby="shipped-board-title">
-      <header className="shipped-board-head">
-        <p className="shipped-board-eyebrow">SHIPPED 2026</p>
-        <h1 id="shipped-board-title" className="shipped-board-title">
-          The public receipt printer
-        </h1>
-        <p className="shipped-board-pitch">Pay and your logo is on every receipt printed.</p>
-        <Ticker />
-        <p className="shipped-board-proof">
-          {state && now !== null ? (closed ? 'printer is off' : `printer shuts off in ${countdown(left)}`) : '··'}
-        </p>
-      </header>
+    <section className={`shipped-board${open ? ' is-open' : ''}`} id="board">
+      <Ticker />
+      <p className="shipped-board-proof">
+        {state && now !== null ? (closed ? 'printer is off' : `shuts off in ${countdown(left)}`) : '··'}
+      </p>
 
-      <article className="shipped-board-hero" aria-label={slotLabel(hero.slot)}>
-        <p className="shipped-board-slot">HERO</p>
-        <SlotFace slot={hero} hero />
-        <BidButtons slot={hero} open={open} frozen={frozen} now={now} />
-      </article>
+      <button
+        type="button"
+        className="shipped-board-toggle"
+        aria-expanded={open}
+        aria-controls={panelId}
+        onPointerDown={press}
+        onClick={() => setOpen((v) => !v)}
+      >
+        <span className="shipped-board-toggle-copy">
+          Sponsors · {SLOT_COUNT} spots · from {from}
+        </span>
+        <span className="shipped-board-marks" aria-hidden>
+          {slots.map((slot) => (
+            <Mark key={slot.slot} slot={slot} />
+          ))}
+        </span>
+        <span className="shipped-board-chevron" aria-hidden />
+      </button>
 
-      <ul className="shipped-board-grid">
-        {rest.map((slot) => (
-          <li key={slot.slot} className="shipped-board-cell">
-            <p className="shipped-board-slot">{slotLabel(slot.slot)}</p>
-            <SlotFace slot={slot} hero={false} />
-            <BidButtons slot={slot} open={open} frozen={frozen} now={now} />
-          </li>
-        ))}
-      </ul>
+      <div className="shipped-board-panel" id={panelId}>
+        <div className="shipped-board-panel-inner">
+          <ul className="shipped-slot-list">
+            {slots.map((slot) => (
+              <SlotRow key={slot.slot} slot={slot} open={paymentsOpen} frozen={frozen} now={now} />
+            ))}
+          </ul>
+        </div>
+      </div>
+      <BidChoose slots={slots} />
     </section>
   );
 }

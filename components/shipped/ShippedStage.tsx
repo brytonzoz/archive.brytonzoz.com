@@ -9,6 +9,7 @@ import Link from 'next/link';
 import { track } from '../../lib/analytics';
 import { closingLabel, countdown } from '../../lib/shipped-event';
 import { RECEIPT_PATH, SHIPPED_HOST, readQuery, receiptNumber, type Candidate } from '../../lib/shipped-year';
+import { press } from './feel';
 import { HumanCheck, type HumanCheckHandle } from './HumanCheck';
 import { Machine, type Job, type Tone } from './Machine';
 import { Line, Rule, Tall } from './paper';
@@ -271,11 +272,11 @@ export function ShippedStage({ opening, title }: { opening: Opening; title: Reac
   return (
     <div className="shipped-stage">
       <section className="shipped-kiosk" id="print" aria-labelledby="shipped-title">
-        <p className="shipped-kiosk-eyebrow">BZ-80 · SELF-SERVE</p>
+        <p className="shipped-kiosk-eyebrow">Shipped {generator?.year ?? 2026}</p>
         <h2 id="shipped-title" className="shipped-kiosk-title">
           {title}
         </h2>
-        <p className="shipped-kiosk-lede">Everything you shipped in {generator?.year ?? 'this year'}, itemized on one receipt. Apps, launches, repos, releases, sites.</p>
+        <p className="shipped-kiosk-lede">Type a name. The printer itemizes what they shipped this year.</p>
 
         <Countdown />
 
@@ -312,7 +313,7 @@ export function ShippedStage({ opening, title }: { opening: Opening; title: Reac
                 aria-invalid={error ? true : undefined}
                 aria-describedby={error ? 'shipped-print-error' : 'shipped-print-hint'}
               />
-              <button type="submit" className="shipped-kiosk-go" disabled={busy || !generator}>
+              <button type="submit" className="shipped-kiosk-go" disabled={busy || !generator} onPointerDown={press}>
                 {step.name === 'looking' ? 'Looking' : step.name === 'feeding' ? 'Printing' : 'Print'}
               </button>
             </div>
@@ -333,7 +334,7 @@ export function ShippedStage({ opening, title }: { opening: Opening; title: Reac
                 <ul>
                   {step.candidates.map((candidate) => (
                     <li key={`${candidate.kind}:${candidate.id}`}>
-                      <button type="button" className="shipped-kiosk-choice" onClick={() => print(candidate)} disabled={waitingForHuman}>
+                      <button type="button" className="shipped-kiosk-choice" onPointerDown={press} onClick={() => print(candidate)} disabled={waitingForHuman}>
                         <span className="block font-semibold">{candidate.display}</span>
                         <span className="block opacity-60">{candidate.detail}</span>
                       </button>
@@ -396,13 +397,14 @@ export function ShippedStage({ opening, title }: { opening: Opening; title: Reac
           <div className="shipped-after is-ready is-cta">
             <button
               type="button"
-              className="shipped-button is-big w-full"
+              className="shipped-kiosk-go"
+              onPointerDown={press}
               onClick={() => {
                 input.current?.scrollIntoView({ behavior: 'smooth', block: 'center' });
                 input.current?.focus({ preventScroll: true });
               }}
             >
-              PRINT YOURS
+              Print yours
             </button>
           </div>
         ) : null}

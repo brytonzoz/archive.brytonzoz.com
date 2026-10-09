@@ -1,8 +1,7 @@
 'use client';
 
-// Live counters on the board: PRINTED, SHARED, SHIPPED, VIEWS. They start at 0 and only ever show
-// numbers the Worker has confirmed. The display eases toward the confirmed value and never overshoots.
-// Tap to open the proof sheet (how each count is made, plus real takeovers).
+// Compact live counters under the printer: printed first, then shared / mailed / views. They start at 0
+// and only ever show numbers the Worker has confirmed. Tap to open the proof sheet.
 import React, { useEffect, useRef, useState } from 'react';
 import { moneyShort } from '../../lib/shipped-receipt';
 import { slotLabel } from '../../lib/shipped-sponsors';
@@ -146,14 +145,8 @@ function ProofSheet({ onClose }: { onClose: () => void }) {
   );
 }
 
-function Stat({ label, value }: { label: string; value: number }) {
-  const shown = useConfirmedCount(value);
-  return (
-    <span className="shipped-ticker-stat">
-      <span className="shipped-ticker-n tabular-nums">{fmt(shown)}</span>
-      <span className="shipped-ticker-k">{label}</span>
-    </span>
-  );
+function Count({ value }: { value: number }) {
+  return <span className="shipped-ticker-n tabular-nums">{fmt(useConfirmedCount(value))}</span>;
 }
 
 export function Ticker() {
@@ -172,10 +165,11 @@ export function Ticker() {
         aria-label={`Printed ${printed}, shared ${shared}, shipped ${shipped}, views ${views}. Open proof.`}
         onClick={() => setOpen(true)}
       >
-        <Stat label="PRINTED" value={printed} />
-        <Stat label="SHARED" value={shared} />
-        <Stat label="SHIPPED" value={shipped} />
-        <Stat label="VIEWS" value={views} />
+        <Count value={printed} />
+        <span className="shipped-ticker-k">printed</span>
+        <span className="shipped-ticker-rest">
+          · <Count value={shared} /> shared · <Count value={shipped} /> mailed · <Count value={views} /> views
+        </span>
       </button>
       {open ? <ProofSheet onClose={() => setOpen(false)} /> : null}
     </>

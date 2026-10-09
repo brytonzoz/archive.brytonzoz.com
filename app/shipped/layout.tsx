@@ -1,16 +1,23 @@
 import React from 'react';
 import type { Metadata } from 'next';
-import { IBM_Plex_Mono } from 'next/font/google';
+import { IBM_Plex_Mono, Inter } from 'next/font/google';
 import { SHIPPED_APP_TITLE, SHIPPED_DESCRIPTION, SHIPPED_TITLE } from '../../lib/shipped-brand';
 import { SHIPPED_OG_IMAGE } from '../../lib/shipped';
 import { EVENT_NAME } from '../../lib/shipped-event';
 import { SHIPPED_URL } from '../../lib/shipped-year';
 import './receipt.css';
 
+const uiSans = Inter({
+  subsets: ['latin'],
+  display: 'swap',
+  variable: '--font-ui',
+});
+
 const receiptMono = IBM_Plex_Mono({
   subsets: ['latin'],
   weight: ['400', '500', '600'],
   display: 'swap',
+  variable: '--font-receipt',
 });
 
 // Own name, own preview, own home-screen title. The root layout's Bryton author / keywords / JSON-LD
@@ -64,7 +71,7 @@ export const metadata: Metadata = {
 
 export default function ShippedLayout({ children }: { children: React.ReactNode }) {
   return (
-    <div className={`${receiptMono.className} shipped-page`}>
+    <div className={`${uiSans.variable} ${receiptMono.variable} ${uiSans.className} shipped-page`}>
       <div className="shipped-stack">{children}</div>
     </div>
   );

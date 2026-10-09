@@ -35,7 +35,7 @@ export function isCrumpled(id: number, ids: Iterable<number> = readCrumpled()): 
 }
 
 export function writeCrumpled(ids: number[]): number[] {
-  const unique = [...new Set(ids.filter((id) => Number.isSafeInteger(id) && id > 0))];
+  const unique = Array.from(new Set(ids.filter((id) => Number.isSafeInteger(id) && id > 0)));
   try {
     localStorage.setItem(WALL_CRUMPLE_KEY, JSON.stringify(unique));
   } catch {
@@ -48,7 +48,7 @@ export function setCrumpled(id: number, crumpled: boolean): number[] {
   const next = new Set(readCrumpled());
   if (crumpled) next.add(id);
   else next.delete(id);
-  return writeCrumpled([...next]);
+  return writeCrumpled(Array.from(next));
 }
 
 export type WallPinKind = 'pin' | 'tape';

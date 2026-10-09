@@ -7,6 +7,14 @@ import { dirname } from 'node:path';
 const year = Number(process.env.SHIPPED_YEAR || 2026);
 const original = JSON.parse(readFileSync(new URL('../docs/shipped-ground-truth.json', import.meta.url), 'utf8'));
 const heldOut = JSON.parse(readFileSync(new URL('../docs/shipped-heldout-ground-truth.json', import.meta.url), 'utf8'));
+const LEADERS = [
+  { query: 'Tibo from OpenAI', set: 'leaders', ships: [], stats: [], prolific: true },
+  { query: 'CEO of Higgsfield', set: 'leaders', ships: [], stats: [], prolific: true },
+  { query: 'sama', set: 'leaders', ships: [], stats: [], prolific: true },
+  { query: 'Michael Truell', set: 'leaders', ships: [], stats: [], prolific: true },
+  { query: 'rauchg', set: 'leaders', ships: [], stats: [], prolific: true },
+  { query: 'amasad', set: 'leaders', ships: [], stats: [], prolific: true },
+];
 const builders = [
   ...original.builders.map((b) => ({ ...b, set: 'original' })),
   ...heldOut.builders.map((b) => ({ ...b, set: 'held-out' })),
@@ -34,15 +42,6 @@ const env = {
   SHIPPED_MAX_SEARCHES: process.env.SHIPPED_MAX_SEARCHES || '3',
   SHIPPED_XAI_MAX_POSTS: process.env.SHIPPED_XAI_MAX_POSTS || '8',
 };
-
-const LEADERS = [
-  { query: 'Tibo from OpenAI', set: 'leaders', ships: [], stats: [], prolific: true },
-  { query: 'CEO of Higgsfield', set: 'leaders', ships: [], stats: [], prolific: true },
-  { query: 'sama', set: 'leaders', ships: [], stats: [], prolific: true },
-  { query: 'Michael Truell', set: 'leaders', ships: [], stats: [], prolific: true },
-  { query: 'rauchg', set: 'leaders', ships: [], stats: [], prolific: true },
-  { query: 'amasad', set: 'leaders', ships: [], stats: [], prolific: true },
-];
 
 const loose = (text) => String(text || '').toLowerCase().normalize('NFKD').replace(/[^a-z0-9]/g, '');
 const hostOf = (url) => {

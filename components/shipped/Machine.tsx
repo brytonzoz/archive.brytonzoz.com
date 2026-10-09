@@ -194,18 +194,14 @@ export function Machine({ job, display, tone, onPrinted, onTorn, tearSignal = 0,
     const p = pull.current;
     if (!el || !p) return;
     p.style.transform = '';
-    if (reducedMotion() || shown.fast) {
+    if (reducedMotion()) {
       const rest = { x: 0, y: REST_Y, r: 0 };
       pos.current = rest;
       p.style.transform = transformOf(rest);
       setPhase('torn');
-      const key = shown.key;
-      // Parent focus CSS must not flush in this effect — that crashed /r/ as React #329.
-      const later = window.setTimeout(() => {
-        callbacks.current.onPrinted?.(key);
-        callbacks.current.onTorn?.(key);
-      }, 0);
-      return () => window.clearTimeout(later);
+      callbacks.current.onPrinted?.(shown.key);
+      callbacks.current.onTorn?.(shown.key);
+      return;
     }
     const height = el.offsetHeight;
     const { frames, duration } = feedFrames(height, shown.key, shown.slip ? 0.45 : shown.fast ? 0.9 : 0.36);

@@ -164,7 +164,16 @@ export function ShippedStage({ opening, title }: { opening: Opening; title: Reac
   const prints = useRef(0);
   const run = useRef(0);
   const house = job.key === 'house' || Boolean(job.kind === 'print' && job.slip);
-  const focus = paper === 'torn' && Boolean(current) && job.kind === 'print' && !house;
+  const wantFocus = paper === 'torn' && Boolean(current) && job.kind === 'print' && !house;
+  const [focus, setFocus] = useState(false);
+  useEffect(() => {
+    if (!wantFocus) {
+      setFocus(false);
+      return;
+    }
+    const timer = window.setTimeout(() => setFocus(true), 50);
+    return () => window.clearTimeout(timer);
+  }, [wantFocus]);
   const paperMax = usePaperMax(focus, house);
 
   useEffect(() => {
@@ -354,7 +363,12 @@ export function ShippedStage({ opening, title }: { opening: Opening; title: Reac
           display={display}
           tone={tone}
           tearSignal={tearSignal}
-          onPrinted={() => setPaper('hanging')}
+          onPrinted={() => {
+            setPaper('hanging');
+            if (opening.kind === 'loaded' && !touched.current) {
+              window.setTimeout(() => setTearSignal((n) => n + 1), 120);
+            }
+          }}
           onTorn={() => setPaper('torn')}
           paperMax={paperMax}
           focus={focus}

@@ -185,12 +185,30 @@
   width: 1.7rem;
   height: 1.7rem;
   border-radius: 50%;
-  background: rgba(243, 234, 216, 0.1);
+  overflow: hidden;
+  background: rgba(243, 234, 216, 0.12);
   color: var(--cream);
-  font-size: 10px;
-  font-weight: 600;
+  font-size: 9px;
+  font-weight: 650;
+  letter-spacing: -0.05em;
+  line-height: 1;
   object-fit: cover;
+}
+
+.shipped-mark-logo {
+  background: #fff;
+  image-rendering: auto;
+}
+
+.shipped-mark-logo.is-ink {
+  padding: 0.15rem;
+  background: var(--paper);
+  object-fit: contain;
   image-rendering: pixelated;
+}
+
+.shipped-board-marks .shipped-mark {
+  font-size: 7px;
 }
 
 .shipped-board-chevron {

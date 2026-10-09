@@ -5,7 +5,7 @@
 import React, { useEffect, useId, useState } from 'react';
 import { countdown } from '../../lib/shipped-event';
 import { moneyShort } from '../../lib/shipped-receipt';
-import { BID_RULES, HERO_SLOT, HOUSE_SLOTS, SLOT_COUNT, bidRange, slotLabel, sponsorTag, takeoversOpen } from '../../lib/shipped-sponsors';
+import { BID_RULES, HERO_SLOT, HOUSE_SLOTS, SLOT_COUNT, bidRange, houseMarkPath, monogram, slotLabel, sponsorTag, takeoversOpen } from '../../lib/shipped-sponsors';
 import type { SponsorSlot } from '../../lib/shipped-year';
 import { press } from './feel';
 import { chooseSponsor, closeSponsor, openSponsor, useSponsorPick } from './sponsor-pick';
@@ -38,14 +38,22 @@ function housePreview(slot: number): SponsorSlot {
 const PREVIEW = HOUSE_SLOTS.map((_, slot) => housePreview(slot));
 
 function Mark({ slot }: { slot: SponsorSlot }) {
-  if (slot.logo) {
+  const [failed, setFailed] = useState(false);
+  const src = slot.logo ?? (slot.house ? houseMarkPath(slot.slot) : null);
+  if (src && !failed) {
     // eslint-disable-next-line @next/next/no-img-element
-    return <img src={slot.logo} alt="" className="shipped-mark-logo" />;
+    return (
+      <img
+        src={src}
+        alt=""
+        className={`shipped-mark-logo${slot.house ? '' : ' is-ink'}`}
+        onError={() => setFailed(true)}
+      />
+    );
   }
-  const letter = (slot.name.trim()[0] || '?').toUpperCase();
   return (
     <span className="shipped-mark" aria-hidden>
-      {letter}
+      {monogram(slot.name)}
     </span>
   );
 }

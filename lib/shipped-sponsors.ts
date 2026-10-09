@@ -112,6 +112,22 @@ export const HOUSE_SLOTS: HouseSlot[] = [
 ];
 
 export const isSlot = (value: unknown): value is number => Number.isInteger(value) && (value as number) >= 0 && (value as number) < SLOT_COUNT;
+
+/** Same-origin color mark for a house slot (Brandfetch / favicon, never a thermal 1-bit). */
+export const houseMarkPath = (slot: number) => (isSlot(slot) ? `/api/shipped/mark/${slot}` : null);
+
+/** One or two letters for when a mark image is missing. */
+export function monogram(name: string): string {
+  const words = name.trim().split(/[\s/]+/).filter((word) => /[A-Za-z0-9]/.test(word));
+  if (words.length >= 2) {
+    const a = words[0].match(/[A-Za-z0-9]/)?.[0] ?? '';
+    const b = words[1].match(/[A-Za-z0-9]/)?.[0] ?? '';
+    return (a + b).toUpperCase() || '?';
+  }
+  const letters = (words[0] ?? '').replace(/[^A-Za-z0-9]/g, '');
+  if (letters.length >= 2) return letters.slice(0, 2).toUpperCase();
+  return (letters[0] || '?').toUpperCase();
+}
 export const slotLabel = (slot: number) => (slot === HERO_SLOT ? 'HERO' : `SLOT ${slot}`);
 export const limitsFor = (slot: number) => (slot === HERO_SLOT ? SLOT_LIMITS.hero : SLOT_LIMITS.small);
 

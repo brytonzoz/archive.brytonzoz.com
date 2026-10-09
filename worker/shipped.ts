@@ -19,6 +19,7 @@
 //   POST /api/shipped/checkout/cancel  { checkout } the wallet sheet closed unpaid
 //   POST /api/shipped/webhook/<id>     payment provider webhook (worker/shipped-pay.ts; Stripe: /webhook/stripe)
 //   GET  /api/shipped/logo/<bid>.png   a sponsor's reviewed 1-bit logo
+//   GET  /api/shipped/mark/<slot>      house-ad color mark (Brandfetch / favicon, same-origin)
 //   GET  /q/<key>                      a printed QR code -> the slot's link (counts scans; worker/shipped-host.ts)
 //   GET  /shipped/r/<id>/              share page: the static shell with this receipt's tags and data
 //   GET  /shipped/r/<id>/og.png        the 1200×675 card for X        (?download=1 to save it)
@@ -32,6 +33,7 @@
 // Tables are created (and new columns added) on first use; see SCHEMA below.
 import { DEFAULT_MODEL, PrintError, assembleReceipt, demoReceipt, maxSearches, promptFor, worstCaseMicros, type AiEnv, type DraftItem } from './shipped-ai';
 import { ICON_HASH, bytesDataUri, iconDataUri, iconKey, reencodeLogo, storeIcon } from './shipped-icons';
+import { houseMark } from './shipped-marks';
 import { yearCardPng, yearRolloPdf, yearRolloPng, yearTallPng, type LogoResolver } from './shipped-og';
 import { PRINT_KIND, SPONSOR_KIND, isProduction, sponsorProvider, type PayEnv, type SponsorEvent } from './shipped-pay';
 import { brandIcon, clean, faviconUrl, gather, githubUser, hostOf, readSite, searchGithubUsers, tinyfishAccess, type SourceEnv } from './shipped-sources';
@@ -1641,6 +1643,8 @@ export async function handleShipped(request: Request, env: ShippedEnv, ctx: Exec
   if (iconMatch && method === 'GET') return icon(env, iconMatch[1]);
   const logo = path.match(/^\/api\/shipped\/logo\/(\d{1,9})\.png$/);
   if (logo && method === 'GET') return publicLogo(env, Number(logo[1]));
+  const mark = path.match(/^\/api\/shipped\/mark\/(\d{1,2})$/);
+  if (mark && method === 'GET') return houseMark(env, Number(mark[1]));
 
   return json({ error: 'not-found' }, 404);
 }

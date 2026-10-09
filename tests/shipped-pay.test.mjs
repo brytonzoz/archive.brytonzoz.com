@@ -57,6 +57,21 @@ test('there is no floor ladder: a house hero and a small slot both open at $1', 
   assert.equal('parseLadder' in sponsors, false);
 });
 
+test('house-ad marks: two-letter monograms and Brandfetch/favicon URLs, never a letter circle as the only option', async () => {
+  const { houseMarkPath, monogram } = await import('../lib/shipped-sponsors.ts');
+  const { markUrls } = await import('../worker/shipped-marks.ts');
+  assert.equal(monogram('POCKET FACTORY'), 'PF');
+  assert.equal(monogram('MOPKIN'), 'MO');
+  assert.equal(monogram('COVER ART'), 'CA');
+  assert.equal(monogram(''), '?');
+  assert.equal(houseMarkPath(0), '/api/shipped/mark/0');
+  assert.equal(houseMarkPath(99), null);
+  const urls = markUrls('getpocketfactory.com', 'https://cdn.brandfetch.io/getpocketfactory.com/icon.png');
+  assert.equal(urls[0], 'https://cdn.brandfetch.io/getpocketfactory.com/icon.png');
+  assert.ok(urls.some((u) => u.includes('cdn.brandfetch.io') && u.includes('getpocketfactory.com')));
+  assert.ok(urls.some((u) => u.includes('google.com/s2/favicons') && u.includes('getpocketfactory.com')));
+});
+
 test('ticker interpolation never shows more than the confirmed count', async () => {
   const { TICKER_MS, displayCount, stepCount } = await import('../lib/shipped-ticker.ts');
   const seconds = TICKER_MS / 1000;

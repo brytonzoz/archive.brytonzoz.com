@@ -48,12 +48,14 @@ export function stubClip(edge: EdgePoint[], height: number, depth = 5): string {
   return `polygon(0% 0px, 100% 0px, ${lower.join(', ')})`;
 }
 
-export type FeedFrame = { offset: number; transform: string; easing: string };
+export type FeedFrame = { offset: number; transform: string; clipPath: string; easing: string };
+
+const clipFor = (hidden: number) => `inset(0 0 ${Math.max(0, hidden)}px 0)`;
 
 /**
  * A thermal print head advances one dot-line at a time; to the eye it is a quick shove per text line,
- * a beat while the line burns, and every so often a longer catch. `height` px of paper is fed out from
- * under the slot (translateY from -height to 0) over roughly `height / speed` ms.
+ * a beat while the line burns, and every so often a longer catch. The header (top of the paper) comes
+ * out of the slot first: clip-path reveals from the top while the feed stays at the slot.
  */
 export function feedFrames(height: number, seed: string, speed = 0.8): { frames: FeedFrame[]; duration: number } {
   const random = prng(`feed:${seed}`);
@@ -71,18 +73,19 @@ export function feedFrames(height: number, seed: string, speed = 0.8): { frames:
   }
   const total = weights.reduce((sum, w) => sum + w.move + w.hold, 0);
   const duration = Math.round(Math.min(4200, Math.max(1300, height / speed)));
-  const frames: FeedFrame[] = [{ offset: 0, transform: `translateY(${-height}px)`, easing: 'linear' }];
+  const frames: FeedFrame[] = [{ offset: 0, transform: 'translateY(0)', clipPath: clipFor(height), easing: 'linear' }];
   let t = 0;
   for (let i = 0; i < steps; i++) {
-    const y = -height + Math.min(height, (i + 1) * line);
+    const printed = Math.min(height, (i + 1) * line);
+    const hidden = height - printed;
     const moved = (t + weights[i].move) / total;
     t += weights[i].move + weights[i].hold;
-    // A shove that lands quickly, then the line sits still while it burns.
-    frames[frames.length - 1].easing = 'cubic-bezier(0.25, 0.9, 0.3, 1)';
-    frames.push({ offset: +Math.min(1, moved).toFixed(5), transform: `translateY(${y}px)`, easing: 'linear' });
-    if (i < steps - 1) frames.push({ offset: +Math.min(1, t / total).toFixed(5), transform: `translateY(${y}px)`, easing: 'linear' });
+    frames[frames.length - 1].easing = 'cubic-bezier(0.23, 1, 0.32, 1)';
+    frames.push({ offset: +Math.min(1, moved).toFixed(5), transform: 'translateY(0)', clipPath: clipFor(hidden), easing: 'linear' });
+    if (i < steps - 1) frames.push({ offset: +Math.min(1, t / total).toFixed(5), transform: 'translateY(0)', clipPath: clipFor(hidden), easing: 'linear' });
   }
   frames[frames.length - 1].offset = 1;
+  frames[frames.length - 1].clipPath = clipFor(0);
   return { frames, duration };
 }
 

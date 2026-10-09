@@ -139,7 +139,11 @@ function ProofSheet({ onClose }: { onClose: () => void }) {
 }
 
 function Count({ value }: { value: number }) {
-  return <span className="shipped-ticker-n tabular-nums">{fmt(useConfirmedCount(value))}</span>;
+  return (
+    <span className="shipped-ticker-n tabular-nums" suppressHydrationWarning>
+      {fmt(useConfirmedCount(value))}
+    </span>
+  );
 }
 
 export function Ticker() {

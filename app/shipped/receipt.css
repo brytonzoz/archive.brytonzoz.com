@@ -219,7 +219,7 @@
   border-right: 1.5px solid rgba(243, 234, 216, 0.55);
   border-bottom: 1.5px solid rgba(243, 234, 216, 0.55);
   transform: rotate(45deg);
-  transition: transform 220ms var(--ease-out);
+  transition: transform 200ms var(--ease-out);
 }
 
 .shipped-board.is-open .shipped-board-chevron {
@@ -229,7 +229,7 @@
 .shipped-board-panel {
   display: grid;
   grid-template-rows: 0fr;
-  transition: grid-template-rows 380ms var(--ease-drawer);
+  transition: grid-template-rows 220ms var(--ease-drawer);
 }
 
 .shipped-board.is-open .shipped-board-panel {
@@ -1119,10 +1119,10 @@
   position: relative;
 }
 
-/* Before the print starts (and before JS) the paper is still on the roll. */
+/* Before the print starts (and before JS) the paper is still on the roll: hide from the bottom so the header is what emerges. */
 .is-printing .shipped-feed,
 .is-feeding .shipped-feed {
-  transform: translateY(-100%);
+  clip-path: inset(0 0 100% 0);
 }
 
 .shipped-pull {
@@ -1510,6 +1510,7 @@
   .is-printing .shipped-feed,
   .is-feeding .shipped-feed {
     transform: none;
+    clip-path: none;
   }
 }
 

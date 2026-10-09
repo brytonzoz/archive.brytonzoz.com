@@ -129,6 +129,20 @@ test('the year is configurable and falls back to this year', () => {
   }
 });
 
+test('the receipt feed reveals the header first, never the footer', async () => {
+  const { feedFrames } = await import('../components/shipped/physics.ts');
+  const { frames } = feedFrames(180, 'seed', 0.8);
+  assert.match(frames[0].clipPath, /inset\(0 0 180px 0\)/);
+  assert.match(frames[frames.length - 1].clipPath, /inset\(0 0 0px 0\)/);
+  let hidden = 180;
+  for (const frame of frames) {
+    const n = Number(/inset\(0 0 (\d+)px 0\)/.exec(frame.clipPath)?.[1]);
+    assert.ok(Number.isFinite(n) && n <= hidden, frame.clipPath);
+    hidden = n;
+  }
+  assert.equal(hidden, 0);
+});
+
 test('the printer mouth and receipt sponsor cells do not share a class (absolute slot must not stack ads on the header)', () => {
   const machine = fs.readFileSync(new URL('../components/shipped/Machine.tsx', import.meta.url), 'utf8');
   const year = fs.readFileSync(new URL('../components/shipped/YearReceipt.tsx', import.meta.url), 'utf8');

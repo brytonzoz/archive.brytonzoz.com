@@ -184,14 +184,22 @@ export function Machine({ job, display, tone, onPrinted, onTorn, tearSignal = 0,
     }
     const height = el.offsetHeight;
     const { frames, duration } = feedFrames(height, shown.key, shown.slip ? 0.45 : shown.fast ? 0.9 : 0.36);
-    const animation = el.animate(frames, { duration, fill: 'both' });
+    const animation = el.animate(
+      frames.map((frame) => ({
+        offset: frame.offset,
+        transform: frame.transform,
+        clipPath: frame.clipPath,
+        easing: frame.easing,
+      })),
+      { duration, fill: 'both' },
+    );
     const shiver = body.current?.animate(
       [{ transform: 'translateY(0)' }, { transform: 'translateY(0.7px)' }, { transform: 'translateY(-0.3px)' }, { transform: 'translateY(0)' }],
       { duration: 110, iterations: Infinity },
     );
     motorOn();
     const timers = frames
-      .filter((frame, i) => i > 0 && frames[i - 1].transform !== frame.transform)
+      .filter((frame, i) => i > 0 && frames[i - 1].clipPath !== frame.clipPath)
       .filter((_, i) => i % 2 === 0)
       .map((frame) => window.setTimeout(tick, frame.offset * duration));
     let cancelled = false;

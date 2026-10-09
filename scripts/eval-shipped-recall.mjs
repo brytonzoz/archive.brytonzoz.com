@@ -3,7 +3,21 @@ import '../tests/resolve-ts.mjs';
 import { readFileSync, writeFileSync } from 'node:fs';
 
 const year = Number(process.env.SHIPPED_YEAR || 2026);
-const truth = JSON.parse(readFileSync(new URL('../docs/shipped-ground-truth.json', import.meta.url), 'utf8'));
+const truthPath = process.env.SHIPPED_TRUTH || new URL('../docs/shipped-ground-truth.json', import.meta.url);
+const truth = JSON.parse(readFileSync(truthPath, 'utf8'));
+const evalList = readFileSync(new URL('../docs/shipped-eval-builders.md', import.meta.url), 'utf8');
+const identitySrc = readFileSync(new URL('../worker/shipped-identity.ts', import.meta.url), 'utf8');
+if (truth.heldOut) {
+  for (const builder of truth.builders) {
+    const q = builder.query;
+    if (new RegExp(`\`${q.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}\``, 'i').test(evalList)) {
+      throw new Error(`held-out query ${q} is in shipped-eval-builders.md`);
+    }
+    if (new RegExp(`['"\`]${q.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}['"\`]`, 'i').test(identitySrc.split('IDENTITY_COLLISIONS')[1]?.slice(0, 400) ?? '')) {
+      throw new Error(`held-out query ${q} is in IDENTITY_COLLISIONS`);
+    }
+  }
+}
 const { readQuery } = await import('../lib/shipped-year.ts');
 const { gather, inYearCount } = await import('../worker/shipped-sources.ts');
 const { demoReceipt } = await import('../worker/shipped-ai.ts');

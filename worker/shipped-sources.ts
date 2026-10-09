@@ -16,16 +16,17 @@ import { hasBlockedWord } from '../lib/shipped-sponsors';
 import { tinyfishFetch, tinyfishSearch, type TinyfishMeter, type TinyfishPage } from './shipped-tinyfish';
 import { safeFetch } from './shipped-fetch';
 import {
+  collisionOverride,
   companyLogins,
   extraSitePaths,
-  handleAliases,
+  githubLoginsFromText,
   handleVariants,
+  makerMentions,
   mergeSites,
-  ownerForProduct,
   parsePersonName,
   parseProductQuery,
+  productHostGuesses,
   productNameFromHost,
-  siteHint,
   readXProfile,
   scoreGithubMatch,
   urlsFromText,
@@ -940,7 +941,8 @@ export async function githubUser(login: string, env: SourceEnv, tinyfish: Tinyfi
 export async function searchGithubUsers(name: string, env: SourceEnv, tinyfish: TinyfishAccess = null): Promise<{ login: string }[]> {
   return cached(`gh:people:${loose(name)}`, 1440 * MIN, async () => {
     if (apiOpen(env)) {
-      const data = await githubApi<{ items?: { login?: unknown }[] }>(`/search/users?q=${encodeURIComponent(`${name} in:name`)}&per_page=4`, env).catch(() => null);
+      const query = /\s/.test(name.trim()) ? `fullname:${name.trim()}` : `${name} in:name`;
+      const data = await githubApi<{ items?: { login?: unknown }[] }>(`/search/users?q=${encodeURIComponent(query)}&per_page=4`, env).catch(() => null);
       if (data) return (data.items ?? []).filter((u) => typeof u.login === 'string' && isGithubLogin(u.login)).map((u) => ({ login: u.login as string }));
     }
     if (!tinyfish) return [];
@@ -980,27 +982,107 @@ export function identityCacheKey(profile: Profile, subject: Subject): string {
 }
 
 async function bestGithubFor(
-  opts: { wantX?: string | null; wantName?: string | null; wantSite?: string | null; wantCompany?: string | null; logins: string[] },
+  opts: { wantX?: string | null; wantName?: string | null; wantSite?: string | null; wantSites?: string[]; wantCompany?: string | null; logins: (string | null | undefined)[] },
   env: SourceEnv,
   tinyfish: TinyfishAccess,
-): Promise<GithubUser | null> {
+): Promise<{ user: GithubUser; score: number } | null> {
   const seen = new Set<string>();
   let best: { user: GithubUser; score: number } | null = null;
   for (const login of opts.logins) {
-    if (!isGithubLogin(login) || seen.has(login.toLowerCase())) continue;
+    if (!login || !isGithubLogin(login) || seen.has(login.toLowerCase())) continue;
     seen.add(login.toLowerCase());
     const user = await githubUser(login, env, tinyfish).catch(() => null);
     if (!user) continue;
-    const score = scoreGithubMatch({ user, wantX: opts.wantX, wantName: opts.wantName, wantSite: opts.wantSite, wantCompany: opts.wantCompany });
+    const score = scoreGithubMatch({
+      user,
+      wantX: opts.wantX,
+      wantName: opts.wantName,
+      wantSite: opts.wantSite,
+      wantSites: opts.wantSites,
+      wantCompany: opts.wantCompany,
+    });
     if (score < 8) continue;
     if (!best || score > best.score) best = { user, score };
   }
-  return best?.user ?? null;
+  return best;
+}
+
+/** Repo search for a product name: the owners are maker candidates. */
+async function githubRepoOwners(product: string, env: SourceEnv): Promise<string[]> {
+  if (!apiOpen(env) || product.length < 3) return [];
+  const q = product.replace(/[^A-Za-z0-9._-]+/g, ' ').trim();
+  const data = await githubApi<{ items?: { owner?: { login?: string }; name?: string; description?: string }[] }>(
+    `/search/repositories?q=${encodeURIComponent(q)}&per_page=5`,
+    env,
+  ).catch(() => null);
+  const want = loose(product);
+  return (data?.items ?? [])
+    .filter((row) => loose(`${row.name ?? ''} ${row.description ?? ''}`).includes(want) || want.includes(loose(row.name ?? '')))
+    .map((row) => row.owner?.login)
+    .filter((login): login is string => Boolean(login && isGithubLogin(login)))
+    .slice(0, 4);
 }
 
 /** Expand a typed subject to GitHub, X, sites, PH/npm usernames. Cached 24h. */
 export async function resolveIdentity(subject: Subject, env: SourceEnv, tinyfish: TinyfishAccess = null): Promise<ResolvedIdentity> {
-  return cached(`id:v3:${subject.kind}:${subject.id.toLowerCase()}:${loose(subject.display)}`, 1440 * MIN, () => resolveIdentityFresh(subject, env, tinyfish));
+  return cached(`id:v5:${subject.kind}:${subject.id.toLowerCase()}:${loose(subject.display)}`, 1440 * MIN, () => resolveIdentityFresh(subject, env, tinyfish));
+}
+
+async function resolveProductMaker(
+  product: string,
+  env: SourceEnv,
+  tinyfish: TinyfishAccess,
+  notes: string[],
+): Promise<{ x: string[]; github: string[]; names: string[]; sites: string[] }> {
+  const x: string[] = [];
+  const github: string[] = [];
+  const names: string[] = [];
+  const sites: string[] = [];
+  const take = (mentions: { x: string[]; github: string[]; names: string[] }, site?: string | null) => {
+    for (const h of mentions.x) if (!x.some((v) => v.toLowerCase() === h.toLowerCase())) x.push(h);
+    for (const g of mentions.github) if (!github.some((v) => v.toLowerCase() === g.toLowerCase())) github.push(g);
+    for (const n of mentions.names) if (!names.includes(n)) names.push(n);
+    if (site) sites.push(site);
+  };
+
+  for (const url of productHostGuesses(product)) {
+    const page = await readSite(url).catch(() => null);
+    if (!page) continue;
+    notes.push(`product-host:${hostOf(url)}`);
+    take(makerMentions(`${page.title}\n${page.description}\n${page.text}\n${page.links.map((l) => `${l.text} ${l.url}`).join('\n')}`), url);
+    if (x.length || github.length) break;
+  }
+
+  const owners = await githubRepoOwners(product, env).catch(() => []);
+  if (owners.length) {
+    notes.push(`product-gh:${owners.join(',')}`);
+    github.push(...owners.filter((g) => !github.some((v) => v.toLowerCase() === g.toLowerCase())));
+  }
+
+  const key = tinyfish?.key;
+  if (key && tinyfish && !x.length && !github.length) {
+    const year = new Date().getUTCFullYear();
+    const hits = await tinyfishSearch(`"${product}" founder OR maker OR creator`, year, key, tinyfish.meter).catch(() => []);
+    notes.push(`product-search:${hits.length}`);
+    for (const hit of hits.slice(0, 5)) {
+      const blob = `${hit.title}\n${hit.snippet}\n${hit.url}`;
+      if (!loose(blob).includes(loose(product))) continue;
+      take(makerMentions(blob), publicUrl(hit.url));
+    }
+  }
+  return { x: x.slice(0, 4), github: github.slice(0, 4), names: names.slice(0, 3), sites: sites.slice(0, 4) };
+}
+
+async function followSitesForGithub(urls: string[], notes: string[]): Promise<string[]> {
+  const logins: string[] = [];
+  for (const url of urls.slice(0, 4)) {
+    const page = await readSite(url).catch(() => null);
+    if (!page) continue;
+    const found = githubLoginsFromText(`${page.text}\n${page.links.map((l) => l.url).join('\n')}`);
+    if (found.length) notes.push(`site-github:${hostOf(url)}=${found.join(',')}`);
+    for (const login of found) if (!logins.some((v) => v.toLowerCase() === login.toLowerCase())) logins.push(login);
+  }
+  return logins.slice(0, 6);
 }
 
 async function resolveIdentityFresh(subject: Subject, env: SourceEnv, tinyfish: TinyfishAccess): Promise<ResolvedIdentity> {
@@ -1009,15 +1091,24 @@ async function resolveIdentityFresh(subject: Subject, env: SourceEnv, tinyfish: 
   if (subject.kind === 'github') profile.github = subject.id;
   if (subject.kind === 'x') profile.x = subject.id;
   if (subject.kind === 'domain' && isDomain(subject.id)) profile.site = `https://${subject.id}/`;
-  const nameParts = subject.kind === 'name' ? parsePersonName(subject.display) : parsePersonName(subject.display);
+  const nameParts = parsePersonName(subject.display);
   if (subject.kind === 'name' && !nameParts.product) profile.name = subject.display;
   if (nameParts.product) notes.push(`product:${nameParts.product}`);
 
-  const productOwner = ownerForProduct(nameParts.product || parseProductQuery(subject.display));
-  if (productOwner) {
-    notes.push(`product-owner:${productOwner}`);
-    if (isXHandle(productOwner)) profile.x ||= productOwner;
-    if (isGithubLogin(productOwner)) profile.github ||= productOwner;
+  const collided = collisionOverride(subject.id);
+  if (collided) {
+    notes.push(`collision:${subject.id}->${collided}`);
+    if (isGithubLogin(collided)) profile.github ||= collided;
+    if (isXHandle(collided)) profile.x ||= collided;
+  }
+
+  if (nameParts.product) {
+    const maker = await resolveProductMaker(nameParts.product, env, tinyfish, notes);
+    if (maker.x[0]) profile.x ||= maker.x[0];
+    if (maker.github[0]) profile.github ||= maker.github[0];
+    if (maker.names[0]) profile.name ||= maker.names[0];
+    if (maker.sites[0]) profile.site ||= maker.sites[0];
+    profile.sites = mergeSites(profile.sites, maker.sites);
   }
 
   const xHandle = profile.x || (subject.kind !== 'domain' && isXHandle(subject.id) ? subject.id : null);
@@ -1042,52 +1133,53 @@ async function resolveIdentityFresh(subject: Subject, env: SourceEnv, tinyfish: 
   const parts = subject.kind === 'name' ? nameParts : { name: profile.name, company: null, tokens: profile.name ? [profile.name] : [], product: null };
   if (parts.company) notes.push(`name-parse:${parts.name}|${parts.company}`);
 
-  const aliasLogins = [
-    ...handleAliases(subject.id),
-    ...handleAliases(profile.x ?? ''),
+  if (xProfile?.github?.length) {
+    notes.push(`x-github:${xProfile.github.join(',')}`);
+    profile.github ||= xProfile.github[0];
+  }
+
+  const followed = await followSitesForGithub(mergeSites(profile.sites, [profile.site]), notes);
+  const knownLogins = [
     ...companyLogins(parts.name || subject.id, parts.company),
-    productOwner,
+    ...handleVariants(subject.id),
+    ...handleVariants(profile.x ?? ''),
+    ...followed,
+    ...(xProfile?.github ?? []),
     profile.github,
+    collided,
   ].filter((l): l is string => Boolean(l));
-  const variantLogins = handleVariants(subject.id);
-  const knownLogins = [...aliasLogins, ...variantLogins];
   notes.push(`gh-try:${knownLogins.slice(0, 8).join(',') || 'none'}`);
 
-  let matched = await bestGithubFor(
-    { wantX: profile.x, wantName: profile.name || parts.name, wantSite: profile.site, wantCompany: parts.company, logins: knownLogins },
-    env,
-    tinyfish,
-  );
+  const wantSites = mergeSites(profile.sites, [profile.site]);
+  const matchOpts = { wantX: profile.x, wantName: profile.name || parts.name, wantSite: profile.site, wantSites, wantCompany: parts.company };
+  let matched = await bestGithubFor({ ...matchOpts, logins: knownLogins }, env, tinyfish);
 
-  if (!matched && !nameParts.product) {
+  // A same-string GitHub login is often a decoy (theo, swyx, fofrAI). Search the X name when the hit is weak.
+  if (!matched || matched.score < 40) {
     const searchTerms = [
-      parts.name && parts.name !== subject.display ? parts.name : null,
+      parts.name && parts.name.length >= 3 ? parts.name : null,
       parts.company ? `${parts.name} ${parts.company}` : null,
-      profile.name && profile.name !== subject.id ? profile.name : null,
-      subject.kind === 'name' && parts.name ? parts.name : null,
-    ].filter((t): t is string => Boolean(t && t.length >= 2));
+      profile.name && profile.name !== subject.id && profile.name.length >= 3 ? profile.name : null,
+    ].filter((t): t is string => Boolean(t && t.length >= 2 && !/^the guy/i.test(t)));
     const searched: string[] = [];
     for (const term of searchTerms.slice(0, 3)) {
       const people = await searchGithubUsers(term, env, tinyfish).catch(() => []);
       notes.push(`gh-search:${term}=${people.map((p) => p.login).join(',') || 'none'}`);
       searched.push(...people.map((p) => p.login));
     }
-    matched = await bestGithubFor(
-      { wantX: profile.x, wantName: profile.name || parts.name, wantSite: profile.site, wantCompany: parts.company, logins: searched },
-      env,
-      tinyfish,
-    );
+    const fromSearch = await bestGithubFor({ ...matchOpts, logins: searched }, env, tinyfish);
+    if (fromSearch && (!matched || fromSearch.score > matched.score)) matched = fromSearch;
   }
   if (matched) {
-    notes.push(`github:${matched.login} repos=${matched.repos}`);
-    profile.github = matched.login;
-    profile.name ||= matched.name;
-    profile.bio ||= matched.bio;
-    profile.site ||= matched.blog;
-    profile.x ||= matched.x;
-    if (matched.blog) {
-      profile.site = matched.blog;
-      profile.sites = mergeSites(profile.sites, [matched.blog]);
+    notes.push(`github:${matched.user.login} repos=${matched.user.repos} score=${matched.score}`);
+    profile.github = matched.user.login;
+    profile.name ||= matched.user.name;
+    profile.bio ||= matched.user.bio;
+    profile.site ||= matched.user.blog;
+    profile.x ||= matched.user.x;
+    if (matched.user.blog) {
+      profile.site = matched.user.blog;
+      profile.sites = mergeSites(profile.sites, [matched.user.blog]);
     }
   } else if (profile.github) {
     const user = await githubUser(profile.github, env, tinyfish).catch(() => null);
@@ -1101,12 +1193,6 @@ async function resolveIdentityFresh(subject: Subject, env: SourceEnv, tinyfish: 
   } else notes.push('github:unresolved');
 
   if (profile.bio) profile.sites = mergeSites(profile.sites, urlsFromText(profile.bio));
-  const hinted = siteHint(subject.id) || siteHint(profile.x) || siteHint(profile.github);
-  if (hinted) {
-    profile.site ||= hinted;
-    profile.sites = mergeSites(profile.sites, [hinted]);
-    notes.push(`site-hint:${hostOf(hinted)}`);
-  }
   const finished = finishProfile(profile);
   notes.push(`sites:${finished.sites.map((u) => hostOf(u)).join(',') || 'none'}`);
   return { profile: finished, notes, cacheKey: identityCacheKey(finished, subject) };

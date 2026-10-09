@@ -4,7 +4,11 @@
 import { isDomain, isGithubLogin, isXHandle } from '../lib/shipped-year';
 
 const UA = 'brytonzoz.com-shipped (+https://shipped.brytonzoz.com/)';
+/** Fx/Vx Twitter 404 or empty-body the project UA; a browser UA is what their public JSON answers. */
+const X_UA =
+  'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/128.0.0.0 Safari/537.36';
 const TIMEOUT = 6000;
+const SHORTENERS = /(^|\.)(t\.co|bit\.ly|tinyurl\.com|ow\.ly|buff\.ly|lnkd\.in)$/i;
 
 /** Social / profile hosts that are not a shipped product. */
 export const PROFILE_HOSTS =
@@ -16,44 +20,19 @@ export type XProfile = {
   bio: string;
   site: string | null;
   urls: string[];
+  github: string[];
 };
 
 export type NameParts = { name: string; company: string | null; tokens: string[]; product: string | null };
 
-/** X/handle spellings that are not the GitHub login. Keep this list short — only proven mismatches. */
-export const HANDLE_ALIASES: Record<string, string[]> = {
-  tdinh_me: ['tony-dinh'],
-  tibo_maker: ['tibo-maker'],
-  dannypostmaa: ['dannypostma'],
-  theo: ['t3dotgg'],
-  t3dotgg: ['t3dotgg'],
-  antfu7: ['antfu'],
-  swyx: ['swyxio', 'sw-yx'],
-  officiallogank: ['logankilpatrick'],
-  alexalbert__: ['alexalbert'],
-  jh3yy: ['jh3y'],
-  rauno: ['raunofreiberg'],
-  mkbhd: ['MKBHD'],
-};
+/**
+ * Only for two living people who share one public handle. Never a convenience list of
+ * eval builders. Empty until a real collision shows up.
+ */
+export const IDENTITY_COLLISIONS: Record<string, string> = {};
 
-/** "the guy who made Photo AI" → the person who ships that product. */
-export const PRODUCT_OWNERS: Record<string, string> = {
-  photoai: 'levelsio',
-  'photo ai': 'levelsio',
-  'photo-ai': 'levelsio',
-};
-
-/** Personal sites that GitHub/X often omit. */
-export const SITE_HINTS: Record<string, string> = {
-  steventey: 'https://steventey.com/',
-  tdinh_me: 'https://tonyis.online/',
-  tibo_maker: 'https://www.tmaker.io/',
-  tony_dinh: 'https://tonyis.online/',
-};
-
-export function handleAliases(handle: string): string[] {
-  const id = handle.replace(/^@/, '').toLowerCase();
-  return HANDLE_ALIASES[id] ?? [];
+export function collisionOverride(handle: string): string | null {
+  return IDENTITY_COLLISIONS[handle.replace(/^@/, '').toLowerCase()] ?? null;
 }
 
 /** Typed "the guy who made Photo AI" / "Photo AI guy" → the product name. */
@@ -67,14 +46,58 @@ export function parseProductQuery(text: string): string | null {
   return product && product.length >= 3 ? product : null;
 }
 
-export function ownerForProduct(product: string | null | undefined): string | null {
-  if (!product) return null;
-  return PRODUCT_OWNERS[loose(product)] || PRODUCT_OWNERS[product.toLowerCase()] || null;
+const SKIP_GH = new Set(
+  'about apps blog collections explore features github issues login marketplace notifications orgs pricing pulls search settings signup sponsors stars topics trending users'.split(
+    ' ',
+  ),
+);
+
+/** github.com/<login> mentions in a bio, page, or search snippet. */
+export function githubLoginsFromText(text: string): string[] {
+  const out: string[] = [];
+  for (const match of text.matchAll(/github\.com\/([A-Za-z0-9-]{1,39})(?=$|[/?#\s"'<>),])/gi)) {
+    const login = match[1];
+    if (!isGithubLogin(login) || SKIP_GH.has(login.toLowerCase())) continue;
+    if (!out.some((v) => v.toLowerCase() === login.toLowerCase())) out.push(login);
+  }
+  return out.slice(0, 6);
 }
 
-export function siteHint(handle: string | null | undefined): string | null {
-  if (!handle) return null;
-  return SITE_HINTS[handle.replace(/^@/, '').toLowerCase()] ?? null;
+/** @handle and x.com/twitter.com/<handle> mentions. */
+export function xHandlesFromText(text: string): string[] {
+  const out: string[] = [];
+  const add = (raw: string) => {
+    const handle = raw.replace(/^@/, '');
+    if (!isXHandle(handle) || /^(github|x|twitter|http|https|www)$/i.test(handle)) return;
+    if (!out.some((v) => v.toLowerCase() === handle.toLowerCase())) out.push(handle);
+  };
+  for (const match of text.matchAll(/(?:x|twitter)\.com\/([A-Za-z0-9_]{1,15})/gi)) add(match[1]);
+  for (const match of text.matchAll(/@([A-Za-z0-9_]{1,15})\b/g)) add(match[1]);
+  return out.slice(0, 8);
+}
+
+/** Photo AI → photoai.com / photo-ai.ai … hosts to try, not a person table. */
+export function productHostGuesses(product: string): string[] {
+  const slug = product.toLowerCase().replace(/[^a-z0-9]+/g, '');
+  const hyphen = product.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '');
+  const out: string[] = [];
+  for (const tld of ['com', 'ai', 'io', 'dev', 'so', 'app']) {
+    if (slug.length >= 3) out.push(`https://${slug}.${tld}/`);
+    if (hyphen && hyphen !== slug && hyphen.length >= 3) out.push(`https://${hyphen}.${tld}/`);
+  }
+  return out.slice(0, 8);
+}
+
+/** "built by @levelsio" / github.com/foo on a product page. */
+export function makerMentions(text: string): { x: string[]; github: string[]; names: string[] } {
+  const x = xHandlesFromText(text);
+  const github = githubLoginsFromText(text);
+  const names: string[] = [];
+  for (const match of text.matchAll(/\b(?:built by|made by|founder|maker|creator|by)\s+@?([A-Z][A-Za-z0-9_-]{1,24}(?:\s+[A-Z][a-z]{1,20}){0,2})/g)) {
+    const name = cleanText(match[1], 40);
+    if (name && !names.includes(name)) names.push(name);
+  }
+  return { x, github, names: names.slice(0, 4) };
 }
 
 /** `Tibo` + `OpenAI` → `tibo-openai` / `tiboopenai`. */
@@ -135,7 +158,7 @@ export function urlsFromText(text: string): string[] {
     const url = httpsUrl(raw.replace(/[),.;:]+$/, ''));
     if (!url) return;
     const host = hostOf(url);
-    if (!host || PROFILE_HOSTS.test(host)) return;
+    if (!host || PROFILE_HOSTS.test(host) || SHORTENERS.test(host)) return;
     if (!found.some((u) => hostOf(u) === host)) found.push(url);
   };
   for (const match of text.matchAll(/\bhttps?:\/\/[^\s<>"'()]+/gi)) add(match[0]);
@@ -194,15 +217,17 @@ export function scoreGithubMatch(opts: {
   wantX?: string | null;
   wantName?: string | null;
   wantSite?: string | null;
+  wantSites?: string[];
   wantCompany?: string | null;
 }): number {
   const { user, wantX, wantName, wantSite, wantCompany } = opts;
+  const sites = [...(opts.wantSites ?? []), wantSite].filter((u): u is string => Boolean(u));
   let score = 0;
   const xLinked = Boolean(wantX && user.x && user.x.toLowerCase() === wantX.toLowerCase());
   const variantHit = Boolean(
     wantX && handleVariants(wantX).some((v) => v.toLowerCase() === user.login.toLowerCase() || (user.x && v.toLowerCase() === user.x.toLowerCase())),
   );
-  const siteHit = Boolean(wantSite && user.blog && hostOf(user.blog) === hostOf(wantSite));
+  const siteHit = Boolean(user.blog && sites.some((s) => hostOf(user.blog) === hostOf(s)));
   if (wantX && user.x && user.x.toLowerCase() === wantX.toLowerCase()) score += 50;
   if (wantX && user.login.toLowerCase() === wantX.toLowerCase()) score += 8;
   if (variantHit) score += 18;
@@ -214,52 +239,152 @@ export function scoreGithubMatch(opts: {
   if (nameHit && (!wantX || xLinked || variantHit || siteHit) && (!shortName || xLinked || siteHit || companyHit)) score += shortName ? 8 : 20;
   if (companyHit) score += 16;
   if (user.repos > 0 && score > 0) score += Math.min(8, Math.round(Math.log10(1 + user.repos) * 3));
-  if (user.repos === 0 && !user.blog && !user.x) score -= 20;
+  // Empty accounts that copy a blog or X handle are decoys (fofrAI → fofrai).
+  if (user.repos === 0) return Math.min(score, 6);
   if (wantX && !xLinked && !variantHit && !siteHit && user.login.toLowerCase() !== wantX.toLowerCase()) return Math.min(score, 6);
   return score;
 }
 
-/** Unauthenticated X profile: FxTwitter first, then a TinyFish read of x.com/<handle>. */
+function finishXProfile(partial: Omit<XProfile, 'github' | 'urls'> & { urls?: string[]; github?: string[] }): XProfile {
+  const blob = `${partial.bio}\n${(partial.urls ?? []).join('\n')}`;
+  return {
+    ...partial,
+    urls: uniqueUrls(partial.urls ?? []),
+    github: githubLoginsFromText(blob).slice(0, 4),
+  };
+}
+
+/** Unauthenticated X profile: FxTwitter, VxTwitter (flat JSON), syndication, then a page read of x.com/<handle>. */
 export async function readXProfile(
   handle: string,
   fetchPage?: (url: string) => Promise<{ title: string; description: string; text: string; links: string[] } | null>,
 ): Promise<XProfile | null> {
   if (!isXHandle(handle)) return null;
-  const fromFx = (await readFxTwitter(handle)) ?? (await readFxTwitter(handle, 'https://api.vxtwitter.com'));
+  const fromFx =
+    (await readFxTwitter(handle)) ??
+    (await readFxTwitter(handle, 'https://api.vxtwitter.com')) ??
+    (await readVxTwitter(handle));
   if (fromFx) return fromFx;
+  const fromSynd = await readSyndication(handle);
+  if (fromSynd) return fromSynd;
   if (!fetchPage) return null;
   const page = await fetchPage(`https://x.com/${handle}`).catch(() => null);
   if (!page) return null;
   const title = cleanText(page.title.replace(/\s*[|/·].*$/, ''), 60);
   const bio = cleanText(page.description || page.text.slice(0, 400), 280);
-  const urls = [...urlsFromText(`${page.description}\n${page.text}`), ...page.links.map((u) => httpsUrl(u)).filter((u): u is string => Boolean(u))];
-  const site = urls.find((u) => !PROFILE_HOSTS.test(hostOf(u) ?? '')) ?? null;
+  const urls = await expandShortUrls([
+    ...urlsFromText(`${page.description}\n${page.text}`),
+    ...page.links.map((u) => httpsUrl(u)).filter((u): u is string => Boolean(u)),
+  ]);
+  const site = urls.find((u) => !PROFILE_HOSTS.test(hostOf(u) ?? '') && !SHORTENERS.test(hostOf(u) ?? '')) ?? null;
   const name = title && !/^(@|x\.com)/i.test(title) ? title : handle;
-  return { handle, name: cleanText(name, 60), bio, site, urls: uniqueUrls(urls) };
+  return finishXProfile({ handle, name: cleanText(name, 60), bio, site, urls });
+}
+
+type XUserFields = {
+  screen_name?: string;
+  name?: string;
+  description?: string;
+  website?: { url?: string; display_url?: string } | string;
+  url?: string;
+};
+
+/** FxTwitter nests `{ user }`; VxTwitter puts the same fields on the root. */
+export function xUserFromPayload(body: unknown): XUserFields | null {
+  if (!body || typeof body !== 'object') return null;
+  const root = body as XUserFields & { user?: XUserFields; code?: number };
+  const user = root.user && typeof root.user === 'object' ? root.user : root;
+  if (typeof user.screen_name !== 'string' && typeof user.name !== 'string' && typeof user.description !== 'string') return null;
+  if (typeof user.screen_name !== 'string' && typeof user.description !== 'string') return null;
+  return user;
+}
+
+async function profileFromXUser(handle: string, user: XUserFields): Promise<XProfile | null> {
+  if (!user.screen_name && !user.name && !user.description) return null;
+  const bio = cleanText(user.description, 280);
+  const website = typeof user.website === 'string' ? user.website : user.website?.url || user.website?.display_url || user.url;
+  const site = httpsUrl(website ?? null);
+  const expanded = await expandShortUrls([site, ...tcoUrls(user.description), ...urlsFromText(bio)].filter((u): u is string => Boolean(u)));
+  const urls = uniqueUrls(expanded);
+  const screen = typeof user.screen_name === 'string' && isXHandle(user.screen_name) ? user.screen_name : handle;
+  return finishXProfile({
+    handle: screen,
+    name: cleanText(user.name, 60) || handle,
+    bio,
+    site: urls[0] ?? (site && !PROFILE_HOSTS.test(hostOf(site) ?? '') && !SHORTENERS.test(hostOf(site) ?? '') ? site : null),
+    urls,
+  });
+}
+
+function tcoUrls(text: string | undefined): string[] {
+  if (!text) return [];
+  return [...text.matchAll(/https?:\/\/t\.co\/[A-Za-z0-9]+/gi)].map((m) => m[0]).slice(0, 8);
+}
+
+/** Follow t.co (and friends) so a bio becomes real product hosts, not shortener URLs. */
+export async function expandShortUrls(urls: string[]): Promise<string[]> {
+  const out: string[] = [];
+  for (const raw of urls.slice(0, 8)) {
+    const url = httpsUrl(raw);
+    if (!url) continue;
+    const host = hostOf(url);
+    if (!host) continue;
+    if (!SHORTENERS.test(host)) {
+      out.push(url);
+      continue;
+    }
+    const response = await fetch(url, {
+      headers: { 'user-agent': X_UA, accept: 'text/html' },
+      redirect: 'follow',
+      signal: AbortSignal.timeout(4000),
+    }).catch(() => null);
+    const dest = httpsUrl(response?.url ?? null);
+    if (dest && !SHORTENERS.test(hostOf(dest) ?? '')) out.push(dest);
+  }
+  return uniqueUrls(out);
 }
 
 async function readFxTwitter(handle: string, origin = 'https://api.fxtwitter.com'): Promise<XProfile | null> {
   const response = await fetch(`${origin}/${encodeURIComponent(handle)}`, {
+    headers: { 'user-agent': X_UA, accept: 'application/json' },
+    signal: AbortSignal.timeout(TIMEOUT),
+  }).catch(() => null);
+  if (!response?.ok) return null;
+  const body = await response.json().catch(() => null);
+  const user = xUserFromPayload(body);
+  if (!user) return null;
+  return profileFromXUser(handle, user);
+}
+
+async function readVxTwitter(handle: string): Promise<XProfile | null> {
+  const response = await fetch(`https://api.vxtwitter.com/${encodeURIComponent(handle)}`, {
+    headers: { 'user-agent': X_UA, accept: 'application/json' },
+    signal: AbortSignal.timeout(TIMEOUT),
+  }).catch(() => null);
+  if (!response?.ok) return null;
+  const body = await response.json().catch(() => null);
+  const user = xUserFromPayload(body);
+  if (!user) return null;
+  return profileFromXUser(handle, user);
+}
+
+async function readSyndication(handle: string): Promise<XProfile | null> {
+  const response = await fetch(`https://cdn.syndication.twimg.com/widgets/followbutton/info.json?screen_names=${encodeURIComponent(handle)}`, {
     headers: { 'user-agent': UA, accept: 'application/json' },
     signal: AbortSignal.timeout(TIMEOUT),
   }).catch(() => null);
   if (!response?.ok) return null;
-  const body = (await response.json().catch(() => null)) as {
-    user?: { screen_name?: string; name?: string; description?: string; website?: { url?: string; display_url?: string } | string };
-  } | null;
-  const user = body?.user;
-  if (!user) return null;
+  const body = (await response.json().catch(() => null)) as { screen_name?: string; name?: string; description?: string }[] | null;
+  const user = Array.isArray(body) ? body[0] : null;
+  if (!user?.screen_name) return null;
   const bio = cleanText(user.description, 280);
-  const website = typeof user.website === 'string' ? user.website : user.website?.url || user.website?.display_url;
-  const site = httpsUrl(website ?? null);
-  const urls = uniqueUrls([site, ...urlsFromText(bio)].filter((u): u is string => Boolean(u)));
-  return {
-    handle: typeof user.screen_name === 'string' && isXHandle(user.screen_name) ? user.screen_name : handle,
+  return finishXProfile({
+    handle: isXHandle(user.screen_name) ? user.screen_name : handle,
     name: cleanText(user.name, 60) || handle,
     bio,
-    site: site && !PROFILE_HOSTS.test(hostOf(site) ?? '') ? site : urls[0] ?? null,
-    urls,
-  };
+    site: urlsFromText(bio)[0] ?? null,
+    urls: urlsFromText(bio),
+  });
 }
 
 function uniqueUrls(urls: string[]): string[] {
@@ -268,7 +393,7 @@ function uniqueUrls(urls: string[]): string[] {
   for (const raw of urls) {
     const url = httpsUrl(raw);
     const host = hostOf(url);
-    if (!url || !host || PROFILE_HOSTS.test(host) || seen.has(host)) continue;
+    if (!url || !host || PROFILE_HOSTS.test(host) || SHORTENERS.test(host) || seen.has(host)) continue;
     seen.add(host);
     out.push(url);
   }

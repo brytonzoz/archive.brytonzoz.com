@@ -26,6 +26,20 @@ test('bio text yields product URLs and skips social hosts', () => {
   assert.equal(urls.some((u) => /x\.com/i.test(u)), false);
 });
 
+test('public X payloads parse without a person table', () => {
+  const vx = identity.xUserFromPayload({
+    screen_name: 'tdinh_me',
+    name: 'Tony Dinh',
+    description: 'Creating software I love to use. https://t.co/p4T2vFYQTt',
+  });
+  assert.equal(vx?.screen_name, 'tdinh_me');
+  const fx = identity.xUserFromPayload({
+    code: 200,
+    user: { screen_name: 'fofrAI', name: 'fofr', description: 'models', website: { url: 'https://fofr.ai' } },
+  });
+  assert.equal(fx?.name, 'fofr');
+});
+
 test('a 0-repo decoy GitHub account scores below the real one', () => {
   const decoy = { login: 'Dannypostmaa', name: '', bio: '', blog: null, x: null, repos: 0 };
   const real = { login: 'dannypostma', name: 'Danny Postma', bio: 'HeadshotPro', blog: 'https://www.headshotpro.com', x: 'dannypostma', repos: 18 };
@@ -45,6 +59,20 @@ test('a 0-repo decoy GitHub account scores below the real one', () => {
     wantCompany: 'OpenAI',
   });
   assert.ok(nameOnly < 8, `OpenAI-less Tibo scored ${nameOnly}`);
+  const copiedBlog = identity.scoreGithubMatch({
+    user: { login: 'fofrai', name: 'fofrAI', bio: '', blog: 'https://fofr.ai', x: 'fofrai', repos: 0 },
+    wantX: 'fofrAI',
+    wantName: 'fofr',
+    wantSite: 'https://fofr.ai/',
+  });
+  const realFofr = identity.scoreGithubMatch({
+    user: { login: 'fofr', name: 'fofr', bio: '', blog: null, x: 'fofrAI', repos: 164 },
+    wantX: 'fofrAI',
+    wantName: 'fofr',
+    wantSite: 'https://fofr.ai/',
+  });
+  assert.ok(copiedBlog <= 6, `0-repo blog copy scored ${copiedBlog}`);
+  assert.ok(realFofr > copiedBlog, `${realFofr} vs ${copiedBlog}`);
 });
 
 test('undated own-site products become found items; other years do not', () => {
@@ -123,11 +151,13 @@ test('paid search still runs when harvest is gappy, not only when the tape is em
   assert.ok(sources.inYearCount(gathered, 2026) < ai.SEARCH_BELOW);
 });
 
-test('product nicknames and known handle aliases resolve', () => {
+test('identity tables are not an eval cheat sheet', () => {
+  assert.deepEqual(identity.IDENTITY_COLLISIONS, {});
   assert.equal(identity.parseProductQuery('the guy who made Photo AI'), 'Photo AI');
-  assert.equal(identity.ownerForProduct('Photo AI'), 'levelsio');
-  assert.ok(identity.handleAliases('tdinh_me').includes('tony-dinh'));
-  assert.ok(identity.handleAliases('theo').includes('t3dotgg'));
+  assert.ok(identity.productHostGuesses('Photo AI').some((u) => /photoai\.com/i.test(u)));
+  assert.ok(identity.githubLoginsFromText('see github.com/tony-dinh/app').includes('tony-dinh'));
+  assert.ok(identity.xHandlesFromText('built by @levelsio on photoai.com').includes('levelsio'));
+  assert.ok(identity.makerMentions('Built by @levelsio').x.includes('levelsio'));
   assert.ok(identity.companyLogins('Tibo', 'OpenAI').includes('tibo-openai'));
 });
 

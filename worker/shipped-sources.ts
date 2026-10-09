@@ -1595,7 +1595,7 @@ export async function gather(
   const tinyfish = tinyfishAccess(env, meter);
   const resolved = await resolveIdentity(subject, env, tinyfish);
   const mode: GatherMode = opts?.mode === 'full' ? 'full' : 'free';
-  const key = mode === 'full' ? `gather:full:v4:${year}:${resolved.cacheKey}` : `gather:v13:${year}:${resolved.cacheKey}`;
+  const key = mode === 'full' ? `gather:full:v5:${year}:${resolved.cacheKey}` : `gather:v14:${year}:${resolved.cacheKey}`;
   return cached(key, 1440 * MIN, () => gatherFresh(subject, resolved.profile, env, year, meter, tinyfish, resolved.notes, mode));
 }
 

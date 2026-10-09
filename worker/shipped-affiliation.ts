@@ -141,6 +141,15 @@ export function affiliationFromBio(bio: string, hint: Affiliation = emptyAffilia
   }
   const atCo = text.match(/\b(?:at|@)\s+([A-Z][A-Za-z0-9._-]{1,39})\b/);
   if (atCo && !out.company) out.company = cleanText(atCo[1], 40);
+  if (!out.company) {
+    const ofCo = text.match(/\bof\s+([A-Z][A-Za-z0-9]{2,39})\b/);
+    const stop = /^(the|a|an|this|that|our|all|humanity|people|life|course|things|stuff|code)$/i;
+    if (ofCo && !stop.test(ofCo[1])) out.company = cleanText(ofCo[1], 40);
+  }
+  if (!out.company) {
+    const camel = text.match(/\b([A-Z][a-z]+[A-Z][A-Za-z0-9]+)\b/);
+    if (camel) out.company = cleanText(camel[1], 40);
+  }
   const handles = xHandlesFromText(text);
   if (!out.companyX && out.company) {
     const slug = companySlug(out.company);

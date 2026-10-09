@@ -39,6 +39,11 @@ test('bio CEO patterns and host guesses cover OpenAI / Cursor / Vercel', () => {
   const vercel = affiliation.affiliationFromBio('Vercel CEO', affiliation.emptyAffiliation());
   assert.equal(vercel.role, 'ceo');
   assert.equal(vercel.company, 'Vercel');
+  const mission = affiliation.affiliationFromBio(
+    'The mission of OpenAI is to ensure that AGI benefits all of humanity',
+    affiliation.emptyAffiliation(),
+  );
+  assert.equal(mission.company, 'OpenAI');
   const hosts = company.hostGuesses('Cursor (Anysphere)');
   assert.ok(hosts.some((url) => url.includes('cursor.com')), JSON.stringify(hosts));
   assert.ok(hosts.some((url) => url.includes('anysphere.com')));

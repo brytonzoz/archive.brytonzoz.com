@@ -58,7 +58,9 @@ import {
   acquire,
   budgetKey,
   budgetUsed,
+  currentBudgetAlert,
   cycleBudgetCap,
+  recordBudgetAlerts,
   clientIp,
   concurrencySlot,
   guardTables,
@@ -143,7 +145,7 @@ export interface ShippedEnv extends AiEnv, PayEnv, SourceEnv, GuardEnv {
   TURNSTILE_SECRET_KEY?: string;
   /** Daily AI budget in USD (legacy / tests). */
   SHIPPED_DAILY_CAP_USD?: string;
-  /** Cycle AI budget base in USD (default 180), plus 80% of last cycle's net sales. */
+  /** Cycle AI budget base in USD (default 180), plus 80% of this cycle's settled sales. */
   SHIPPED_CYCLE_CAP_USD?: string;
   /** The year receipts itemize (default: the current year). */
   SHIPPED_YEAR?: string;
@@ -554,10 +556,15 @@ async function generate(
         usage = { input: result.inputTokens, output: result.outputTokens, searches: result.searches, cost: result.costMicros };
         holdBudget(0);
         await settleBudget(db, worst, usage.cost, budgetKey());
+        const used = await budgetUsed(db, budgetKey());
+        ctx.waitUntil(recordBudgetAlerts(db, used.spent, cap).catch(() => undefined));
       } catch (error) {
         const spent = error as { costMicros?: number; inputTokens?: number; outputTokens?: number };
         holdBudget(0);
-        await settleBudget(db, worst, spent.costMicros ?? 0, budgetKey());
+        // Errors and retries count: a call that dies with no token usage still spends the reservation.
+        await settleBudget(db, worst, spent.costMicros && spent.costMicros > 0 ? spent.costMicros : worst, budgetKey());
+        const used = await budgetUsed(db, budgetKey());
+        ctx.waitUntil(recordBudgetAlerts(db, used.spent, cap).catch(() => undefined));
         ctx.waitUntil(recordSpend(db, false, spent.inputTokens ?? 0, spent.outputTokens ?? 0, 0));
         ctx.waitUntil(acquire(db, `failed:${key}`, FAILED_FOR).catch(() => undefined));
         if (error instanceof PrintError && error.code === 'out-of-credit') {
@@ -1806,6 +1813,7 @@ export async function adminShipped(request: Request, env: ShippedEnv): Promise<R
     },
     capUsd: ((await cycleBudgetCap(db, env)) ?? 0) / 1_000_000,
     budget: await budgetUsed(db, budgetKey()),
+    budgetAlert: await currentBudgetAlert(db),
     printed: t?.printed ?? 0,
     shared: t?.shared ?? 0,
     views: t?.views ?? 0,

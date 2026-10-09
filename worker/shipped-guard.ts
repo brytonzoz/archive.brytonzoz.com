@@ -3,14 +3,14 @@
 // D1, so it holds across isolates and data centers:
 //   - fixed-window counters per hashed IP, per /24 (IPv4) or /48 (IPv6) subnet and globally
 //   - locks: one print per IP at a time, one print per subject at a time, a global ceiling of concurrent prints
-//   - the cycle AI budget ($180 from the 8th, plus 80% of last cycle's sales), reserved before each call
+//   - the cycle AI budget ($180 from the 8th, plus 80% of this cycle's settled sales), reserved before each call
 //   - kill switches (D1 flags set in /admin, or the SHIPPED_OFF var) for the site, printing, sponsors, prints
 //   - "are you human": Turnstile when its keys exist, else a proof-of-work puzzle (HMAC-signed, single use)
 //   - request hygiene: same-origin POSTs only, body size caps, obvious scripts and headless browsers turned away
 //   - security headers and a hash-based CSP for every page on the Shipped host
 // No IP address is ever stored: keys are SHA-256 of the address and the UTC day.
 
-import { CYCLE_BASE_USD, cycleCapMicros as capFromSales, cycleRowKey, previousCycleBounds } from '../lib/shipped-budget';
+import { BUDGET_ALERTS, CYCLE_BASE_USD, budgetAlertLevel, cycleBounds, cycleCapMicros as capFromSales, cycleRowKey, saleNetCents, type BudgetAlert } from '../lib/shipped-budget';
 
 export const MINUTE = 60_000;
 export const HOUR = 60 * MINUTE;
@@ -27,7 +27,7 @@ export interface GuardEnv {
   SHIPPED_OFF?: string;
   /** Daily AI budget in USD (legacy override / tests). Cycle budget is the product default. */
   SHIPPED_DAILY_CAP_USD?: string;
-  /** Cycle AI budget base in USD (default 180); plus 80% of last cycle's net sales. */
+  /** Cycle AI budget base in USD (default 180); plus 80% of this cycle's settled sales. */
   SHIPPED_CYCLE_CAP_USD?: string;
   /** Receipts generated per UTC day across everyone (default 1500). */
   SHIPPED_DAILY_PRINTS?: string;
@@ -218,21 +218,33 @@ export async function concurrencySlot(db: D1Database, env: GuardEnv, ttlMs: numb
 
 export const capMicros = (env: GuardEnv) => Math.round(num(env.SHIPPED_DAILY_CAP_USD, 5, 0, 1000) * 1_000_000);
 
-const NET_CENTS = `COALESCE(total_cents, amount_cents) - COALESCE(refund_cents, 0)`;
 const SETTLED = `status NOT IN ('checkout', 'failed', 'lost') AND paid_at IS NOT NULL`;
 
-/** Money we actually kept in `[fromMs, toMs)`: paid bids and print orders minus refunds. Null on any read failure. */
+type SaleRow = { amount: number; refund: number };
+
+/** Money we actually kept in `[fromMs, toMs)`: paid bids and print orders after Stripe fees and refunds. Holds (checkout) are excluded. Null on any read failure. */
 export async function netSettledCents(db: D1Database, fromMs: number, toMs: number): Promise<number | null> {
   try {
     const [bids, prints] = await Promise.all([
-      db.prepare(`SELECT COALESCE(SUM(${NET_CENTS}), 0) AS n FROM shipped_bids WHERE ${SETTLED} AND paid_at >= ? AND paid_at < ?`).bind(fromMs, toMs).first<{ n: number }>(),
       db
-        .prepare(`SELECT COALESCE(SUM(${NET_CENTS}), 0) AS n FROM print_orders WHERE ${SETTLED} AND paid_at >= ? AND paid_at < ?`)
+        .prepare(
+          `SELECT COALESCE(total_cents, amount_cents) AS amount, COALESCE(refund_cents, 0) AS refund FROM shipped_bids WHERE ${SETTLED} AND paid_at >= ? AND paid_at < ?`,
+        )
         .bind(fromMs, toMs)
-        .first<{ n: number }>(),
+        .all<SaleRow>(),
+      db
+        .prepare(
+          `SELECT COALESCE(total_cents, amount_cents) AS amount, COALESCE(refund_cents, 0) AS refund FROM print_orders WHERE ${SETTLED} AND paid_at >= ? AND paid_at < ?`,
+        )
+        .bind(fromMs, toMs)
+        .all<SaleRow>(),
     ]);
-    if (!bids || !prints || !Number.isFinite(bids.n) || !Number.isFinite(prints.n)) return null;
-    const n = bids.n + prints.n;
+    if (!bids?.results || !prints?.results) return null;
+    let n = 0;
+    for (const row of [...bids.results, ...prints.results]) {
+      if (!Number.isFinite(row.amount) || !Number.isFinite(row.refund)) return null;
+      n += saleNetCents(row.amount, row.refund);
+    }
     return n >= 0 ? Math.floor(n) : null;
   } catch {
     return null;
@@ -241,15 +253,40 @@ export async function netSettledCents(db: D1Database, fromMs: number, toMs: numb
 
 /**
  * This cycle's AI cap. Fail closed: no database, or sales we cannot read, means no printing.
- * `SHIPPED_CYCLE_CAP_USD` replaces the $180 base (carry-over still applies).
+ * `SHIPPED_CYCLE_CAP_USD` replaces the $180 base (this cycle's settled sales still add 80%).
  */
 export async function cycleBudgetCap(db: D1Database | null, env: GuardEnv, now = Date.now()): Promise<number | null> {
   if (!db) return null;
   const base = num(env.SHIPPED_CYCLE_CAP_USD, CYCLE_BASE_USD, 0, 10_000);
-  const previous = previousCycleBounds(now);
-  const net = await netSettledCents(db, previous.startMs, previous.endMs);
+  const cycle = cycleBounds(now);
+  const net = await netSettledCents(db, cycle.startMs, cycle.endMs);
   if (net === null) return null;
   return capFromSales(base, net);
+}
+
+const alertFlag = (now: number) => `budget-alert:${cycleRowKey(now)}`;
+
+/** Persist 50/80/100 crossings once per cycle. Returns newly crossed levels (for the admin banner). */
+export async function recordBudgetAlerts(db: D1Database, spentMicros: number, capMicros: number, now = Date.now()): Promise<BudgetAlert[]> {
+  const level = budgetAlertLevel(spentMicros, capMicros);
+  if (!level) return [];
+  await guardTables(db);
+  const key = alertFlag(now);
+  const row = await db.prepare('SELECT value FROM shipped_flags WHERE key = ?').bind(key).first<{ value: string }>();
+  const prev = Number(row?.value ?? 0);
+  if (prev >= level) return [];
+  await db
+    .prepare(`INSERT INTO shipped_flags (key, value, set_at) VALUES (?, ?, ?) ON CONFLICT(key) DO UPDATE SET value = excluded.value, set_at = excluded.set_at`)
+    .bind(key, String(level), now)
+    .run();
+  return BUDGET_ALERTS.filter((step) => step > prev && step <= level);
+}
+
+export async function currentBudgetAlert(db: D1Database, now = Date.now()): Promise<0 | BudgetAlert> {
+  await guardTables(db);
+  const row = await db.prepare('SELECT value FROM shipped_flags WHERE key = ?').bind(alertFlag(now)).first<{ value: string }>();
+  const n = Number(row?.value ?? 0);
+  return n === 50 || n === 80 || n === 100 ? n : 0;
 }
 
 export const budgetKey = (now = Date.now()) => cycleRowKey(now);

@@ -76,6 +76,7 @@ type Data = {
   maxSearches: number;
   capUsd: number;
   budget: { spent: number; reserved: number };
+  budgetAlert: 0 | 50 | 80 | 100;
   outOfCreditAt: number | null;
   tinyfish: { enabled: boolean; today: Record<string, number>; daily: { search: number; fetch: number } };
   printed: number;
@@ -188,7 +189,7 @@ export function ShippedCard({ password }: { password: string }) {
         Printer: {generator} · {data.printed.toLocaleString()} printed · {data.shared.toLocaleString()} shared · {data.views.toLocaleString()} page views
         <br />
         Budget this cycle (resets on the 8th UTC): {usd(data.budget.spent)} spent + {usd(data.budget.reserved)} held for prints in
-        progress, of {usd(cap)} ($180 base + 80% of last cycle&apos;s net sales). Paid web
+        progress, of {usd(cap)} ($180 base + 80% of this cycle&apos;s settled sales after Stripe fees; holds don&apos;t count, refunds subtract). Paid web
         search at most {data.maxSearches} per receipt.
         <br />
         TinyFish:{' '}
@@ -198,6 +199,17 @@ export function ShippedCard({ password }: { password: string }) {
         <br />
         Checkout: {data.provider ? `${data.provider.id}${data.provider.live ? '' : ' (test, no real money)'}` : 'closed (no payment provider)'}
       </p>
+
+      {data.budgetAlert ? (
+        <p
+          className={`mt-3 rounded-[10px] px-3 py-2 text-[13px] ${data.budgetAlert >= 100 ? 'bg-[#ff453a]/15 text-[#ff6961]' : 'bg-[#ffd60a]/15 text-[#ffd60a]'}`}
+          role="alert"
+        >
+          {data.budgetAlert >= 100
+            ? 'AI budget empty this cycle (100%). The printer is out of paper until the 8th, or until settled sales raise the cap.'
+            : `AI budget at ${data.budgetAlert}% of this cycle's cap.`}
+        </p>
+      ) : null}
 
       {message ? (
         <p className="mt-3 rounded-[10px] bg-[#ff453a]/15 px-3 py-2 text-[13px] text-[#ff6961]" role="alert">

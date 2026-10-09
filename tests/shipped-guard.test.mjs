@@ -70,7 +70,7 @@ test('locks: one holder at a time, stale locks can be retaken, concurrency slots
   assert.ok(await guard.concurrencySlot(db, env, 60_000, now));
 });
 
-test('cycle budget: $180 from the 8th plus 80% of last cycle net sales; fail closed without sales tables', async () => {
+test('cycle budget: $180 from the 8th plus 80% of this cycle settled sales; fail closed without sales tables', async () => {
   const budget = await import('../lib/shipped-budget.ts');
   const oct9 = Date.UTC(2026, 9, 9, 15);
   const oct7 = Date.UTC(2026, 9, 7, 15);
@@ -83,7 +83,13 @@ test('cycle budget: $180 from the 8th plus 80% of last cycle net sales; fail clo
   assert.equal(budget.cycleBounds(oct7).start, '2026-09-08');
   assert.equal(budget.cycleRowKey(oct9), 'c:2026-10-08');
   assert.equal(budget.cycleCapMicros(180, 0), 180_000_000);
-  assert.equal(budget.cycleCapMicros(180, 10_000), 260_000_000, '$100 net last cycle → +$80');
+  assert.equal(budget.cycleCapMicros(180, 10_000), 260_000_000, '$100 net this cycle → +$80');
+  assert.equal(budget.stripeFeeCents(5000), 175);
+  assert.equal(budget.saleNetCents(5000, 0), 4825);
+  assert.equal(budget.budgetAlertLevel(90_000_000, 180_000_000), 50);
+  assert.equal(budget.budgetAlertLevel(144_000_000, 180_000_000), 80);
+  assert.equal(budget.budgetAlertLevel(180_000_000, 180_000_000), 100);
+  assert.equal(budget.budgetAlertLevel(0, 180_000_000), 0);
 
   const empty = memoryD1();
   assert.equal(await guard.cycleBudgetCap(null, {}), null, 'no database');
@@ -96,18 +102,27 @@ test('cycle budget: $180 from the 8th plus 80% of last cycle net sales; fail clo
   db.raw.exec(`CREATE TABLE print_orders (
     id INTEGER PRIMARY KEY, status TEXT, amount_cents INTEGER, total_cents INTEGER, refund_cents INTEGER, paid_at INTEGER
   )`);
-  assert.equal(await guard.cycleBudgetCap(db, {}, oct9), 180_000_000, 'first cycle, no prior sales');
+  assert.equal(await guard.cycleBudgetCap(db, {}, oct9), 180_000_000, 'first cycle, no sales');
   const lastCycle = Date.UTC(2026, 8, 20);
+  const thisCycle = oct9;
   db.raw.exec(`INSERT INTO shipped_bids (status, amount_cents, total_cents, refund_cents, paid_at) VALUES
-    ('live', 5000, 5000, 0, ${lastCycle}),
-    ('outbid', 2000, 2000, 800, ${lastCycle}),
-    ('lost', 9000, 9000, 9000, ${lastCycle}),
-    ('checkout', 1000, NULL, NULL, NULL)`);
+    ('live', 5000, 5000, 0, ${thisCycle}),
+    ('outbid', 2000, 2000, 800, ${thisCycle}),
+    ('lost', 9000, 9000, 9000, ${thisCycle}),
+    ('checkout', 1000, NULL, NULL, NULL),
+    ('live', 4000, 4000, 0, ${lastCycle})`);
   db.raw.exec(`INSERT INTO print_orders (status, amount_cents, total_cents, refund_cents, paid_at) VALUES
-    ('to_print', 500, 500, 0, ${lastCycle})`);
-  // kept: $50 + ($20-$8) + $5 = $67 → 80% = $53.60 → $180 + $53.60
-  assert.equal(await guard.cycleBudgetCap(db, {}, oct9), 180_000_000 + 53_600_000);
-  assert.equal(await guard.netSettledCents(db, Date.UTC(2026, 8, 8), Date.UTC(2026, 9, 8)), 6700);
+    ('to_print', 500, 500, 0, ${thisCycle})`);
+  const net =
+    budget.saleNetCents(5000, 0) + budget.saleNetCents(2000, 800) + budget.saleNetCents(500, 0);
+  assert.equal(await guard.netSettledCents(db, Date.UTC(2026, 9, 8), Date.UTC(2026, 10, 8)), net);
+  assert.equal(await guard.cycleBudgetCap(db, {}, oct9), budget.cycleCapMicros(180, net));
+  assert.ok(net < 6700, 'Stripe fees come off; last-cycle $40 does not count; the unpaid hold does not count');
+
+  assert.deepEqual(await guard.recordBudgetAlerts(db, 90_000_000, 180_000_000, oct9), [50]);
+  assert.deepEqual(await guard.recordBudgetAlerts(db, 90_000_000, 180_000_000, oct9), [], 'once per cycle');
+  assert.deepEqual(await guard.recordBudgetAlerts(db, 180_000_000, 180_000_000, oct9), [80, 100]);
+  assert.equal(await guard.currentBudgetAlert(db, oct9), 100);
 });
 
 test('budget cap: reservations stop at the cap, settling swaps the hold for the real cost', async () => {

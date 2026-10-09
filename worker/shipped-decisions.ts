@@ -16,7 +16,16 @@ const PERSONAL_SHIP_SOURCE = /^(github|npm|producthunt|appstore)$/;
 
 export function isPersonalShipSource(item: { source?: string; link?: string | null }): boolean {
   if (PERSONAL_SHIP_SOURCE.test(item.source ?? '')) return true;
-  if (item.source === 'site' && item.link && !/\/(blog|posts?|news|articles?|p|index)\//i.test(item.link)) return true;
+  if ((item.source === 'site' || item.source === 'web') && item.link) {
+    if (/\/(blog|posts?|news|articles?|p|index|customers|topic|resources|support)\//i.test(item.link)) return false;
+    try {
+      const path = new URL(item.link).pathname.replace(/\/+$/, '');
+      if (!path) return true;
+    } catch {
+      /* ignore */
+    }
+    return item.source === 'site';
+  }
   return false;
 }
 
@@ -176,7 +185,11 @@ export function looksLikeNotAShip(item: { name?: string; description?: string; l
   if (/\b(uses|using)\b.{0,48}\b(to|for)\b/i.test(name)) return true;
   if (/\bsystem card\b/i.test(name)) return true;
   if (/\b(gartner|cfo council|analyst|keynote)\b/i.test(name)) return true;
-  if (/^(blog|company|research|sign in|contact)\b/i.test(name)) return true;
+  if (/^(blog|company|research|sign in|contact|resources|customers|support|next|submit now|see the changelog|timeline|of the year|do not sell|series [abc])\b/i.test(name)) return true;
+  if (/^(inside|beyond|securing|decision time|cfos?)\b/i.test(name)) return true;
+  if (/\b(ships faster with|running .{0,40} safely|harness engineering|beyond rate limits|leveraging|economics of|guidance)\b/i.test(name)) return true;
+  if (/^(output:|screenshot|to get started|each dot |design \()/i.test(name)) return true;
+  if (/\/(customers|topic|resources|support)(\/|$)/i.test(item.link ?? '')) return true;
   if (/\/(research|blog)\//i.test(item.link ?? '') && /\b(how |why |tutorial|case |stor(?:y|ies)|accelerat)/i.test(name)) return true;
   return false;
 }

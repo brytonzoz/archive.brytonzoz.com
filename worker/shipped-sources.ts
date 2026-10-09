@@ -1486,7 +1486,7 @@ const NAV_LINK =
   /^(home|about|blog|contact|login|sign ?in|sign up|subscribe|newsletter|privacy|terms|careers|jobs|pricing|docs|support|twitter|github|x|linkedin|instagram|shop|store|cart|projects|changelog|source|start now|media kit|tech stack|api reference|investments?|sponsor( my work)?)$/i;
 const JUNK_ITEM =
   /\b(subscribe|newsletter|sign[- ]?up|sign-up here|log ?in|listen on|apple podcasts|spotify|overcast|pocket casts|amazon music|telegram|investments?|media kit|tech stack|api reference|broadcast by|transistor|start now|follow me|buy me a coffee|powered by|wordpress|built with|24 startups|my book|my newsletter|sponsor my work|diamond sponsor|gold sponsor|silver sponsor|submit your game|founder not found)\b/i;
-const GENERIC_NAME = /^(self|write|code|ideas|source|projects|changelog|home|shop|nvidia|replicate|fal|vercel|cursor|perplexity|openai|anthropic|sync|make|https|founder not found)$/i;
+const GENERIC_NAME = /^(self|write|code|ideas|source|projects|changelog|home|shop|nvidia|replicate|fal|vercel|cursor|perplexity|openai|anthropic|sync|make|https|founder not found|cli|next|resources|customers|support|submit now|see the changelog|timeline)$/i;
 
 function yearMention(text: string, year: number): boolean {
   return new RegExp(`\\b${year}\\b`).test(text);
@@ -1600,7 +1600,7 @@ export async function gather(
   const tinyfish = tinyfishAccess(env, meter);
   const resolved = await resolveIdentity(subject, env, tinyfish);
   const mode: GatherMode = opts?.mode === 'full' ? 'full' : 'free';
-  const key = mode === 'full' ? `gather:full:v8:${year}:${resolved.cacheKey}` : `gather:v17:${year}:${resolved.cacheKey}`;
+  const key = mode === 'full' ? `gather:full:v9:${year}:${resolved.cacheKey}` : `gather:v18:${year}:${resolved.cacheKey}`;
   return cached(key, 1440 * MIN, () => gatherFresh(subject, resolved.profile, env, year, meter, tinyfish, resolved.notes, mode));
 }
 

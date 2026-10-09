@@ -122,7 +122,10 @@ function isNoiseTitle(text: string): boolean {
   if (/\b(uses|using)\b.{0,48}\b(to|for)\b/i.test(text)) return true;
   if (/\bsystem card\b/i.test(text)) return true;
   if (/^(to get started|each dot |sign in |contact |blog \/|company \/)/i.test(text)) return true;
-  if (/^(blog|company|research|sign in|contact)\b/i.test(text)) return true;
+  if (/^(blog|company|research|sign in|contact|resources|customers|support|next|submit now|see the changelog|timeline|of the year|do not sell|series [abc])\b/i.test(text)) return true;
+  if (/^(inside|beyond|securing|decision time|cfos?)\b/i.test(text)) return true;
+  if (/\b(ships faster with|running .{0,40} safely|harness engineering|beyond rate limits|leveraging|economics of|guidance)\b/i.test(text)) return true;
+  if (/^(output:|screenshot|to get started|each dot |design \()/i.test(text)) return true;
   return false;
 }
 

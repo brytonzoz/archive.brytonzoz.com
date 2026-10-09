@@ -120,6 +120,14 @@ test('tutorials, case studies, and research writeups are not ships', () => {
   const repo = found({ name: 'skillbox', source: 'github', link: 'https://github.com/kitze/skillbox', date: '2026-09-17' });
   const repoMark = { ...decisions.heuristicMark(repo, 2026, person), kind: 'NOT_A_SHIP', isRealShip: 0.2 };
   assert.ok(decisions.shouldKeep(repoMark, repo), 'personal github repos stay on the tape');
+  const homepage = found({ name: 'Feather', source: 'web', link: 'https://feather.so/', date: null, thisYear: true });
+  assert.equal(decisions.isPersonalShipSource(homepage), true);
+  const virgin = decisions.heuristicMark(
+    found({ name: 'Virgin Atlantic ships faster with Codex', link: 'https://openai.com/index/virgin', via: 'via OpenAI · Codex' }),
+    2026,
+    lead,
+  );
+  assert.equal(decisions.shouldKeep(virgin), false);
 });
 
 test('xAI is a keyword gap-fill with a hard post cap and monthly fail-closed', async () => {

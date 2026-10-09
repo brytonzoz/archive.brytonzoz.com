@@ -218,8 +218,14 @@ export function groundedNote(items: DraftItem[], seed: number, profileName = '',
   const real = items.filter((item) => item.source !== 'none');
   if (!real.length) return POTENTIAL_NOTES[seed % POTENTIAL_NOTES.length];
   const first = real[0]?.name ?? 'THIS';
-  const loud = real[(seed + first.length) % real.length] ?? real[0];
-  const phrase = statPhrase(stats.find((line) => /\d/.test(line) && !/\/mo\b/i.test(line)) ?? '');
+  const short = real.filter((item) => item.name.split(/\s+/).length <= 6 && item.name.length <= 36);
+  const pool = short.length ? short : real;
+  const loud = pool[(seed + first.length) % pool.length] ?? real[0];
+  const phrase = statPhrase(
+    stats.find((line) => /\b(stars|upvotes|downloads|users)\b/i.test(line) && !/\brepos\b/i.test(line)) ??
+      stats.find((line) => /\d/.test(line) && !/\/mo\b/i.test(line) && !/\brepos\b/i.test(line)) ??
+      '',
+  );
   const who = profileName.split(/\s+/)[0] ?? '';
   if (phrase && loud?.name) {
     const variants = [

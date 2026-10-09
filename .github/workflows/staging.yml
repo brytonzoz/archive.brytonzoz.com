@@ -1,11 +1,15 @@
 name: Staging
 
 # Every pull request into main is checked, built, and deployed to the staging Worker.
+# This design branch also deploys on push so Shipped's new pipeline keys land on
+# archive-staging now — they must not wait for a later merge into main.
 # Only one pull request may be open at a time; a second one fails the "One open PR" check.
 on:
   pull_request:
     branches: [main]
     types: [opened, synchronize, reopened, ready_for_review]
+  push:
+    branches: [cursor/shipped-receipt-page-918f]
   workflow_dispatch:
 
 permissions:
@@ -129,7 +133,8 @@ jobs:
           if [ -n "$pk" ]; then printf '%s' "$pk" | npx wrangler secret put STRIPE_PUBLISHABLE_KEY --env staging; fi
 
       # Shipped: every secret its Worker needs, copied from the repository secrets in one `wrangler secret bulk`
-      # (scripts/sync-worker-secrets.mjs maps the names, skips empty ones, prints names only, never values).
+      # plus explicit `wrangler secret put` for the new pipeline keys (XAI_KEY→XAI_API_KEY, OPENAI_KEY→OPENAI_API_KEY,
+      # TINYFISH, PRODUCTHUNT). Names only in the log, never values. Staging fails if the pipeline keys are missing.
       # TURNSTILE_SITE_KEY is public (the Worker hands it to the page); TURNSTILE_SECRET_KEY stays server-side.
       - name: Sync Shipped secrets
         env:
@@ -153,7 +158,58 @@ jobs:
           TURNSTILE_SECRET_KEY: ${{ secrets.TURNSTILE_SECRET_KEY }}
           STRIPE_SHIPPED_WEBHOOK_SECRET: ${{ secrets.STRIPE_SHIPPED_WEBHOOK_SECRET }}
           STRIPE_TEST_SHIPPED_WEBHOOK_SECRET: ${{ secrets.STRIPE_TEST_SHIPPED_WEBHOOK_SECRET }}
-        run: node scripts/sync-worker-secrets.mjs staging
+        run: |
+          node scripts/sync-worker-secrets.mjs staging
+          put() {
+            local name="$1" value="$2"
+            if [ -z "$value" ]; then
+              echo "::error::$name is empty; archive-staging cannot run the new Shipped pipeline."
+              exit 1
+            fi
+            printf '%s' "$value" | npx wrangler secret put "$name" --env staging
+            echo "put $name on archive-staging"
+          }
+          put XAI_API_KEY "${XAI_API_KEY:-$XAI_KEY}"
+          put OPENAI_API_KEY "${OPENAI_API_KEY:-$OPENAI_KEY}"
+          put TINYFISH_API_KEY "${TINYFISH_API_KEY:-$TINYFISH}"
+          if [ -n "$PRODUCTHUNT_TOKEN" ]; then
+            printf '%s' "$PRODUCTHUNT_TOKEN" | npx wrangler secret put PRODUCTHUNT_TOKEN --env staging
+            echo "put PRODUCTHUNT_TOKEN on archive-staging"
+          elif [ -n "$PRODUCTHUNT_KEY" ] && [ -n "$PRODUCTHUNT_SECRET" ]; then
+            printf '%s' "$PRODUCTHUNT_KEY" | npx wrangler secret put PRODUCTHUNT_KEY --env staging
+            printf '%s' "$PRODUCTHUNT_SECRET" | npx wrangler secret put PRODUCTHUNT_SECRET --env staging
+            echo "put PRODUCTHUNT_KEY and PRODUCTHUNT_SECRET on archive-staging"
+          else
+            echo "::error::PRODUCTHUNT_TOKEN or PRODUCTHUNT_KEY+SECRET is empty; archive-staging cannot query Product Hunt."
+            exit 1
+          fi
+
+      # Booleans only: /api/shipped/state.sources lists which pipeline backends the Worker can see.
+      # Never prints secret values. Fails the deploy if xAI or Decisions did not land.
+      - name: Confirm Shipped pipeline on staging
+        run: |
+          node --input-type=module -e '
+            const url = "https://shipped-staging.brytonzoz.com/api/shipped/state";
+            const need = ["xai", "decisions"];
+            let last = "";
+            for (let i = 0; i < 8; i++) {
+              if (i) await new Promise((ok) => setTimeout(ok, 4000));
+              const res = await fetch(url, { cache: "no-store", headers: { "cache-control": "no-cache" } });
+              if (!res.ok) { last = "state HTTP " + res.status; continue; }
+              const body = await res.json();
+              const sources = body.generator?.sources ?? [];
+              last = "sources: " + sources.join(", ");
+              console.log(last);
+              const missing = need.filter((name) => !sources.includes(name));
+              if (!missing.length) {
+                if (!sources.includes("tinyfish")) console.log("::warning::tinyfish is not in sources");
+                if (!sources.includes("producthunt")) console.log("::warning::producthunt is not in sources");
+                process.exit(0);
+              }
+            }
+            console.error("staging Worker is missing pipeline sources after retries:", last);
+            process.exit(1);
+          '
 
       # Apple Pay needs the domain registered with Stripe (its verification file is public/.well-known).
       # Never fails the deploy: a wallet button that can't register simply doesn't show.

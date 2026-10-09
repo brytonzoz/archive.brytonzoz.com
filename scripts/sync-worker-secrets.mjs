@@ -52,6 +52,20 @@ const WHY_SKIPPED = {
 const set = Object.fromEntries(Object.entries(secrets).filter(([, value]) => value));
 for (const name of Object.keys(secrets).filter((name) => !set[name])) console.log(`::notice::${name} not set, so ${WHY_SKIPPED[name]}.`);
 
+if (target === 'staging') {
+  const required = ['XAI_API_KEY', 'OPENAI_API_KEY', 'TINYFISH_API_KEY'];
+  const missing = required.filter((name) => !set[name]);
+  if (!set.PRODUCTHUNT_TOKEN && !(set.PRODUCTHUNT_KEY && set.PRODUCTHUNT_SECRET)) {
+    missing.push('PRODUCTHUNT_TOKEN or PRODUCTHUNT_KEY+SECRET');
+  }
+  if (missing.length) {
+    console.error(
+      `::error::Staging must push the new pipeline keys now (XAI_KEY→XAI_API_KEY, OPENAI_KEY→OPENAI_API_KEY, TINYFISH, PRODUCTHUNT). Missing: ${missing.join(', ')}.`,
+    );
+    process.exit(1);
+  }
+}
+
 if (!Object.keys(set).length) {
   console.log('No Shipped secrets to set.');
   process.exit(0);

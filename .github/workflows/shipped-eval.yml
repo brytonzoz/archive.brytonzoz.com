@@ -62,7 +62,9 @@ jobs:
           OPENAI_API_KEY: ${{ secrets.OPENAI_KEY }}
           SHIPPED_YEAR: '2026'
           SHIPPED_MAX_SEARCHES: '3'
-          SHIPPED_XAI_MAX_POSTS: '8'
+          XAI_MAX_POSTS: '10'
+          SHIPPED_XAI_MAX_POSTS: '10'
+          XAI_MONTHLY_CAP_USD: '15'
         run: |
           if [ -z "$CLAUDE_KEY" ] && [ -z "$ANTHROPIC_API_KEY" ]; then
             echo "::error::CLAUDE_KEY (or ANTHROPIC_API_KEY) is not set. Commentary cannot be tested."

@@ -37,6 +37,7 @@ import { houseMark } from './shipped-marks';
 import { yearCardPng, yearRolloPdf, yearRolloPng, yearTallPng, type LogoResolver } from './shipped-og';
 import { PRINT_KIND, SPONSOR_KIND, isProduction, sponsorProvider, type PayEnv, type SponsorEvent } from './shipped-pay';
 import { brandIcon, candidatesFromIdentity, clean, faviconUrl, gather, hostOf, readSite, resolveIdentity, tinyfishAccess, type SourceEnv } from './shipped-sources';
+import { d1XaiMeter } from './shipped-xai';
 import { TINYFISH_DAILY, type TinyfishKind, type TinyfishMeter } from './shipped-tinyfish';
 import { checkFetchUrl, finalUrl } from './shipped-fetch';
 import {
@@ -227,6 +228,8 @@ const SCHEMA = [
   'CREATE INDEX IF NOT EXISTS shipped_takedowns_key ON shipped_takedowns (subject_key, status)',
   // TinyFish units used per UTC day, so we stay inside the free allowance.
   'CREATE TABLE IF NOT EXISTS shipped_tinyfish (day TEXT NOT NULL, kind TEXT NOT NULL, n INTEGER NOT NULL DEFAULT 0, PRIMARY KEY (day, kind))',
+  // xAI monthly spend (ticks). Fail closed to the free pipeline when the cap is reached.
+  'CREATE TABLE IF NOT EXISTS shipped_xai (month TEXT PRIMARY KEY, ticks INTEGER NOT NULL DEFAULT 0, posts INTEGER NOT NULL DEFAULT 0, receipts INTEGER NOT NULL DEFAULT 0)',
   // Sponsor bids: one row per checkout; at most one 'live' per slot (the holder).
   `CREATE TABLE IF NOT EXISTS shipped_bids (
     id INTEGER PRIMARY KEY AUTOINCREMENT, slot INTEGER NOT NULL, name TEXT NOT NULL, cta TEXT NOT NULL, url TEXT NOT NULL,
@@ -572,7 +575,7 @@ async function generate(
 ): Promise<Response> {
   const seed = seedOf(key);
   try {
-    const gathered = await gather(subject, env, year, tinyfishMeter(db));
+    const gathered = await gather(subject, Object.assign(Object.create(env) as typeof env, { xaiMeter: d1XaiMeter(db, env) }), year, tinyfishMeter(db));
     if (gathered.profile.name && !hasBlockedWord(gathered.profile.name)) subject.display = clean(gathered.profile.name, 60);
     let model: string | null = null;
     let usage = { input: 0, output: 0, searches: 0, cost: 0 };
@@ -666,6 +669,9 @@ async function generate(
         searches: usage.searches,
         xaiMicros: gathered.costs?.xaiMicros ?? 0,
         xaiUsd: Number(((gathered.costs?.xaiMicros ?? 0) / 1_000_000).toFixed(4)),
+        xaiTicks: gathered.costs?.xaiTicks ?? 0,
+        xaiHit: Boolean(gathered.costs?.xaiHit),
+        xaiPosts: gathered.costs?.xaiPosts ?? 0,
         decisionsMicros: gathered.costs?.decisionsMicros ?? 0,
         decisionsUsd: Number(((gathered.costs?.decisionsMicros ?? 0) / 1_000_000).toFixed(6)),
       }),

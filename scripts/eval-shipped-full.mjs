@@ -24,6 +24,7 @@ const builders = [
 const { readQuery } = await import('../lib/shipped-year.ts');
 const { gather, inYearCount } = await import('../worker/shipped-sources.ts');
 const { assembleReceipt, demoReceipt, cashierNoteLooksCanned } = await import('../worker/shipped-ai.ts');
+const { memoryXaiMeter } = await import('../worker/shipped-xai.ts');
 
 const pick = (...names) => names.map((n) => process.env[n]).find((v) => typeof v === 'string' && v.trim()) || '';
 // Eval is not on the Worker daily cap. Same always-allow meter as diagnose-shipped-research.mjs.
@@ -56,7 +57,10 @@ const env = {
   OPENAI_API_KEY: pick('OPENAI_KEY', 'OPENAI_API_KEY'),
   SHIPPED_MODEL: process.env.SHIPPED_MODEL || 'claude-haiku-5-5',
   SHIPPED_MAX_SEARCHES: process.env.SHIPPED_MAX_SEARCHES || '3',
-  SHIPPED_XAI_MAX_POSTS: process.env.SHIPPED_XAI_MAX_POSTS || '8',
+  XAI_MAX_POSTS: pick('XAI_MAX_POSTS', 'SHIPPED_XAI_MAX_POSTS') || '10',
+  SHIPPED_XAI_MAX_POSTS: pick('XAI_MAX_POSTS', 'SHIPPED_XAI_MAX_POSTS') || '10',
+  XAI_MONTHLY_CAP_USD: pick('XAI_MONTHLY_CAP_USD', 'SHIPPED_XAI_MONTHLY_CAP_USD') || '15',
+  xaiMeter: memoryXaiMeter(Number(pick('XAI_MONTHLY_CAP_USD', 'SHIPPED_XAI_MONTHLY_CAP_USD') || 15)),
 };
 
 const loose = (text) => String(text || '').toLowerCase().normalize('NFKD').replace(/[^a-z0-9]/g, '');
@@ -162,6 +166,9 @@ for (const builder of builders) {
     costUsd: Number((costMicros / 1_000_000).toFixed(4)),
     xaiMicros: gathered?.costs?.xaiMicros ?? 0,
     xaiUsd: Number(((gathered?.costs?.xaiMicros ?? 0) / 1_000_000).toFixed(4)),
+    xaiTicks: gathered?.costs?.xaiTicks ?? 0,
+    xaiHit: Boolean(gathered?.costs?.xaiHit),
+    xaiPosts: gathered?.costs?.xaiPosts ?? 0,
     decisionsMicros: gathered?.costs?.decisionsMicros ?? 0,
     decisionsUsd: Number(((gathered?.costs?.decisionsMicros ?? 0) / 1_000_000).toFixed(6)),
     sampleLines: (draft?.items ?? []).slice(0, 10).map(sampleLine),
@@ -201,6 +208,9 @@ const report = {
   totalCostUsd: Number((rows.reduce((n, r) => n + r.costUsd, 0)).toFixed(4)),
   meanCostUsd: Number((rows.reduce((n, r) => n + r.costUsd, 0) / Math.max(1, rows.length)).toFixed(4)),
   meanXaiUsd: Number((rows.reduce((n, r) => n + r.xaiUsd, 0) / Math.max(1, rows.length)).toFixed(4)),
+  xaiHitShare: Number((rows.filter((r) => r.xaiHit).length / Math.max(1, rows.length)).toFixed(3)),
+  meanXaiUsdWhenHit: Number((rows.filter((r) => r.xaiHit).reduce((n, r) => n + r.xaiUsd, 0) / Math.max(1, rows.filter((r) => r.xaiHit).length)).toFixed(4)),
+  totalXaiTicks: rows.reduce((n, r) => n + (r.xaiTicks || 0), 0),
   meanDecisionsUsd: Number((rows.reduce((n, r) => n + r.decisionsUsd, 0) / Math.max(1, rows.length)).toFixed(6)),
   meanReceiptItems: Number((rows.reduce((n, r) => n + r.receiptItems, 0) / Math.max(1, rows.length)).toFixed(1)),
   templatedNotes: rows.filter((r) => r.noteTemplated).map((r) => r.query),
@@ -227,7 +237,7 @@ const md = [
   `- Mean items / receipt: ${report.meanReceiptItems}`,
   `- Total Claude cost: $${report.totalCostUsd}`,
   `- Mean Claude / receipt: $${report.meanCostUsd}`,
-  `- Mean xAI / receipt: $${report.meanXaiUsd}`,
+  `- Mean xAI / receipt: $${report.meanXaiUsd} (${(report.xaiHitShare * 100).toFixed(0)}% hit xAI; $${report.meanXaiUsdWhenHit} when hit; ${report.totalXaiTicks} ticks)`,
   `- Mean Decisions / receipt: $${report.meanDecisionsUsd}`,
   report.templatedNotes.length ? `- Templated notes: ${report.templatedNotes.join(', ')}` : '- Templated notes: none',
   `- Notes naming a receipt item: ${rows.filter((r) => r.noteMentionsItem).length}/${rows.length}`,
@@ -236,7 +246,7 @@ const md = [
   '| --- | --- | ---: | ---: | ---: | ---: | --- |',
   ...rows.map(
     (r) =>
-      `| ${r.set} | ${r.query} | ${r.receiptItems} | ${r.set === 'leaders' ? '—' : `${(r.recall * 100).toFixed(0)}%`} | $${r.decisionsUsd.toFixed(6)} | $${r.xaiUsd.toFixed(4)} | ${r.note.replace(/\|/g, '/')} |`,
+      `| ${r.set} | ${r.query} | ${r.receiptItems} | ${r.set === 'leaders' ? '—' : `${(r.recall * 100).toFixed(0)}%`} | $${r.decisionsUsd.toFixed(6)} | ${r.xaiHit ? `$${r.xaiUsd.toFixed(4)}` : '—'} | ${r.note.replace(/\|/g, '/')} |`,
   ),
   '',
   '## Receipts (10 sample lines each)',
@@ -268,6 +278,8 @@ console.log(
       medianRecallOriginal: report.medianRecallOriginal,
       medianRecallHeldOut: report.medianRecallHeldOut,
       totalCostUsd: report.totalCostUsd,
+      meanXaiUsd: report.meanXaiUsd,
+      xaiHitShare: report.xaiHitShare,
       templatedNotes: report.templatedNotes,
       notesNamingItem: rows.filter((r) => r.noteMentionsItem).length,
     },

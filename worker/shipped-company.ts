@@ -3,7 +3,7 @@
 // (when XAI_API_KEY is set) the company's X announcements. No per-visitor deep research.
 import { extraResearchPaths } from './shipped-research';
 import { companyScope, companySlug, type Affiliation } from './shipped-affiliation';
-import { searchXShips, type XaiEnv, type XaiSpend, emptyXaiSpend } from './shipped-xai';
+import { type XaiEnv, type XaiSpend, emptyXaiSpend } from './shipped-xai';
 import {
   cached,
   clean,
@@ -110,14 +110,21 @@ async function githubOrgShips(org: string, env: SourceEnv, year: number): Promis
     signal: AbortSignal.timeout(7000),
   }).catch(() => null);
   if (!response?.ok) return [];
-  const repos = (await response.json().catch(() => [])) as { name?: string; html_url?: string; description?: string; pushed_at?: string; created_at?: string; stargazers_count?: number }[];
+  const repos = (await response.json().catch(() => [])) as {
+    name?: string;
+    html_url?: string;
+    description?: string;
+    pushed_at?: string;
+    created_at?: string;
+    stargazers_count?: number;
+    fork?: boolean;
+  }[];
   if (!Array.isArray(repos)) return [];
-  return repos
-    .filter((repo) => {
-      const pushed = typeof repo.pushed_at === 'string' ? repo.pushed_at : '';
-      const created = typeof repo.created_at === 'string' ? repo.created_at : '';
-      return pushed.startsWith(String(year)) || created.startsWith(String(year));
-    })
+  const own = repos.filter((repo) => !repo.fork);
+  const createdThisYear = own.filter((repo) => typeof repo.created_at === 'string' && repo.created_at.startsWith(String(year)));
+  const releaseItems = await githubOrgReleases(login, own, env, year).catch(() => []);
+  const repoItems = createdThisYear
+    .slice(0, 40)
     .map((repo): Found => {
       const created = typeof repo.created_at === 'string' && repo.created_at.startsWith(String(year));
       return {
@@ -134,6 +141,54 @@ async function githubOrgShips(org: string, env: SourceEnv, year: number): Promis
       };
     })
     .filter((item) => item.name && item.link);
+  return [...releaseItems, ...repoItems];
+}
+
+async function githubOrgReleases(
+  org: string,
+  repos: { name?: string }[],
+  env: SourceEnv,
+  year: number,
+): Promise<Found[]> {
+  const targets = repos.map((repo) => repo.name).filter((name): name is string => Boolean(name)).slice(0, 8);
+  const pages = await Promise.all(
+    targets.map((name) =>
+      fetch(`https://api.github.com/repos/${encodeURIComponent(org)}/${encodeURIComponent(name)}/releases?per_page=6`, {
+        headers: {
+          'user-agent': 'brytonzoz.com-shipped (+https://shipped.brytonzoz.com/)',
+          accept: 'application/vnd.github+json',
+          ...(env.GITHUB_TOKEN ? { authorization: `Bearer ${env.GITHUB_TOKEN}` } : {}),
+        },
+        signal: AbortSignal.timeout(7000),
+      })
+        .then(async (response) => (response.ok ? ((await response.json()) as { name?: string; tag_name?: string; html_url?: string; published_at?: string; body?: string }[]) : []))
+        .catch(() => [] as { name?: string; tag_name?: string; html_url?: string; published_at?: string; body?: string }[]),
+    ),
+  );
+  const found: Found[] = [];
+  for (const releases of pages) {
+    if (!Array.isArray(releases)) continue;
+    for (const release of releases) {
+      const published = typeof release.published_at === 'string' ? release.published_at : '';
+      if (!published.startsWith(String(year))) continue;
+      const name = clean(release.name || release.tag_name, 60);
+      const link = publicUrl(release.html_url);
+      if (!name || !link) continue;
+      found.push({
+        name,
+        description: clean(release.body, 140),
+        date: published.slice(0, 10),
+        dateConfidence: 'exact',
+        link,
+        icon: null,
+        source: 'company',
+        status: 'RELEASED',
+        score: 7,
+        thisYear: true,
+      });
+    }
+  }
+  return found;
 }
 
 export async function harvestCompany(opts: {
@@ -146,11 +201,12 @@ export async function harvestCompany(opts: {
   if (!slug || companyScope(affiliation.role) === 'none') {
     return { found: [], spend: emptyXaiSpend(), ran: [], cacheHit: false };
   }
-  return cached(`company:v2:${year}:${slug}`, 1440 * MIN, async () => {
+  // Company lists are shared for 7 days. No xAI here — that is a per-person gap-fill only.
+  return cached(`company:v3:${year}:${slug}`, 7 * 1440 * MIN, async () => {
     const via = viaFor(affiliation);
     const ran: string[] = [];
     const found: Found[] = [];
-    let spend = emptyXaiSpend();
+    const spend = emptyXaiSpend();
     const sites = [affiliation.companySite, ...hostGuesses(affiliation.company ?? '')].filter((u): u is string => Boolean(u));
     const seenHost = new Set<string>();
     for (const site of sites.slice(0, 5)) {
@@ -170,19 +226,6 @@ export async function harvestCompany(opts: {
       found.push(...withVia(orgItems, via));
       ran.push(`company-github:${org}`);
     }
-    const companyHandle = affiliation.companyX;
-    const x = await searchXShips({
-      env,
-      year,
-      handles: companyHandle ? [companyHandle] : [],
-      who: affiliation.company || companyHandle || slug,
-      kind: 'company',
-      maxPosts: 4,
-      allowWebOnly: true,
-    });
-    found.push(...withVia(x.found, via));
-    spend = x.spend;
-    if (x.found.length || x.spend.costMicros) ran.push('company-xai');
     const scoped =
       companyScope(affiliation.role) === 'product' && affiliation.product
         ? found.filter((item) => {

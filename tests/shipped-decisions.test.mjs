@@ -65,18 +65,26 @@ test('heuristic keep/drop matches the Decisions product threshold', () => {
   assert.equal(decisions.shouldKeep(old), false);
 });
 
-test('xAI lists sourced ships without slicing to the post-cost cap', async () => {
+test('xAI is a keyword gap-fill with a hard post cap and monthly fail-closed', async () => {
+  assert.equal(xai.xaiMaxPosts({}), 10);
+  assert.equal(xai.xaiMaxPosts({ XAI_MAX_POSTS: '10' }), 10);
+  assert.equal(xai.xaiKeywordQuery('sama', 2026), 'from:sama (shipped OR launched OR live OR released) since:2026-01-01');
+  assert.equal(xai.xaiShouldGapFill(1, true), true);
+  assert.equal(xai.xaiShouldGapFill(6, true), false);
+  assert.equal(xai.xaiShouldGapFill(1, false), false);
+  assert.equal(xai.ticksToMicros(37_756_000), 3776);
+  assert.equal(xai.ticksToUsd(10_000_000_000), 1);
+  const meter = xai.memoryXaiMeter(0);
+  assert.equal(await meter.allow(), false);
   const empty = await xai.searchXShips({
-    env: {},
+    env: { XAI_API_KEY: 'sk-test', xaiMeter: meter },
     year: 2026,
-    handles: [],
-    who: 'OpenAI',
-    kind: 'company',
-    allowWebOnly: true,
+    handles: ['sama'],
+    who: 'sama',
+    kind: 'person',
   });
   assert.equal(empty.found.length, 0);
   assert.equal(empty.spend.costMicros, 0);
-  assert.ok(xai.xaiMaxPosts({}) >= 8);
 });
 
 test('Decisions and xAI skip when the key is missing', async () => {

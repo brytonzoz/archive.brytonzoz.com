@@ -10,7 +10,7 @@
 //   PRODUCTHUNT_SECRET    client_credentials grant, cached until it expires (PRODUCTHUNT_TOKEN also works)
 //   TINYFISH_API_KEY      TinyFish Search + Fetch (free endpoints only)
 //   BRANDFETCH_API        Brandfetch Brand API: a brand's real icon before the site's own icon or favicon
-//   XAI_API_KEY           xAI Responses (X search + web) for launch posts. Absent → skip
+//   XAI_API_KEY           xAI gap-fill only (x_keyword_search). Absent or monthly cap closed → skip
 //   OPENAI_API_KEY        OpenAI Decisions only (POST /v1/decisions, gpt-6-luna). Never any other OpenAI endpoint
 import type { Candidate, ItemSource, ItemStatus, Subject } from '../lib/shipped-year';
 import { isDomain, isGithubLogin, isXHandle } from '../lib/shipped-year';
@@ -61,7 +61,11 @@ export interface SourceEnv {
   XAI_API_KEY?: string;
   XAI_API_BASE?: string;
   SHIPPED_XAI_MODEL?: string;
+  XAI_MAX_POSTS?: string;
   SHIPPED_XAI_MAX_POSTS?: string;
+  XAI_MONTHLY_CAP_USD?: string;
+  SHIPPED_XAI_MONTHLY_CAP_USD?: string;
+  xaiMeter?: import('./shipped-xai').XaiMeter;
   OPENAI_API_KEY?: string;
   OPENAI_API_BASE?: string;
 }
@@ -142,7 +146,7 @@ export type Gathered = {
   stats?: import('./shipped-research').SourcedStat[];
   gaps?: string[];
   coverageCapped?: boolean;
-  costs?: { xaiMicros: number; decisionsMicros: number };
+  costs?: { xaiMicros: number; decisionsMicros: number; xaiTicks?: number; xaiHit?: boolean; xaiPosts?: number };
 };
 
 export type SourceContext = {
@@ -1562,7 +1566,7 @@ function dedupeFound(found: Found[]): Found[] {
 export async function gather(subject: Subject, env: SourceEnv, year: number, meter: TinyfishMeter | null = null): Promise<Gathered> {
   const tinyfish = tinyfishAccess(env, meter);
   const resolved = await resolveIdentity(subject, env, tinyfish);
-  return cached(`gather:v8:${year}:${resolved.cacheKey}`, 1440 * MIN, () => gatherFresh(subject, resolved.profile, env, year, meter, tinyfish, resolved.notes));
+  return cached(`gather:v9:${year}:${resolved.cacheKey}`, 1440 * MIN, () => gatherFresh(subject, resolved.profile, env, year, meter, tinyfish, resolved.notes));
 }
 
 async function gatherFresh(
@@ -1737,36 +1741,17 @@ async function gatherFresh(
   profile.affiliation = affiliation;
 
   let xaiMicros = 0;
+  let xaiTicks = 0;
+  let xaiPosts = 0;
+  let xaiHit = false;
   let decisionsMicros = 0;
   try {
     const { harvestCompany } = await import('./shipped-company');
     const company = await harvestCompany({ affiliation, year, env });
     if (company.found.length) found.push(...company.found);
     ran.push(...company.ran);
-    xaiMicros += company.spend.costMicros;
   } catch {
     failed.push('company-harvest');
-  }
-
-  try {
-    const { searchXShips, xaiEnabled } = await import('./shipped-xai');
-    if (xaiEnabled(env) && (profile.x || who || affiliation.company)) {
-      const personX = await searchXShips({
-        env,
-        year,
-        handles: profile.x ? [profile.x] : [],
-        who,
-        company: affiliation.company,
-        kind: 'person',
-        maxPosts: 4,
-        allowWebOnly: !profile.x,
-      });
-      found.push(...personX.found);
-      xaiMicros += personX.spend.costMicros;
-      if (personX.found.length || personX.spend.costMicros) ran.push(profile.x ? 'xai-person' : 'xai-person-web');
-    }
-  } catch {
-    failed.push('xai-person');
   }
 
   deduped = dedupeFound(found).map((item) => ({ ...item, description: describeWithStat(item) }));
@@ -1784,6 +1769,55 @@ async function gatherFresh(
     ran.push('decisions:heuristic');
   }
 
+  const prolific = Boolean(profile.github || profile.site || affiliation.company || (profile.bio && profile.bio.length > 20));
+  try {
+    const { searchXShips, resolveRoleWithXai, xaiConfigured, xaiShouldGapFill } = await import('./shipped-xai');
+    if (xaiConfigured(env) && !profile.x && !affiliation.company && subject.kind === 'name') {
+      const ident = await resolveRoleWithXai({ env, who });
+      xaiMicros += ident.spend.costMicros;
+      xaiTicks += ident.spend.ticks;
+      xaiPosts += ident.spend.posts;
+      if (ident.spend.ticks || ident.spend.costMicros) {
+        xaiHit = true;
+        ran.push('xai-identity');
+      }
+      if (ident.handle) profile.x = ident.handle;
+      if (ident.company && !affiliation.company) affiliation.company = ident.company;
+    }
+    if (xaiConfigured(env) && xaiShouldGapFill(deduped.length, prolific) && profile.x) {
+      const personX = await searchXShips({
+        env,
+        year,
+        handles: [profile.x],
+        who,
+        company: affiliation.company,
+        kind: 'person',
+      });
+      xaiMicros += personX.spend.costMicros;
+      xaiTicks += personX.spend.ticks;
+      xaiPosts += personX.spend.posts;
+      if (personX.spend.ticks || personX.spend.costMicros || personX.found.length) {
+        xaiHit = true;
+        ran.push('xai-gapfill');
+      }
+      if (personX.found.length) {
+        found.push(...personX.found);
+        const { verifyCandidates, dedupeSameShips, sortBySignificance } = await import('./shipped-decisions');
+        const extra = await verifyCandidates({ env, items: personX.found, year, who, affiliation, via });
+        decisionsMicros += extra.spend.costMicros;
+        const same = await dedupeSameShips({ env, items: [...deduped, ...extra.items] });
+        decisionsMicros += same.spend.costMicros;
+        deduped = sortBySignificance(same.items);
+      }
+    } else if (xaiConfigured(env) && xaiShouldGapFill(deduped.length, prolific) && !profile.x) {
+      ran.push('xai-skipped:no-handle');
+    } else if (xaiConfigured(env)) {
+      ran.push(deduped.length >= 6 ? 'xai-skipped:enough' : 'xai-skipped:not-prolific');
+    }
+  } catch {
+    failed.push('xai-gapfill');
+  }
+
   stats = mergeStats([pageStats, deduped.flatMap((item) => item.metrics ?? [])]);
   return {
     ...draft,
@@ -1792,7 +1826,7 @@ async function gatherFresh(
     stats,
     gaps: detectGaps({ ...draft, found: deduped, stats, profile }),
     coverageCapped: false,
-    costs: { xaiMicros, decisionsMicros },
+    costs: { xaiMicros, decisionsMicros, xaiTicks, xaiHit, xaiPosts },
     ran,
     failed,
   };

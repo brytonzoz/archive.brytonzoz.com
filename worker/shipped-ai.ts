@@ -1,6 +1,6 @@
-// "Shipped in <year>": harvest (free sources, xAI X search, company changelogs) prints the lines.
-// OpenAI Decisions (gpt-6-luna, /v1/decisions only) verifies and ranks them. Claude writes the
-// cashier note; Anthropic web_search is a last resort when the tape is still thin and xAI did not run.
+// "Shipped in <year>": harvest (free sources, company changelogs) prints the lines.
+// OpenAI Decisions (gpt-6-luna, /v1/decisions only) verifies and ranks them. xAI x_search is a
+// gap-fill only when a prolific tape is still thin. Claude writes the cashier note.
 // Without ANTHROPIC_API_KEY (staging), demoReceipt prints the harvested lines with a canned note.
 import type { ItemStatus, Subject } from '../lib/shipped-year';
 import { ITEM_STATUSES } from '../lib/shipped-year';
@@ -539,7 +539,7 @@ export async function assembleReceipt(subject: Subject, gathered: Gathered, year
   const model = env.SHIPPED_MODEL || DEFAULT_MODEL;
   const searches = maxSearches(env);
   const harvested = harvestItems(gathered, year);
-  const xaiRan = gathered.ran.some((tag) => tag.includes('xai'));
+  const xaiRan = gathered.ran.some((tag) => tag === 'xai-gapfill' || tag === 'xai-identity' || tag === 'xai-person');
   const allowed = new Allowed();
   for (const item of gathered.found) allowed.add(item.link);
   for (const result of gathered.web) allowed.add(result.url);

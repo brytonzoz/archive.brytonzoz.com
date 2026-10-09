@@ -1,41 +1,159 @@
-// xAI (Grok) is the paid search source: X search + web, capped hard per receipt, cached 24h
-// per person handle and per company. Absent XAI_API_KEY → skip. Docs: POST /v1/responses,
-// tools x_search + web_search (https://docs.x.ai/developers/tools/x-search). grok-4.3 tokens
-// plus $5/1k X posts and $5/1k web calls.
+// xAI is a GAP-FILL only. Free sources (GitHub, PH, App Store, npm, HN, changelogs, TinyFish)
+// plus OpenAI Decisions run first. x_search runs when a prolific-looking person still has
+// fewer than ~6 verified lines, or to resolve a missing handle/role. Absent XAI_API_KEY,
+// or a closed monthly cap, skips to the non-xAI pipeline.
+//
+// Billing (docs.x.ai): x_search is $5/1k posts fetched + $10/1k profiles; web_search $5/1k
+// calls; plus tokens. Exact charge is usage.cost_in_usd_ticks (1 USD = 1e10 ticks).
 import { clean, publicUrl, type Found } from './shipped-sources';
 import type { Affiliation } from './shipped-affiliation';
 
 export const XAI_RESPONSES = 'https://api.x.ai/v1/responses';
-export const XAI_MODEL = 'grok-4.3';
-/** $1.25 / $2.50 per 1M tokens (grok-4.3, under 200k). */
-const IN_PER_M = 1.25;
-const OUT_PER_M = 2.5;
-/** $5 per 1,000 X posts fetched; $5 per 1,000 web_search calls. */
+/** Cheap tools-capable Grok. Override with SHIPPED_XAI_MODEL. */
+export const XAI_MODEL = 'grok-4-fast-non-reasoning';
+/** Fallback token estimate when cost_in_usd_ticks is missing. */
+const IN_PER_M = 0.2;
+const OUT_PER_M = 0.5;
 export const XAI_POST_MICROS = 5_000;
+export const XAI_PROFILE_MICROS = 10_000;
 export const XAI_WEB_MICROS = 5_000;
+export const XAI_TICKS_PER_USD = 10_000_000_000;
+export const XAI_GAP_BELOW = 6;
+export const XAI_DEFAULT_MAX_POSTS = 10;
+export const XAI_HARD_MAX_POSTS = 25;
+export const XAI_DEFAULT_MONTHLY_USD = 15;
 
 export type XaiEnv = {
   XAI_API_KEY?: string;
   XAI_API_BASE?: string;
   SHIPPED_XAI_MODEL?: string;
-  /** Max X posts one search may fetch (default 8 → $0.04). */
+  XAI_MAX_POSTS?: string;
   SHIPPED_XAI_MAX_POSTS?: string;
+  XAI_MONTHLY_CAP_USD?: string;
+  SHIPPED_XAI_MONTHLY_CAP_USD?: string;
+  xaiMeter?: XaiMeter;
 };
 
-export type XaiSpend = { inputTokens: number; outputTokens: number; posts: number; web: number; costMicros: number };
+export type XaiSpend = {
+  inputTokens: number;
+  outputTokens: number;
+  posts: number;
+  profiles: number;
+  web: number;
+  ticks: number;
+  costMicros: number;
+};
 
-export const emptyXaiSpend = (): XaiSpend => ({ inputTokens: 0, outputTokens: 0, posts: 0, web: 0, costMicros: 0 });
+export type XaiMeter = {
+  allow: () => Promise<boolean>;
+  record: (spend: XaiSpend) => Promise<void>;
+};
 
-export function xaiEnabled(env: XaiEnv): boolean {
+export const emptyXaiSpend = (): XaiSpend => ({
+  inputTokens: 0,
+  outputTokens: 0,
+  posts: 0,
+  profiles: 0,
+  web: 0,
+  ticks: 0,
+  costMicros: 0,
+});
+
+export function xaiConfigured(env: XaiEnv): boolean {
   return Boolean(env.XAI_API_KEY?.trim());
 }
 
-export function xaiMaxPosts(env: XaiEnv): number {
-  return Math.min(12, Math.max(0, Math.round(Number(env.SHIPPED_XAI_MAX_POSTS ?? 8)) || 0));
+/** @deprecated use xaiConfigured; enabled also needs the monthly cap (async). */
+export function xaiEnabled(env: XaiEnv): boolean {
+  return xaiConfigured(env);
 }
 
-export function xaiCostMicros(spend: Omit<XaiSpend, 'costMicros'>): number {
-  return Math.ceil(spend.inputTokens * IN_PER_M + spend.outputTokens * OUT_PER_M) + spend.posts * XAI_POST_MICROS + spend.web * XAI_WEB_MICROS;
+export function xaiMaxPosts(env: XaiEnv): number {
+  const raw = env.XAI_MAX_POSTS ?? env.SHIPPED_XAI_MAX_POSTS ?? String(XAI_DEFAULT_MAX_POSTS);
+  return Math.min(XAI_HARD_MAX_POSTS, Math.max(0, Math.round(Number(raw)) || 0));
+}
+
+export function xaiMonthlyCapUsd(env: XaiEnv): number {
+  const raw = env.XAI_MONTHLY_CAP_USD ?? env.SHIPPED_XAI_MONTHLY_CAP_USD ?? String(XAI_DEFAULT_MONTHLY_USD);
+  const n = Number(raw);
+  return Number.isFinite(n) && n >= 0 ? n : XAI_DEFAULT_MONTHLY_USD;
+}
+
+export function ticksToMicros(ticks: number): number {
+  if (!Number.isFinite(ticks) || ticks <= 0) return 0;
+  return Math.round(ticks / 10_000);
+}
+
+export function ticksToUsd(ticks: number): number {
+  if (!Number.isFinite(ticks) || ticks <= 0) return 0;
+  return ticks / XAI_TICKS_PER_USD;
+}
+
+export function xaiCostMicros(spend: Omit<XaiSpend, 'costMicros' | 'ticks'> & { ticks?: number }): number {
+  if (spend.ticks && spend.ticks > 0) return ticksToMicros(spend.ticks);
+  return (
+    Math.ceil(spend.inputTokens * IN_PER_M + spend.outputTokens * OUT_PER_M) +
+    spend.posts * XAI_POST_MICROS +
+    spend.profiles * XAI_PROFILE_MICROS +
+    spend.web * XAI_WEB_MICROS
+  );
+}
+
+/** Free harvest + Decisions first. xAI only when a prolific tape is still thin. */
+export function xaiShouldGapFill(verified: number, prolific: boolean): boolean {
+  return prolific && verified < XAI_GAP_BELOW;
+}
+
+export function xaiKeywordQuery(handle: string, year: number): string {
+  const who = handle.replace(/^@/, '');
+  return `from:${who} (shipped OR launched OR live OR released) since:${year}-01-01`;
+}
+
+export function memoryXaiMeter(capUsd = XAI_DEFAULT_MONTHLY_USD): XaiMeter & { ticks: number; receipts: number } {
+  const state = { ticks: 0, receipts: 0 };
+  const capTicks = capUsd * XAI_TICKS_PER_USD;
+  return {
+    get ticks() {
+      return state.ticks;
+    },
+    get receipts() {
+      return state.receipts;
+    },
+    async allow() {
+      return state.ticks < capTicks;
+    },
+    async record(spend) {
+      state.ticks += spend.ticks || spend.costMicros * 10_000;
+      if (spend.ticks || spend.costMicros) state.receipts += 1;
+    },
+  };
+}
+
+export function xaiMonthKey(at = new Date()): string {
+  return `${at.getUTCFullYear()}-${String(at.getUTCMonth() + 1).padStart(2, '0')}`;
+}
+
+export function d1XaiMeter(db: D1Database, env: XaiEnv): XaiMeter {
+  const month = xaiMonthKey();
+  const capTicks = xaiMonthlyCapUsd(env) * XAI_TICKS_PER_USD;
+  return {
+    async allow() {
+      const row = await db.prepare('SELECT ticks FROM shipped_xai WHERE month = ?').bind(month).first<{ ticks: number }>().catch(() => null);
+      return (row?.ticks ?? 0) < capTicks;
+    },
+    async record(spend) {
+      const ticks = spend.ticks || spend.costMicros * 10_000;
+      if (!ticks) return;
+      await db
+        .prepare(
+          `INSERT INTO shipped_xai (month, ticks, posts, receipts) VALUES (?, ?, ?, 1)
+           ON CONFLICT(month) DO UPDATE SET ticks = ticks + excluded.ticks, posts = posts + excluded.posts, receipts = receipts + 1`,
+        )
+        .bind(month, ticks, spend.posts)
+        .run()
+        .catch((error) => console.warn('shipped: xai-meter', error instanceof Error ? error.message : error));
+    },
+  };
 }
 
 type ResponsesBody = {
@@ -44,7 +162,13 @@ type ResponsesBody = {
   usage?: {
     input_tokens?: number;
     output_tokens?: number;
-    server_side_tool_usage_details?: { x_posts_fetched?: number; web_search_calls?: number; x_search_calls?: number };
+    cost_in_usd_ticks?: number;
+    server_side_tool_usage_details?: {
+      x_posts_fetched?: number;
+      x_users_fetched?: number;
+      web_search_calls?: number;
+      x_search_calls?: number;
+    };
   };
 };
 
@@ -95,9 +219,36 @@ function parseShips(text: string, year: number): Found[] {
   return found;
 }
 
+function parseIdentity(text: string): { handle: string | null; company: string | null; role: string | null } {
+  const start = text.indexOf('{');
+  const end = text.lastIndexOf('}');
+  if (start < 0 || end <= start) return { handle: null, company: null, role: null };
+  try {
+    const raw = JSON.parse(text.slice(start, end + 1)) as Record<string, unknown>;
+    const handle = typeof raw.handle === 'string' ? raw.handle.replace(/^@/, '').trim() : '';
+    return {
+      handle: /^[A-Za-z0-9_]{1,15}$/.test(handle) ? handle : null,
+      company: typeof raw.company === 'string' ? clean(raw.company, 40) || null : null,
+      role: typeof raw.role === 'string' ? clean(raw.role, 20) || null : null,
+    };
+  } catch {
+    return { handle: null, company: null, role: null };
+  }
+}
+
+async function xaiOpen(env: XaiEnv): Promise<boolean> {
+  if (!xaiConfigured(env)) return false;
+  if (!env.xaiMeter) return true;
+  return env.xaiMeter.allow();
+}
+
 async function xaiResponses(env: XaiEnv, payload: Record<string, unknown>): Promise<{ body: ResponsesBody; spend: XaiSpend } | null> {
   const key = env.XAI_API_KEY?.trim();
   if (!key) return null;
+  if (!(await xaiOpen(env))) {
+    console.log(JSON.stringify({ shipped: 'xai', skipped: 'monthly-cap' }));
+    return null;
+  }
   const base = (env.XAI_API_BASE || 'https://api.x.ai/v1').replace(/\/+$/, '');
   const model = env.SHIPPED_XAI_MODEL || XAI_MODEL;
   const response = await fetch(`${base}/responses`, {
@@ -113,13 +264,18 @@ async function xaiResponses(env: XaiEnv, payload: Record<string, unknown>): Prom
   const body = (await response.json().catch(() => null)) as ResponsesBody | null;
   if (!body) return null;
   const details = body.usage?.server_side_tool_usage_details ?? {};
+  const ticks = body.usage?.cost_in_usd_ticks ?? 0;
   const spendBase = {
     inputTokens: body.usage?.input_tokens ?? 0,
     outputTokens: body.usage?.output_tokens ?? 0,
     posts: details.x_posts_fetched ?? 0,
+    profiles: details.x_users_fetched ?? 0,
     web: details.web_search_calls ?? 0,
+    ticks,
   };
-  return { body, spend: { ...spendBase, costMicros: xaiCostMicros(spendBase) } };
+  const spend = { ...spendBase, costMicros: xaiCostMicros(spendBase) };
+  await env.xaiMeter?.record(spend);
+  return { body, spend };
 }
 
 export async function searchXShips(opts: {
@@ -129,40 +285,70 @@ export async function searchXShips(opts: {
   who: string;
   company?: string | null;
   kind: 'person' | 'company';
-  /** Cap X posts fetched (cost), not how many sourced ships the model may list. */
   maxPosts?: number;
-  /** Web search without an X handle (typed "Tibo from OpenAI", "CEO of Higgsfield"). */
-  allowWebOnly?: boolean;
 }): Promise<{ found: Found[]; spend: XaiSpend }> {
   const posts = Math.min(xaiMaxPosts(opts.env), opts.maxPosts ?? xaiMaxPosts(opts.env));
-  if (!xaiEnabled(opts.env)) return { found: [], spend: emptyXaiSpend() };
-  const handles = [...new Set(opts.handles.map((h) => h.replace(/^@/, '')).filter(Boolean))].slice(0, 8);
-  const useX = handles.length > 0 && posts > 0;
-  if (!useX && !opts.allowWebOnly) return { found: [], spend: emptyXaiSpend() };
-  const prompt =
-    opts.kind === 'company'
-      ? `List every distinct product, model, feature, API, app, and launch ${opts.who} shipped in ${opts.year} (from ${opts.year}-01-01 through today). Use X and the public web (blog, changelog, news, docs). Only real ships that are live, released, launched, or GA — not hiring, teasers, opinions, or roadmaps. Return as many distinct ships as you can prove, each with a real public URL (blog, changelog, news, or X). JSON only: {"ships":[{"name":"","date":"YYYY-MM-DD or null","url":"https://...","why":""}]}`
-      : `List every distinct thing ${opts.who}${opts.company ? ` (at ${opts.company})` : ''} shipped in ${opts.year}: products, features, launches, releases, models, and company ships they lead or founded. Use X and the public web. Only real ships with a public URL. JSON only: {"ships":[{"name":"","date":"YYYY-MM-DD or null","url":"https://...","why":""}]}`;
-  const tools: Record<string, unknown>[] = [];
-  if (useX) {
-    tools.push({
-      type: 'x_search',
-      allowed_x_handles: handles,
-      from_date: `${opts.year}-01-01`,
-      to_date: `${opts.year + 1}-01-01`,
-    });
-  }
-  tools.push({ type: 'web_search' });
+  const handles = [...new Set(opts.handles.map((h) => h.replace(/^@/, '')).filter(Boolean))].slice(0, 4);
+  if (!xaiConfigured(opts.env) || posts <= 0 || !handles.length) return { found: [], spend: emptyXaiSpend() };
+  const query = xaiKeywordQuery(handles[0], opts.year);
+  const prompt = [
+    `Gap-fill only. Run ONE x_keyword_search with this exact query (do not change it):`,
+    query,
+    `Fetch at most ${posts} latest posts. Do NOT call x_semantic_search, x_user_search, or x_thread_fetch — the handle is already known.`,
+    `List distinct ${opts.year} ships by ${opts.who}${opts.company ? ` (at ${opts.company})` : ''} that those posts prove, each with a real public URL.`,
+    `JSON only: {"ships":[{"name":"","date":"YYYY-MM-DD or null","url":"https://...","why":""}]}`,
+  ].join('\n');
   const result = await xaiResponses(opts.env, {
     input: [{ role: 'user', content: prompt }],
-    tools,
-    max_turns: 2,
+    tools: [
+      {
+        type: 'x_search',
+        allowed_x_handles: handles,
+        from_date: `${opts.year}-01-01`,
+        to_date: `${opts.year + 1}-01-01`,
+        enable_image_understanding: false,
+        enable_video_understanding: false,
+      },
+    ],
+    max_turns: 1,
   });
   if (!result) return { found: [], spend: emptyXaiSpend() };
-  // Post cap is a fetch-cost guard. The tape may list every sourced ship the tools proved.
-  const found = parseShips(outputText(result.body), opts.year).slice(0, 80);
-  console.log(JSON.stringify({ shipped: 'xai', kind: opts.kind, who: opts.who, items: found.length, ...result.spend }));
+  const found = parseShips(outputText(result.body), opts.year).slice(0, 40);
+  console.log(
+    JSON.stringify({
+      shipped: 'xai',
+      kind: opts.kind,
+      who: opts.who,
+      items: found.length,
+      query,
+      ticks: result.spend.ticks,
+      costUsd: Number(ticksToUsd(result.spend.ticks).toFixed(6)),
+      ...result.spend,
+    }),
+  );
   return { found, spend: result.spend };
+}
+
+/** One cheap identity call when free resolve found no handle and no company. */
+export async function resolveRoleWithXai(opts: {
+  env: XaiEnv;
+  who: string;
+}): Promise<{ handle: string | null; company: string | null; role: string | null; spend: XaiSpend }> {
+  if (!xaiConfigured(opts.env) || !opts.who.trim()) return { handle: null, company: null, role: null, spend: emptyXaiSpend() };
+  const result = await xaiResponses(opts.env, {
+    input: [
+      {
+        role: 'user',
+        content: `Who is "${opts.who}" on X? Return JSON only: {"handle":"","company":"","role":"ceo|founder|lead|employee|unknown"}. One x_user_search at most. Do not fetch posts or threads.`,
+      },
+    ],
+    tools: [{ type: 'x_search', enable_image_understanding: false, enable_video_understanding: false }],
+    max_turns: 1,
+  });
+  if (!result) return { handle: null, company: null, role: null, spend: emptyXaiSpend() };
+  const ident = parseIdentity(outputText(result.body));
+  console.log(JSON.stringify({ shipped: 'xai-identity', who: opts.who, ...ident, ticks: result.spend.ticks, costUsd: Number(ticksToUsd(result.spend.ticks).toFixed(6)) }));
+  return { ...ident, spend: result.spend };
 }
 
 export async function searchPersonAndCompanyX(opts: {
@@ -175,40 +361,25 @@ export async function searchPersonAndCompanyX(opts: {
   const ran: string[] = [];
   const spend = emptyXaiSpend();
   const found: Found[] = [];
-  const add = (row: { found: Found[]; spend: XaiSpend }, tag: string) => {
-    found.push(...row.found);
-    spend.inputTokens += row.spend.inputTokens;
-    spend.outputTokens += row.spend.outputTokens;
-    spend.posts += row.spend.posts;
-    spend.web += row.spend.web;
-    spend.costMicros += row.spend.costMicros;
-    if (row.found.length || row.spend.costMicros) ran.push(tag);
-  };
-  if (opts.personX) {
-    add(
-      await searchXShips({
-        env: opts.env,
-        year: opts.year,
-        handles: [opts.personX],
-        who: opts.personName || `@${opts.personX}`,
-        company: opts.affiliation.company,
-        kind: 'person',
-      }),
-      'xai-person',
-    );
-  }
-  const companyHandle = opts.affiliation.companyX;
-  if (companyHandle && (opts.affiliation.role === 'ceo' || opts.affiliation.role === 'founder' || opts.affiliation.role === 'lead')) {
-    add(
-      await searchXShips({
-        env: opts.env,
-        year: opts.year,
-        handles: [companyHandle],
-        who: opts.affiliation.company || companyHandle,
-        kind: 'company',
-      }),
-      'xai-company',
-    );
-  }
+  if (!opts.personX) return { found, spend, ran };
+  const row = await searchXShips({
+    env: opts.env,
+    year: opts.year,
+    handles: [opts.personX],
+    who: opts.personName || `@${opts.personX}`,
+    company: opts.affiliation.company,
+    kind: 'person',
+  });
+  found.push(...row.found);
+  Object.assign(spend, {
+    inputTokens: spend.inputTokens + row.spend.inputTokens,
+    outputTokens: spend.outputTokens + row.spend.outputTokens,
+    posts: spend.posts + row.spend.posts,
+    profiles: spend.profiles + row.spend.profiles,
+    web: spend.web + row.spend.web,
+    ticks: spend.ticks + row.spend.ticks,
+    costMicros: spend.costMicros + row.spend.costMicros,
+  });
+  if (row.found.length || row.spend.costMicros) ran.push('xai-person');
   return { found, spend, ran };
 }

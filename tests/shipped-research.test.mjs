@@ -12,6 +12,8 @@ test('handle variants stitch X spellings to GitHub logins', () => {
   assert.ok(identity.handleVariants('tdinh_me').includes('tdinhme'));
   assert.ok(identity.handleVariants('tibo_maker').includes('tibo-maker'));
   assert.equal(identity.handleVariants('tibo_maker').includes('tibo'), false);
+  assert.ok(identity.handleTokens('fofrAI').includes('fofr'));
+  assert.equal(identity.handleVariants('fofrAI').includes('fofr'), false);
 });
 
 test('name queries split "Tibo from OpenAI"', () => {

@@ -17,7 +17,7 @@ Queries are what a visitor would type.
 | 9 | `yacineMTB` | AI / hardware-ish | dingcad / dingvid |
 | 10 | `johnrushx` | indie | John Rush, MarsX |
 | 11 | `pketh` | design | Pirijan |
-| 12 | `mckaywrigley` | AI apps | Chatbot UI / AI tooling |
+| 12 | `keijiro` | games | Keijiro Takahashi, 40+ Unity/graphics repos in 2026 |
 | 13 | `coryetzkorn` | design | Cory Etzkorn |
 | 14 | `hijonathan` | indie | Jonathan K |
 | 15 | `soffes` | iOS | Sam Soffes |
@@ -26,6 +26,8 @@ Queries are what a visitor would type.
 | 18 | `csallen` | founders | Courtland Allen / Indie Hackers |
 | 19 | `sebastianlague` | games | Coding / game videos + repos |
 | 20 | `andrewchen` | founders | a16z / writing; sparse software, kept as a founder-style input |
+
+`mckaywrigley` was probed and swapped for `keijiro`: Chatbot UI last moved in 2024, so it is not a 2026 ship.
 
 Ground truth (10 of these): [`shipped-heldout-ground-truth.json`](./shipped-heldout-ground-truth.json).
 Results: [`shipped-heldout-recall.json`](./shipped-heldout-recall.json).

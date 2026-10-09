@@ -205,6 +205,14 @@ export function handleVariants(handle: string): string[] {
   return out.filter((v) => isGithubLogin(v) || isXHandle(v)).slice(0, 8);
 }
 
+/** `fofrAI` → `fofr`; `tdinh_me` → `tdinh`. Generic suffixes (ai, me, io) are dropped. */
+export function handleTokens(handle: string): string[] {
+  const id = handle.replace(/^@/, '');
+  const parts = id.split(/[_-]+|(?<=[a-z])(?=[A-Z0-9])/).filter(Boolean);
+  const skip = new Set(['the', 'dev', 'io', 'ai', 'app', 'hq', 'me', 'js', 'oss', 'inc']);
+  return parts.filter((p) => p.length >= 4 && !skip.has(p.toLowerCase())).slice(0, 4);
+}
+
 function namesClose(a: string, b: string): boolean {
   const x = loose(a);
   const y = loose(b);

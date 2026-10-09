@@ -131,15 +131,18 @@
       ]
     },
     {
-      "query": "mckaywrigley",
+      "query": "keijiro",
       "prolific": true,
-      "identity": { "github": "mckaywrigley", "x": "mckaywrigley", "site": "https://mckaywrigley.com/" },
+      "identity": { "github": "keijiro", "x": null, "site": "https://www.keijiro.tokyo/" },
       "ships": [
-        { "name": "chatbot-ui", "aliases": ["chatbot-ui", "chatbotui"], "url": "https://github.com/mckaywrigley/chatbot-ui", "date": "2026" },
-        { "name": "mckaywrigley.com", "aliases": ["mckaywrigley"], "url": "https://mckaywrigley.com/", "date": "2026" }
+        { "name": "Jacquard", "aliases": ["jacquard"], "url": "https://github.com/keijiro/Jacquard", "date": "2026-07-30" },
+        { "name": "AudioTailor", "aliases": ["audiotailor"], "url": "https://github.com/keijiro/AudioTailor", "date": "2026-06-24" },
+        { "name": "MeshSlicer", "aliases": ["meshslicer"], "url": "https://github.com/keijiro/MeshSlicer", "date": "2026-05-12" },
+        { "name": "KinoGlitchURP", "aliases": ["kinoglitchurp", "kinoglitch"], "url": "https://github.com/keijiro/KinoGlitchURP", "date": "2026-02-18" }
       ],
       "stats": [
-        { "kind": "repos", "about": "mckaywrigley", "min": 40, "url": "https://github.com/mckaywrigley" }
+        { "kind": "stars", "about": "Jacquard", "min": 200, "url": "https://github.com/keijiro/Jacquard" },
+        { "kind": "repos", "about": "keijiro", "min": 200, "url": "https://github.com/keijiro" }
       ]
     }
   ]

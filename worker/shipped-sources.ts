@@ -20,6 +20,7 @@ import {
   companyLogins,
   extraSitePaths,
   githubLoginsFromText,
+  handleTokens,
   handleVariants,
   makerMentions,
   mergeSites,
@@ -374,10 +375,30 @@ async function apiRepos(login: string, env: SourceEnv): Promise<RepoRow[]> {
     }));
 }
 
-/** GitHub search "user:<login> created:>=<year>-01-01", read by TinyFish: repos created this year, most starred first. */
+function reposFromSearchHtml(html: string, login: string): string[] {
+  const names: string[] = [];
+  const add = (name: string) => {
+    const n = decodeURIComponent(name).replace(/\.git$/, '');
+    if (REPO_NAME.test(n) && !names.some((v) => v.toLowerCase() === n.toLowerCase())) names.push(n);
+  };
+  const owner = login.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+  for (const match of html.matchAll(new RegExp(`(?:github\\.com|href=")/${owner}/([A-Za-z0-9._-]+)`, 'gi'))) add(match[1]);
+  return names.slice(0, 20);
+}
+
+/** Repos created this year: github.com search HTML (no API quota), then TinyFish if the page is empty. */
 async function searchCreated(login: string, year: number, tinyfish: TinyfishAccess): Promise<string[]> {
   const q = `user:${login} created:>=${year}-01-01 fork:false`;
-  const page = await tinyfishPage(`${GH}/search?q=${encodeURIComponent(q)}&type=repositories&s=stars&o=desc`, tinyfish);
+  const path = `/search?q=${encodeURIComponent(q)}&type=repositories&s=stars&o=desc`;
+  try {
+    const html = await githubPage(path);
+    const fromHtml = html ? reposFromSearchHtml(html, login) : [];
+    if (fromHtml.length) return fromHtml;
+  } catch {
+    // github.com search sometimes wants a session; TinyFish can still read it.
+  }
+  if (!tinyfish) return [];
+  const page = await tinyfishPage(`${GH}${path}`, tinyfish);
   const fromText = [...page.text.matchAll(/github\.com\/[^/\s)]+\/[^/\s)?#]+/gi)].map((m) => `https://${m[0]}`);
   return reposLinked(login, [...page.links, ...fromText]).slice(0, 20);
 }
@@ -421,7 +442,7 @@ const github: SourceProvider = {
       soft(cached(`gh:feed:${id}`, 30 * MIN, () => feedOf(login))),
       apiOpen(env) ? soft(cached(`gh:repos:${id}`, 360 * MIN, () => apiRepos(login, env))) : Promise.resolve(null),
     ]);
-    const searched = api ? null : await soft(cached(`gh:search:${id}:${year}`, 720 * MIN, () => searchCreated(login, year, tinyfish)));
+    const searched = await soft(cached(`gh:search:${id}:${year}`, 720 * MIN, () => searchCreated(login, year, tinyfish)));
     if (!list && !feed && !api && !searched) throw new SourceError('github-unreachable');
 
     const rows = new Map<string, RepoRow>();
@@ -460,6 +481,29 @@ const github: SourceProvider = {
               ? sourcedStat('stars', `${row.stars >= 1000 ? `${(row.stars / 1000).toFixed(row.stars >= 10_000 ? 0 : 1).replace(/\.0$/, '')}k` : String(row.stars)} GitHub stars`, row.stars, repoUrl, name)
               : null,
           ],
+        ),
+      );
+    }
+
+    // Older repos still pushed this year with public numbers — a site mention should inherit stars.
+    for (const row of rows.values()) {
+      if (createdOn.has(row.name.toLowerCase()) || (row.stars ?? 0) < 20 || !inYear(row.updated, year)) continue;
+      const repoUrl = `${GH}/${login}/${row.name}`;
+      found.push(
+        withMetrics(
+          {
+            name: clean(row.name, 60),
+            description: row.description,
+            date: row.updated,
+            link: repoUrl,
+            icon: row.homepage ? faviconUrl(row.homepage) : null,
+            source: 'github',
+            status: row.homepage ? 'LIVE' : 'SHIPPED',
+            score: 1.5 + Math.log10(1 + row.stars) * 2,
+            dateConfidence: 'inferred',
+            thisYear: true,
+          },
+          [sourcedStat('stars', `${row.stars >= 1000 ? `${(row.stars / 1000).toFixed(row.stars >= 10_000 ? 0 : 1).replace(/\.0$/, '')}k` : String(row.stars)} GitHub stars`, row.stars, repoUrl, row.name)],
         ),
       );
     }
@@ -1143,6 +1187,8 @@ async function resolveIdentityFresh(subject: Subject, env: SourceEnv, tinyfish: 
     ...companyLogins(parts.name || subject.id, parts.company),
     ...handleVariants(subject.id),
     ...handleVariants(profile.x ?? ''),
+    ...handleTokens(subject.id),
+    ...handleTokens(profile.x ?? ''),
     ...followed,
     ...(xProfile?.github ?? []),
     profile.github,
@@ -1160,6 +1206,8 @@ async function resolveIdentityFresh(subject: Subject, env: SourceEnv, tinyfish: 
       parts.name && parts.name.length >= 3 ? parts.name : null,
       parts.company ? `${parts.name} ${parts.company}` : null,
       profile.name && profile.name !== subject.id && profile.name.length >= 3 ? profile.name : null,
+      ...handleTokens(subject.id),
+      ...handleTokens(profile.x ?? ''),
     ].filter((t): t is string => Boolean(t && t.length >= 2 && !/^the guy/i.test(t)));
     const searched: string[] = [];
     for (const term of searchTerms.slice(0, 3)) {
@@ -1222,8 +1270,8 @@ export function candidatesFromIdentity(subject: Subject, resolved: ResolvedIdent
 const NAV_LINK =
   /^(home|about|blog|contact|login|sign ?in|sign up|subscribe|newsletter|privacy|terms|careers|jobs|pricing|docs|support|twitter|github|x|linkedin|instagram|shop|store|cart|projects|changelog|source|start now|media kit|tech stack|api reference|investments?|sponsor( my work)?)$/i;
 const JUNK_ITEM =
-  /\b(subscribe|newsletter|sign[- ]?up|sign-up here|log ?in|listen on|apple podcasts|spotify|overcast|pocket casts|amazon music|telegram|investments?|media kit|tech stack|api reference|broadcast by|transistor|start now|follow me|buy me a coffee|powered by|wordpress|built with|24 startups|my book|my newsletter|sponsor my work|diamond sponsor|gold sponsor|silver sponsor|submit your game)\b/i;
-const GENERIC_NAME = /^(self|write|code|ideas|source|projects|changelog|home|shop|nvidia|replicate|fal|vercel|cursor|perplexity|openai|anthropic|sync|make)$/i;
+  /\b(subscribe|newsletter|sign[- ]?up|sign-up here|log ?in|listen on|apple podcasts|spotify|overcast|pocket casts|amazon music|telegram|investments?|media kit|tech stack|api reference|broadcast by|transistor|start now|follow me|buy me a coffee|powered by|wordpress|built with|24 startups|my book|my newsletter|sponsor my work|diamond sponsor|gold sponsor|silver sponsor|submit your game|founder not found)\b/i;
+const GENERIC_NAME = /^(self|write|code|ideas|source|projects|changelog|home|shop|nvidia|replicate|fal|vercel|cursor|perplexity|openai|anthropic|sync|make|https|founder not found)$/i;
 
 function yearMention(text: string, year: number): boolean {
   return new RegExp(`\\b${year}\\b`).test(text);

@@ -1,13 +1,13 @@
 'use client';
 
-// The sponsor sheet: ten fixed-price slots at the foot of every receipt. Pick a slot, see its one posted
-// price, write a name and a line, add an https link (and maybe a logo), and pay that price to take it. The
-// Worker sets every price and re-checks everything; the checks here are only there to answer as you type.
+// The sponsor sheet: ten bidding slots at the foot of every receipt. Pick a slot, choose the lowest or
+// highest legal raise, write a name and a line, add an https link (and maybe a logo), and pay that bid.
+// The Worker sets the legal range and re-checks everything; the checks here only answer as you type.
 import React, { useEffect, useRef, useState } from 'react';
 import { ditherLogo, type DitheredLogo } from '../../lib/dither';
 import { closingLabel } from '../../lib/shipped-event';
 import { money } from '../../lib/shipped-receipt';
-import { BID_RULES, HERO_SLOT, limitsFor, slotLabel, validateBid } from '../../lib/shipped-sponsors';
+import { BID_RULES, HERO_SLOT, limitsFor, slotLabel, takeoversOpen, validateBid } from '../../lib/shipped-sponsors';
 import type { SponsorSlot } from '../../lib/shipped-year';
 import { HumanCheck, type HumanCheckHandle } from './HumanCheck';
 import { Line, Rule, Ticket } from './paper';
@@ -17,7 +17,7 @@ import { refreshShippedState, useShippedState } from './state';
 const ERRORS: Record<string, string> = {
   'sponsors-closed': 'Sponsor slots are closed right now.',
   closed: 'The printer is off. The sponsor block is final.',
-  locked: 'Slots stopped changing hands an hour before close.',
+  locked: 'This slot is no longer changing hands.',
   turnstile: 'Couldn’t check you’re human. Try again.',
   'slow-down': 'Too many tries. Try again in an hour.',
   'checkout-failed': 'Checkout didn’t open. Try again.',
@@ -46,6 +46,7 @@ export function SponsorDesk() {
   const block = state?.sponsors;
   const payments = state?.payments;
   const [slot, setSlot] = useState(HERO_SLOT);
+  const [cents, setCents] = useState<number | null>(null);
   const [name, setName] = useState('');
   const [cta, setCta] = useState('');
   const [url, setUrl] = useState('');
@@ -58,8 +59,11 @@ export function SponsorDesk() {
   const human = useRef<HumanCheckHandle>(null);
 
   useEffect(() => {
-    if (pick.open) setSlot(pick.slot);
-  }, [pick.open, pick.slot]);
+    if (pick.open) {
+      setSlot(pick.slot);
+      setCents(pick.cents);
+    }
+  }, [pick.open, pick.slot, pick.cents]);
 
   useEffect(() => {
     if (!pick.open) return;
@@ -103,8 +107,10 @@ export function SponsorDesk() {
   const slots = block?.slots ?? [];
   const picked: SponsorSlot | undefined = slots.find((s) => s.slot === slot);
   const limits = limitsFor(slot);
-  const open = Boolean(payments?.open) && !block?.frozen;
+  const slotOpen = picked ? takeoversOpen(Date.now(), picked.closesAt || Date.now() + 1) : false;
+  const open = Boolean(payments?.open) && !block?.frozen && slotOpen;
   const soldOut = picked ? picked.next > BID_RULES.maxCents : false;
+  const bid = picked ? (cents === picked.maxNext ? picked.maxNext : picked.next) : BID_RULES.minCents;
 
   async function pickLogo(event: React.ChangeEvent<HTMLInputElement>) {
     const file = event.target.files?.[0];
@@ -118,9 +124,10 @@ export function SponsorDesk() {
     }
   }
 
-  async function submit(event: React.FormEvent) {
+  async function submit(event: React.SyntheticEvent, amount = bid) {
     event.preventDefault();
     if (!picked) return;
+    setCents(amount);
     setError(null);
     const check = validateBid({ slot, name, cta, url });
     if (!check.ok) return setError({ field: check.field, message: check.error });
@@ -132,7 +139,7 @@ export function SponsorDesk() {
     form.set('name', check.name);
     form.set('cta', check.cta);
     form.set('url', check.url);
-    form.set('cents', String(picked.next));
+    form.set('cents', String(amount));
     form.set('terms', '1');
     form.set('token', token);
     if (logo) form.set('logo', logo.blob, 'logo.png');
@@ -174,14 +181,17 @@ export function SponsorDesk() {
         </div>
         <h2 id="sponsor-sheet-title" className="mt-2 text-[20px] font-semibold leading-none tracking-[0.2em]">TAKE A SLOT</h2>
         <p className="mt-2 text-[12px] leading-relaxed text-[#1c1917]/75">
-          Ten slots at the foot of every receipt, share image and mailed print, each with its own QR code. One fixed price per slot:
-          what the holder paid plus {money(BID_RULES.incrementCents)}. Pay it and the slot is yours until someone pays the next price.
-          Taken over? You’re refunded for the time you lose. At close, whoever holds a slot keeps it forever.
+          Ten slots at the foot of every receipt, share image and mailed print, each with its own QR code. House ads are {money(0)} and
+          are not bids; the first outside bid is {money(BID_RULES.minCents)}. After that each raise is a whole dollar, at least +
+          {money(BID_RULES.incrementCents)} and at most +{money(BID_RULES.maxRaiseFloorCents)} or 10% of the current bid, whichever is
+          larger. Lowest bid and Highest bid post those two amounts. You cannot raise your own slot. Taken over? You’re refunded for the
+          time you lose. A bid in the last {BID_RULES.antiSnipeMinutes} minutes extends that slot by {BID_RULES.antiSnipeMinutes} minutes.
+          At close, whoever holds a slot keeps it forever.
         </p>
       </header>
       <div className="mt-3 space-y-1 text-[12px]">
         <Line label="RECEIPTS PRINTED SO FAR" value={state ? state.printed.toLocaleString('en-US') : '······'} />
-        <Line label="SLOTS FREEZE" value={state ? closingLabel(state.event.closesAt - BID_RULES.lockMinutes * 60_000) : '······'} />
+        <Line label="SLOTS CLOSE" value={state ? closingLabel(picked?.closesAt || state.event.closesAt) : '······'} />
       </div>
       <div className="mt-2">
         <Rule />
@@ -193,7 +203,7 @@ export function SponsorDesk() {
         </p>
       ) : null}
 
-      <form className="mt-3 space-y-3" onSubmit={submit} noValidate>
+      <form className="mt-3 space-y-3" onSubmit={(event) => void submit(event)} noValidate>
         <fieldset>
           <legend className="text-[11px] font-semibold tracking-[0.16em]">PICK A SLOT</legend>
           <div className="mt-1.5 grid grid-cols-2 gap-1.5">
@@ -203,9 +213,9 @@ export function SponsorDesk() {
                 <span className="shipped-lead text-[12px] font-semibold tracking-[0.1em]">
                   <span>{slotLabel(s.slot)}</span>
                   <span className="shipped-lead-fill" aria-hidden="true" />
-                  <span className="tabular-nums">{s.next > BID_RULES.maxCents ? 'MAXED' : money(s.next)}</span>
+                  <span className="tabular-nums">{s.next > BID_RULES.maxCents ? 'MAXED' : s.next === s.maxNext ? money(s.next) : `${money(s.next)}–${money(s.maxNext)}`}</span>
                 </span>
-                <span className="mt-0.5 block truncate text-[10.5px] opacity-70">{s.house ? 'House ad · open' : `Held by ${s.name}`}</span>
+                <span className="mt-0.5 block truncate text-[10.5px] opacity-70">{s.house ? 'HOUSE AD · $0 · bid $1' : `Held by ${s.name}`}</span>
               </label>
             ))}
           </div>
@@ -291,9 +301,24 @@ export function SponsorDesk() {
 
             <HumanCheck ref={human} check={state?.generator.human} onToken={setToken} />
 
-            <button type="submit" className="shipped-button w-full" disabled={busy || soldOut}>
-              {busy ? 'OPENING CHECKOUT…' : soldOut ? 'THIS SLOT IS MAXED' : `TAKE ${slotLabel(slot)} · ${money(picked.next)}`}
-            </button>
+            <div className="grid grid-cols-2 gap-1.5">
+              <button
+                type="button"
+                className={`shipped-button w-full ${bid === picked.next ? '' : 'is-ghost'}`}
+                disabled={busy || soldOut}
+                onClick={(event) => void submit(event, picked.next)}
+              >
+                {busy && bid === picked.next ? 'OPENING…' : `Lowest bid ${money(picked.next)}`}
+              </button>
+              <button
+                type="button"
+                className={`shipped-button w-full ${bid === picked.maxNext ? '' : 'is-ghost'}`}
+                disabled={busy || soldOut || picked.maxNext === picked.next}
+                onClick={(event) => void submit(event, picked.maxNext)}
+              >
+                {busy && bid === picked.maxNext ? 'OPENING…' : `Highest bid ${money(picked.maxNext)}`}
+              </button>
+            </div>
             {fieldError('form')}
             <p className="text-center text-[11px] text-[#1c1917]/65">Plus sales tax where it applies, worked out at checkout. Paid securely with Stripe.</p>
             {payments?.provider === 'stripe' && !payments.live ? (

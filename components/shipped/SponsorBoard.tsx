@@ -1,20 +1,19 @@
 'use client';
 
-// The first thing on /: a live outbid-style board. Hero on top, 3×3 under it. Each slot shows who
-// holds it (logo or name), what they paid (HOUSE AD · $0 until someone buys), and a take button at
-// the posted price. Tapping opens the bid sheet. The printer sits directly under this.
+// The first thing on /: a live bidding board. Hero on top, 3×3 under it. Each slot shows who
+// holds it (logo or name), HOUSE AD · $0 · bid $1 until someone pays, then the holder's bid, and
+// Lowest bid / Highest bid buttons. Tapping opens the bid sheet. The printer sits under this.
 import React, { useEffect, useState } from 'react';
 import { countdown } from '../../lib/shipped-event';
 import { moneyShort } from '../../lib/shipped-receipt';
-import { BID_RULES, DEFAULT_LADDER, HERO_SLOT, HOUSE_SLOTS, floorFor, floorsAt, slotLabel, slotPrice, sponsorTag } from '../../lib/shipped-sponsors';
+import { BID_RULES, HERO_SLOT, HOUSE_SLOTS, bidRange, slotLabel, sponsorTag, takeoversOpen } from '../../lib/shipped-sponsors';
 import type { SponsorSlot } from '../../lib/shipped-year';
 import { openSponsor } from './sponsor-pick';
 import { useShippedState } from './state';
 
 function housePreview(slot: number): SponsorSlot {
-  const floors = floorsAt(DEFAULT_LADDER, 0);
-  const floor = floorFor(slot, floors);
   const ad = HOUSE_SLOTS[slot];
+  const range = bidRange(0);
   return {
     slot,
     name: ad.name,
@@ -24,22 +23,19 @@ function housePreview(slot: number): SponsorSlot {
     logo: null,
     house: true,
     cents: 0,
-    next: slotPrice(0, floor),
-    floor,
+    next: range.min,
+    maxNext: range.max,
     impressions: 0,
     since: null,
     lastOutbid: null,
     holders: 0,
     serial: null,
     cooldownUntil: null,
+    closesAt: 0,
   };
 }
 
 const PREVIEW = HOUSE_SLOTS.map((_, slot) => housePreview(slot));
-
-function takeCopy(cents: number) {
-  return `Take this spot for ${moneyShort(cents)}`;
-}
 
 function SlotFace({ slot, hero }: { slot: SponsorSlot; hero: boolean }) {
   return (
@@ -52,28 +48,53 @@ function SlotFace({ slot, hero }: { slot: SponsorSlot; hero: boolean }) {
       )}
       <p className="shipped-board-cta">{slot.cta}</p>
       <p className="shipped-board-held">
-        {slot.house ? 'HOUSE AD · $0' : `${slot.serial ? `${sponsorTag(slot.serial)} · ` : ''}${moneyShort(slot.cents)}`}
+        {slot.house
+          ? `HOUSE AD · ${moneyShort(0)} · bid ${moneyShort(slot.next)}`
+          : `${slot.serial ? `${sponsorTag(slot.serial)} · ` : ''}${moneyShort(slot.cents)}`}
       </p>
     </div>
   );
 }
 
-function TakeButton({ slot, open, frozen, now }: { slot: SponsorSlot; open: boolean; frozen: boolean; now: number | null }) {
+function BidButtons({ slot, open, frozen, now }: { slot: SponsorSlot; open: boolean; frozen: boolean; now: number | null }) {
   const maxed = slot.next > BID_RULES.maxCents;
   const cooling = Boolean(now && slot.cooldownUntil && now < slot.cooldownUntil);
-  const disabled = !open || frozen || maxed || cooling;
+  const slotClosed = Boolean(now && slot.closesAt && !takeoversOpen(now, slot.closesAt));
+  const disabled = !open || frozen || maxed || cooling || slotClosed;
   const wait = cooling && now && slot.cooldownUntil ? Math.max(1, Math.ceil((slot.cooldownUntil - now) / 1000)) : 0;
-  const label = frozen
-    ? 'Board is final'
-    : maxed
-      ? 'This spot is maxed'
-      : cooling
-        ? `Just taken · ${wait}s`
-        : takeCopy(slot.next);
+  const same = slot.next === slot.maxNext;
+  if (frozen || slotClosed) {
+    return (
+      <button type="button" className="shipped-board-take" disabled>
+        Board is final
+      </button>
+    );
+  }
+  if (maxed) {
+    return (
+      <button type="button" className="shipped-board-take" disabled>
+        This spot is maxed
+      </button>
+    );
+  }
+  if (cooling) {
+    return (
+      <button type="button" className="shipped-board-take" disabled>
+        Just taken · {wait}s
+      </button>
+    );
+  }
   return (
-    <button type="button" className="shipped-board-take" disabled={disabled} onClick={() => openSponsor(slot.slot)}>
-      {label}
-    </button>
+    <div className="shipped-board-bids">
+      <button type="button" className="shipped-board-take" disabled={disabled} onClick={() => openSponsor(slot.slot, slot.next)}>
+        {same ? `Bid ${moneyShort(slot.next)}` : `Lowest bid ${moneyShort(slot.next)}`}
+      </button>
+      {same ? null : (
+        <button type="button" className="shipped-board-take is-high" disabled={disabled} onClick={() => openSponsor(slot.slot, slot.maxNext)}>
+          Highest bid {moneyShort(slot.maxNext)}
+        </button>
+      )}
+    </div>
   );
 }
 
@@ -128,7 +149,7 @@ export function SponsorBoard() {
       <article className="shipped-board-hero" aria-label={slotLabel(hero.slot)}>
         <p className="shipped-board-slot">HERO</p>
         <SlotFace slot={hero} hero />
-        <TakeButton slot={hero} open={open} frozen={frozen} now={now} />
+        <BidButtons slot={hero} open={open} frozen={frozen} now={now} />
       </article>
 
       <ul className="shipped-board-grid">
@@ -136,7 +157,7 @@ export function SponsorBoard() {
           <li key={slot.slot} className="shipped-board-cell">
             <p className="shipped-board-slot">{slotLabel(slot.slot)}</p>
             <SlotFace slot={slot} hero={false} />
-            <TakeButton slot={slot} open={open} frozen={frozen} now={now} />
+            <BidButtons slot={slot} open={open} frozen={frozen} now={now} />
           </li>
         ))}
       </ul>

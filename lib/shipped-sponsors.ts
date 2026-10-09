@@ -2,13 +2,13 @@
 // top and a 3×3 grid of nine small slots. Each slot has a name (or 1-bit logo), a one-line call to action and
 // its own QR code to the sponsor's link.
 //
-// Fixed price, not an auction: every slot has one posted price, set by the server: $1 for a house ad, else
-// what the current holder paid plus $1. Paying it takes the slot. The holder keeps it until someone pays the
-// next price or the event ends; when the printer shuts off, whoever holds each slot keeps it forever in the
-// frozen archive. A sponsor who is taken over is refunded automatically for the time they lose: their payment
-// times (time left until close) / (time from going live until close). Takeovers stop an hour before close so
-// nobody can be sniped in the last seconds; a payment that arrives after that, or for a price that has since
-// moved, is refunded in full. Logos print only after a review; a slot taken down in review is refunded in full.
+// Pure bidding, enforced on the server. House ads are $0 and are not bids: the first outside bid is $1.
+// After that each raise is a whole-dollar amount, at least +$1 and at most +max($5, floor(10% of the holder's
+// price)). The holder cannot raise their own slot. A takeover cools the slot for 60 seconds. A bid in the last
+// 10 minutes of that slot extends that slot by 10 minutes. A sponsor who is taken over is refunded for the time
+// they lose: payment × (time left until that slot's close) / (time from going live until close). Checkouts that
+// miss the price, arrive after the slot closes, or come from the holder are refunded in full. Logos print only
+// after a review; a slot taken down in review is refunded in full.
 
 export const SLOT_COUNT = 10;
 export const HERO_SLOT = 0;
@@ -16,36 +16,69 @@ export const HERO_SLOT = 0;
 export const BID_RULES = {
   minCents: 100,
   incrementCents: 100,
+  /** Floor of the max raise: $5, or 10% of the current price when that's bigger. */
+  maxRaiseFloorCents: 500,
   maxCents: 500_000,
   /** Stripe's shortest checkout; checkouts in progress don't hold the slot. */
   checkoutMinutes: 30,
-  /** No takeovers in the last hour before close. */
-  lockMinutes: 60,
+  /** Bidding stays open until the slot's close (anti-snipe extends the slot, not a separate lock). */
+  lockMinutes: 0,
   /** After a slot changes hands, nobody else can take it for this long. */
-  cooldownMinutes: 5,
-  /** A takeover inside this window before lock slides close (and the lock) forward. */
+  cooldownSeconds: 60,
+  /** A bid inside this window before that slot's close slides that slot forward. */
   antiSnipeMinutes: 10,
 };
 
 export const lockAt = (closesAt: number) => closesAt - BID_RULES.lockMinutes * 60_000;
 
-/** Whether slots can still change hands at `now`. */
+/** Whether this slot can still change hands at `now` (per-slot close, which anti-snipe can extend). */
 export const takeoversOpen = (now: number, closesAt: number) => now < lockAt(closesAt);
 
+const COOLDOWN_MS = BID_RULES.cooldownSeconds * 1000;
+
 /** True while this slot's current holder just went live (the next buyer has to wait). */
-export const slotCooling = (liveAt: number | null | undefined, now: number) =>
-  Boolean(liveAt && now - liveAt < BID_RULES.cooldownMinutes * 60_000);
+export const slotCooling = (liveAt: number | null | undefined, now: number) => Boolean(liveAt && now - liveAt < COOLDOWN_MS);
 
-export const cooldownUntil = (liveAt: number | null | undefined) =>
-  liveAt && liveAt > 0 ? liveAt + BID_RULES.cooldownMinutes * 60_000 : null;
+export const cooldownUntil = (liveAt: number | null | undefined) => (liveAt && liveAt > 0 ? liveAt + COOLDOWN_MS : null);
 
-/** A paid takeover this close to lock extends the event so the next person can still answer. */
+/** A paid takeover this close to the slot's close extends that slot so the next person can still answer. */
 export const inAntiSnipeWindow = (now: number, closesAt: number) => {
   const lock = lockAt(closesAt);
   return now >= lock - BID_RULES.antiSnipeMinutes * 60_000 && now < lock;
 };
 
 export const extendClose = (closesAt: number) => closesAt + BID_RULES.antiSnipeMinutes * 60_000;
+
+const wholeDollars = (cents: number) => Number.isSafeInteger(cents) && cents >= 0 && cents % 100 === 0;
+
+/** Max raise in cents: +$1 on a house ad; otherwise +max($5, floor(10% of the current whole-dollar price)). */
+export function maxRaiseCents(currentCents: number): number {
+  if (!wholeDollars(currentCents) || currentCents <= 0) return BID_RULES.minCents;
+  const tenPercent = Math.floor(currentCents / 1000) * 100;
+  return Math.max(BID_RULES.maxRaiseFloorCents, tenPercent);
+}
+
+export type BidRange = { min: number; max: number };
+
+/** Posted range to take a slot: $1 on a house ad, else [holder+$1, holder+max raise], capped, whole dollars. */
+export function bidRange(currentCents: number): BidRange {
+  const current = wholeDollars(currentCents) ? currentCents : 0;
+  if (current <= 0) return { min: BID_RULES.minCents, max: BID_RULES.minCents };
+  const min = Math.min(BID_RULES.maxCents, current + BID_RULES.incrementCents);
+  const max = Math.min(BID_RULES.maxCents, current + maxRaiseCents(current));
+  return { min, max: Math.max(min, max) };
+}
+
+export const slotPrice = (currentCents: number) => bidRange(currentCents).min;
+export const minimumBid = slotPrice;
+export const maximumBid = (currentCents: number) => bidRange(currentCents).max;
+
+/** True when `cents` is a legal whole-dollar bid against the current holder (0 = house ad). */
+export function isValidBid(currentCents: number, cents: number): boolean {
+  if (!wholeDollars(cents) || cents < BID_RULES.minCents || cents > BID_RULES.maxCents) return false;
+  const { min, max } = bidRange(currentCents);
+  return cents >= min && cents <= max;
+}
 
 /** Same Stripe email = the current holder trying to raise their own price. */
 export function sameHolder(a?: string | null, b?: string | null): boolean {
@@ -81,69 +114,6 @@ export const HOUSE_SLOTS: HouseSlot[] = [
 export const isSlot = (value: unknown): value is number => Number.isInteger(value) && (value as number) >= 0 && (value as number) < SLOT_COUNT;
 export const slotLabel = (slot: number) => (slot === HERO_SLOT ? 'HERO' : `SLOT ${slot}`);
 export const limitsFor = (slot: number) => (slot === HERO_SLOT ? SLOT_LIMITS.hero : SLOT_LIMITS.small);
-
-/**
- * Floors that rise with traction: once `at` receipts have been printed (a real count of rows, never inflated),
- * no slot sells below `slot` cents and the hero below `hero`. The hero climbs fastest. Floors only ever apply to
- * the next sale: a holder keeps what they paid for, and a checkout already open keeps its price.
- */
-export type LadderStep = { at: number; hero: number; slot: number };
-
-export const DEFAULT_LADDER: LadderStep[] = [
-  { at: 0, hero: 500, slot: 100 },
-  { at: 100, hero: 1_000, slot: 200 },
-  { at: 250, hero: 2_500, slot: 300 },
-  { at: 500, hero: 5_000, slot: 500 },
-  { at: 1_000, hero: 10_000, slot: 1_000 },
-  { at: 2_500, hero: 25_000, slot: 2_000 },
-  { at: 5_000, hero: 50_000, slot: 3_500 },
-  { at: 10_000, hero: 100_000, slot: 5_000 },
-  { at: 25_000, hero: 200_000, slot: 10_000 },
-  { at: 50_000, hero: 400_000, slot: 20_000 },
-];
-
-const LADDER_MAX_STEPS = 30;
-
-/** A ladder from JSON (env or /admin): starts at 0, `at` strictly rising, floors never falling, whole dollars, under the cap. */
-export function parseLadder(raw: unknown): LadderStep[] | null {
-  let value = raw;
-  if (typeof value === 'string') {
-    try {
-      value = JSON.parse(value);
-    } catch {
-      return null;
-    }
-  }
-  if (!Array.isArray(value) || value.length < 1 || value.length > LADDER_MAX_STEPS) return null;
-  const steps: LadderStep[] = [];
-  for (const entry of value) {
-    if (!entry || typeof entry !== 'object') return null;
-    const { at, hero, slot } = entry as Record<string, unknown>;
-    const cents = (n: unknown) => Number.isSafeInteger(n) && (n as number) >= BID_RULES.minCents && (n as number) <= BID_RULES.maxCents && (n as number) % 100 === 0;
-    if (!Number.isSafeInteger(at) || (at as number) < 0 || !cents(hero) || !cents(slot)) return null;
-    const previous = steps[steps.length - 1];
-    if (previous ? (at as number) <= previous.at || (hero as number) < previous.hero || (slot as number) < previous.slot : at !== 0) return null;
-    steps.push({ at: at as number, hero: hero as number, slot: slot as number });
-  }
-  return steps;
-}
-
-export type Floors = { step: number; at: number; hero: number; slot: number; next: LadderStep | null };
-
-/** The floors in force after `printed` receipts, and the next milestone (null at the top of the ladder). */
-export function floorsAt(ladder: LadderStep[], printed: number): Floors {
-  let step = 0;
-  for (let i = 0; i < ladder.length; i++) if (printed >= ladder[i].at) step = i;
-  const current = ladder[step];
-  return { step, at: current.at, hero: current.hero, slot: current.slot, next: ladder[step + 1] ?? null };
-}
-
-export const floorFor = (slot: number, floors: Pick<Floors, 'hero' | 'slot'>) => (slot === HERO_SLOT ? floors.hero : floors.slot);
-
-/** The slot's posted price: the holder's payment plus the increment (0 for a house ad), never below the floor. */
-export const slotPrice = (currentCents: number, floorCents: number = BID_RULES.minCents) =>
-  Math.max(BID_RULES.minCents, floorCents, currentCents > 0 ? currentCents + BID_RULES.incrementCents : 0);
-export const minimumBid = slotPrice;
 
 /** What an outbid sponsor gets back: their payment for the share of the run they lose, in whole cents. */
 export function proratedRefund(paidCents: number, liveAt: number, outbidAt: number, closesAt: number): number {

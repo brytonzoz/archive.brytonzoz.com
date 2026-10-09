@@ -40,15 +40,14 @@ import {
   MARKET_COLUMNS,
   MARKET_SCHEMA,
   bump,
+  bumpSlotClose,
   counters,
   logTakeover,
   market,
   nextSponsorSerial,
+  slotClosesAt,
   slotHistory,
-  syncFloors,
-  ladderFor,
   type Market,
-  type MarketEnv,
 } from './shipped-market';
 import {
   DAY,
@@ -117,22 +116,21 @@ import {
   LOGO_LIMITS,
   SLOT_COUNT,
   checkSponsorUrl,
+  bidRange,
   cooldownUntil,
-  extendClose,
-  floorFor,
   hasBlockedWord,
   inAntiSnipeWindow,
   isSlot,
+  isValidBid,
   proratedRefund,
   sameHolder,
   slotCooling,
   slotLabel,
-  slotPrice,
   takeoversOpen,
   validateBid,
 } from '../lib/shipped-sponsors';
 
-export interface ShippedEnv extends AiEnv, PayEnv, SourceEnv, GuardEnv, MarketEnv {
+export interface ShippedEnv extends AiEnv, PayEnv, SourceEnv, GuardEnv {
   /** Google Safe Browsing API key: sponsor links are checked against it when set. */
   SAFE_BROWSING_KEY?: string;
   DB?: D1Database;
@@ -599,10 +597,7 @@ async function generate(
     if (!state.demo) ctx.waitUntil(recordSpend(db, true, usage.input, usage.output, usage.searches));
     if (!inserted) return json({ error: 'taken-down' }, 410);
     await db.prepare('UPDATE shipped_receipts SET hidden = 0 WHERE id = ? AND hidden = 2').bind(inserted.id).run();
-    if (!replaces) {
-      const printed = await bump(db, 'printed');
-      ctx.waitUntil(ladderFor(db, env).then(({ ladder }) => syncFloors(db, ladder, printed)).catch(() => undefined));
-    }
+    if (!replaces) await bump(db, 'printed');
     console.log(JSON.stringify({ shipped: 'print', id: inserted.id, kind: subject.kind, items: receipt.items.length, potential: receipt.potential, ran: gathered.ran, failed: gathered.failed, costMicros: usage.cost }));
     return json({ id: inserted.id, pile: await pileToken(env, inserted.id) });
   } catch (error) {
@@ -718,36 +713,14 @@ async function cached(request: Request, ctx: ExecutionContext, seconds: number, 
 // ---- The event, the pile ------------------------------------------------------------------------------
 
 const event = (env: ShippedEnv) => eventWindow(env);
-const CLOSE_FLAG = 'event:closes-at';
 
-/** Advertised close, plus any anti-snipe extensions written to D1. */
+/** Advertised close. Per-slot anti-snipe lives on shipped_flags slot-close:<n>, not here. */
 async function liveWindow(env: ShippedEnv, db: D1Database | null, now = Date.now()) {
   const base = event(env);
-  if (!db) return { ...base, now, phase: (now >= base.closesAt ? 'closed' : 'open') as const };
-  try {
-    const row = await db.prepare('SELECT value FROM shipped_flags WHERE key = ?').bind(CLOSE_FLAG).first<{ value: string }>();
-    const stored = Number(row?.value);
-    const closesAt = Number.isFinite(stored) && stored > base.closesAt ? stored : base.closesAt;
-    return { opensAt: base.opensAt, closesAt, phase: (now >= closesAt ? 'closed' : 'open') as const, now };
-  } catch {
-    return { ...base, now, phase: (now >= base.closesAt ? 'closed' : 'open') as const };
-  }
+  return { opensAt: base.opensAt, closesAt: base.closesAt, phase: (now >= base.closesAt ? 'closed' : 'open') as const, now };
 }
 
 const isClosed = (env: ShippedEnv) => event(env).phase === 'closed';
-
-async function bumpClose(db: D1Database, closesAt: number, now = Date.now()): Promise<number> {
-  const next = extendClose(closesAt);
-  await db
-    .prepare(
-      `INSERT INTO shipped_flags (key, value, set_at) VALUES (?, ?, ?)
-       ON CONFLICT(key) DO UPDATE SET value = excluded.value, set_at = excluded.set_at
-       WHERE CAST(shipped_flags.value AS INTEGER) < excluded.value`,
-    )
-    .bind(CLOSE_FLAG, String(next), now)
-    .run();
-  return next;
-}
 
 async function hmacHex(secret: string, message: string): Promise<string> {
   const key = await crypto.subtle.importKey('raw', new TextEncoder().encode(secret), { name: 'HMAC', hash: 'SHA-256' }, false, ['sign']);
@@ -816,7 +789,7 @@ async function tossOnPile(request: Request, env: ShippedEnv): Promise<Response> 
   return json({ ok: true, listed });
 }
 
-// ---- Sponsor block: 10 fixed-price slots, taken over at the next price, frozen when the printer shuts off ----
+// ---- Sponsor block: 10 bidding slots, taken over at a legal raise, frozen when that slot closes ----
 
 type BidRow = {
   id: number;
@@ -849,7 +822,12 @@ type BidRow = {
 const bidLogoPath = (id: number) => `/api/shipped/logo/${id}.png`;
 const houseKey = (slot: number) => `h${slot}`;
 
-type SlotContext = { floor: number; impressions: number; lastOutbid: number | null; holders: number; seenAtEnd: number | null };
+type SlotContext = { impressions: number; lastOutbid: number | null; holders: number; seenAtEnd: number | null; closesAt: number };
+
+function priced(currentCents: number): { next: number; maxNext: number } {
+  const range = bidRange(currentCents);
+  return { next: range.min, maxNext: range.max };
+}
 
 function houseSlot(slot: number, ctx: SlotContext): SponsorSlot {
   const ad = HOUSE_SLOTS[slot];
@@ -862,14 +840,14 @@ function houseSlot(slot: number, ctx: SlotContext): SponsorSlot {
     logo: null,
     house: true,
     cents: 0,
-    next: slotPrice(0, ctx.floor),
-    floor: ctx.floor,
+    ...priced(0),
     impressions: Math.max(0, ctx.impressions - (ctx.seenAtEnd ?? 0)),
     since: null,
     lastOutbid: ctx.lastOutbid,
     holders: ctx.holders,
     serial: null,
     cooldownUntil: null,
+    closesAt: ctx.closesAt,
   };
 }
 
@@ -884,8 +862,7 @@ function slotFrom(slot: number, bid: BidRow | undefined, ctx: SlotContext): Spon
     logo: bid.logo_key && bid.logo_ok ? bidLogoPath(bid.id) : null,
     house: false,
     cents: bid.amount_cents,
-    next: slotPrice(bid.amount_cents, ctx.floor),
-    floor: ctx.floor,
+    ...priced(bid.amount_cents),
     // Bids that went live before impressions were counted started at zero.
     impressions: Math.max(0, ctx.impressions - (bid.seen_at_live ?? 0)),
     since: bid.live_at,
@@ -893,27 +870,31 @@ function slotFrom(slot: number, bid: BidRow | undefined, ctx: SlotContext): Spon
     holders: ctx.holders,
     serial: bid.serial,
     cooldownUntil: cooldownUntil(bid.live_at),
+    closesAt: ctx.closesAt,
   };
 }
 
 /** Who holds each slot right now (after close: forever), at what price. With sponsor-display switched off, the house ads. */
 async function sponsorBlock(db: D1Database | null, env: ShippedEnv, off?: Set<Switch>, known?: Market): Promise<SponsorBlock> {
-  const frozen = (await liveWindow(env, db)).phase === 'closed';
-  const hidden = (off ?? (await switchedOff(env, db))).has('sponsor-display');
-  const [live, history, now] = await Promise.all([
-    db && !hidden ? db.prepare(`SELECT * FROM shipped_bids WHERE status = 'live'`).all<BidRow>().then((r) => r.results) : Promise.resolve([] as BidRow[]),
+  const window = await liveWindow(env, db);
+  const [live, history, now, closes] = await Promise.all([
+    db && !(off ?? (await switchedOff(env, db))).has('sponsor-display')
+      ? db.prepare(`SELECT * FROM shipped_bids WHERE status = 'live'`).all<BidRow>().then((r) => r.results)
+      : Promise.resolve([] as BidRow[]),
     db ? slotHistory(db) : Promise.resolve(new Map()),
-    known ?? market(db, env),
+    known ?? market(db),
+    slotClosesAt(db, window.closesAt),
   ]);
+  const frozen = window.phase === 'closed' && closes.every((at) => window.now >= at);
   const bySlot = new Map(live.map((bid) => [bid.slot, bid]));
   const slots = Array.from({ length: SLOT_COUNT }, (_, slot) => {
     const past = history.get(slot);
     const ctx: SlotContext = {
-      floor: floorFor(slot, now.floors),
       impressions: now.counts.impressions,
       lastOutbid: past?.lastOutbid ?? null,
       holders: past?.holders ?? 0,
       seenAtEnd: past?.seenAtEnd ?? null,
+      closesAt: closes[slot] ?? window.closesAt,
     };
     return slotFrom(slot, bySlot.get(slot), ctx);
   });
@@ -973,8 +954,6 @@ async function createBid(request: Request, env: ShippedEnv): Promise<Response> {
   if (!db || !provider) return json({ error: 'sponsors-closed' }, 503);
   if ((await switchedOff(env, db)).has('sponsors')) return json({ error: 'sponsors-closed' }, 503);
   const window = await liveWindow(env, db);
-  if (window.phase === 'closed') return json({ error: 'closed', message: 'The printer is off. The sponsor block is final.' }, 410);
-  if (!takeoversOpen(window.now, window.closesAt)) return json({ error: 'locked', message: 'Slots stopped changing hands an hour before close.' }, 410);
   let form: FormData;
   try {
     form = await request.formData();
@@ -983,6 +962,11 @@ async function createBid(request: Request, env: ShippedEnv): Promise<Response> {
   }
   const slot = Number(form.get('slot'));
   if (!isSlot(slot)) return json({ error: 'bad-slot' }, 400);
+  const closes = await slotClosesAt(db, window.closesAt);
+  const slotClose = closes[slot] ?? window.closesAt;
+  if (!takeoversOpen(window.now, slotClose)) {
+    return json({ error: window.now >= slotClose ? 'closed' : 'locked', message: 'This slot is no longer changing hands.' }, 410);
+  }
   if (form.get('terms') !== '1') return json({ error: 'invalid', field: 'terms', message: 'Please accept the sponsor terms.' }, 400);
   if (await overLimit(db, request, 'bid')) return json({ error: 'slow-down' }, 429);
   if (!(await verifyHuman(env, db, form.get('token'), request))) return json({ error: 'turnstile' }, 403);
@@ -993,21 +977,23 @@ async function createBid(request: Request, env: ShippedEnv): Promise<Response> {
   const check = validateBid({ slot, name: text('name'), cta: text('cta'), url: text('url') });
   if (!check.ok) return json({ error: 'invalid', field: check.field, message: check.error }, 400);
 
-  // The price is ours: the holder's payment plus $1, never below the floor for the receipts printed so far.
-  // A client that sends anything else is told the real price.
-  const [holder, now] = await Promise.all([
-    db.prepare(`SELECT amount_cents, live_at FROM shipped_bids WHERE slot = ? AND status = 'live'`).bind(slot).first<{ amount_cents: number; live_at: number | null }>(),
-    market(db, env),
-  ]);
+  // The price is ours: a whole-dollar raise in [+$1, +max($5, 10% of current)], or $1 on a house ad.
+  const holder = await db
+    .prepare(`SELECT amount_cents, live_at, email FROM shipped_bids WHERE slot = ? AND status = 'live'`)
+    .bind(slot)
+    .first<{ amount_cents: number; live_at: number | null; email: string | null }>();
   if (slotCooling(holder?.live_at, Date.now())) {
     const until = cooldownUntil(holder?.live_at) ?? Date.now();
     const wait = Math.max(1, Math.ceil((until - Date.now()) / 1000));
     return json({ error: 'cooldown', message: `This slot just changed hands. Try again in ${wait}s.`, retryAfter: wait }, 429);
   }
-  const price = slotPrice(holder?.amount_cents ?? 0, floorFor(slot, now.floors));
-  if (price > BID_RULES.maxCents) return json({ error: 'sold-out', message: 'This slot is at its ceiling price and can\u2019t be taken over.' }, 409);
+  const current = holder?.amount_cents ?? 0;
+  const range = bidRange(current);
+  if (range.min > BID_RULES.maxCents) return json({ error: 'sold-out', message: 'This slot is at its ceiling price and can\u2019t be taken over.' }, 409);
   const cents = Number(form.get('cents'));
-  if (cents !== price) return json({ error: 'price-changed', message: `The price is now ${money(price)}.`, price }, 409);
+  if (!isValidBid(current, cents)) {
+    return json({ error: 'price-changed', message: `Bid between ${money(range.min)} and ${money(range.max)}.`, price: range.min, min: range.min, max: range.max }, 409);
+  }
 
   const badUrl = await vetSponsorUrl(env, check.url);
   if (badUrl) return json({ error: 'invalid', field: 'url', message: badUrl }, 400);
@@ -1024,7 +1010,7 @@ async function createBid(request: Request, env: ShippedEnv): Promise<Response> {
 
   const bid = await db
     .prepare(`INSERT INTO shipped_bids (slot, name, cta, url, amount_cents, status, provider, created_at) VALUES (?, ?, ?, ?, ?, 'checkout', ?, ?) RETURNING id`)
-    .bind(slot, check.name, check.cta, check.url, price, provider.id, Date.now())
+    .bind(slot, check.name, check.cta, check.url, cents, provider.id, Date.now())
     .first<{ id: number }>();
   if (!bid) return json({ error: 'jammed' }, 500);
   let logoKey: string | null = null;
@@ -1039,8 +1025,8 @@ async function createBid(request: Request, env: ShippedEnv): Promise<Response> {
       kind: SPONSOR_KIND,
       ref: String(bid.id),
       label,
-      description: `"${check.name}" with your line and QR code in the ${slot === HERO_SLOT ? 'hero' : 'small'} slot of the sponsor block on Shipped 2026 receipts, share images and mailed prints. Fixed price ${money(price)}. If someone takes the slot at the next price, you are refunded for the time you lose; when the event ends the block freezes for good. Full terms: ${shippedOrigin(env, new URL(request.url))}/terms/`,
-      amountCents: price,
+      description: `"${check.name}" with your line and QR code in the ${slot === HERO_SLOT ? 'hero' : 'small'} slot of the sponsor block on Shipped 2026 receipts, share images and mailed prints. Bid ${money(cents)}. If someone takes the slot at a higher bid, you are refunded for the time you lose; when this slot closes the block freezes for good. Full terms: ${shippedOrigin(env, new URL(request.url))}/terms/`,
+      amountCents: cents,
       origin: shippedOrigin(env, new URL(request.url)),
       returnPath: '/?bid={CHECKOUT_SESSION_ID}#sponsor',
       cancelPath: '/#sponsor',
@@ -1089,15 +1075,18 @@ async function settleBid(db: D1Database, env: ShippedEnv, bid: BidRow, paid: Ext
     console.error(JSON.stringify({ shipped: 'pay-mismatch', bid: bid.id, mismatch }));
     return refundAll(`payment didn't match: ${mismatch}`);
   }
-  if (now >= window.closesAt) return refundAll('paid after the printer shut off');
-  if (!takeoversOpen(now, window.closesAt)) return refundAll('paid after takeovers locked (one hour before close)');
+  const closes = await slotClosesAt(db, window.closesAt);
+  const slotClose = closes[bid.slot] ?? window.closesAt;
+  if (!takeoversOpen(now, slotClose)) return refundAll('paid after this slot closed');
 
   const live = await db
-    .prepare(`SELECT email, live_at FROM shipped_bids WHERE slot = ? AND status = 'live'`)
+    .prepare(`SELECT email, live_at, amount_cents FROM shipped_bids WHERE slot = ? AND status = 'live'`)
     .bind(bid.slot)
-    .first<{ email: string | null; live_at: number | null }>();
+    .first<{ email: string | null; live_at: number | null; amount_cents: number }>();
   if (sameHolder(live?.email, paid.email)) return refundAll('holder cannot raise their own slot');
   if (slotCooling(live?.live_at, now)) return refundAll('slot is in cooldown');
+  const current = live?.amount_cents ?? 0;
+  if (!isValidBid(current, bid.amount_cents)) return refundAll('bid is outside the legal raise for this slot');
 
   // One transaction: the bid goes live only if the holder still paid less than this price; then it pushes them out.
   const [promoted, pushed] = await db.batch([
@@ -1122,14 +1111,14 @@ async function settleBid(db: D1Database, env: ShippedEnv, bid: BidRow, paid: Ext
   const pushedOut = (pushed.results ?? []) as BidRow[];
   const serial = await nextSponsorSerial(db);
   await db.prepare('UPDATE shipped_bids SET serial = ? WHERE id = ? AND serial IS NULL').bind(serial, bid.id).run();
-  if (inAntiSnipeWindow(now, window.closesAt)) {
-    window.closesAt = await bumpClose(db, window.closesAt, now);
+  if (inAntiSnipeWindow(now, slotClose)) {
+    await bumpSlotClose(db, bid.slot, slotClose, now);
   }
   const { printed } = await counters(db);
   await logTakeover(db, bid.slot, pushedOut[0]?.amount_cents ?? 0, bid.amount_cents, printed, bid.id, now).catch(() => undefined);
   for (const previous of pushedOut) {
     const total = previous.total_cents ?? previous.amount_cents;
-    const owed = proratedRefund(total, previous.live_at ?? previous.paid_at ?? now, now, window.closesAt);
+    const owed = proratedRefund(total, previous.live_at ?? previous.paid_at ?? now, now, slotClose);
     const refund =
       owed > 0 && provider && previous.order_id && previous.provider === provider.id
         ? await provider.refund(previous.order_id, owed, `bid-${previous.id}-outbid-${bid.id}`)
@@ -1372,10 +1361,12 @@ async function state(env: ShippedEnv): Promise<Response> {
   const generator = await generatorState(env, db, off);
   const provider = sponsorProvider(env);
   const window = await liveWindow(env, db);
-  const open = Boolean(provider) && window.phase === 'open';
+  const closes = await slotClosesAt(db, window.closesAt);
+  const anySlotOpen = closes.some((at) => takeoversOpen(window.now, at));
+  const open = Boolean(provider) && (window.phase === 'open' || anySlotOpen);
   const payments = {
-    open: open && !off.has('sponsors') && takeoversOpen(window.now, window.closesAt),
-    prints: open && !off.has('prints'),
+    open: Boolean(provider) && !off.has('sponsors') && anySlotOpen,
+    prints: open && !off.has('prints') && window.phase === 'open',
     provider: provider?.id ?? null,
     live: provider?.live ?? false,
     wallet: Boolean(provider?.id === 'stripe' && env.STRIPE_PUBLISHABLE_KEY),

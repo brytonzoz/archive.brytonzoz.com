@@ -25,11 +25,21 @@ test('webhook signatures: valid passes; tampered, foreign, stale, or malformed o
   assert.equal(await verifySignature(payload, `t=${t},v1=${sign(payload, t)}`, '', now), false, 'no secret configured');
 });
 
-test('slot prices are fixed and set by the server: $1 for a house slot, holder + $1 after that', () => {
+test('slot bids are whole dollars: $1 on a house ad, then +$1 up to +max($5, 10% of current)', () => {
+  assert.deepEqual(sponsors.bidRange(0), { min: 100, max: 100 });
   assert.equal(sponsors.slotPrice(0), 100);
-  assert.equal(sponsors.slotPrice(100), 200);
-  assert.equal(sponsors.slotPrice(4_200), 4_300);
-  assert.equal(sponsors.slotPrice(-500), 100, 'never below the floor');
+  assert.deepEqual(sponsors.bidRange(100), { min: 200, max: 600 }, '$1 holder → +$1 to +$5');
+  assert.deepEqual(sponsors.bidRange(1_000), { min: 1_100, max: 1_500 }, '$10 holder → +$5');
+  assert.deepEqual(sponsors.bidRange(10_000), { min: 10_100, max: 11_000 }, '$100 holder → +$10');
+  assert.deepEqual(sponsors.bidRange(4_200), { min: 4_300, max: 4_700 });
+  assert.equal(sponsors.isValidBid(0, 100), true);
+  assert.equal(sponsors.isValidBid(0, 200), false, 'house ads only take $1');
+  assert.equal(sponsors.isValidBid(10_000, 10_050), false, 'whole dollars only');
+  assert.equal(sponsors.isValidBid(10_000, 10_100), true);
+  assert.equal(sponsors.isValidBid(10_000, 11_000), true);
+  assert.equal(sponsors.isValidBid(10_000, 11_100), false, 'above the max raise');
+  assert.equal(sponsors.isValidBid(10_000, 10_000), false, 'must raise');
+  assert.equal(sponsors.slotPrice(-500), 100, 'junk current still opens at $1');
   assert.equal(sponsors.SLOT_COUNT, 10);
 });
 
@@ -40,24 +50,17 @@ test('Shipped names itself in metadata, never Bryton Zoz', async () => {
   }
 });
 
-test('floors rise with receipts printed; a house hero never sells below the current floor', () => {
-  const floors = sponsors.floorsAt(sponsors.DEFAULT_LADDER, 0);
-  assert.equal(floors.hero, 500);
-  assert.equal(floors.slot, 100);
-  assert.equal(sponsors.slotPrice(0, floors.hero), 500);
-  assert.equal(sponsors.slotPrice(0, floors.slot), 100);
-  const later = sponsors.floorsAt(sponsors.DEFAULT_LADDER, 250);
-  assert.equal(later.hero, 2_500);
-  assert.equal(later.slot, 300);
-  assert.equal(sponsors.slotPrice(400, later.slot), 500, 'holder plus $1 still wins if it is above the floor');
-  assert.equal(sponsors.parseLadder('nope'), null);
-  assert.ok(sponsors.parseLadder(sponsors.DEFAULT_LADDER));
+test('there is no floor ladder: a house hero and a small slot both open at $1', () => {
+  assert.equal(sponsors.slotPrice(0), 100);
+  assert.equal(sponsors.maximumBid(0), 100);
+  assert.equal('DEFAULT_LADDER' in sponsors, false);
+  assert.equal('parseLadder' in sponsors, false);
 });
 
-test('takeovers lock an hour before close; prorated refunds never exceed what was paid', () => {
+test('takeovers stay open until that slot closes; prorated refunds never exceed what was paid', () => {
   const close = Date.UTC(2026, 9, 26, 16);
-  assert.equal(sponsors.takeoversOpen(close - 61 * 60_000, close), true);
-  assert.equal(sponsors.takeoversOpen(close - 59 * 60_000, close), false);
+  assert.equal(sponsors.takeoversOpen(close - 1, close), true);
+  assert.equal(sponsors.takeoversOpen(close, close), false);
   const live = close - 10 * 86_400_000;
   assert.equal(sponsors.proratedRefund(1000, live, live + 5 * 86_400_000, close), 500);
   assert.equal(sponsors.proratedRefund(1000, live, live, close), 1000);
@@ -72,18 +75,19 @@ test('bidding guardrails: same holder, per-slot cooldown, 10-minute anti-snipe, 
   assert.equal(sponsors.sameHolder(null, 'ada@example.com'), false);
 
   const live = Date.UTC(2026, 9, 20, 12);
-  assert.equal(sponsors.slotCooling(live, live + 4 * 60_000), true);
-  assert.equal(sponsors.slotCooling(live, live + 5 * 60_000), false);
+  assert.equal(sponsors.slotCooling(live, live + 59_000), true);
+  assert.equal(sponsors.slotCooling(live, live + 60_000), false);
   assert.equal(sponsors.slotCooling(null, live), false);
-  assert.equal(sponsors.cooldownUntil(live), live + sponsors.BID_RULES.cooldownMinutes * 60_000);
+  assert.equal(sponsors.cooldownUntil(live), live + sponsors.BID_RULES.cooldownSeconds * 1000);
 
   const close = Date.UTC(2026, 9, 26, 16);
-  const lock = close - 60 * 60_000;
-  assert.equal(sponsors.inAntiSnipeWindow(lock - 10 * 60_000, close), true);
-  assert.equal(sponsors.inAntiSnipeWindow(lock - 10 * 60_000 + 1, close), true);
-  assert.equal(sponsors.inAntiSnipeWindow(lock - 11 * 60_000, close), false);
-  assert.equal(sponsors.inAntiSnipeWindow(lock, close), false);
+  assert.equal(sponsors.inAntiSnipeWindow(close - 10 * 60_000, close), true);
+  assert.equal(sponsors.inAntiSnipeWindow(close - 10 * 60_000 + 1, close), true);
+  assert.equal(sponsors.inAntiSnipeWindow(close - 11 * 60_000, close), false);
+  assert.equal(sponsors.inAntiSnipeWindow(close, close), false);
   assert.equal(sponsors.extendClose(close), close + 10 * 60_000);
+  assert.equal(sponsors.takeoversOpen(close - 1, close), true);
+  assert.equal(sponsors.takeoversOpen(close, close), false);
 
   assert.equal(sponsors.sponsorTag(1), 'SPONSOR #001');
   assert.equal(sponsors.sponsorTag(42), 'SPONSOR #042');

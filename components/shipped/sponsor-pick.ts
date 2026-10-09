@@ -3,9 +3,9 @@
 import { useEffect, useState } from 'react';
 import { HERO_SLOT, isSlot } from '../../lib/shipped-sponsors';
 
-type PickState = { slot: number; open: boolean };
+type PickState = { slot: number; open: boolean; cents: number | null };
 
-let current: PickState = { slot: HERO_SLOT, open: false };
+let current: PickState = { slot: HERO_SLOT, open: false, cents: null };
 const listeners = new Set<() => void>();
 
 function emit(next: PickState) {
@@ -13,9 +13,9 @@ function emit(next: PickState) {
   listeners.forEach((listener) => listener());
 }
 
-/** Open the bid sheet on a slot. The board's take buttons call this. */
-export function openSponsor(slot: number) {
-  emit({ slot: isSlot(slot) ? slot : HERO_SLOT, open: true });
+/** Open the bid sheet on a slot. Lowest/Highest bid buttons pass the cents they posted. */
+export function openSponsor(slot: number, cents?: number) {
+  emit({ slot: isSlot(slot) ? slot : HERO_SLOT, open: true, cents: Number.isInteger(cents) ? cents! : null });
 }
 
 export function closeSponsor() {

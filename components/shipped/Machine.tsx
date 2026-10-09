@@ -60,8 +60,7 @@ export type MachineProps = {
 
 type Phase = 'idle' | 'feeding' | 'printing' | 'hanging' | 'tearing' | 'torn';
 
-const phaseFor = (job: Job): Phase =>
-  job.kind === 'feed' ? 'feeding' : job.kind === 'idle' ? 'idle' : job.fast ? 'torn' : 'printing';
+const phaseFor = (job: Job): Phase => (job.kind === 'feed' ? 'feeding' : job.kind === 'idle' ? 'idle' : 'printing');
 type Vec = { x: number; y: number; r: number };
 
 const REST_Y = 30;

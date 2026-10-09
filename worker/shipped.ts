@@ -1423,6 +1423,7 @@ export async function shippedCron(env: ShippedEnv): Promise<void> {
   const db = await database(env);
   if (!db) return;
   const now = Date.now();
+  await settleOpenCheckouts(db, env, now);
   await db.batch([
     db
       .prepare(
@@ -1431,9 +1432,31 @@ export async function shippedCron(env: ShippedEnv): Promise<void> {
       )
       .bind(now - 30 * DAY, now - 60 * DAY),
     db.prepare('UPDATE shipped_bids SET email = NULL WHERE email IS NOT NULL AND paid_at < ?').bind(now - 120 * DAY),
-    db.prepare(`UPDATE shipped_bids SET status = 'failed', note = 'checkout abandoned' WHERE status = 'checkout' AND paid_at IS NULL AND created_at < ?`).bind(now - DAY),
+    db.prepare(`UPDATE shipped_bids SET status = 'failed', note = 'checkout abandoned' WHERE status = 'checkout' AND paid_at IS NULL AND created_at < ?`).bind(now - 2 * DAY),
   ]);
   await sweepLimits(db, now);
+}
+
+/**
+ * Checkouts still open after Stripe's shortest session: asks Stripe how each ended. Without the webhook secret a
+ * buyer who paid and closed the tab would otherwise be swept as "abandoned" with their money taken.
+ */
+async function settleOpenCheckouts(db: D1Database, env: ShippedEnv, now: number): Promise<void> {
+  const provider = sponsorProvider(env);
+  if (!provider?.confirm) return;
+  const since = now - 3 * DAY;
+  const until = now - (BID_RULES.checkoutMinutes + 5) * 60_000;
+  const [bids, orders] = await Promise.all([
+    db.prepare(`SELECT checkout_id FROM shipped_bids WHERE status = 'checkout' AND checkout_id IS NOT NULL AND created_at BETWEEN ? AND ? LIMIT 25`).bind(since, until).all<{ checkout_id: string }>(),
+    db.prepare(`SELECT checkout_id FROM print_orders WHERE status = 'checkout' AND checkout_id IS NOT NULL AND created_at BETWEEN ? AND ? LIMIT 25`).bind(since, until).all<{ checkout_id: string }>(),
+  ]);
+  for (const { checkout_id: checkoutId } of [...bids.results, ...orders.results]) {
+    try {
+      await applyEvent(db, env, await provider.confirm(checkoutId));
+    } catch (error) {
+      console.error('shipped: settle failed', error instanceof Error ? error.message.slice(0, 200) : 'unknown');
+    }
+  }
 }
 
 // ---- Admin (/admin, behind the password check in worker/metrics.ts) --------------------------------

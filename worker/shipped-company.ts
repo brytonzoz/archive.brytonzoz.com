@@ -2,7 +2,7 @@
 // / releases / updates, <link rel=alternate> feeds, sitemap.xml (2026 lastmod), GitHub org
 // releases, and App Store version rows. No per-company URL tables.
 import { extraResearchPaths, itemsFromProjectList } from './shipped-research';
-import { companyScope, companySlug, type Affiliation } from './shipped-affiliation';
+import { companyOrgGuess, companyScope, companySlug, companyTokens, productTokens, type Affiliation } from './shipped-affiliation';
 import { type XaiEnv, type XaiSpend, emptyXaiSpend } from './shipped-xai';
 import {
   cached,
@@ -46,15 +46,23 @@ type CompanyPage = {
 };
 
 export function hostGuesses(company: string): string[] {
-  const slug = companySlug(company);
-  if (!slug) return [];
-  const hyphen = company.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '');
+  const tokens = companyTokens(company);
+  const names = tokens.length ? tokens : [company];
   const out: string[] = [];
-  for (const tld of ['com', 'ai', 'dev', 'io', 'so']) {
-    out.push(`https://${slug}.${tld}/`);
-    if (hyphen && hyphen !== slug) out.push(`https://${hyphen}.${tld}/`);
+  for (const name of names) {
+    const slug = companySlug(name);
+    if (!slug) continue;
+    const hyphen = name.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '');
+    for (const tld of ['com', 'ai', 'dev', 'io', 'so']) {
+      const apex = `https://${slug}.${tld}/`;
+      if (!out.includes(apex)) out.push(apex);
+      if (hyphen && hyphen !== slug) {
+        const dashed = `https://${hyphen}.${tld}/`;
+        if (!out.includes(dashed)) out.push(dashed);
+      }
+    }
   }
-  return out.slice(0, 6);
+  return out.slice(0, 12);
 }
 
 function prefixHosts(apex: string): string[] {
@@ -113,9 +121,9 @@ async function fetchText(url: string, maxBytes: number, types?: string[]): Promi
 }
 
 export async function readCompanyPage(siteUrl: string): Promise<CompanyPage | null> {
-  const fetched = await fetchText(siteUrl, 900_000, ['text/html', 'application/xhtml', 'text/xml', 'application/xml']);
+  const fetched = await fetchText(siteUrl, 2_500_000, ['text/html', 'application/xhtml', 'text/xml', 'application/xml']);
   if (!fetched) return null;
-  const html = fetched.text.slice(0, 700_000);
+  const html = fetched.text.slice(0, 1_800_000);
   const base = fetched.url;
   const abs = (href: string | null) => {
     try {
@@ -129,7 +137,7 @@ export async function readCompanyPage(siteUrl: string): Promise<CompanyPage | nu
     const href = abs(/href=["']([^"']+)["']/i.exec(match[1])?.[1] ?? null);
     const text = clean(match[2].replace(/<[^>]+>/g, ' '), 80);
     if (href && text && !links.some((l) => l.url === href)) links.push({ text, url: href });
-    if (links.length >= 220) break;
+    if (links.length >= 400) break;
   }
   const headings = (html.match(/<h[1-3][^>]*>[\s\S]*?<\/h[1-3]>/gi) ?? [])
     .map((tag) => `# ${clean(tag.replace(/<[^>]+>/g, ' '), 80)}`)
@@ -143,7 +151,7 @@ export async function readCompanyPage(siteUrl: string): Promise<CompanyPage | nu
     .replace(/[ \t]+\n/g, '\n')
     .replace(/\n{3,}/g, '\n\n');
   const dated = (rawText.match(/(?:^|\n).{0,40}20\d\d[-/.]\d{1,2}.{0,100}/g) ?? []).join('\n');
-  const text = `${headings}\n${dated}\n${rawText}`.slice(0, 80_000);
+  const text = `${headings}\n${dated}\n${rawText}`.slice(0, 140_000);
   return {
     url: base,
     title: clean(html.match(/<title[^>]*>([\s\S]*?)<\/title>/i)?.[1] ?? '', 100),
@@ -428,8 +436,12 @@ async function appStoreVersionHistory(trackId: number, appName: string, year: nu
 
 function scopeFilter(affiliation: Affiliation, found: Found[]): Found[] {
   if (companyScope(affiliation.role) !== 'product' || !affiliation.product) return found;
-  const product = affiliation.product.toLowerCase();
-  return found.filter((item) => `${item.name} ${item.description} ${item.via ?? ''} ${item.link ?? ''}`.toLowerCase().includes(product));
+  const tokens = productTokens(affiliation.product).map((t) => t.toLowerCase());
+  if (!tokens.length) return found;
+  return found.filter((item) => {
+    const hay = `${item.name} ${item.description} ${item.link ?? ''}`.toLowerCase();
+    return tokens.some((token) => hay.includes(token));
+  });
 }
 
 export async function harvestCompany(opts: {
@@ -446,13 +458,17 @@ export async function harvestCompany(opts: {
   if (!slug || companyScope(affiliation.role) === 'none') {
     return { found: [], spend: emptyXaiSpend(), ran: [], cacheHit: false };
   }
-  const cacheKey = opts.deep ? `company:deep:v2:${year}:${slug}` : `company:v4:${year}:${slug}`;
+  const cacheKey = opts.deep ? `company:deep:v3:${year}:${slug}` : `company:v5:${year}:${slug}`;
   return cached(cacheKey, 7 * 1440 * MIN, async () => {
     const via = viaFor(affiliation);
     const ran: string[] = [];
     const found: Found[] = [];
     const spend = emptyXaiSpend();
-    const seeds = [affiliation.companySite, ...hostGuesses(affiliation.company ?? '')].filter((u): u is string => Boolean(u));
+    const seeds = [
+      affiliation.companySite,
+      ...hostGuesses(affiliation.company ?? ''),
+      ...hostGuesses(affiliation.product ?? ''),
+    ].filter((u): u is string => Boolean(u));
     const seenHost = new Set<string>();
     const liveOrigins: string[] = [];
     const feeds: string[] = [];
@@ -504,7 +520,7 @@ export async function harvestCompany(opts: {
       ran.push('company-feeds');
     }
 
-    const org = affiliation.companyGithub || slug;
+    const org = affiliation.companyGithub || companyOrgGuess(affiliation.company) || slug;
     const orgItems = await githubOrgShips(org, env, year).catch(() => []);
     if (orgItems.length) {
       found.push(...withVia(orgItems, via));

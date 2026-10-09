@@ -18,6 +18,7 @@ on:
       - worker/shipped-xai.ts
       - worker/shipped-decisions.ts
       - worker/shipped-company.ts
+      - worker/shipped-changelog.ts
       - docs/shipped-ground-truth.json
       - docs/shipped-heldout-ground-truth.json
 

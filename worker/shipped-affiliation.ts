@@ -42,6 +42,51 @@ export function companySlug(company: string | null | undefined): string | null {
   return slug.length >= 2 ? slug : null;
 }
 
+/** "Cursor (Anysphere)" → ["Cursor", "Anysphere"]. Used for host and org guesses. */
+export function companyTokens(company: string | null | undefined): string[] {
+  if (!company) return [];
+  const parts = company
+    .split(/[()[\],/|]/)
+    .map((part) => part.replace(/\b(inc|llc|ltd|corp|the|ai|labs?)\b/gi, ' ').trim())
+    .filter((part) => part.length >= 2 && !/^(inc|llc|ltd|the)$/i.test(part));
+  const out: string[] = [];
+  for (const part of parts) {
+    if (!out.some((v) => v.toLowerCase() === part.toLowerCase())) out.push(part);
+  }
+  return out.slice(0, 4);
+}
+
+export function companyOrgGuess(company: string | null | undefined): string | null {
+  const primary = companyTokens(company)[0];
+  return companySlug(primary ?? company);
+}
+
+/** vercel.com / openai.com on a CEO's profile → the company name. Skip personal hosts. */
+export function companyFromSites(
+  urls: (string | null | undefined)[],
+  person: { name?: string; handle?: string | null },
+): { company: string; site: string } | null {
+  const skip = [person.handle, ...(person.name ?? '').split(/\s+/)]
+    .filter((t): t is string => Boolean(t && t.length >= 3))
+    .map((t) => t.toLowerCase().replace(/[^a-z0-9]/g, ''));
+  for (const raw of urls) {
+    if (!raw) continue;
+    let host = '';
+    try {
+      host = new URL(raw).hostname.replace(/^www\./, '').toLowerCase();
+    } catch {
+      continue;
+    }
+    if (!host || /^(x\.com|twitter\.com|github\.com|linkedin\.com|instagram\.com)$/.test(host)) continue;
+    const base = host.replace(/\.(com|ai|io|dev|so|app|me|co)$/i, '').replace(/\./g, '');
+    if (base.length < 3) continue;
+    if (skip.some((t) => base.includes(t) || t.includes(base))) continue;
+    const label = companyTokens(base)[0] ?? base;
+    return { company: label.charAt(0).toUpperCase() + label.slice(1), site: raw.startsWith('http') ? raw : `https://${host}/` };
+  }
+  return null;
+}
+
 /** Typed "CEO of Higgsfield", "Higgsfield CEO", "Tibo from OpenAI", "Codex lead at OpenAI". */
 export function parseAffiliationQuery(text: string): Affiliation {
   const raw = cleanText(text, 80);
@@ -77,11 +122,16 @@ export function parseAffiliationQuery(text: string): Affiliation {
 export function affiliationFromBio(bio: string, hint: Affiliation = emptyAffiliation()): Affiliation {
   const text = cleanText(bio, 400);
   const out: Affiliation = { ...hint };
-  const ceo = text.match(/\b(ceo|founder|co-?founder)\b(?:\s+(?:of|at|@)\s*([A-Za-z0-9._-]{2,40}))?/i);
+  const ceo = text.match(/\b(ceo|founder|co-?founder)\b(?:\s*(?:of|at|@|,|[/|-]|–)\s*@?([A-Za-z][A-Za-z0-9._-]{1,39}))?/i);
   if (ceo) {
     const role = ceo[1].toLowerCase().includes('founder') ? 'founder' : 'ceo';
     if (out.role === 'unknown' || role === 'ceo' || role === 'founder') out.role = role;
     if (ceo[2] && !out.company) out.company = cleanText(ceo[2], 40);
+  }
+  const titled = text.match(/\b([A-Z][A-Za-z0-9._-]{1,39})\s+(ceo|founder|co-?founder)\b/i);
+  if (titled) {
+    if (out.role === 'unknown') out.role = titled[2].toLowerCase().includes('founder') ? 'founder' : 'ceo';
+    if (!out.company) out.company = cleanText(titled[1], 40);
   }
   const lead = text.match(/\b([A-Za-z][A-Za-z0-9 ._-]{1,32}?)\s+(?:lead|head|director)\s+(?:of|at|@)\s+([A-Za-z0-9._-]{2,40})/i);
   if (lead) {
@@ -128,6 +178,36 @@ export function needsPersonResolve(opts: { handle?: string | null; name?: string
   if (opts.name && opts.company) return true;
   if (opts.name && /\s/.test(opts.name)) return true;
   return Boolean(opts.company || opts.name);
+}
+
+/** Handle is known but the company they run is not — @sama, @rauchg.
+ *  Only fires for CEO/founder (typed or bio). Unknown+handle stays free. */
+export function needsCompanyResolve(opts: {
+  handle?: string | null;
+  company?: string | null;
+  role?: RoleKind;
+  bio?: string;
+}): boolean {
+  if (opts.company) return false;
+  if (!opts.handle) return false;
+  if (opts.role === 'ceo' || opts.role === 'founder') return true;
+  return Boolean(opts.bio && /\b(ceo|founder|co-?founder)\b/i.test(opts.bio));
+}
+
+/** GitHub `company` is often `@openai`. */
+export function cleanGithubCompany(raw: string | null | undefined): string | null {
+  if (!raw) return null;
+  const cleaned = raw.replace(/^@/, '').replace(/\s+/g, ' ').trim();
+  return cleaned.length >= 2 ? cleaned : null;
+}
+
+export function productTokens(product: string | null | undefined): string[] {
+  if (!product) return [];
+  return product
+    .split(/\s*(?:,|;|&|\/|\band\b)\s*/i)
+    .map((part) => part.trim())
+    .filter((part) => part.length >= 3 && !/^(the|and|platform|generation)$/i.test(part))
+    .slice(0, 4);
 }
 
 export function identitySearchQuery(who: string, company: string | null, role: RoleKind | string | null): string {

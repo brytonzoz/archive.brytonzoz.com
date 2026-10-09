@@ -18,6 +18,32 @@ test('name queries without a handle need a cheap person resolve', () => {
   assert.equal(affiliation.needsPersonResolve({ handle: 'rauchg', name: '', company: null, role: 'unknown' }), false);
 });
 
+test('handle-only CEOs resolve a company; unknown builders stay free', () => {
+  assert.equal(affiliation.needsCompanyResolve({ handle: 'sama', company: null, role: 'unknown', bio: 'CEO, OpenAI' }), true);
+  assert.equal(affiliation.needsCompanyResolve({ handle: 'rauchg', company: null, role: 'ceo' }), true);
+  assert.equal(affiliation.needsCompanyResolve({ handle: 'steventey', company: null, role: 'unknown', bio: 'building stuff' }), false);
+  assert.equal(affiliation.needsCompanyResolve({ handle: 'sama', company: 'OpenAI', role: 'unknown' }), false);
+  assert.equal(affiliation.cleanGithubCompany('@openai'), 'openai');
+  assert.deepEqual(affiliation.companyTokens('Cursor (Anysphere)'), ['Cursor', 'Anysphere']);
+  assert.equal(affiliation.companyOrgGuess('Cursor (Anysphere)'), 'cursor');
+  const fromVercel = affiliation.companyFromSites(['https://rauchg.com', 'https://vercel.com'], { name: 'Guillermo Rauch', handle: 'rauchg' });
+  assert.equal(fromVercel?.company, 'Vercel');
+  const skipSelf = affiliation.companyFromSites(['https://sama.com'], { name: 'Sam Altman', handle: 'sama' });
+  assert.equal(skipSelf, null);
+});
+
+test('bio CEO patterns and host guesses cover OpenAI / Cursor / Vercel', () => {
+  const openai = affiliation.affiliationFromBio('CEO, OpenAI', affiliation.emptyAffiliation());
+  assert.equal(openai.role, 'ceo');
+  assert.equal(openai.company, 'OpenAI');
+  const vercel = affiliation.affiliationFromBio('Vercel CEO', affiliation.emptyAffiliation());
+  assert.equal(vercel.role, 'ceo');
+  assert.equal(vercel.company, 'Vercel');
+  const hosts = company.hostGuesses('Cursor (Anysphere)');
+  assert.ok(hosts.some((url) => url.includes('cursor.com')), JSON.stringify(hosts));
+  assert.ok(hosts.some((url) => url.includes('anysphere.com')));
+});
+
 test('Cursor-style heading then Sep 23, 2026 becomes a dated ship', () => {
   const text = `# Remote control for local agents\nYou can now see local agents.\n\nSep 23, 2026 · Changelog\n\n# Cursor Projects\n\nSep 2, 2026 · Changelog`;
   const items = changelog.itemsFromDatedCards(text, 'https://cursor.com/changelog', 2026);

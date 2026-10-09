@@ -117,6 +117,8 @@ export type Profile = {
   phUsers?: string[];
   npmUsers?: string[];
   affiliation?: import('./shipped-affiliation').Affiliation;
+  /** From GitHub `company` / worksFor, if we found one. */
+  company?: string | null;
 };
 
 export const emptyProfile = (): Profile => ({
@@ -128,6 +130,7 @@ export const emptyProfile = (): Profile => ({
   sites: [],
   phUsers: [],
   npmUsers: [],
+  company: null,
 });
 
 const sitesOf = (profile: Profile) => profile.sites ?? [];
@@ -1106,7 +1109,7 @@ function toPage(page: TinyfishPage): PageInfo | null {
 
 // ---- Who is this? --------------------------------------------------------------------------------
 
-export type GithubUser = { login: string; name: string; bio: string; blog: string | null; x: string | null; repos: number };
+export type GithubUser = { login: string; name: string; bio: string; blog: string | null; x: string | null; repos: number; company: string | null };
 
 const xFrom = (urls: string[]) =>
   urls
@@ -1128,6 +1131,7 @@ function parseProfile(html: string, login: string): GithubUser | null {
     blog: siteFromProfile(website ? decode(website) : null),
     x: xFrom(me),
     repos: count(html.match(/Repositories\s*<span title="([\d,]+)"/)?.[1]),
+    company: clean(decode(html.match(/itemprop="worksFor"[\s\S]*?<div>([^<]+)</)?.[1] ?? html.match(/aria-label="Organization:\s*([^"]+)"/)?.[1] ?? ''), 40) || null,
   };
 }
 
@@ -1141,6 +1145,7 @@ function profileFromTinyfish(page: TinyfishPage, login: string): GithubUser | nu
     blog: null,
     x: xFrom(page.links),
     repos: 0,
+    company: null,
   };
 }
 
@@ -1157,6 +1162,7 @@ async function apiUser(login: string, env: SourceEnv): Promise<GithubUser | null
     blog: siteFromProfile(user.blog),
     x: typeof user.twitter_username === 'string' && isXHandle(user.twitter_username) ? user.twitter_username : null,
     repos: Number(user.public_repos) || 0,
+    company: typeof user.company === 'string' ? clean(user.company, 40) || null : null,
   };
 }
 
@@ -1427,6 +1433,7 @@ async function resolveIdentityFresh(subject: Subject, env: SourceEnv, tinyfish: 
     profile.bio ||= matched.user.bio;
     profile.site ||= matched.user.blog;
     profile.x ||= matched.user.x;
+    profile.company ||= matched.user.company;
     if (matched.user.blog) {
       profile.site = matched.user.blog;
       profile.sites = mergeSites(profile.sites, [matched.user.blog]);
@@ -1438,6 +1445,7 @@ async function resolveIdentityFresh(subject: Subject, env: SourceEnv, tinyfish: 
       profile.bio ||= user.bio;
       profile.site ||= user.blog;
       profile.x ||= user.x;
+      profile.company ||= user.company;
       if (user.blog) profile.sites = mergeSites(profile.sites, [user.blog]);
     } else notes.push('github-profile:miss');
   } else notes.push('github:unresolved');
@@ -1587,7 +1595,7 @@ export async function gather(
   const tinyfish = tinyfishAccess(env, meter);
   const resolved = await resolveIdentity(subject, env, tinyfish);
   const mode: GatherMode = opts?.mode === 'full' ? 'full' : 'free';
-  const key = mode === 'full' ? `gather:full:v2:${year}:${resolved.cacheKey}` : `gather:v11:${year}:${resolved.cacheKey}`;
+  const key = mode === 'full' ? `gather:full:v4:${year}:${resolved.cacheKey}` : `gather:v13:${year}:${resolved.cacheKey}`;
   return cached(key, 1440 * MIN, () => gatherFresh(subject, resolved.profile, env, year, meter, tinyfish, resolved.notes, mode));
 }
 
@@ -1720,6 +1728,7 @@ async function gatherFresh(
       if (user?.repos) {
         pageStats.push(sourcedStat('repos', `${user.repos} public GitHub repos`, user.repos, `${GH}/${profile.github}`, user.name || profile.github)!);
       }
+      if (user?.company) profile.company ||= user.company;
       ran.push('github-overview');
     } catch {
       failed.push('github-overview');
@@ -1752,16 +1761,36 @@ async function gatherFresh(
 
   // Person → role → company. Resolve a missing handle/name BEFORE the company harvest so
   // "Tibo from OpenAI" becomes Thibault Sottiaux / Codex lead and the tape is scoped right.
-  const { parseAffiliationQuery, affiliationFromBio, mergeAffiliation, viaLabel, defaultAttribution, companySlug, needsPersonResolve } =
-    await import('./shipped-affiliation');
+  const {
+    parseAffiliationQuery,
+    affiliationFromBio,
+    mergeAffiliation,
+    viaLabel,
+    defaultAttribution,
+    companyOrgGuess,
+    companyFromSites,
+    needsPersonResolve,
+    needsCompanyResolve,
+    cleanGithubCompany,
+  } = await import('./shipped-affiliation');
   const typed = parseAffiliationQuery(subject.display || subject.id);
   let affiliation = mergeAffiliation(typed, affiliationFromBio(profile.bio || '', typed));
   if (!affiliation.name) affiliation.name = who;
-  if (!affiliation.companyX && affiliation.company) {
-    const slug = companySlug(affiliation.company);
-    if (slug && slug.length <= 15) affiliation.companyX = slug;
-  }
-  if (!affiliation.companyGithub && affiliation.company) affiliation.companyGithub = companySlug(affiliation.company);
+  const applyCompanyHints = () => {
+    const fromSites = companyFromSites(sitesOf(profile), { name: affiliation.name || profile.name, handle: profile.x });
+    if (fromSites && !affiliation.company) {
+      affiliation.company = fromSites.company;
+      affiliation.companySite ||= fromSites.site;
+    }
+    const fromGithub = cleanGithubCompany(profile.company);
+    if (fromGithub && !affiliation.company) affiliation.company = fromGithub;
+    if (!affiliation.companyX && affiliation.company) {
+      const slug = companyOrgGuess(affiliation.company);
+      if (slug && slug.length <= 15) affiliation.companyX = slug;
+    }
+    if (!affiliation.companyGithub && affiliation.company) affiliation.companyGithub = companyOrgGuess(affiliation.company);
+  };
+  applyCompanyHints();
   profile.affiliation = affiliation;
 
   let xaiMicros = 0;
@@ -1770,66 +1799,79 @@ async function gatherFresh(
   let xaiHit = false;
   let decisionsMicros = 0;
   const { xaiConfigured } = await import('./shipped-xai');
-  if (xaiConfigured(env) && needsPersonResolve({ handle: profile.x, name: affiliation.name, company: affiliation.company, role: affiliation.role })) {
-    try {
-      const { resolvePersonWithXai } = await import('./shipped-xai');
-      const ident = await resolvePersonWithXai({ env, who, company: affiliation.company, role: affiliation.role });
-      xaiMicros += ident.spend.costMicros;
-      xaiTicks += ident.spend.ticks;
-      xaiPosts += ident.spend.posts;
-      if (ident.spend.ticks || ident.spend.costMicros) {
-        xaiHit = true;
-        ran.push('xai-identity');
+  const applyResolved = async (searchWho: string) => {
+    const { resolvePersonWithXai } = await import('./shipped-xai');
+    const ident = await resolvePersonWithXai({ env, who: searchWho, company: affiliation.company, role: affiliation.role });
+    xaiMicros += ident.spend.costMicros;
+    xaiTicks += ident.spend.ticks;
+    xaiPosts += ident.spend.posts;
+    if (ident.spend.ticks || ident.spend.costMicros) {
+      xaiHit = true;
+      ran.push('xai-identity');
+    }
+    const { verifyResolvedPerson } = await import('./shipped-decisions');
+    const verified = await verifyResolvedPerson({
+      env,
+      query: subject.display || subject.id,
+      company: affiliation.company,
+      candidate: ident,
+    });
+    decisionsMicros += verified.spend.costMicros;
+    if (!verified.keep) {
+      ran.push('identity:rejected');
+      return ident;
+    }
+    if (ident.handle) profile.x = ident.handle;
+    if (ident.name) {
+      affiliation.name = ident.name;
+      if (!profile.name) profile.name = ident.name;
+    }
+    if (ident.company && !affiliation.company) affiliation.company = ident.company;
+    if (ident.role && affiliation.role === 'unknown') {
+      const role = ident.role.toLowerCase();
+      if (role.includes('ceo')) affiliation.role = 'ceo';
+      else if (role.includes('founder')) affiliation.role = 'founder';
+      else if (role.includes('lead') || role.includes('head') || role.includes('director')) affiliation.role = 'lead';
+    }
+    if (ident.product) affiliation.product = affiliation.product || ident.product;
+    if (ident.handle) {
+      try {
+        const { readXProfile } = await import('./shipped-identity');
+        const xProfile = await readXProfile(ident.handle);
+        if (xProfile?.bio) {
+          profile.bio = profile.bio || xProfile.bio;
+          affiliation = mergeAffiliation(affiliation, affiliationFromBio(xProfile.bio, affiliation));
+        }
+        if (xProfile?.name && !profile.name) profile.name = xProfile.name;
+        if (xProfile?.site && !profile.site) profile.site = xProfile.site;
+        if (xProfile?.site) profile.sites = mergeSites(profile.sites, [xProfile.site]);
+      } catch {
+        ran.push('x-profile:identity-miss');
       }
-      const { verifyResolvedPerson } = await import('./shipped-decisions');
-      const verified = await verifyResolvedPerson({
-        env,
-        query: subject.display || subject.id,
-        company: affiliation.company,
-        candidate: ident,
-      });
-      decisionsMicros += verified.spend.costMicros;
-      if (verified.keep) {
-        if (ident.handle) profile.x = ident.handle;
-        if (ident.name) {
-          affiliation.name = ident.name;
-          if (!profile.name) profile.name = ident.name;
-        }
-        if (ident.company && !affiliation.company) affiliation.company = ident.company;
-        if (ident.role && affiliation.role === 'unknown') {
-          const role = ident.role.toLowerCase();
-          if (role.includes('ceo')) affiliation.role = 'ceo';
-          else if (role.includes('founder')) affiliation.role = 'founder';
-          else if (role.includes('lead') || role.includes('head') || role.includes('director')) affiliation.role = 'lead';
-        }
-        if (ident.product) affiliation.product = affiliation.product || ident.product;
-        if (ident.handle) {
-          try {
-            const { readXProfile } = await import('./shipped-identity');
-            const xProfile = await readXProfile(ident.handle);
-            if (xProfile?.bio) {
-              profile.bio = profile.bio || xProfile.bio;
-              affiliation = mergeAffiliation(affiliation, affiliationFromBio(xProfile.bio, affiliation));
-            }
-            if (xProfile?.name && !profile.name) profile.name = xProfile.name;
-            if (xProfile?.site && !profile.site) profile.site = xProfile.site;
-          } catch {
-            ran.push('x-profile:identity-miss');
-          }
-        }
-        ran.push(`identity:${affiliation.name || who}${profile.x ? `@${profile.x}` : ''}${affiliation.product ? `:${affiliation.product}` : ''}`);
-      } else {
-        ran.push('identity:rejected');
+    }
+    applyCompanyHints();
+    ran.push(`identity:${affiliation.name || who}${profile.x ? `@${profile.x}` : ''}${affiliation.product ? `:${affiliation.product}` : ''}`);
+    return ident;
+  };
+  const wantPerson = needsPersonResolve({ handle: profile.x, name: affiliation.name, company: affiliation.company, role: affiliation.role });
+  const wantCompany = needsCompanyResolve({
+    handle: profile.x,
+    company: affiliation.company,
+    role: affiliation.role,
+    bio: profile.bio,
+  });
+  if (xaiConfigured(env) && (wantPerson || wantCompany)) {
+    try {
+      await applyResolved(affiliation.name || who);
+      // Legal name landed without a handle (CEO of Higgsfield → Alex Mashrabov).
+      if (!profile.x && affiliation.name && affiliation.name !== who) {
+        await applyResolved(affiliation.name);
       }
     } catch {
       failed.push('xai-identity');
     }
   }
-  if (!affiliation.companyX && affiliation.company) {
-    const slug = companySlug(affiliation.company);
-    if (slug && slug.length <= 15) affiliation.companyX = slug;
-  }
-  if (!affiliation.companyGithub && affiliation.company) affiliation.companyGithub = companySlug(affiliation.company);
+  applyCompanyHints();
   profile.affiliation = affiliation;
 
   try {

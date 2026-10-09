@@ -186,7 +186,7 @@ export function formatStats(items: { source?: string }[], sourced: SourcedStat[]
 }
 
 const TEMPLATE_NOTE =
-  /is first on the tape|led the year|closed the year|set the tone|through-line|Receipt paper running low|Someone likes the publish button|\d+\s+launches?\s+·|night shift|publish button|\bthe tape\b|the register is|stock the shelves|counted receipts|got the paperwork|rings the publish|cashier has seen worse|mostly i just|wish and a prayer|nobody asked|same maker, more skus|runs on a wish/i;
+  /is first on the tape|led the year|closed the year|set the tone|through-line|Receipt paper running low|Someone likes the publish button|\d+\s+launches?\s+·|night shift|publish button|\bthe tape\b|\bthe register\b|stock the shelves|counted receipts|got the paperwork|rings the publish|cashier has seen worse|mostly i just|wish and a prayer|nobody asked|same maker, more skus|runs on a wish/i;
 
 /** Notes that read like a leftover slogan, a fallback stat line, or the same cashier bit. */
 export function cashierNoteLooksCanned(note: string): boolean {
@@ -203,9 +203,12 @@ function statPhrase(line: string): string {
 function clipSentence(text: string, max: number): string {
   const trimmed = text.replace(/\s+/g, ' ').trim();
   if (trimmed.length <= max) return trimmed;
+  const sentence = trimmed.match(/^(.+?[.!?])(?:\s|$)/);
+  if (sentence && sentence[1].length >= 40 && sentence[1].length <= max) return sentence[1];
   const cut = trimmed.slice(0, max);
   const space = cut.lastIndexOf(' ');
   let out = (space > Math.floor(max * 0.55) ? cut.slice(0, space) : cut).replace(/[,:;–—-]+$/, '');
+  out = out.replace(/\s+(the|a|an|and|or|to|for|of|with|still|just)$/i, '');
   if (!/[.!?]$/.test(out)) out += '.';
   return out;
 }
@@ -328,7 +331,7 @@ function noteOnlySystem(year: number) {
     'Bad: "runs on a wish and a prayer"',
     'Bad: "Nobody asked for ChatGPT for Research."',
     'Bad: "200/mo public revenue on CHATGPT FOR RESEARCH"',
-    'Banned: wish and a prayer, Nobody asked, Same maker more SKUs, night shift, publish button, the tape, the register, receipt paper, stock the shelves, invented numbers, insults, exclamation marks, emoji, em dashes.',
+    'Banned: wish and a prayer, Nobody asked, Same maker more SKUs, night shift, publish button, the tape, the register, receipt paper, stock the shelves, invented numbers, insults, exclamation marks, emoji.',
     'Finish with only a JSON object, no markdown: {"note":""}',
   ].join('\n');
 }

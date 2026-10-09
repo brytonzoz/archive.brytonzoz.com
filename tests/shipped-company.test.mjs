@@ -63,6 +63,9 @@ test('bio CEO patterns and host guesses cover OpenAI / Cursor / Vercel', () => {
     affiliation.emptyAffiliation(),
   );
   assert.equal(mission.company, 'OpenAI');
+  assert.equal(mission.role, 'ceo');
+  const camel = affiliation.affiliationFromBio('PhotoAI and InteriorAI on the side', affiliation.emptyAffiliation());
+  assert.equal(camel.company, null);
   const junk = affiliation.affiliationFromBio(
     'We’ve detected that JavaScript is disabled in this browser. Please enable JavaScript. Terms of Service',
     affiliation.emptyAffiliation(),

@@ -113,7 +113,7 @@ test('cashier note and stats are specific to the items, never stock copy', () =>
   const stats = ai.formatStats(items);
   assert.match(stats[0], /3 launches/);
   assert.match(stats[0], /GitHub/);
-  assert.doesNotMatch(note, /Thank you for shipping|Come again|No refunds on momentum|Receipt paper running low|Someone likes the publish button|night shift|publish button|\bthe tape\b/i);
+  assert.doesNotMatch(note, /Thank you for shipping|Come again|No refunds on momentum|Receipt paper running low|Someone likes the publish button|night shift|publish button|\bthe tape\b|\bthe register\b/i);
   assert.match(note, /PHOTOAI|INTERIORAI|SUPERLEVELS/i);
   assert.match(note, /553|stars/i);
   assert.equal(ai.cashierNoteLooksCanned(note), false);

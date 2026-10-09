@@ -119,6 +119,10 @@ function isNoiseTitle(text: string): boolean {
   if (/\baccelerating\b/i.test(text) && !/\b(launch|released?|version|v\d)\b/i.test(text)) return true;
   if (/^[A-Za-z0-9][\w.-]{1,40}\s+builds\b/i.test(text)) return true;
   if (/\busing\b.{0,48}\bto\s+(search|find|build|make|create|train)\b/i.test(text)) return true;
+  if (/\b(uses|using)\b.{0,48}\b(to|for)\b/i.test(text)) return true;
+  if (/\bsystem card\b/i.test(text)) return true;
+  if (/^(to get started|each dot |sign in |contact |blog \/|company \/)/i.test(text)) return true;
+  if (/^(blog|company|research|sign in|contact)\b/i.test(text)) return true;
   return false;
 }
 

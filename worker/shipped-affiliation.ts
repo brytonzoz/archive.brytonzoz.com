@@ -130,6 +130,7 @@ const NOT_COMPANY = /^(the|a|an|this|that|our|all|humanity|people|life|course|th
 function usableCompany(raw: string | null | undefined): string | null {
   const name = cleanText(raw, 40);
   if (name.length < 3 || NOT_COMPANY.test(name)) return null;
+  if (/\d/.test(name) && /[A-Z]/.test(name) && name.length > 8) return null;
   return name;
 }
 
@@ -159,11 +160,10 @@ export function affiliationFromBio(bio: string, hint: Affiliation = emptyAffilia
   if (atCo && !out.company) out.company = usableCompany(atCo[1]);
   if (!out.company) {
     const missionOf = text.match(/\b(?:mission|ceo|founder|co-?founder|team|staff)\s+of\s+([A-Z][A-Za-z0-9]{2,39})\b/i);
-    if (missionOf) out.company = usableCompany(missionOf[1]);
-  }
-  if (!out.company) {
-    const camel = text.match(/\b([A-Z][a-z]+[A-Z][A-Za-z0-9]+)\b/);
-    if (camel) out.company = usableCompany(camel[1]);
+    if (missionOf) {
+      out.company = usableCompany(missionOf[1]);
+      if (out.company && out.role === 'unknown' && /\b(mission|ceo)\s+of\b/i.test(text)) out.role = 'ceo';
+    }
   }
   const handles = xHandlesFromText(text);
   if (!out.companyX && out.company) {

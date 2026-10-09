@@ -111,6 +111,15 @@ test('tutorials, case studies, and research writeups are not ships', () => {
   );
   assert.equal(codex.attribution, 'company-led-by-person');
   assert.ok(decisions.shouldKeep(codex), JSON.stringify(codex));
+  const story = decisions.heuristicMark(
+    found({ name: 'Datadog uses Codex for system-level work', description: 'customer', link: 'https://openai.com/index/datadog', via: 'via OpenAI · Codex' }),
+    2026,
+    lead,
+  );
+  assert.equal(decisions.shouldKeep(story), false);
+  const repo = found({ name: 'skillbox', source: 'github', link: 'https://github.com/kitze/skillbox', date: '2026-09-17' });
+  const repoMark = { ...decisions.heuristicMark(repo, 2026, person), kind: 'NOT_A_SHIP', isRealShip: 0.2 };
+  assert.ok(decisions.shouldKeep(repoMark, repo), 'personal github repos stay on the tape');
 });
 
 test('xAI is a keyword gap-fill with a hard post cap and monthly fail-closed', async () => {

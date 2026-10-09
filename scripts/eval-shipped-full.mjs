@@ -38,7 +38,7 @@ const tinyfishMeter = {
 function sampleLine(item) {
   const bits = [item.name];
   if (item.source) bits.push(`[${item.source}]`);
-  if (item.via) bits.push(`via ${item.via}`);
+  if (item.via) bits.push(item.via.startsWith('via ') ? item.via : `via ${item.via}`);
   if (item.date) bits.push(item.date);
   if (item.link) bits.push(item.link);
   return bits.join(' · ');

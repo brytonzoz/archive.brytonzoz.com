@@ -10,7 +10,15 @@ export const DECISIONS_URL = 'https://api.openai.com/v1/decisions';
 export const DECISIONS_MODEL = 'gpt-6-luna';
 /** $0.10 per 1M input tokens; output is free. */
 const IN_PER_M = 0.1;
-export const KEEP_PRODUCT = 0.72;
+export const KEEP_PRODUCT = 0.7;
+
+const PERSONAL_SHIP_SOURCE = /^(github|npm|producthunt|appstore)$/;
+
+export function isPersonalShipSource(item: { source?: string; link?: string | null }): boolean {
+  if (PERSONAL_SHIP_SOURCE.test(item.source ?? '')) return true;
+  if (item.source === 'site' && item.link && !/\/(blog|posts?|news|articles?|p|index)\//i.test(item.link)) return true;
+  return false;
+}
 
 export type DecisionsEnv = {
   OPENAI_API_KEY?: string;
@@ -79,7 +87,7 @@ const CANDIDATE_QUESTIONS = [
     type: 'predicate',
     name: 'is_real_ship',
     instructions:
-      'A ship is a product, feature, model, app, version, or release MADE AVAILABLE to users. Answer yes only for those. Tutorials, how-tos, case studies, customer stories, research papers, hiring posts, opinion, engineering deep dives, event recaps, teasers, roadmaps, and retweets are NOT ships — answer no.',
+      'A ship is a product, feature, model, app, version, or release MADE AVAILABLE to users. A GitHub repo, npm package, Product Hunt launch, or App Store app this person published in 2026 IS a ship. Tutorials, how-tos, case studies, customer stories ("X uses PRODUCT"), research papers, system cards, hiring posts, opinion, engineering deep dives, event recaps, teasers, roadmaps, and retweets are NOT ships — answer no, even if they mention the product.',
   },
   {
     type: 'predicate',
@@ -165,6 +173,10 @@ export function looksLikeNotAShip(item: { name?: string; description?: string; l
   if (/^[A-Za-z0-9][\w.-]{1,40}\s+builds\b/i.test(name)) return true;
   if (/\busing\b.{0,48}\bto\s+(search|find|build|make|create|train)\b/i.test(name)) return true;
   if (/^(rapidly|safely|simply)\s+\w+ing\b/i.test(name)) return true;
+  if (/\b(uses|using)\b.{0,48}\b(to|for)\b/i.test(name)) return true;
+  if (/\bsystem card\b/i.test(name)) return true;
+  if (/\b(gartner|cfo council|analyst|keynote)\b/i.test(name)) return true;
+  if (/^(blog|company|research|sign in|contact)\b/i.test(name)) return true;
   if (/\/(research|blog)\//i.test(item.link ?? '') && /\b(how |why |tutorial|case |stor(?:y|ies)|accelerat)/i.test(name)) return true;
   return false;
 }
@@ -189,29 +201,36 @@ export function heuristicMark(item: Found, year: number, affiliation: Affiliatio
   const thisYear = Boolean(item.thisYear) || dated;
   const isRealShip = article ? 0.08 : tease ? 0.15 : item.link ? 0.88 : 0.4;
   const changelogYear = (item.source === 'changelog' || item.source === 'company') && thisYear;
-  const inYear = dated ? 0.9 : changelogYear ? 0.86 : thisYear ? 0.78 : item.date ? 0.15 : 0.45;
+  const inYear = dated ? 0.9 : changelogYear ? 0.86 : thisYear ? 0.82 : item.date ? 0.15 : 0.45;
   const attribution = scopedAttribution(item, affiliation);
   const significance = Math.min(4, Math.max(0, Math.round(Math.log10(1 + (item.score ?? 1)) * 2)));
   const kind: ShipKind = article || tease ? 'NOT_A_SHIP' : changelogYear || dated ? 'release_version' : 'feature';
   return { isRealShip, inYear, attribution, significance, kind, confidence: isRealShip * inYear };
 }
 
-export function shouldKeep(mark: DecisionMark): boolean {
-  if (mark.kind === 'NOT_A_SHIP') return false;
-  return mark.isRealShip * mark.inYear >= KEEP_PRODUCT && mark.attribution !== 'unrelated';
+export function shouldKeep(mark: DecisionMark, item?: Found): boolean {
+  if (mark.attribution === 'unrelated') return false;
+  const personal = item ? isPersonalShipSource(item) && !looksLikeNotAShip(item) : false;
+  if (mark.kind === 'NOT_A_SHIP' && !personal) return false;
+  if (personal && (item?.thisYear || (item?.date && /^\d{4}/.test(item.date)))) return true;
+  return mark.isRealShip * mark.inYear >= KEEP_PRODUCT;
 }
 
-function markFromAnswers(answers: Answer[], fallback: DecisionMark): DecisionMark {
+function markFromAnswers(answers: Answer[], fallback: DecisionMark, item?: Found): DecisionMark {
   const real = pick(answers, 'is_real_ship');
   const year = pick(answers, 'in_2026');
   const attr = pick(answers, 'attribution');
   const sig = pick(answers, 'significance');
   const kindAns = pick(answers, 'kind');
-  const isRealShip = real?.type === 'predicate' ? real.probability : fallback.isRealShip;
+  let isRealShip = real?.type === 'predicate' ? real.probability : fallback.isRealShip;
   const inYear = year?.type === 'predicate' ? year.probability : fallback.inYear;
   const attribution = attr?.type === 'choice' && ATTRIBUTION_CHOICES.some((c) => c.value === attr.choice) ? (attr.choice as Attribution) : fallback.attribution;
   const significance = sig?.type === 'score' ? sig.score : fallback.significance;
-  const kind = kindAns?.type === 'choice' && SHIP_KINDS.some((c) => c.value === kindAns.choice) ? (kindAns.choice as ShipKind) : fallback.kind;
+  let kind = kindAns?.type === 'choice' && SHIP_KINDS.some((c) => c.value === kindAns.choice) ? (kindAns.choice as ShipKind) : fallback.kind;
+  if (item && kind === 'NOT_A_SHIP' && isPersonalShipSource(item) && !looksLikeNotAShip(item)) {
+    kind = 'release_version';
+    if (isRealShip < 0.75) isRealShip = 0.8;
+  }
   const confidence = (attr?.type === 'choice' ? attr.confidence ?? 0.6 : 0.6) * isRealShip * inYear;
   return { isRealShip, inYear, attribution, significance, kind, confidence };
 }
@@ -243,7 +262,7 @@ export async function verifyCandidates(opts: {
   if (!decisionsEnabled(opts.env)) {
     const kept = opts.items
       .map((item) => applyMark(item, heuristicMark(item, opts.year, opts.affiliation), opts.via))
-      .filter((item) => shouldKeep(heuristicMark(item, opts.year, opts.affiliation)));
+      .filter((item) => shouldKeep(heuristicMark(item, opts.year, opts.affiliation), item));
     return { items: kept, spend, usedDecisions: false };
   }
 
@@ -255,22 +274,23 @@ export async function verifyCandidates(opts: {
   const heuristicRest = queue.slice(100);
   for (const item of heuristicRest) {
     const mark = heuristicMark(item, opts.year, opts.affiliation);
-    if (shouldKeep(mark)) kept.push(applyMark(item, mark, opts.via));
+    if (shouldKeep(mark, item)) kept.push(applyMark(item, mark, opts.via));
   }
   for (let i = 0; i < toDecide.length; i += batch) {
     const chunk = toDecide.slice(i, i + batch);
     const rows = await Promise.all(
       chunk.map(async (item) => {
         const fallback = heuristicMark(item, opts.year, opts.affiliation);
+        if (looksLikeNotAShip(item)) return { item, mark: fallback };
         const result = await decide(opts.env, evidenceOf(item, opts.who, opts.affiliation, opts.year), CANDIDATE_QUESTIONS);
         if (!result) return { item, mark: fallback };
         spend.inputTokens += result.inputTokens;
         spend.requests += 1;
-        return { item, mark: markFromAnswers(result.answers, fallback) };
+        return { item, mark: markFromAnswers(result.answers, fallback, item) };
       }),
     );
     for (const row of rows) {
-      if (!shouldKeep(row.mark)) continue;
+      if (!shouldKeep(row.mark, row.item)) continue;
       kept.push(applyMark(row.item, row.mark, opts.via));
     }
   }

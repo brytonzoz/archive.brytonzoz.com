@@ -42,6 +42,7 @@ export type ThermalReceipt = {
   modules?: { id: string; title: string; lines: string[] }[];
   /** 0–100 from sourced public work. Absent when unknown. */
   shipScore?: number;
+  printedAt?: string;
 };
 
 export type Align = 'left' | 'center' | 'right';

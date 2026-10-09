@@ -7,7 +7,7 @@ import plexSemiBold from './fonts/IBMPlexMono-SemiBold.ttf';
 import { yearCardSvg, yearRolloSvg, yearTallSvg, type YearOg } from '../lib/receipt-svg';
 import { pdfFromRgb, rgbFlate, rgbaToRgb } from '../lib/rollo-pdf';
 import { receiptBarcodeUnits, receiptDate } from '../lib/shipped';
-import { isFirstRun, itemsForPrint, pickDeepCut, receiptBadges, receiptModules } from '../lib/shipped-modules';
+import { isFirstRun, receiptModules } from '../lib/shipped-modules';
 import { qr } from '../lib/shipped-qr';
 import { itemDate, itemsShipped, receiptNumber, subjectLabel, QR_PATH, RECEIPT_PATH, type SponsorBlock, type YearReceipt } from '../lib/shipped-year';
 
@@ -51,11 +51,9 @@ export async function decodePixels(svg: string): Promise<{ pixels: Uint8Array; w
 export type LogoResolver = (path: string | null) => Promise<string | null>;
 
 async function yearOg(receipt: YearReceipt, block: SponsorBlock, origin: string, logo: LogoResolver, maxItems: number): Promise<YearOg> {
-  const ordered = itemsForPrint(receipt.potential ? [] : receipt.items);
-  const items = (receipt.potential ? receipt.items : ordered).slice(0, maxItems);
+  const items = receipt.items.slice(0, maxItems);
   const logos = await Promise.all(items.map((item) => logo(item.logo).catch(() => null)));
   const sponsorLogos = await Promise.all(block.slots.map((slot) => logo(slot.logo).catch(() => null)));
-  const cut = pickDeepCut(ordered);
   const modules = receiptModules({ receipt });
   return {
     number: receiptNumber(receipt.id),
@@ -75,11 +73,12 @@ async function yearOg(receipt: YearReceipt, block: SponsorBlock, origin: string,
     sponsors: block.slots.map((slot, i) => ({ name: slot.name, cta: slot.cta, logo: sponsorLogos[i], qr: qr(new URL(QR_PATH(slot.qr), origin).toString()) })),
     url: new URL(RECEIPT_PATH(receipt.id), origin).toString().replace(/^https?:\/\//, ''),
     barcode: receiptBarcodeUnits(`BZ${receiptNumber(receipt.id)}${receipt.year}`),
-    deepCut: cut ? { name: cut.name, why: `Sourced from ${cut.source}` } : null,
-    badges: receiptBadges(modules),
+    deepCut: null,
+    badges: [],
     firstRun: isFirstRun(receipt.id),
     modules: modules.map((band) => ({ id: band.id, title: band.title, lines: band.lines })),
     shipScore: receipt.shipScore,
+    printedAt: receipt.printedAt,
   };
 }
 

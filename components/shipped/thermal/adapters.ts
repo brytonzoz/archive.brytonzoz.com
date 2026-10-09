@@ -2,7 +2,7 @@
 // rendered on the page by visitor.tsx) and its sponsor slots. Same mapping as VisitorReceipt, so the print,
 // the pile and the DOM receipt never disagree.
 import { receiptDate } from '../../../lib/shipped';
-import { isFirstRun, itemsForPrint, pickDeepCut, receiptBadges, receiptModules } from '../../../lib/shipped-modules';
+import { isFirstRun, receiptModules } from '../../../lib/shipped-modules';
 import { itemDate, itemsShipped, receiptNumber, subjectLabel, type SponsorBlock, type YearReceipt } from '../../../lib/shipped-year';
 import type { ThermalReceipt } from './types';
 
@@ -25,8 +25,6 @@ export function paidByLines(sponsors: SponsorBlock | null): Pick<ThermalReceipt,
 export function fromLoaded({ receipt, sponsors }: LoadedReceipt): ThermalReceipt {
   const who = subjectLabel(receipt.subject);
   const kicker = receipt.subject.kind === 'github' && receipt.subject.display !== who ? `@${receipt.subject.id} · GITHUB` : KICKER[receipt.subject.kind];
-  const ordered = itemsForPrint(receipt.potential ? [] : receipt.items);
-  const cut = pickDeepCut(ordered);
   const modules = receiptModules({ receipt });
   return {
     id: `r${receipt.id}`,
@@ -35,7 +33,7 @@ export function fromLoaded({ receipt, sponsors }: LoadedReceipt): ThermalReceipt
     kicker,
     date: receiptDate(receipt.printedAt),
     number: receiptNumber(receipt.id),
-    items: (receipt.potential ? receipt.items : ordered).map((item) => ({
+    items: receipt.items.map((item) => ({
       name: item.name,
       status: item.status,
       date: itemDate(item.date),
@@ -46,10 +44,11 @@ export function fromLoaded({ receipt, sponsors }: LoadedReceipt): ThermalReceipt
     note: receipt.note,
     ...paidByLines(sponsors),
     barcode: `SH${receiptNumber(receipt.id)}`,
-    deepCut: cut ? { name: cut.name, why: `Sourced · ${cut.source}` } : null,
-    badges: receiptBadges(modules),
+    deepCut: null,
+    badges: [],
     firstRun: isFirstRun(receipt.id),
     modules: modules.map((band) => ({ id: band.id, title: band.title, lines: band.lines })),
     shipScore: receipt.shipScore,
+    printedAt: receipt.printedAt,
   };
 }

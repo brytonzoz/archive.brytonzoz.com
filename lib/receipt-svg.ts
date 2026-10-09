@@ -169,10 +169,8 @@ function header(c: number, date: string, number: string) {
   ];
 }
 
-function headerFull(c: number, data: Pick<YearOg, 'date' | 'number' | 'firstRun' | 'badges'>) {
-  const extra = data.firstRun ? [leader(148, 'RUN', 'FIRST RUN', 12, 600), rule(164)] : [rule(146)];
-  const chips = data.badges?.length ? [txt(c, data.firstRun ? 182 : 164, fit(data.badges.join(' · '), 48), 9, { anchor: 'middle', opacity: 0.7 })] : [];
-  return [...header(c, data.date, data.number).slice(0, -1), ...extra, ...chips];
+function headerFull(c: number, data: Pick<YearOg, 'date' | 'number'>) {
+  return header(c, data.date, data.number);
 }
 
 // ---- The home page card -----------------------------------------------------------------------------
@@ -241,6 +239,7 @@ export type YearOg = {
   firstRun?: boolean;
   modules?: { id: string; title: string; lines: string[] }[];
   shipScore?: number;
+  printedAt?: string;
 };
 
 function qrMark(x: number, y: number, width: number, code: { size: number; path: string }) {
@@ -316,12 +315,7 @@ export function yearCardSvg(data: YearOg): string {
     txt(72, 322, name, name.length > 16 ? 28 : 34, { weight: 600, spacing: -0.5, fill: CREAM }),
     txt(72, 372, `${data.count} ${data.count === 1 ? 'thing' : 'things'} shipped`, 26, { fill: CREAM, opacity: 0.8 }),
   ];
-  if (data.deepCut) {
-    left.push(txt(72, 412, 'How did it know?', 16, { fill: CREAM, opacity: 0.5 }));
-    left.push(txt(72, 440, fit(data.deepCut.name, 36), 20, { weight: 600, fill: CREAM }));
-  } else {
-    wrap(`“${data.note}”`, 44, 2).forEach((line, i) => left.push(txt(72, 424 + i * 26, line, 18, { fill: CREAM, opacity: 0.6 })));
-  }
+  wrap(`“${data.note}”`, 44, 2).forEach((line, i) => left.push(txt(72, 424 + i * 26, line, 18, { fill: CREAM, opacity: 0.6 })));
   const hero = data.sponsors[0];
   if (hero) {
     left.push(txt(72, 540, 'Sponsored by', 14, { fill: CREAM, opacity: 0.45 }));
@@ -331,14 +325,8 @@ export function yearCardSvg(data: YearOg): string {
   left.push(txt(72, 636, 'Print yours: shipped.brytonzoz.com', 15, { fill: CREAM, opacity: 0.5 }));
 
   const c = PAPER_W / 2;
-  const body: string[] = [...headerFull(c, data), ...customer(c, data.firstRun ? 214 : 180, data.year, data.who), rule(data.firstRun ? 292 : 258)];
-  let y = data.firstRun ? 324 : 290;
-  if (data.deepCut) {
-    body.push(inverse(c, y, 'HOW DID IT KNOW?', 11));
-    y += 26;
-    body.push(txt(c, y, fit(data.deepCut.name.toUpperCase(), 28), 12, { weight: 600, anchor: 'middle' }));
-    y += 28;
-  }
+  const body: string[] = [...headerFull(c, data), ...customer(c, 180, data.year, data.who), rule(258)];
+  let y = 290;
   for (const item of data.items) {
     if (y > 700) break;
     if (item.logo) body.push(logoImage(28, y - 15, 20, item.logo));
@@ -358,26 +346,15 @@ function paintItems(body: string[], data: YearOg, y: number): number {
     lines.forEach((line, i) => body.push(txt(indent, y + 17 + i * 14, line, 10.5, { opacity: 0.72 })));
     y += 22 + Math.max(lines.length, item.logo ? 1 : 0) * 14 + 10;
   }
-  body.push(rule(y - 4, true), txt(28, y + 22, 'ITEMS SHIPPED', 13, { weight: 600 }), tall(PAPER_W - 28, y + 24, String(data.count), 16, { anchor: 'end' }), rule(y + 38, true));
+  const shippedLabel = typeof data.shipScore === 'number' ? `ITEMS SHIPPED · ${data.shipScore}` : 'ITEMS SHIPPED';
+  body.push(rule(y - 4, true), txt(28, y + 22, shippedLabel, 13, { weight: 600 }), tall(PAPER_W - 28, y + 24, String(data.count), 16, { anchor: 'end' }), rule(y + 38, true));
   return y + 66;
-}
-
-function paintDeepCut(body: string[], data: YearOg, c: number, y: number): number {
-  if (!data.deepCut) return y;
-  body.push(inverse(c, y, 'HOW DID IT KNOW?', 12));
-  y += 28;
-  body.push(txt(c, y, fit(data.deepCut.name.toUpperCase(), 30), 13, { weight: 600, anchor: 'middle' }));
-  y += 18;
-  body.push(txt(c, y, fit(data.deepCut.why, 48), 10.5, { anchor: 'middle', opacity: 0.7 }));
-  y += 24;
-  body.push(rule(y));
-  return y + 20;
 }
 
 function paintCashier(body: string[], data: YearOg, y: number): number {
   body.push(txt(28, y, 'CASHIER’S NOTE', 10.5, { opacity: 0.6 }));
   y += 18;
-  for (const line of wrap(data.note, 52, 3)) {
+  for (const line of wrap(data.note, 52, 2)) {
     body.push(txt(28, y, line, 12));
     y += 17;
   }
@@ -386,51 +363,17 @@ function paintCashier(body: string[], data: YearOg, y: number): number {
 
 function yearReceiptPaint(data: YearOg): { body: string; height: number } {
   const c = PAPER_W / 2;
-  const body: string[] = [...headerFull(c, data), ...customer(c, data.firstRun ? 214 : 180, data.year, data.who), rule(data.firstRun ? 292 : 258)];
-  let y = data.firstRun ? 322 : 288;
-  if (typeof data.shipScore === 'number') {
-    body.push(txt(c, y, `SHIP SCORE ${data.shipScore}`, 10, { anchor: 'middle', opacity: 0.65 }));
-    y += 18;
-  }
-  if (data.modules?.length) {
-    for (const band of data.modules) {
-      if (band.id === 'items') {
-        y = paintItems(body, data, y);
-        continue;
-      }
-      if (band.id === 'deep-cut') {
-        y = paintDeepCut(body, data, c, y);
-        continue;
-      }
-      if (band.id === 'cashier') {
-        y = paintCashier(body, data, y);
-        continue;
-      }
-      body.push(txt(c, y, fit(band.title, 40), 10.5, { weight: 600, anchor: 'middle', opacity: 0.65 }));
-      y += 16;
-      for (const line of band.lines) {
-        wrap(line, 48, 2).forEach((part) => {
-          body.push(txt(c, y, fit(part, 48), 11, { anchor: 'middle' }));
-          y += 15;
-        });
-      }
-      y += 8;
-      body.push(rule(y));
-      y += 16;
-    }
-  } else {
-    y = paintDeepCut(body, data, c, y);
-    y = paintItems(body, data, y);
-    y = paintCashier(body, data, y);
-  }
+  const body: string[] = [...headerFull(c, data), ...customer(c, 180, data.year, data.who), rule(258)];
+  let y = paintItems(body, data, 288);
+  y = paintCashier(body, data, y);
+  const stamp = data.printedAt?.replace('T', ' ').replace(/\.\d+Z$/, ' UTC') ?? data.date;
+  body.push(leader(y, `#${data.number}${data.firstRun ? ' FIRST RUN' : ''}`, fit(stamp, 28), 11, 500));
+  y += 28;
   y = sponsorBlock(body, c, y, data.sponsors);
   y += 24;
   body.push(barcode(64, y, 272, 34, data.barcode));
   y += 56;
-  body.push(txt(c, y, 'PRINTED AT SHIPPED.BRYTONZOZ.COM', 10.5, { weight: 600, anchor: 'middle' }));
-  body.push(txt(c, y + 16, '*** CUSTOMER COPY ***', 10, { anchor: 'middle', opacity: 0.6 }));
-  body.push(txt(c, y + 32, fit(data.url, 52), 9.5, { anchor: 'middle', opacity: 0.55 }));
-  return { body: body.join(''), height: y + 56 };
+  return { body: body.join(''), height: y + 40 };
 }
 
 /** The whole receipt as one tall image (2×), PAID FOR BY block and all. */

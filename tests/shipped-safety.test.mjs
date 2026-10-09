@@ -138,7 +138,7 @@ test('AI module ids are validated; HTML never becomes a band', () => {
     2026,
     4,
   );
-  assert.deepEqual(draft.layout.filter((id) => id === 'items' || id === 'deep-cut' || id === 'serial'), ['items', 'serial', 'deep-cut']);
+  assert.deepEqual(draft.layout, ['items', 'cashier', 'stamp']);
   assert.ok(!draft.layout.some((id) => /[<>]/.test(id)));
   const garbage = ai.validateDraft({ items: [{ name: 'Keepawake', link: 'https://github.com/someone/keepawake', date: '2026-03' }], note: 'x', modules: '<html>' }, gathered(), [], 2026, 4);
   assert.ok(garbage.layout.includes('items'));

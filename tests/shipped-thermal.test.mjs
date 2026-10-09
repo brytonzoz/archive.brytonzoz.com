@@ -59,40 +59,31 @@ test('long item names wrap and the status lands on the leader line', () => {
   }
 });
 
-test('the sourced deep-cut prints first as HOW DID IT KNOW', () => {
+test('filler bands never print, even if a stored layout still names them', () => {
   const doc = receiptToDoc({
     ...RECEIPT,
     firstRun: true,
     deepCut: { name: 'SHOW HN APP', why: 'Sourced · hn' },
     badges: ['FIRST RUN', 'DEEP CUT'],
-  });
-  const text = doc.text;
-  assert.match(text, /HOW DID IT KNOW\?/);
-  assert.match(text, /SHOW HN APP/);
-  assert.match(text, /FIRST RUN/);
-  const how = doc.lines.findIndex((line) => line.kind === 'text' && line.invert && line.text === 'HOW DID IT KNOW?');
-  const itemsHead = doc.lines.findIndex((line) => line.kind === 'text' && line.text.startsWith('ITEM'));
-  assert.ok(how >= 0 && how < itemsHead);
-});
-
-test('chosen modules print in that order; ship score is the stored number', () => {
-  const doc = receiptToDoc({
-    ...RECEIPT,
-    shipScore: 42,
+    shipScore: 18,
+    printedAt: '2026-10-09T01:00:19.000Z',
     modules: [
+      { id: 'deep-cut', title: 'HOW DID IT KNOW?', lines: ['SHOW HN APP'] },
       { id: 'items', title: 'ITEMS', lines: [] },
-      { id: 'volume', title: 'TAPE', lines: ['Two public things. A short list.'] },
-      { id: 'serial', title: 'SERIAL', lines: ['#000042'] },
+      { id: 'friend', title: 'PRINT A FRIEND', lines: ['Type someone else'] },
+      { id: 'volume', title: 'TAPE', lines: ['One public thing.'] },
       { id: 'cashier', title: "CASHIER'S NOTE", lines: [] },
-      { id: 'stamp', title: 'STAMP', lines: ['2026-10-09'] },
+      { id: 'stamp', title: 'STAMP', lines: [] },
     ],
   });
-  assert.match(doc.text, /SHIP SCORE 42/);
-  assert.match(doc.text, /TAPE/);
-  const itemsHead = doc.lines.findIndex((line) => line.kind === 'text' && line.text.startsWith('ITEM'));
-  const tape = doc.lines.findIndex((line) => line.kind === 'text' && line.text === 'TAPE');
-  const note = doc.lines.findIndex((line) => line.kind === 'text' && line.text === "CASHIER'S NOTE");
-  assert.ok(itemsHead < tape && tape < note);
+  const text = doc.text;
+  assert.equal(text.includes('HOW DID IT KNOW'), false);
+  assert.equal(text.includes('PRINT A FRIEND'), false);
+  assert.equal(text.includes('TAPE'), false);
+  assert.equal(text.includes('DEEP CUT'), false);
+  assert.match(text, /CASHIER'S NOTE/);
+  assert.match(text, /ITEMS SHIPPED · SCORE 18/);
+  assert.match(text, /FIRST RUN/);
 });
 
 test('the plain-text copy carries every item and the note', () => {

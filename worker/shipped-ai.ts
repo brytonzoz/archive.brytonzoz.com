@@ -6,7 +6,7 @@
 import type { ItemStatus, Subject } from '../lib/shipped-year';
 import { ITEM_STATUSES } from '../lib/shipped-year';
 import { hasBlockedWord } from '../lib/shipped-sponsors';
-import { MODULE_ORDER, REQUIRED_MODULES, sanitizeLayout, type ModuleId } from '../lib/shipped-modules';
+import { REQUIRED_MODULES, sanitizeLayout, type ModuleId } from '../lib/shipped-modules';
 import { clean, hostOf, inYearCount, publicUrl, type Found, type Gathered } from './shipped-sources';
 
 export interface AiEnv {
@@ -195,8 +195,8 @@ function systemPrompt(year: number, searches: number) {
     'Item names: the product name as people know it, max 32 characters. Description: what it is, plainly, max 70 characters. Write like a terse spec sheet: "Menu bar app that keeps the Mac awake", not "An innovative solution that empowers users".',
     'Then one "note" from the cashier, max 90 characters. Voice: a deadpan night-shift cashier who has rung up a lot of receipts. Dry, specific, warm, never at the person\'s expense. It must mention something concrete from THIS receipt (an item, the count, the month most things shipped). Good: "Four npm packages in one spring. Strong Tuesday energy." / "One app, eleven releases. Someone likes the publish button." Bad: anything generic, inspirational, congratulatory, or teasing.',
     'Banned words and moves everywhere: delve, testament, journey, innovative, seamless, elevate, unlock, empower, leverage, cutting-edge, game-changer, robust, passion, incredible, amazing, "truly", exclamation marks, emoji, em dashes, and praise like "impressive year".',
-    `Then choose which receipt modules to print, and in what order. Ids only, from this list: ${MODULE_ORDER.join(', ')}. Always include ${REQUIRED_MODULES.join(', ')}. Never output HTML, markdown, CSS or extra keys. Module body copy is filled in on the server from sourced data; you only pick the ids.`,
-    `Finish with only a JSON object, no markdown: {"items":[{"name":"","description":"","date":"YYYY-MM or YYYY-MM-DD or null","status":"${ITEM_STATUSES.join('|')}","link":"url or null"}],"note":"","modules":["${MODULE_ORDER.slice(0, 3).join('","')}"]}`,
+    `Do not add extra receipt bands. The tape is short: items, a one-line cashier note, stamp and serial. If you output modules, ids only from ${REQUIRED_MODULES.join(', ')}. Never output HTML, markdown, CSS, filler ids (deep-cut, first-last, platforms, still-running, volume, friend, sources, serial) or extra keys.`,
+    `Finish with only a JSON object, no markdown: {"items":[{"name":"","description":"","date":"YYYY-MM or YYYY-MM-DD or null","status":"${ITEM_STATUSES.join('|')}","link":"url or null"}],"note":""}`,
   ].join('\n');
 }
 

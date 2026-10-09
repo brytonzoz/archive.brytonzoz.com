@@ -5,7 +5,7 @@ import React, { useEffect, useRef, useState } from 'react';
 import { track } from '../../lib/analytics';
 import { receiptDate } from '../../lib/shipped';
 import { money } from '../../lib/shipped-receipt';
-import { isFirstRun, itemsForPrint, pickDeepCut, receiptBadges, receiptModules } from '../../lib/shipped-modules';
+import { isFirstRun } from '../../lib/shipped-modules';
 import {
   CARD_PATH,
   RECEIPT_PATH,
@@ -55,10 +55,6 @@ export function pileTokenFor(id: number): string | null {
 export function VisitorReceipt({ receipt, sponsors }: Loaded) {
   const who = subjectLabel(receipt.subject);
   const kicker = receipt.subject.kind === 'github' && receipt.subject.display !== who ? `@${receipt.subject.id} · GITHUB` : KICKER[receipt.subject.kind];
-  const ordered = itemsForPrint(receipt.potential ? [] : receipt.items);
-  const cut = pickDeepCut(ordered);
-  const modules = receiptModules({ receipt });
-  const badges = receiptBadges(modules);
   return (
     <YearReceipt
       year={receipt.year}
@@ -66,7 +62,8 @@ export function VisitorReceipt({ receipt, sponsors }: Loaded) {
       kicker={kicker}
       date={receiptDate(receipt.printedAt)}
       number={receiptNumber(receipt.id)}
-      items={(receipt.potential ? receipt.items : ordered).map((item, i) => ({
+      printedAt={receipt.printedAt}
+      items={receipt.items.map((item, i) => ({
         key: `${i}-${item.name}`,
         name: item.name,
         status: item.status,
@@ -79,31 +76,8 @@ export function VisitorReceipt({ receipt, sponsors }: Loaded) {
       note={receipt.note}
       sponsors={sponsors}
       barcode={`SH${receiptNumber(receipt.id)}`}
-      deepCut={cut ? { name: cut.name, why: `Sourced from ${cut.source}` } : null}
-      badges={badges}
       firstRun={isFirstRun(receipt.id)}
-      modules={modules.map((band) => ({ id: band.id, title: band.title, lines: band.lines }))}
       shipScore={receipt.shipScore}
-      fine={
-        <>
-          <p>
-            Made from public pages and APIs
-            {receipt.demo ? ' (demo print: no AI on this server)' : ', itemized by AI'}. Every item links to its public source. Only public,
-            professional work. Wrong? Remove or correct it.
-          </p>
-          <p className="mt-2 space-x-3">
-            <a href={`/remove/?id=${receipt.id}`} className="shipped-link">
-              Report, remove or correct
-            </a>
-            <a href="/#print" className="shipped-link">
-              Print a friend&apos;s
-            </a>
-            <a href="/#sponsor" className="shipped-link">
-              Sponsor a slot
-            </a>
-          </p>
-        </>
-      }
     />
   );
 }

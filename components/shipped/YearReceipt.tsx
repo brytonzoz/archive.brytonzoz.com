@@ -43,6 +43,8 @@ export type YearReceiptProps = {
   firstRun?: boolean;
   modules?: { id: string; title: string; lines: string[] }[];
   shipScore?: number;
+  /** ISO time the Worker stamped; shown with the serial. */
+  printedAt?: string;
 };
 
 function ItemName({ item }: { item: ViewItem }) {
@@ -115,17 +117,6 @@ export function SponsorBlockView({ block }: { block: SponsorBlock | null }) {
   );
 }
 
-function DeepCut({ cut }: { cut: YearReceiptProps['deepCut'] }) {
-  if (!cut) return null;
-  return (
-    <section className="mt-3 text-center" aria-label="How did it know?">
-      <p className="shipped-inverse">HOW DID IT KNOW?</p>
-      <p className="mt-2 text-[13px] font-semibold">{cut.name}</p>
-      <p className="mt-0.5 text-[11px] opacity-70">{cut.why}</p>
-    </section>
-  );
-}
-
 function ItemList({ props }: { props: YearReceiptProps }) {
   return (
     <>
@@ -163,7 +154,12 @@ function ItemList({ props }: { props: YearReceiptProps }) {
       </ol>
       <Rule heavy />
       <div className="shipped-lead items-end py-1 text-[13px] font-semibold">
-        <span>ITEMS SHIPPED</span>
+        <span>
+          ITEMS SHIPPED
+          {typeof props.shipScore === 'number' ? (
+            <span className="ml-2 text-[11px] font-medium opacity-70">SCORE {props.shipScore}</span>
+          ) : null}
+        </span>
         <span className="shipped-lead-fill" aria-hidden="true" />
         <Tall className="text-[18px] tabular-nums">{String(props.count)}</Tall>
       </div>
@@ -176,24 +172,18 @@ function CashierNote({ note }: { note: string }) {
   return (
     <section className="mt-3" aria-label="Cashier’s note">
       <p className="text-[10.5px] opacity-60">CASHIER’S NOTE</p>
-      <p className="mt-1 text-[12.5px] leading-[1.5]">{note}</p>
+      <p className="mt-1 text-[12.5px] leading-snug">{note}</p>
     </section>
   );
 }
 
-function ModuleBand({ band, props }: { band: { id: string; title: string; lines: string[] }; props: YearReceiptProps }) {
-  if (band.id === 'items') return <ItemList props={props} />;
-  if (band.id === 'deep-cut') return <DeepCut cut={props.deepCut} />;
-  if (band.id === 'cashier') return <CashierNote note={props.note} />;
+function Stamp({ number, printed, firstRun }: { number: string; printed?: string; firstRun?: boolean }) {
+  const stamp = printed?.replace('T', ' ').replace(/\.\d+Z$/, ' UTC') ?? '';
+  const serial = `#${number}${firstRun ? ' FIRST RUN' : ''}`;
   return (
-    <section className="mt-3 text-center" aria-label={band.title}>
-      <p className="text-[10.5px] font-semibold tracking-[0.14em] opacity-60">{band.title}</p>
-      {band.lines.map((line, i) => (
-        <p key={`${band.id}-${i}`} className="mt-1 text-[12px] leading-[1.45]">
-          {line}
-        </p>
-      ))}
-    </section>
+    <div className="mt-3 text-[11.5px] tabular-nums">
+      <Line label={serial} value={stamp || '—'} />
+    </div>
   );
 }
 
@@ -211,8 +201,6 @@ export function YearReceipt(props: YearReceiptProps) {
       <div className="space-y-0.5 text-[12px]">
         <Line label="DATE" value={props.date} />
         <Line label="RECEIPT" value={`#${props.number}`} />
-        <Line label="CASHIER" value="NIGHT SHIFT" />
-        {props.firstRun ? <Line label="RUN" value="FIRST RUN" /> : null}
       </div>
       <Rule />
 
@@ -228,29 +216,14 @@ export function YearReceipt(props: YearReceiptProps) {
       </h2>
       {props.kicker ? <p className="mt-1 text-center text-[11px] opacity-70">{props.kicker}</p> : null}
 
-      {props.modules?.length ? (
-        props.modules.map((band) => (
-          <ModuleBand key={band.id} band={band} props={props} />
-        ))
-      ) : (
-        <>
-          <DeepCut cut={props.deepCut} />
-          <ItemList props={props} />
-          <CashierNote note={props.note} />
-        </>
-      )}
+      <ItemList props={props} />
+      <CashierNote note={props.note} />
+      <Stamp number={props.number} printed={props.printedAt} firstRun={props.firstRun} />
 
       <SponsorBlockView block={props.sponsors} />
 
       <footer className="mt-4 text-center text-[11px] leading-relaxed">
         <Barcode value={props.barcode} />
-        <p className="mt-2">
-          PRINTED AT{' '}
-          <a href="/" className="shipped-link font-semibold">
-            SHIPPED.BRYTONZOZ.COM
-          </a>
-        </p>
-        <p className="mt-1 opacity-60">*** CUSTOMER COPY ***</p>
         {props.fine ? <div className="mt-3 text-[10.5px] leading-relaxed opacity-70">{props.fine}</div> : null}
       </footer>
     </article>

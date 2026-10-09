@@ -58,13 +58,25 @@ test('there is no floor ladder: a house hero and a small slot both open at $1', 
 });
 
 test('ticker interpolation never shows more than the confirmed count', async () => {
-  const { stepCount } = await import('../lib/shipped-ticker.ts');
+  const { TICKER_MS, displayCount, stepCount } = await import('../lib/shipped-ticker.ts');
+  const seconds = TICKER_MS / 1000;
   assert.equal(stepCount(0, 0, 1), 0);
   assert.equal(stepCount(12, 10, 1), 10, 'drops to the confirmed number, never stays high');
-  let n = 0;
-  for (let i = 0; i < 40; i++) n = stepCount(n, 100, 0.016);
-  assert.ok(n <= 100, n);
-  assert.ok(n > 0, 'moves toward the target');
+  assert.equal(stepCount(0, 8, 0), 0);
+  assert.equal(stepCount(0, 8, seconds), 8, 'lands on the confirmed number at duration');
+  assert.equal(stepCount(0, 8, seconds + 1), 8);
+  assert.equal(displayCount(stepCount(0, 8, seconds), 8), 8);
+  assert.equal(displayCount(7.99, 8), 8, 'rounding never leaves the last integer hanging');
+  assert.equal(displayCount(8.4, 8), 8, 'never rounds above confirmed');
+  let last = 0;
+  for (let t = 0; t <= seconds; t += 0.016) {
+    const n = stepCount(0, 8, t);
+    const shown = displayCount(n, 8);
+    assert.ok(shown <= 8, shown);
+    assert.ok(shown >= last, 'never goes backwards');
+    last = shown;
+  }
+  assert.equal(last, 8, 'the displayed count settles on the confirmed number');
   assert.equal(stepCount(99.99, 100, 1), 100);
 });
 

@@ -5,7 +5,7 @@
 import React, { useEffect, useRef, useState } from 'react';
 import { moneyShort } from '../../lib/shipped-receipt';
 import { slotLabel } from '../../lib/shipped-sponsors';
-import { stepCount, wholeCount } from '../../lib/shipped-ticker';
+import { displayCount, stepCount, wholeCount } from '../../lib/shipped-ticker';
 import { Line, Rule, Ticket } from './paper';
 import { useShippedState } from './state';
 
@@ -18,7 +18,7 @@ const LABELS: { key: keyof TickerCounts; label: string }[] = [
   { key: 'views', label: 'VIEWS' },
 ];
 
-/** Ease toward `target`, never showing more than the confirmed number. Reduced motion snaps. */
+/** Ease toward `target` in a finite time, never showing more than the confirmed number. Reduced motion snaps. */
 function useConfirmedCount(target: number): number {
   const confirmed = wholeCount(target);
   const value = useRef(0);
@@ -26,24 +26,17 @@ function useConfirmedCount(target: number): number {
 
   useEffect(() => {
     const reduced = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
-    if (reduced || confirmed <= value.current) {
+    const from = value.current;
+    if (reduced || confirmed <= from) {
       value.current = confirmed;
       setShown(confirmed);
       return;
     }
     let raf = 0;
-    let last = performance.now();
+    const start = performance.now();
     const tick = (now: number) => {
-      const dt = Math.min(0.05, (now - last) / 1000);
-      last = now;
-      const cur = value.current;
-      if (cur >= confirmed) {
-        value.current = confirmed;
-        setShown(confirmed);
-        return;
-      }
-      value.current = stepCount(cur, confirmed, dt);
-      setShown(Math.min(confirmed, wholeCount(value.current)));
+      value.current = stepCount(from, confirmed, (now - start) / 1000);
+      setShown(displayCount(value.current, confirmed));
       if (value.current < confirmed) raf = window.requestAnimationFrame(tick);
     };
     raf = window.requestAnimationFrame(tick);

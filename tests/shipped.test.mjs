@@ -2,7 +2,7 @@ import assert from 'node:assert/strict';
 import { test } from 'node:test';
 import fs from 'node:fs';
 import { SHIPPED_STATUSES, shippedCounts, toItems, yearGroups } from '../lib/shipped.ts';
-import { isGithubLogin, itemDate, itemsShipped, readQuery, shareText, shippedYear, subjectKey, subjectLabel } from '../lib/shipped-year.ts';
+import { isGithubLogin, itemDate, itemsShipped, readQuery, receiptPageTitle, shareText, shippedYear, subjectKey, subjectLabel } from '../lib/shipped-year.ts';
 
 const read = (file) => JSON.parse(fs.readFileSync(new URL(file, import.meta.url), 'utf8'));
 const DATA = read('../data/shipped/businesses.json');
@@ -105,6 +105,8 @@ test('item dates and the share text', () => {
   assert.doesNotMatch(shareText(receipt), /@/, 'sharing never tags the person on the receipt');
   assert.equal(itemsShipped({ ...receipt, potential: true, items: [{}] }), 1);
   assert.match(shareText({ ...receipt, potential: true, items: [{}] }), /potential/);
+  assert.equal(receiptPageTitle(receipt), '@levelsio shipped 3 things in 2026 | Shipped');
+  assert.equal(receiptPageTitle({ ...receipt, potential: true, items: [{}] }), '@levelsio: shipped in 2026 (potential) | Shipped');
 });
 
 test('the year is configurable and falls back to this year', () => {
@@ -141,6 +143,15 @@ test('the receipt feed reveals the header first, never the footer', async () => 
     hidden = n;
   }
   assert.equal(hidden, 0);
+});
+
+test('share pages fill a placeholder instead of appending head scripts', () => {
+  const page = fs.readFileSync(new URL('../app/shipped/r/page.tsx', import.meta.url), 'utf8');
+  const worker = fs.readFileSync(new URL('../worker/shipped.ts', import.meta.url), 'utf8');
+  assert.match(page, /id="shipped-receipt-data"/);
+  assert.match(worker, /#shipped-receipt-data/);
+  assert.match(worker, /isShareBot/);
+  assert.equal(worker.includes("el.append(`<script>window.__SHIPPED_RECEIPT__"), false);
 });
 
 test('the printer mouth and receipt sponsor cells do not share a class (absolute slot must not stack ads on the header)', () => {

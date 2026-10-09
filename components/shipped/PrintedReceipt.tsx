@@ -1,6 +1,7 @@
 'use client';
 
 import React, { useEffect, useMemo, useState } from 'react';
+import { receiptPageTitle } from '../../lib/shipped-year';
 import { ShippedStage, type Opening } from './ShippedStage';
 import { OrderNotice, type Loaded } from './visitor';
 
@@ -15,7 +16,8 @@ function readInjected(): Loaded | null {
   const el = document.getElementById('shipped-receipt-data');
   if (!el?.textContent) return null;
   try {
-    return JSON.parse(el.textContent) as Loaded;
+    const data = JSON.parse(el.textContent) as Loaded | null;
+    return data && typeof data === 'object' && 'receipt' in data ? data : null;
   } catch {
     return null;
   }
@@ -26,40 +28,34 @@ function idFromPath(): number | null {
   return match ? Number(match[1]) : null;
 }
 
-/** /r/<id>/: the Worker injects the receipt into the page; fetched if it isn't there. */
-export function PrintedReceiptView() {
-  const [loaded, setLoaded] = useState<Loaded | null | undefined>(undefined);
+function PrintedReceiptLive() {
+  const [loaded, setLoaded] = useState<Loaded | null | undefined>(() => readInjected() ?? undefined);
 
-  // After paint, and not in the same turn as hydration recovery: the Worker rewrites <title>
-  // so /r/ always hits React #418/#423. Applying the receipt in that turn crashed the root (#329).
   useEffect(() => {
+    if (loaded !== undefined) return;
     let cancelled = false;
-    const apply = (value: Loaded | null) => {
-      if (!cancelled) setLoaded(value);
-    };
-    const start = () => {
-      if (cancelled) return;
-      const injected = readInjected();
-      if (injected) {
-        apply(injected);
-        return;
-      }
-      const id = idFromPath();
-      if (!id) {
-        apply(null);
-        return;
-      }
-      fetch(`/api/shipped/receipts/${id}`)
-        .then((response) => (response.ok ? (response.json() as Promise<Loaded>) : null))
-        .then((data) => apply(data ?? null))
-        .catch(() => apply(null));
-    };
-    const timer = window.setTimeout(start, 0);
+    const id = idFromPath();
+    if (!id) {
+      setLoaded(null);
+      return;
+    }
+    fetch(`/api/shipped/receipts/${id}`)
+      .then((response) => (response.ok ? (response.json() as Promise<Loaded>) : null))
+      .then((data) => {
+        if (!cancelled) setLoaded(data ?? null);
+      })
+      .catch(() => {
+        if (!cancelled) setLoaded(null);
+      });
     return () => {
       cancelled = true;
-      window.clearTimeout(timer);
     };
-  }, []);
+  }, [loaded]);
+
+  useEffect(() => {
+    if (!loaded?.receipt) return;
+    document.title = receiptPageTitle(loaded.receipt);
+  }, [loaded]);
 
   const opening = useMemo<Opening>(() => (loaded === undefined ? { kind: 'loading' } : loaded ? { kind: 'loaded', loaded } : { kind: 'missing' }), [loaded]);
   const stageKey = opening.kind === 'loaded' ? `r${opening.loaded.receipt.id}` : opening.kind;
@@ -75,4 +71,14 @@ export function PrintedReceiptView() {
       </p>
     </>
   );
+}
+
+/** /r/<id>/: the Worker injects the receipt into the page; fetched if it isn't there.
+ *  Mounted after the first paint so Worker title/meta rewrites cannot crash React hydrate (#329)
+ *  when this tab already ran the printer at /. */
+export function PrintedReceiptView() {
+  const [live, setLive] = useState(false);
+  useEffect(() => setLive(true), []);
+  if (!live) return <div className="shipped-r-pending" aria-busy="true" />;
+  return <PrintedReceiptLive />;
 }

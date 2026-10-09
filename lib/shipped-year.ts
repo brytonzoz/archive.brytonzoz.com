@@ -140,6 +140,15 @@ export function shareText(receipt: Pick<YearReceipt, 'items' | 'potential' | 'su
   return `I shipped ${n} thing${n === 1 ? '' : 's'} in ${receipt.year}. Receipt attached.`;
 }
 
+/** Browser tab / og:title for a printed receipt. Crawlers read this; the printer sets document.title after hydrate. */
+export function receiptPageTitle(receipt: Pick<YearReceipt, 'items' | 'potential' | 'subject' | 'year'>): string {
+  const who = subjectLabel(receipt.subject);
+  const n = itemsShipped(receipt);
+  return receipt.potential
+    ? `${who}: shipped in ${receipt.year} (potential) | Shipped`
+    : `${who} shipped ${n} thing${n === 1 ? '' : 's'} in ${receipt.year} | Shipped`;
+}
+
 const GITHUB_LOGIN = /^[a-z\d](?:[a-z\d]|-(?=[a-z\d])){0,38}$/i;
 const X_HANDLE = /^[a-z0-9_]{1,15}$/i;
 const DOMAIN = /^(?:[a-z0-9](?:[a-z0-9-]{0,61}[a-z0-9])?\.)+[a-z]{2,24}$/i;

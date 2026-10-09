@@ -33,5 +33,11 @@ export const metadata: Metadata = {
 };
 
 export default function PrintedReceiptPage() {
-  return <PrintedReceiptView />;
+  return (
+    <>
+      {/* Worker fills this with the receipt. suppressHydrationWarning: the text is rewritten per id. */}
+      <script id="shipped-receipt-data" type="application/json" suppressHydrationWarning dangerouslySetInnerHTML={{ __html: 'null' }} />
+      <PrintedReceiptView />
+    </>
+  );
 }

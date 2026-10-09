@@ -29,7 +29,7 @@ function noindex(response: Response): Response {
 /** Author / keywords / creator / Twitter handles inherited from brytonzoz.com's root layout. */
 const DROP_META = new Set(['author', 'creator', 'keywords', 'publisher', 'twitter:creator', 'twitter:site']);
 
-/** Strip Bryton's JSON-LD and author tags; keep only the small made-by credit in the page body. */
+/** Strip leftover author tags; JSON-LD is client-only and already skipped on this host. Keep the made-by credit. */
 function debrand(response: Response): Response {
   if (!(response.headers.get('content-type') ?? '').includes('text/html')) return response;
   return new HTMLRewriter()
@@ -43,10 +43,6 @@ function debrand(response: Response): Response {
         const name = (el.getAttribute('name') ?? el.getAttribute('property') ?? '').toLowerCase();
         if (DROP_META.has(name)) el.remove();
         else if (name === 'apple-mobile-web-app-title' || name === 'application-name') el.setAttribute('content', SHIPPED_APP_TITLE);
-        else if (name === 'apple-mobile-web-app-capable') {
-          el.setAttribute('name', 'mobile-web-app-capable');
-          el.setAttribute('content', 'yes');
-        }
       },
     })
     .transform(response);

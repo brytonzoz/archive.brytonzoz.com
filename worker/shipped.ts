@@ -107,6 +107,7 @@ import {
   itemsShipped,
   readQuery,
   receiptNumber,
+  receiptPageTitle,
   shareText,
   shippedYear,
   subjectKey,
@@ -717,12 +718,19 @@ async function purgeReceipt(env: ShippedEnv, id: number, origin?: string): Promi
 /** The data center's cache (absent in tests and local dev). */
 const edgeCache = (): Cache | null => (typeof caches !== 'undefined' ? (caches as unknown as { default: Cache }).default : null);
 
+/** Link-preview crawlers. Browsers hydrate React; rewriting <title>/og on those documents crashes the root. */
+function isShareBot(request: Request): boolean {
+  return /googlebot|bingbot|slurp|duckduckbot|baiduspider|yandex|facebookexternalhit|facebot|twitterbot|slackbot|discordbot|telegrambot|whatsapp|linkedinbot|pinterest|applebot|preview|embedly|iframely|opengraph|vkshare|skypeuripreview|redditbot|quora|outbrain/i.test(
+    request.headers.get('user-agent') ?? '',
+  );
+}
+
 /** Serves a GET from this data center's cache, or makes it, keeps it `seconds`, and serves that. */
-async function cached(request: Request, ctx: ExecutionContext, seconds: number, make: () => Promise<Response>): Promise<Response> {
+async function cached(request: Request, ctx: ExecutionContext, seconds: number, make: () => Promise<Response>, salt = ''): Promise<Response> {
   const cache = edgeCache();
   const url = new URL(request.url);
   url.search = '';
-  url.hash = `m${seconds}`;
+  url.hash = `m${seconds}${salt}`;
   const key = new Request(url.toString(), { method: 'GET' });
   const hit = cache ? await cache.match(key).catch(() => undefined) : undefined;
   if (hit) return hit;
@@ -1528,7 +1536,7 @@ async function dropShareImages(env: ShippedEnv, id: number) {
 
 const attr = (value: string) => ({ element: (el: Element) => void el.setAttribute('content', value) });
 
-async function sharePage(request: Request, env: ShippedEnv & { ASSETS: Fetcher }, ctx: ExecutionContext, id: number): Promise<Response> {
+async function sharePage(request: Request, env: ShippedEnv & { ASSETS: Fetcher }, ctx: ExecutionContext, id: number, bots: boolean): Promise<Response> {
   const url = new URL(request.url);
   const shell = await env.ASSETS.fetch(new Request(new URL('/shipped/r/', url)));
   const db = await database(env);
@@ -1552,34 +1560,31 @@ async function sharePage(request: Request, env: ShippedEnv & { ASSETS: Fetcher }
   // JSON inside a <script> data block: "<" escaped so nothing in a receipt can close the tag.
   const payload = JSON.stringify({ receipt, sponsors }).replace(/</g, '\\u003c').replace(/\u2028/g, '\\u2028').replace(/\u2029/g, '\\u2029');
   const who = subjectLabel(receipt.subject);
-  const n = itemsShipped(receipt);
-  const title = receipt.potential ? `${who}: shipped in ${receipt.year} (potential) | Shipped` : `${who} shipped ${n} thing${n === 1 ? '' : 's'} in ${receipt.year} | Shipped`;
+  const title = receiptPageTitle(receipt);
   const description = `${shareText(receipt).replace(/:$/, '.')} Print yours at ${SHIPPED_HOST}.`;
   const page = new URL(RECEIPT_PATH(receipt.id), url).toString();
   const image = new URL(CARD_PATH(receipt.id), url).toString();
   const alt = `A printed receipt: what ${who} shipped in ${receipt.year}, one line per item`;
 
-  return new HTMLRewriter()
-    .on('title', { element: (el) => void el.setInnerContent(title) })
-    .on('meta[name="description"]', attr(description))
-    .on('meta[property="og:title"]', attr(title))
-    .on('meta[property="og:description"]', attr(description))
-    .on('meta[property="og:url"]', attr(page))
-    .on('meta[property="og:image"]', attr(image))
-    .on('meta[property="og:image:alt"]', attr(alt))
-    .on('meta[name="twitter:title"]', attr(title))
-    .on('meta[name="twitter:description"]', attr(description))
-    .on('meta[name="twitter:image"]', attr(image))
-    .on('meta[name="twitter:image:alt"]', attr(alt))
-    .on('link[rel="canonical"]', { element: (el) => void el.setAttribute('href', page) })
-    .on('head', {
-      element: (el) => {
-        el.append(`<script id="shipped-receipt-data" type="application/json">${payload}</script>`, { html: true });
-        // Executable so the receipt survives if React later reconciles <head> and drops the JSON tag.
-        el.append(`<script>window.__SHIPPED_RECEIPT__=${payload}</script>`, { html: true });
-      },
-    })
-    .transform(new Response(shell.body, { status: 200, headers }));
+  // Fill the shell's JSON tag. Do not append extra <head> scripts — that crashes React hydrate (#329)
+  // when this tab already ran the printer. Bots get title/og rewrites; browsers set document.title.
+  let rewriter = new HTMLRewriter().on('#shipped-receipt-data', { element: (el) => void el.setInnerContent(payload) });
+  if (bots) {
+    rewriter = rewriter
+      .on('title', { element: (el) => void el.setInnerContent(title) })
+      .on('meta[name="description"]', attr(description))
+      .on('meta[property="og:title"]', attr(title))
+      .on('meta[property="og:description"]', attr(description))
+      .on('meta[property="og:url"]', attr(page))
+      .on('meta[property="og:image"]', attr(image))
+      .on('meta[property="og:image:alt"]', attr(alt))
+      .on('meta[name="twitter:title"]', attr(title))
+      .on('meta[name="twitter:description"]', attr(description))
+      .on('meta[name="twitter:image"]', attr(image))
+      .on('meta[name="twitter:image:alt"]', attr(alt))
+      .on('link[rel="canonical"]', { element: (el) => void el.setAttribute('href', page) });
+  }
+  return rewriter.transform(new Response(shell.body, { status: 200, headers }));
 }
 
 /** /shipped/r/<id>/, its og.png, receipt.png, rollo.png and rollo.pdf. Anything else under /shipped/r/ is the static shell. Edge-cached briefly. */
@@ -1596,7 +1601,8 @@ export async function handleShippedPage(request: Request, env: ShippedEnv & { AS
     if (url.searchParams.has('download')) return shareImage(request, env, ctx, id, kind);
     return cached(request, ctx, 300, () => shareImage(request, env, ctx, id, kind));
   }
-  return cached(request, ctx, 60, () => sharePage(request, env, ctx, id));
+  const bots = isShareBot(request);
+  return cached(request, ctx, 60, () => sharePage(request, env, ctx, id, bots), bots ? 'b' : 'd');
 }
 
 /** The whole site switched off: one plain page, no app, no data. */

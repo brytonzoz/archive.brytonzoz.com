@@ -31,7 +31,7 @@ Other dials (all `vars` in `wrangler.jsonc`, defaults in brackets):
 
 | Var | Meaning |
 | --- | --- |
-| `SHIPPED_DAILY_CAP_USD` [5, staging 1, max 1000] | Claude + web search spend per UTC day. When reached, printing shows "out of paper" until midnight UTC or a restock in `/admin`. |
+| `SHIPPED_CYCLE_CAP_USD` [180] | Claude + web search spend per cycle (UTC, resets on the 8th), plus 80% of last cycle's net settled sales. If the cap cannot be read, printing fails closed ("out of paper"). |
 | `SHIPPED_DAILY_PRINTS` [1500] | New receipts per UTC day across everyone. |
 | `SHIPPED_PRINTS_PER_MINUTE` [20] | New receipts per minute across everyone. |
 | `SHIPPED_MAX_CONCURRENT` [6, max 50] | Receipts generating at the same moment. |
@@ -47,7 +47,7 @@ Other dials (all `vars` in `wrangler.jsonc`, defaults in brackets):
 | One person spams Generate | Per-IP and per-subnet fixed-window counters in D1 (`overLimit`): 8 prints an hour per IP, 24 per /24 (IPv4) or /48 (IPv6). Every endpoint has its own limit (`LIMITS` in shipped-guard.ts). Counters hold across isolates and data centers. |
 | Rotating IPs inside a cloud range | The subnet counter runs out even when each address is fresh. |
 | A botnet / everyone at once | Global per-minute and per-day ceilings, and at most `SHIPPED_MAX_CONCURRENT` prints in flight. |
-| Draining the AI budget | Before each Claude call the worst case (every turn at the token ceiling, the whole prompt each time, every search) is reserved against the day's cap; the real cost replaces it afterwards. Concurrent prints can't overspend, and one call bigger than the whole cap never starts. Hitting the cap flips to "out of paper". |
+| Draining the AI budget | Before each Claude call the worst case is reserved against the cycle cap ($180 from the 8th UTC + 80% of last cycle's net sales). Concurrent prints can't overspend. Hitting the cap, or failing to read it, flips to "out of paper". |
 | Draining TinyFish | Daily metered quotas per call type (`TINYFISH_DAILY`); past them the sources fall back to free APIs. |
 | Re-running the same name | One receipt per subject per 7 days: the same name/handle/domain returns the cached receipt with no upstream calls (works even while out of paper). One print per subject and per visitor at a time (D1 locks); a failed subject is paused briefly instead of retried. |
 | Huge inputs | Input capped at 80 characters and normalized (control and bidi characters removed); JSON bodies capped before parsing (`readJsonCapped`); multipart (logo) bodies capped by length. |

@@ -3,12 +3,14 @@
 // D1, so it holds across isolates and data centers:
 //   - fixed-window counters per hashed IP, per /24 (IPv4) or /48 (IPv6) subnet and globally
 //   - locks: one print per IP at a time, one print per subject at a time, a global ceiling of concurrent prints
-//   - the daily AI budget, reserved before each call (concurrent prints can't overspend) and settled after
+//   - the cycle AI budget ($180 from the 8th, plus 80% of last cycle's sales), reserved before each call
 //   - kill switches (D1 flags set in /admin, or the SHIPPED_OFF var) for the site, printing, sponsors, prints
 //   - "are you human": Turnstile when its keys exist, else a proof-of-work puzzle (HMAC-signed, single use)
 //   - request hygiene: same-origin POSTs only, body size caps, obvious scripts and headless browsers turned away
 //   - security headers and a hash-based CSP for every page on the Shipped host
 // No IP address is ever stored: keys are SHA-256 of the address and the UTC day.
+
+import { CYCLE_BASE_USD, cycleCapMicros as capFromSales, cycleRowKey, previousCycleBounds } from '../lib/shipped-budget';
 
 export const MINUTE = 60_000;
 export const HOUR = 60 * MINUTE;
@@ -23,8 +25,10 @@ export interface GuardEnv {
   ADMIN_PASSWORD?: string;
   /** Comma list of kill switches forced on (site, generate, sponsors, prints, sponsor-display). */
   SHIPPED_OFF?: string;
-  /** Daily AI budget in USD (default 5). */
+  /** Daily AI budget in USD (legacy override / tests). Cycle budget is the product default. */
   SHIPPED_DAILY_CAP_USD?: string;
+  /** Cycle AI budget base in USD (default 180); plus 80% of last cycle's net sales. */
+  SHIPPED_CYCLE_CAP_USD?: string;
   /** Receipts generated per UTC day across everyone (default 1500). */
   SHIPPED_DAILY_PRINTS?: string;
   /** Receipts generated per minute across everyone (default 20). */
@@ -213,6 +217,42 @@ export async function concurrencySlot(db: D1Database, env: GuardEnv, ttlMs: numb
 // ---- Budget -----------------------------------------------------------------------------------------
 
 export const capMicros = (env: GuardEnv) => Math.round(num(env.SHIPPED_DAILY_CAP_USD, 5, 0, 1000) * 1_000_000);
+
+const NET_CENTS = `COALESCE(total_cents, amount_cents) - COALESCE(refund_cents, 0)`;
+const SETTLED = `status NOT IN ('checkout', 'failed', 'lost') AND paid_at IS NOT NULL`;
+
+/** Money we actually kept in `[fromMs, toMs)`: paid bids and print orders minus refunds. Null on any read failure. */
+export async function netSettledCents(db: D1Database, fromMs: number, toMs: number): Promise<number | null> {
+  try {
+    const [bids, prints] = await Promise.all([
+      db.prepare(`SELECT COALESCE(SUM(${NET_CENTS}), 0) AS n FROM shipped_bids WHERE ${SETTLED} AND paid_at >= ? AND paid_at < ?`).bind(fromMs, toMs).first<{ n: number }>(),
+      db
+        .prepare(`SELECT COALESCE(SUM(${NET_CENTS}), 0) AS n FROM print_orders WHERE ${SETTLED} AND paid_at >= ? AND paid_at < ?`)
+        .bind(fromMs, toMs)
+        .first<{ n: number }>(),
+    ]);
+    if (!bids || !prints || !Number.isFinite(bids.n) || !Number.isFinite(prints.n)) return null;
+    const n = bids.n + prints.n;
+    return n >= 0 ? Math.floor(n) : null;
+  } catch {
+    return null;
+  }
+}
+
+/**
+ * This cycle's AI cap. Fail closed: no database, or sales we cannot read, means no printing.
+ * `SHIPPED_CYCLE_CAP_USD` replaces the $180 base (carry-over still applies).
+ */
+export async function cycleBudgetCap(db: D1Database | null, env: GuardEnv, now = Date.now()): Promise<number | null> {
+  if (!db) return null;
+  const base = num(env.SHIPPED_CYCLE_CAP_USD, CYCLE_BASE_USD, 0, 10_000);
+  const previous = previousCycleBounds(now);
+  const net = await netSettledCents(db, previous.startMs, previous.endMs);
+  if (net === null) return null;
+  return capFromSales(base, net);
+}
+
+export const budgetKey = (now = Date.now()) => cycleRowKey(now);
 
 /**
  * Holds `micros` of today's budget before an AI call, so concurrent prints can't push past the cap together.

@@ -70,6 +70,46 @@ test('locks: one holder at a time, stale locks can be retaken, concurrency slots
   assert.ok(await guard.concurrencySlot(db, env, 60_000, now));
 });
 
+test('cycle budget: $180 from the 8th plus 80% of last cycle net sales; fail closed without sales tables', async () => {
+  const budget = await import('../lib/shipped-budget.ts');
+  const oct9 = Date.UTC(2026, 9, 9, 15);
+  const oct7 = Date.UTC(2026, 9, 7, 15);
+  assert.deepEqual(budget.cycleBounds(oct9), {
+    start: '2026-10-08',
+    end: '2026-11-08',
+    startMs: Date.UTC(2026, 9, 8),
+    endMs: Date.UTC(2026, 10, 8),
+  });
+  assert.equal(budget.cycleBounds(oct7).start, '2026-09-08');
+  assert.equal(budget.cycleRowKey(oct9), 'c:2026-10-08');
+  assert.equal(budget.cycleCapMicros(180, 0), 180_000_000);
+  assert.equal(budget.cycleCapMicros(180, 10_000), 260_000_000, '$100 net last cycle → +$80');
+
+  const empty = memoryD1();
+  assert.equal(await guard.cycleBudgetCap(null, {}), null, 'no database');
+  assert.equal(await guard.cycleBudgetCap(empty, {}), null, 'sales tables missing → fail closed');
+
+  const db = memoryD1();
+  db.raw.exec(`CREATE TABLE shipped_bids (
+    id INTEGER PRIMARY KEY, status TEXT, amount_cents INTEGER, total_cents INTEGER, refund_cents INTEGER, paid_at INTEGER
+  )`);
+  db.raw.exec(`CREATE TABLE print_orders (
+    id INTEGER PRIMARY KEY, status TEXT, amount_cents INTEGER, total_cents INTEGER, refund_cents INTEGER, paid_at INTEGER
+  )`);
+  assert.equal(await guard.cycleBudgetCap(db, {}, oct9), 180_000_000, 'first cycle, no prior sales');
+  const lastCycle = Date.UTC(2026, 8, 20);
+  db.raw.exec(`INSERT INTO shipped_bids (status, amount_cents, total_cents, refund_cents, paid_at) VALUES
+    ('live', 5000, 5000, 0, ${lastCycle}),
+    ('outbid', 2000, 2000, 800, ${lastCycle}),
+    ('lost', 9000, 9000, 9000, ${lastCycle}),
+    ('checkout', 1000, NULL, NULL, NULL)`);
+  db.raw.exec(`INSERT INTO print_orders (status, amount_cents, total_cents, refund_cents, paid_at) VALUES
+    ('to_print', 500, 500, 0, ${lastCycle})`);
+  // kept: $50 + ($20-$8) + $5 = $67 → 80% = $53.60 → $180 + $53.60
+  assert.equal(await guard.cycleBudgetCap(db, {}, oct9), 180_000_000 + 53_600_000);
+  assert.equal(await guard.netSettledCents(db, Date.UTC(2026, 8, 8), Date.UTC(2026, 9, 8)), 6700);
+});
+
 test('budget cap: reservations stop at the cap, settling swaps the hold for the real cost', async () => {
   const db = memoryD1();
   const day = '2026-10-14';

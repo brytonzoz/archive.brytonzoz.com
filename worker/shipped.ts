@@ -54,8 +54,9 @@ import {
   HOUR,
   MINUTE,
   acquire,
+  budgetKey,
   budgetUsed,
-  capMicros,
+  cycleBudgetCap,
   clientIp,
   concurrencySlot,
   guardTables,
@@ -138,8 +139,10 @@ export interface ShippedEnv extends AiEnv, PayEnv, SourceEnv, GuardEnv, MarketEn
   SHIPPED?: R2Bucket;
   TURNSTILE_SITE_KEY?: string;
   TURNSTILE_SECRET_KEY?: string;
-  /** Daily AI budget in USD (default 5); printing pauses for the day once reached. */
+  /** Daily AI budget in USD (legacy / tests). */
   SHIPPED_DAILY_CAP_USD?: string;
+  /** Cycle AI budget base in USD (default 180), plus 80% of last cycle's net sales. */
+  SHIPPED_CYCLE_CAP_USD?: string;
   /** The year receipts itemize (default: the current year). */
   SHIPPED_YEAR?: string;
   ANTHROPIC_WORKSPACE_DEFAULT?: string;
@@ -294,8 +297,10 @@ async function generatorState(env: ShippedEnv, db: D1Database | null, off?: Set<
   if (demo && isProduction(env)) return stop('no-ai');
   if (!demo) {
     if (await outOfCredit(db)) return stop('out-of-paper');
-    const used = await budgetUsed(db);
-    if (used.spent + used.reserved >= capMicros(env)) return stop('out-of-paper');
+    const cap = await cycleBudgetCap(db, env);
+    if (cap === null) return stop('out-of-paper');
+    const used = await budgetUsed(db, budgetKey());
+    if (used.spent + used.reserved >= cap) return stop('out-of-paper');
   }
   return { ...base, enabled: true, demo, reason: null };
 }
@@ -507,7 +512,7 @@ async function print(request: Request, env: ShippedEnv, ctx: ExecutionContext): 
     });
   } finally {
     await Promise.all(held.map((lock) => release(db, lock).catch(() => undefined)));
-    if (reserved) ctx.waitUntil(settleBudget(db, reserved, 0).catch(() => undefined));
+    if (reserved) ctx.waitUntil(settleBudget(db, reserved, 0, budgetKey()).catch(() => undefined));
   }
 }
 
@@ -537,18 +542,20 @@ async function generate(
       // The worst this print could cost is held against today's budget first, so a burst can't overspend it.
       model = env.SHIPPED_MODEL || DEFAULT_MODEL;
       const worst = worstCaseMicros(model, promptFor(subject, gathered, year).length, maxSearches(env));
-      if (!(await reserveBudget(db, capMicros(env), worst))) return json({ error: 'out-of-paper' }, 503);
+      const cap = await cycleBudgetCap(db, env);
+      if (cap === null) return json({ error: 'out-of-paper' }, 503);
+      if (!(await reserveBudget(db, cap, worst, budgetKey()))) return json({ error: 'out-of-paper' }, 503);
       holdBudget(worst);
       try {
         const result = await assembleReceipt(subject, gathered, year, seed, env, worst);
         draft = result;
         usage = { input: result.inputTokens, output: result.outputTokens, searches: result.searches, cost: result.costMicros };
         holdBudget(0);
-        await settleBudget(db, worst, usage.cost);
+        await settleBudget(db, worst, usage.cost, budgetKey());
       } catch (error) {
         const spent = error as { costMicros?: number; inputTokens?: number; outputTokens?: number };
         holdBudget(0);
-        await settleBudget(db, worst, spent.costMicros ?? 0);
+        await settleBudget(db, worst, spent.costMicros ?? 0, budgetKey());
         ctx.waitUntil(recordSpend(db, false, spent.inputTokens ?? 0, spent.outputTokens ?? 0, 0));
         ctx.waitUntil(acquire(db, `failed:${key}`, FAILED_FOR).catch(() => undefined));
         if (error instanceof PrintError && error.code === 'out-of-credit') {
@@ -1753,8 +1760,8 @@ export async function adminShipped(request: Request, env: ShippedEnv): Promise<R
       today: Object.fromEntries((tinyfish.results as { kind: string; n: number }[]).map((row) => [row.kind, row.n])),
       daily: TINYFISH_DAILY,
     },
-    capUsd: capMicros(env) / 1_000_000,
-    budget: await budgetUsed(db),
+    capUsd: ((await cycleBudgetCap(db, env)) ?? 0) / 1_000_000,
+    budget: await budgetUsed(db, budgetKey()),
     printed: t?.printed ?? 0,
     shared: t?.shared ?? 0,
     views: t?.views ?? 0,

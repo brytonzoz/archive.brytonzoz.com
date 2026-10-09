@@ -93,7 +93,7 @@ const when = (ms: number | null) => (ms ? new Date(ms).toLocaleString(undefined,
 
 const REASONS: Record<string, string> = {
   'no-ai': 'off: add the claude_key secret',
-  'out-of-paper': 'paused: out of paper (switch off, daily budget used up, or the Anthropic credits ran out)',
+  'out-of-paper': 'paused: out of paper (switch off, cycle budget used up, or the Anthropic credits ran out)',
   closed: 'off: the event is over',
   'no-database': 'off: no database',
 };
@@ -187,7 +187,8 @@ export function ShippedCard({ password }: { password: string }) {
       <p className="mt-0.5 text-[13px] text-white/45">
         Printer: {generator} · {data.printed.toLocaleString()} printed · {data.shared.toLocaleString()} shared · {data.views.toLocaleString()} page views
         <br />
-        Budget today: {usd(data.budget.spent)} spent + {usd(data.budget.reserved)} held for prints in progress, of {usd(cap)} (SHIPPED_DAILY_CAP_USD). Paid web
+        Budget this cycle (resets on the 8th UTC): {usd(data.budget.spent)} spent + {usd(data.budget.reserved)} held for prints in
+        progress, of {usd(cap)} ($180 base + 80% of last cycle&apos;s net sales). Paid web
         search at most {data.maxSearches} per receipt.
         <br />
         TinyFish:{' '}

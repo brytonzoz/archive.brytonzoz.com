@@ -56,8 +56,10 @@ jobs:
           PRODUCTHUNT_TOKEN: ${{ secrets.PRODUCTHUNT_TOKEN }}
           TINYFISH: ${{ secrets.TINYFISH }}
           TINYFISH_API_KEY: ${{ secrets.TINYFISH_API_KEY }}
-          XAI_API_KEY: ${{ secrets.XAI_API_KEY }}
-          OPENAI_API_KEY: ${{ secrets.OPENAI_API_KEY }}
+          XAI_KEY: ${{ secrets.XAI_KEY }}
+          XAI_API_KEY: ${{ secrets.XAI_KEY }}
+          OPENAI_KEY: ${{ secrets.OPENAI_KEY }}
+          OPENAI_API_KEY: ${{ secrets.OPENAI_KEY }}
           SHIPPED_YEAR: '2026'
           SHIPPED_MAX_SEARCHES: '3'
           SHIPPED_XAI_MAX_POSTS: '8'
@@ -69,6 +71,19 @@ jobs:
           if [ -z "$PRODUCTHUNT_TOKEN" ] && { [ -z "$PRODUCTHUNT_KEY" ] || [ -z "$PRODUCTHUNT_SECRET" ]; }; then
             echo "::warning::Product Hunt secrets missing; PH upvotes will be absent."
           fi
+          if [ -z "$TINYFISH" ] && [ -z "$TINYFISH_API_KEY" ]; then
+            echo "::error::TINYFISH is not set. Eval must run TinyFish."
+            exit 1
+          fi
+          if [ -z "$XAI_KEY" ] && [ -z "$XAI_API_KEY" ]; then
+            echo "::error::XAI_KEY is not set. Eval must run xAI X search."
+            exit 1
+          fi
+          if [ -z "$OPENAI_KEY" ] && [ -z "$OPENAI_API_KEY" ]; then
+            echo "::error::OPENAI_KEY is not set. Eval must run Decisions."
+            exit 1
+          fi
+          echo "eval keys: claude=yes ph=$([ -n "$PRODUCTHUNT_KEY$PRODUCTHUNT_TOKEN" ] && echo yes || echo no) tinyfish=yes xai=yes openai=yes"
           mkdir -p artifacts
           node --experimental-transform-types --no-warnings scripts/eval-shipped-full.mjs artifacts/shipped-eval.json artifacts/shipped-eval.md
           echo '### Shipped eval' >> "$GITHUB_STEP_SUMMARY"

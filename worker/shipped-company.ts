@@ -11,12 +11,25 @@ import {
   publicUrl,
   readSite,
   type Found,
+  type SiteInfo,
   type SourceEnv,
 } from './shipped-sources';
 import { itemsFromProjectList } from './shipped-research';
 
 const MIN = 60;
-const COMPANY_PATHS = ['/changelog', '/blog', '/news', '/whats-new', "/what's-new", '/releases', '/blog/changelog', '/docs/changelog'];
+const COMPANY_PATHS = [
+  '/changelog',
+  '/blog',
+  '/news',
+  '/index',
+  '/whats-new',
+  "/what's-new",
+  '/releases',
+  '/blog/changelog',
+  '/docs/changelog',
+  '/research',
+  '/product',
+];
 
 export type CompanyEnv = SourceEnv & XaiEnv;
 
@@ -42,15 +55,44 @@ function withVia(items: Found[], via: string): Found[] {
   return items.map((item) => ({ ...item, via: item.via ?? via, source: item.source === 'site' || item.source === 'web' ? 'changelog' : item.source }));
 }
 
+function itemsFromNewsLinks(page: SiteInfo, year: number): Found[] {
+  const found: Found[] = [];
+  const seen = new Set<string>();
+  for (const link of page.links ?? []) {
+    const hay = `${link.text} ${link.url}`;
+    if (!hay.includes(String(year)) && !/\/(changelog|releases?|whats-new|news|blog|index)\//i.test(link.url)) continue;
+    if (/\/(about|careers?|jobs|login|privacy|terms|legal|pricing)\b/i.test(link.url)) continue;
+    const name = clean(link.text, 48);
+    const key = name.toLowerCase().replace(/[^a-z0-9]+/g, '');
+    if (!name || key.length < 3 || seen.has(key)) continue;
+    if (/^(home|about|blog|news|changelog|careers?|sign in|log in)$/i.test(name)) continue;
+    seen.add(key);
+    found.push({
+      name,
+      description: clean(`${name} on ${hostOf(page.url) ?? 'their site'}`, 140),
+      date: null,
+      dateConfidence: hay.includes(String(year)) ? 'year' : 'unknown',
+      link: publicUrl(link.url),
+      icon: null,
+      source: 'changelog',
+      status: 'LAUNCHED',
+      score: hay.includes(String(year)) ? 6 : 4,
+      thisYear: hay.includes(String(year)),
+    });
+  }
+  return found;
+}
+
 async function pagesForCompany(site: string, year: number): Promise<Found[]> {
   const base = publicUrl(site);
   if (!base) return [];
-  const roots = [base, ...COMPANY_PATHS.map((path) => `${base.replace(/\/+$/, '')}${path}`), ...extraResearchPaths(base)].slice(0, 8);
+  const roots = [base, ...COMPANY_PATHS.map((path) => `${base.replace(/\/+$/, '')}${path}`), ...extraResearchPaths(base)].slice(0, 10);
   const pages = await Promise.all(roots.map((url) => readSite(url).catch(() => null)));
   const found: Found[] = [];
   for (const page of pages) {
     if (!page) continue;
     found.push(...itemsFromProjectList({ text: `${page.title}\n${page.description}\n${page.text}`, url: page.url, year }));
+    found.push(...itemsFromNewsLinks(page, year));
   }
   return found;
 }
@@ -59,7 +101,7 @@ async function githubOrgShips(org: string, env: SourceEnv, year: number): Promis
   if (!env.GITHUB_TOKEN && !org) return [];
   const login = org.replace(/^@/, '');
   if (!/^[A-Za-z0-9-]{1,39}$/.test(login)) return [];
-  const response = await fetch(`https://api.github.com/orgs/${encodeURIComponent(login)}/repos?sort=pushed&per_page=30`, {
+  const response = await fetch(`https://api.github.com/orgs/${encodeURIComponent(login)}/repos?sort=pushed&per_page=100`, {
     headers: {
       'user-agent': 'brytonzoz.com-shipped (+https://shipped.brytonzoz.com/)',
       accept: 'application/vnd.github+json',
@@ -104,14 +146,14 @@ export async function harvestCompany(opts: {
   if (!slug || companyScope(affiliation.role) === 'none') {
     return { found: [], spend: emptyXaiSpend(), ran: [], cacheHit: false };
   }
-  return cached(`company:v1:${year}:${slug}`, 1440 * MIN, async () => {
+  return cached(`company:v2:${year}:${slug}`, 1440 * MIN, async () => {
     const via = viaFor(affiliation);
     const ran: string[] = [];
     const found: Found[] = [];
     let spend = emptyXaiSpend();
     const sites = [affiliation.companySite, ...hostGuesses(affiliation.company ?? '')].filter((u): u is string => Boolean(u));
     const seenHost = new Set<string>();
-    for (const site of sites.slice(0, 3)) {
+    for (const site of sites.slice(0, 5)) {
       const host = hostOf(site);
       if (!host || seenHost.has(host)) continue;
       seenHost.add(host);
@@ -119,7 +161,7 @@ export async function harvestCompany(opts: {
       if (pageItems.length) {
         found.push(...withVia(pageItems, via));
         ran.push(`company-site:${host}`);
-        break;
+        if (pageItems.length >= 3) break;
       }
     }
     const org = affiliation.companyGithub || slug;
@@ -128,19 +170,19 @@ export async function harvestCompany(opts: {
       found.push(...withVia(orgItems, via));
       ran.push(`company-github:${org}`);
     }
-    if (affiliation.companyX) {
-      const x = await searchXShips({
-        env,
-        year,
-        handles: [affiliation.companyX],
-        who: affiliation.company || affiliation.companyX,
-        kind: 'company',
-        maxPosts: 4,
-      });
-      found.push(...withVia(x.found, via));
-      spend = x.spend;
-      if (x.found.length || x.spend.costMicros) ran.push('company-xai');
-    }
+    const companyHandle = affiliation.companyX;
+    const x = await searchXShips({
+      env,
+      year,
+      handles: companyHandle ? [companyHandle] : [],
+      who: affiliation.company || companyHandle || slug,
+      kind: 'company',
+      maxPosts: 4,
+      allowWebOnly: true,
+    });
+    found.push(...withVia(x.found, via));
+    spend = x.spend;
+    if (x.found.length || x.spend.costMicros) ran.push('company-xai');
     const scoped =
       companyScope(affiliation.role) === 'product' && affiliation.product
         ? found.filter((item) => {

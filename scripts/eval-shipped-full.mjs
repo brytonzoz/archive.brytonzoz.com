@@ -26,6 +26,22 @@ const { gather, inYearCount } = await import('../worker/shipped-sources.ts');
 const { assembleReceipt, demoReceipt, cashierNoteLooksCanned } = await import('../worker/shipped-ai.ts');
 
 const pick = (...names) => names.map((n) => process.env[n]).find((v) => typeof v === 'string' && v.trim()) || '';
+// Eval is not on the Worker daily cap. Same always-allow meter as diagnose-shipped-research.mjs.
+const tinyfishMeter = {
+  async take() {
+    return true;
+  },
+  async exhausted() {},
+};
+
+function sampleLine(item) {
+  const bits = [item.name];
+  if (item.source) bits.push(`[${item.source}]`);
+  if (item.via) bits.push(`via ${item.via}`);
+  if (item.date) bits.push(item.date);
+  if (item.link) bits.push(item.link);
+  return bits.join(' · ');
+}
 
 const env = {
   GITHUB_TOKEN: pick('SHIPPED_GITHUB_TOKEN', 'EVAL_GITHUB_TOKEN'),
@@ -36,8 +52,8 @@ const env = {
   BRANDFETCH_API: pick('BRANDFETCH_API'),
   ANTHROPIC_API_KEY: pick('CLAUDE_KEY', 'ANTHROPIC_API_KEY'),
   ANTHROPIC_WORKSPACE_ID: pick('CLAUDE_WORKSPACE', 'ANTHROPIC_WORKSPACE_ID', 'ANTHROPIC_WORKSPACE_DEFAULT'),
-  XAI_API_KEY: pick('XAI_API_KEY'),
-  OPENAI_API_KEY: pick('OPENAI_API_KEY'),
+  XAI_API_KEY: pick('XAI_KEY', 'XAI_API_KEY'),
+  OPENAI_API_KEY: pick('OPENAI_KEY', 'OPENAI_API_KEY'),
   SHIPPED_MODEL: process.env.SHIPPED_MODEL || 'claude-haiku-5-5',
   SHIPPED_MAX_SEARCHES: process.env.SHIPPED_MAX_SEARCHES || '3',
   SHIPPED_XAI_MAX_POSTS: process.env.SHIPPED_XAI_MAX_POSTS || '8',
@@ -98,7 +114,7 @@ for (const builder of builders) {
   let searches = 0;
   let model = null;
   try {
-    gathered = await gather(subject, env, year, null);
+    gathered = await gather(subject, env, year, env.TINYFISH_API_KEY ? tinyfishMeter : null);
     if (env.ANTHROPIC_API_KEY) {
       const ai = await assembleReceipt(subject, gathered, year, 1, env);
       draft = ai;
@@ -148,7 +164,7 @@ for (const builder of builders) {
     xaiUsd: Number(((gathered?.costs?.xaiMicros ?? 0) / 1_000_000).toFixed(4)),
     decisionsMicros: gathered?.costs?.decisionsMicros ?? 0,
     decisionsUsd: Number(((gathered?.costs?.decisionsMicros ?? 0) / 1_000_000).toFixed(6)),
-    sampleLines: (draft?.items ?? []).slice(0, 8).map((i) => `${i.name}${i.via ? ` (${i.via})` : ''}`),
+    sampleLines: (draft?.items ?? []).slice(0, 10).map(sampleLine),
     searches,
     model,
     usedClaude: Boolean(env.ANTHROPIC_API_KEY && !error),
@@ -202,6 +218,7 @@ const md = [
   `- At: ${report.at}`,
   `- Claude: ${report.usedClaude ? 'yes (note only on long tapes)' : 'NO (demoReceipt placeholders)'}`,
   `- Product Hunt: ${report.envPresent.PRODUCTHUNT ? 'yes' : 'no'}`,
+  `- TinyFish: ${report.envPresent.TINYFISH ? 'yes' : 'no'}`,
   `- GitHub token: ${report.envPresent.GITHUB_TOKEN ? 'yes' : 'no'}`,
   `- xAI X search: ${report.envPresent.XAI ? 'yes' : 'no'}`,
   `- OpenAI Decisions: ${report.envPresent.OPENAI_DECISIONS ? 'yes (/v1/decisions only)' : 'no (heuristics)'}`,
@@ -222,15 +239,22 @@ const md = [
       `| ${r.set} | ${r.query} | ${r.receiptItems} | ${r.set === 'leaders' ? '—' : `${(r.recall * 100).toFixed(0)}%`} | $${r.decisionsUsd.toFixed(6)} | $${r.xaiUsd.toFixed(4)} | ${r.note.replace(/\|/g, '/')} |`,
   ),
   '',
-  '## Leader sample lines',
+  '## Receipts (10 sample lines each)',
   '',
-  ...rows
-    .filter((r) => r.set === 'leaders')
-    .map((r) => `- **${r.query}** (${r.receiptItems} lines): ${r.sampleLines.join('; ') || 'none'}`),
-  '',
-  '## Notes verbatim',
-  '',
-  ...rows.map((r) => `- **${r.query}** ($${r.costUsd.toFixed(4)}): ${r.note}`),
+  ...rows.flatMap((r) => [
+    `### ${r.query}`,
+    '',
+    `- Set: ${r.set}`,
+    `- Items: ${r.receiptItems} (harvested ${r.items}, in-year ${r.inYear})`,
+    `- Recall: ${r.set === 'leaders' ? '— (no ground-truth ships)' : `${(r.recall * 100).toFixed(0)}%`}${r.missedShips.length ? ` · missed ${r.missedShips.join(', ')}` : ''}`,
+    `- Cost: Claude $${r.costUsd.toFixed(4)} · xAI $${r.xaiUsd.toFixed(4)} · Decisions $${r.decisionsUsd.toFixed(6)}`,
+    `- Cashier note: ${r.note || '(empty)'}`,
+    `- Identity: ${r.identity?.display || r.query}${r.github ? ` · gh:${r.github}` : ''}${r.site ? ` · ${r.site}` : ''}`,
+    `- Ran: ${(r.ran || []).join(', ') || 'none'}`,
+    '',
+    ...(r.sampleLines.length ? r.sampleLines.map((line) => `- ${line}`) : ['- (no lines)']),
+    '',
+  ]),
   '',
 ].join('\n');
 writeFileSync(mdOut, md);

@@ -1562,7 +1562,7 @@ function dedupeFound(found: Found[]): Found[] {
 export async function gather(subject: Subject, env: SourceEnv, year: number, meter: TinyfishMeter | null = null): Promise<Gathered> {
   const tinyfish = tinyfishAccess(env, meter);
   const resolved = await resolveIdentity(subject, env, tinyfish);
-  return cached(`gather:v7:${year}:${resolved.cacheKey}`, 1440 * MIN, () => gatherFresh(subject, resolved.profile, env, year, meter, tinyfish, resolved.notes));
+  return cached(`gather:v8:${year}:${resolved.cacheKey}`, 1440 * MIN, () => gatherFresh(subject, resolved.profile, env, year, meter, tinyfish, resolved.notes));
 }
 
 async function gatherFresh(
@@ -1750,19 +1750,20 @@ async function gatherFresh(
 
   try {
     const { searchXShips, xaiEnabled } = await import('./shipped-xai');
-    if (xaiEnabled(env) && profile.x) {
+    if (xaiEnabled(env) && (profile.x || who || affiliation.company)) {
       const personX = await searchXShips({
         env,
         year,
-        handles: [profile.x],
+        handles: profile.x ? [profile.x] : [],
         who,
         company: affiliation.company,
         kind: 'person',
         maxPosts: 4,
+        allowWebOnly: !profile.x,
       });
       found.push(...personX.found);
       xaiMicros += personX.spend.costMicros;
-      if (personX.found.length || personX.spend.costMicros) ran.push('xai-person');
+      if (personX.found.length || personX.spend.costMicros) ran.push(profile.x ? 'xai-person' : 'xai-person-web');
     }
   } catch {
     failed.push('xai-person');

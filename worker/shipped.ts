@@ -179,8 +179,8 @@ export function withKeyAliases<T extends ShippedEnv>(env: T): T {
   const anthropic = pick('claude_key', 'CLAUDE_KEY', 'ANTHROPIC_API_KEY');
   const tinyfish = pick('tinyfish', 'TINYFISH', 'TINYFISH_API_KEY');
   const workspace = pick('claude_workspace', 'CLAUDE_WORKSPACE', 'claude_workspace_id', 'ANTHROPIC_WORKSPACE_ID', 'ANTHROPIC_WORKSPACE_DEFAULT');
-  const xai = pick('XAI_API_KEY', 'xai_api_key');
-  const openai = pick('OPENAI_API_KEY', 'openai_api_key');
+  const xai = pick('XAI_KEY', 'XAI_API_KEY', 'xai_key', 'xai_api_key');
+  const openai = pick('OPENAI_KEY', 'OPENAI_API_KEY', 'openai_key', 'openai_api_key');
   if (
     anthropic === env.ANTHROPIC_API_KEY &&
     tinyfish === env.TINYFISH_API_KEY &&

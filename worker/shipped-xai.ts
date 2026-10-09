@@ -129,31 +129,38 @@ export async function searchXShips(opts: {
   who: string;
   company?: string | null;
   kind: 'person' | 'company';
-  /** Cap this call below the env default so person + company stay under the receipt budget. */
+  /** Cap X posts fetched (cost), not how many sourced ships the model may list. */
   maxPosts?: number;
+  /** Web search without an X handle (typed "Tibo from OpenAI", "CEO of Higgsfield"). */
+  allowWebOnly?: boolean;
 }): Promise<{ found: Found[]; spend: XaiSpend }> {
   const posts = Math.min(xaiMaxPosts(opts.env), opts.maxPosts ?? xaiMaxPosts(opts.env));
-  if (!xaiEnabled(opts.env) || posts <= 0 || !opts.handles.length) return { found: [], spend: emptyXaiSpend() };
+  if (!xaiEnabled(opts.env)) return { found: [], spend: emptyXaiSpend() };
   const handles = [...new Set(opts.handles.map((h) => h.replace(/^@/, '')).filter(Boolean))].slice(0, 8);
+  const useX = handles.length > 0 && posts > 0;
+  if (!useX && !opts.allowWebOnly) return { found: [], spend: emptyXaiSpend() };
   const prompt =
     opts.kind === 'company'
-      ? `List every product, feature, model, or launch ${opts.who} announced on X from ${opts.year}-01-01 through today. Only real ships (now live, released, launched, GA), not hiring, teasers, or opinions. Return JSON only: {"ships":[{"name":"","date":"YYYY-MM-DD or null","url":"https://x.com/...","why":""}]}`
-      : `List every thing ${opts.who}${opts.company ? ` (at ${opts.company})` : ''} announced they shipped on X from ${opts.year}-01-01 through today: products, features, launches, releases. Phrases like "we just shipped", "now live", "launching", "released". Return JSON only: {"ships":[{"name":"","date":"YYYY-MM-DD or null","url":"https://x.com/...","why":""}]}`;
+      ? `List every distinct product, model, feature, API, app, and launch ${opts.who} shipped in ${opts.year} (from ${opts.year}-01-01 through today). Use X and the public web (blog, changelog, news, docs). Only real ships that are live, released, launched, or GA — not hiring, teasers, opinions, or roadmaps. Return as many distinct ships as you can prove, each with a real public URL (blog, changelog, news, or X). JSON only: {"ships":[{"name":"","date":"YYYY-MM-DD or null","url":"https://...","why":""}]}`
+      : `List every distinct thing ${opts.who}${opts.company ? ` (at ${opts.company})` : ''} shipped in ${opts.year}: products, features, launches, releases, models, and company ships they lead or founded. Use X and the public web. Only real ships with a public URL. JSON only: {"ships":[{"name":"","date":"YYYY-MM-DD or null","url":"https://...","why":""}]}`;
+  const tools: Record<string, unknown>[] = [];
+  if (useX) {
+    tools.push({
+      type: 'x_search',
+      allowed_x_handles: handles,
+      from_date: `${opts.year}-01-01`,
+      to_date: `${opts.year + 1}-01-01`,
+    });
+  }
+  tools.push({ type: 'web_search' });
   const result = await xaiResponses(opts.env, {
     input: [{ role: 'user', content: prompt }],
-    tools: [
-      {
-        type: 'x_search',
-        allowed_x_handles: handles,
-        from_date: `${opts.year}-01-01`,
-        to_date: `${opts.year + 1}-01-01`,
-      },
-      { type: 'web_search' },
-    ],
+    tools,
     max_turns: 2,
   });
   if (!result) return { found: [], spend: emptyXaiSpend() };
-  const found = parseShips(outputText(result.body), opts.year).slice(0, posts);
+  // Post cap is a fetch-cost guard. The tape may list every sourced ship the tools proved.
+  const found = parseShips(outputText(result.body), opts.year).slice(0, 80);
   console.log(JSON.stringify({ shipped: 'xai', kind: opts.kind, who: opts.who, items: found.length, ...result.spend }));
   return { found, spend: result.spend };
 }

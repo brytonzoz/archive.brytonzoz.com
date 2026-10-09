@@ -218,6 +218,14 @@ test('a /projects page dated 2026 becomes found items', () => {
   assert.ok(items.some((item) => /xdr boost/i.test(item.name)));
   assert.ok(items.some((item) => /pieter/i.test(item.name)));
   assert.equal(items.some((item) => /old thing/i.test(item.name)), false);
+  const news = research.itemsFromProjectList({
+    text: 'Introducing Codex — January 15, 2026\nSora 2 · 2026-08-07\nLegacy Widget — December 1, 2025',
+    url: 'https://openai.com/news',
+    year: 2026,
+  });
+  assert.ok(news.some((item) => /codex/i.test(item.name)), JSON.stringify(news.map((i) => i.name)));
+  assert.ok(news.some((item) => /sora/i.test(item.name)));
+  assert.equal(news.some((item) => /legacy/i.test(item.name)), false);
 });
 
 test('public MRR and stars keep their source URL', () => {

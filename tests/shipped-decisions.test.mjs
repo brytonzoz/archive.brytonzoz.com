@@ -65,6 +65,20 @@ test('heuristic keep/drop matches the Decisions product threshold', () => {
   assert.equal(decisions.shouldKeep(old), false);
 });
 
+test('xAI lists sourced ships without slicing to the post-cost cap', async () => {
+  const empty = await xai.searchXShips({
+    env: {},
+    year: 2026,
+    handles: [],
+    who: 'OpenAI',
+    kind: 'company',
+    allowWebOnly: true,
+  });
+  assert.equal(empty.found.length, 0);
+  assert.equal(empty.spend.costMicros, 0);
+  assert.ok(xai.xaiMaxPosts({}) >= 8);
+});
+
 test('Decisions and xAI skip when the key is missing', async () => {
   assert.equal(decisions.decisionsEnabled({}), false);
   assert.equal(xai.xaiEnabled({}), false);

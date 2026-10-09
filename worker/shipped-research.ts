@@ -140,6 +140,14 @@ export function itemsFromProjectList(opts: { text: string; url: string; year: nu
       if (bullet) add(bullet[1], null, `Under the ${year} heading`);
     }
   }
+
+  // "Introducing Codex — January 15, 2026" / "Sora 2 (Mar 2026)" / "GPT-5 · 2026-08-07"
+  const namedDate = new RegExp(
+    `([A-Za-z][A-Za-z0-9][A-Za-z0-9 ._'\\/-]{1,48}?)\\s*(?:[—–\\-·|,]|\\s)\\s*(?:(?:Jan(?:uary)?|Feb(?:ruary)?|Mar(?:ch)?|Apr(?:il)?|May|Jun(?:e)?|Jul(?:y)?|Aug(?:ust)?|Sep(?:t(?:ember)?)?|Oct(?:ober)?|Nov(?:ember)?|Dec(?:ember)?)\\s+\\d{1,2},?\\s+${year}|${year}[-/.]\\d{1,2}(?:[-/.]\\d{1,2})?)`,
+    'gi',
+  );
+  for (const match of text.matchAll(namedDate)) add(match[1], null, `Dated ${year} on ${hostOf(url) ?? 'their site'}`);
+
   return found.slice(0, 80);
 }
 

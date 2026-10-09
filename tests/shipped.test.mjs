@@ -154,6 +154,42 @@ test('the receipt feed reveals the header first, never the footer', async () => 
   assert.equal(hidden, 0);
 });
 
+test('share cards are a 1200×630 desk photo and a 1080×1350 download', async () => {
+  const { yearCardSvg, yearPortraitSvg } = await import('../lib/receipt-svg.ts');
+  const data = {
+    number: '000014',
+    year: 2026,
+    who: 'Marc Lou',
+    date: '09 OCT 2026',
+    items: [
+      { name: 'DataRadar', status: 'LIVE', date: 'FEB 28', description: 'Web analytics', logo: null },
+      { name: 'Ship or Die', status: 'LAUNCHED', date: null, description: 'Community', logo: null },
+      { name: 'TrustMRR', status: 'LIVE', date: null, description: 'Revenue', logo: null },
+    ],
+    count: 6,
+    note: 'Built in public.',
+    sponsors: [{ name: 'Pocket Factory', cta: 'NFC cards', logo: null, qr: { size: 21, path: '' } }],
+    url: 'shipped.brytonzoz.com/r/14/',
+    barcode: [1, 1, 1, 1],
+    shipScore: 72,
+  };
+  const card = yearCardSvg(data);
+  const port = yearPortraitSvg(data);
+  assert.match(card, /width="1200"/);
+  assert.match(card, /height="630"/);
+  assert.match(port, /width="1080"/);
+  assert.match(port, /height="1350"/);
+  assert.match(card, /ITEMS SHIPPED/);
+  assert.match(card, /MARC LOU/);
+  assert.match(card, /DATARADAR/);
+  assert.match(card, /shipped\.brytonzoz\.com/);
+  assert.match(card, /PAID FOR BY/);
+  assert.match(card, /POCKET FACTORY/);
+  assert.match(card, /rotate\(-9/);
+  assert.doesNotMatch(card, /letter-spacing="0"/, 'letter-spacing at 0 doubles the last glyph in resvg');
+  assert.equal(card.includes('printerLip') || /url\(#chassis\)/.test(card), false, 'card is a desk photo, not the printer template');
+});
+
 test('share pages fill a placeholder instead of appending head scripts', () => {
   const page = fs.readFileSync(new URL('../app/shipped/r/page.tsx', import.meta.url), 'utf8');
   const worker = fs.readFileSync(new URL('../worker/shipped.ts', import.meta.url), 'utf8');

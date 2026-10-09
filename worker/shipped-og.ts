@@ -4,7 +4,7 @@ import { initWasm, Resvg } from '@resvg/resvg-wasm';
 import resvgWasm from '@resvg/resvg-wasm/index_bg.wasm';
 import plexRegular from './fonts/IBMPlexMono-Regular.ttf';
 import plexSemiBold from './fonts/IBMPlexMono-SemiBold.ttf';
-import { yearCardSvg, yearRolloSvg, yearTallSvg, type YearOg } from '../lib/receipt-svg';
+import { yearCardSvg, yearPortraitSvg, yearRolloSvg, type YearOg } from '../lib/receipt-svg';
 import { pdfFromRgb, rgbFlate, rgbaToRgb } from '../lib/rollo-pdf';
 import { receiptBarcodeUnits, receiptDate } from '../lib/shipped';
 import { isFirstRun, receiptModules } from '../lib/shipped-modules';
@@ -82,14 +82,14 @@ async function yearOg(receipt: YearReceipt, block: SponsorBlock, origin: string,
   };
 }
 
-/** The 1200×675 card for X. */
+/** The 1200×630 card for X: a photo of the receipt on the desk. */
 export async function yearCardPng(receipt: YearReceipt, block: SponsorBlock, origin: string, logo: LogoResolver) {
-  return renderPng(yearCardSvg(await yearOg(receipt, block, origin, logo, 20)));
+  return renderPng(yearCardSvg(await yearOg(receipt, block, origin, logo, 5)));
 }
 
-/** The whole receipt, tall, for downloading. */
+/** 1080×1350 share-image download: the same photo, taller. */
 export async function yearTallPng(receipt: YearReceipt, block: SponsorBlock, origin: string, logo: LogoResolver) {
-  return renderPng(yearTallSvg(await yearOg(receipt, block, origin, logo, 30)));
+  return renderPng(yearPortraitSvg(await yearOg(receipt, block, origin, logo, 5)));
 }
 
 /** 4-inch Rollo PNG (812 dots wide at 203 dpi). */

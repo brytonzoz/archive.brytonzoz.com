@@ -22,7 +22,7 @@
 //   GET  /api/shipped/mark/<slot>      house-ad color mark (Brandfetch / favicon, same-origin)
 //   GET  /q/<key>                      a printed QR code -> the slot's link (counts scans; worker/shipped-host.ts)
 //   GET  /shipped/r/<id>/              share page: the static shell with this receipt's tags and data
-//   GET  /shipped/r/<id>/og.png        the 1200×675 card for X        (?download=1 to save it)
+//   GET  /shipped/r/<id>/og.png        the 1200×630 card for X        (?download=1 to save it)
 //   GET  /shipped/r/<id>/receipt.png   the whole receipt as one image (?download=1 to save it)
 //   GET  /shipped/r/<id>/rollo.pdf     4-inch Rollo PDF (812 dots / 203 dpi, ?download=1)
 //   GET  /shipped/r/<id>/rollo.png     4-inch Rollo PNG (same layout)
@@ -196,7 +196,7 @@ const FAILED_FOR = 10 * MINUTE;
 /** Longest a print may hold its locks (gathering + up to three 40 s model calls). */
 const PRINT_LOCK = 3 * MINUTE;
 /** Bump when the share images change, so cached ones are redrawn. */
-const IMAGE_VERSION = 7;
+const IMAGE_VERSION = 9;
 
 const SCHEMA = [
   `CREATE TABLE IF NOT EXISTS shipped_receipts (

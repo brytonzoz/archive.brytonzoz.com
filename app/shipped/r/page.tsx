@@ -22,7 +22,7 @@ export const metadata: Metadata = {
     url: `${SHIPPED_URL}/r/`,
     siteName: 'Shipped 2026',
     type: 'website',
-    images: [{ url: `${SHIPPED_URL}${SHIPPED_OG_IMAGE}`, width: 1200, height: 675, alt: ALT }],
+    images: [{ url: `${SHIPPED_URL}${SHIPPED_OG_IMAGE}`, width: 1200, height: 630, alt: ALT }],
   },
   twitter: {
     card: 'summary_large_image',

@@ -3,7 +3,7 @@
 // The top of / and /r/<id>/: one receipt printer on the desk. Type a name on its LCD and press PRINT.
 // It looks the name up, lets the visitor pick if it could be more than one person, tears off whatever is
 // hanging, feeds while the sources are searched, and prints theirs. Jams and an empty roll print a slip.
-import React, { useEffect, useLayoutEffect, useRef, useState } from 'react';
+import React, { useEffect, useRef, useState } from 'react';
 import { track } from '../../lib/analytics';
 import { countdown } from '../../lib/shipped-event';
 import { readQuery, receiptNumber, type Candidate } from '../../lib/shipped-year';
@@ -175,8 +175,9 @@ export function ShippedStage({ opening, title }: { opening: Opening; title: Reac
     }
   }, []);
 
-  // /r/<id>/ injects the receipt before paint; land already torn so the tape is full-screen.
-  useLayoutEffect(() => {
+  // /r/<id>/ injects after the first render. Apply the job after paint so we never
+  // read layout during commit (React #329). Fast jobs skip the feed and land torn.
+  useEffect(() => {
     if (touched.current) return;
     setJob(openingJob(opening));
     setCurrent(opening.kind === 'loaded' ? opening.loaded : null);

@@ -616,14 +616,8 @@
   scroll-margin-top: 1.5rem;
 }
 
-.shipped-kiosk-eyebrow {
-  font-size: 11px;
-  letter-spacing: 0.14em;
-  color: rgba(243, 234, 216, 0.5);
-}
-
 .shipped-kiosk-title {
-  margin-top: 0.2rem;
+  margin-top: 0;
   font-size: 1.35rem;
   font-weight: 560;
   line-height: 1.15;

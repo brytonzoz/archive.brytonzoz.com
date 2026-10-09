@@ -272,7 +272,6 @@ export function ShippedStage({ opening, title }: { opening: Opening; title: Reac
   return (
     <div className="shipped-stage">
       <section className="shipped-kiosk" id="print" aria-labelledby="shipped-title">
-        <p className="shipped-kiosk-eyebrow">Shipped {generator?.year ?? 2026}</p>
         <h2 id="shipped-title" className="shipped-kiosk-title">
           {title}
         </h2>

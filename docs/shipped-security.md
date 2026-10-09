@@ -113,7 +113,8 @@ Everything fetched (X, GitHub, Product Hunt, web pages, search results) is untru
 ## 5. Web security
 
 - **Headers on every Shipped response:** hash-based CSP (inline scripts hashed at serve time, no
-  `unsafe-inline` scripts, `frame-ancestors 'none'`, `object-src 'none'`, `base-uri 'none'`), HSTS,
+  `unsafe-inline` or `unsafe-eval` scripts; only `'wasm-unsafe-eval'` so the pile's physics engine can compile
+  WebAssembly; `frame-ancestors 'none'`, `object-src 'none'`, `base-uri 'none'`), HSTS,
   `X-Frame-Options: DENY`, `nosniff`, `Referrer-Policy`, `Permissions-Policy`, COOP. Non-HTML responses get an
   inert CSP.
 - **No user HTML.** React escapes everything; receipts and share images are drawn from validated fields;

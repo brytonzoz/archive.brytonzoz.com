@@ -99,7 +99,9 @@ Everything fetched (X, GitHub, Product Hunt, web pages, search results) is untru
   server's amount and an idempotency key.
 - **Webhooks:** Stripe signatures verified (timestamp tolerance, constant-time compare), each event handled
   once. The paid event must match our row (reference, currency, amount, US country for prints), otherwise
-  it is refunded in full.
+  it is refunded in full. Without the webhook secret, payments are confirmed by asking Stripe when the buyer
+  returns, and hourly by the cron for every checkout still open, so a buyer who pays and closes the tab still
+  gets their slot or print (checkouts are only called abandoned after two days of that).
 - **Sponsor content:** name/CTA filtered; URL must be https on port 443, a public hostname (no IPs, no
   punycode lookalikes, no shorteners, no risky TLDs), answer without redirecting off-site, and pass Safe
   Browsing when configured. Logos are only shown after admin approval (`/admin` → Logo review); until then

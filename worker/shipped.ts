@@ -588,10 +588,11 @@ async function generate(
         throw error;
       }
     }
+    const x = (gathered.profile.x && isXHandle(gathered.profile.x) ? gathered.profile.x : subject.kind === 'x' ? subject.id : null) || null;
     const receipt: Omit<YearReceipt, 'id'> = {
       version: 2,
       year,
-      subject,
+      subject: { ...subject, x },
       printedAt: new Date().toISOString(),
       items: await withLogos(draft.items, env),
       note: draft.note,

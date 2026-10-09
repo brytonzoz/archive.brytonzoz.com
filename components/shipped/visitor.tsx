@@ -15,6 +15,7 @@ import {
   itemsShipped,
   receiptNumber,
   shareText,
+  shareTweet,
   subjectLabel,
   type SponsorBlock,
   type YearReceipt as Printed,
@@ -268,9 +269,10 @@ export function SharePill({
   const path = RECEIPT_PATH(receipt.id);
   const [origin, setOrigin] = useState('');
   useEffect(() => setOrigin(window.location.origin), []);
+  const tweet = shareTweet(receipt);
   const intent = origin
-    ? `https://x.com/intent/post?text=${encodeURIComponent(shareText(receipt))}&url=${encodeURIComponent(`${origin}${path}`)}`
-    : `https://x.com/intent/post?text=${encodeURIComponent(shareText(receipt))}`;
+    ? `https://x.com/intent/post?text=${encodeURIComponent(tweet)}&url=${encodeURIComponent(`${origin}${path}`)}`
+    : `https://x.com/intent/post?text=${encodeURIComponent(tweet)}`;
 
   const close = () => {
     setOpen(false);

@@ -41,6 +41,8 @@ export type Subject = {
   id: string;
   /** What the receipt is made out to. */
   display: string;
+  /** Resolved X handle (no @), when a source already knew it. Never invented. */
+  x?: string | null;
 };
 
 export type YearReceipt = {
@@ -138,6 +140,23 @@ export function shareText(receipt: Pick<YearReceipt, 'items' | 'potential' | 'su
   if (receipt.potential) return `I shipped nothing public in ${receipt.year} — the receipt itemized my potential instead. Print yours:`;
   const n = receipt.items.length;
   return `I shipped ${n} thing${n === 1 ? '' : 's'} in ${receipt.year}. Receipt attached.`;
+}
+
+/** X handle already on the receipt (typed as X, or persisted from a source). Never guessed. */
+export function xHandle(receipt: Pick<YearReceipt, 'subject'>): string | null {
+  const { subject } = receipt;
+  if (subject.kind === 'x' && isXHandle(subject.id)) return subject.id;
+  if (subject.x && isXHandle(subject.x)) return subject.x;
+  return null;
+}
+
+/** POST TO X prefills this. Tags the person when the receipt has a resolved handle. */
+export function shareTweet(receipt: Pick<YearReceipt, 'items' | 'potential' | 'subject' | 'year'>): string {
+  const n = itemsShipped(receipt);
+  const things = receipt.potential ? 'nothing public' : `${n} thing${n === 1 ? '' : 's'}`;
+  const handle = xHandle(receipt);
+  const who = handle ? `@${handle}` : subjectLabel(receipt.subject);
+  return `${who} shipped ${things} in ${receipt.year} 🧾`;
 }
 
 /** Browser tab / og:title for a printed receipt. Crawlers read this; the printer sets document.title after hydrate. */

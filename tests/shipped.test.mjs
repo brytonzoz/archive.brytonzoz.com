@@ -2,7 +2,7 @@ import assert from 'node:assert/strict';
 import { test } from 'node:test';
 import fs from 'node:fs';
 import { SHIPPED_STATUSES, shippedCounts, toItems, yearGroups } from '../lib/shipped.ts';
-import { isGithubLogin, itemDate, itemsShipped, readQuery, receiptPageTitle, shareText, shippedYear, subjectKey, subjectLabel } from '../lib/shipped-year.ts';
+import { isGithubLogin, itemDate, itemsShipped, readQuery, receiptPageTitle, shareText, shareTweet, shippedYear, subjectKey, subjectLabel, xHandle } from '../lib/shipped-year.ts';
 
 const read = (file) => JSON.parse(fs.readFileSync(new URL(file, import.meta.url), 'utf8'));
 const DATA = read('../data/shipped/businesses.json');
@@ -107,6 +107,15 @@ test('item dates and the share text', () => {
   assert.match(shareText({ ...receipt, potential: true, items: [{}] }), /potential/);
   assert.equal(receiptPageTitle(receipt), '@levelsio shipped 3 things in 2026 | Shipped');
   assert.equal(receiptPageTitle({ ...receipt, potential: true, items: [{}] }), '@levelsio: shipped in 2026 (potential) | Shipped');
+  assert.equal(xHandle(receipt), 'levelsio');
+  assert.equal(shareTweet(receipt), '@levelsio shipped 3 things in 2026 🧾');
+  assert.equal(shareTweet({ ...receipt, potential: true, items: [{}] }), '@levelsio shipped nothing public in 2026 🧾');
+  const named = { ...receipt, subject: { kind: 'name', id: 'Marc Lou', display: 'Marc Lou' } };
+  assert.equal(xHandle(named), null);
+  assert.equal(shareTweet(named), 'Marc Lou shipped 3 things in 2026 🧾');
+  const githubWithX = { ...receipt, subject: { kind: 'github', id: 'levelsio', display: 'Pieter Levels', x: 'levelsio' } };
+  assert.equal(xHandle(githubWithX), 'levelsio');
+  assert.equal(shareTweet(githubWithX), '@levelsio shipped 3 things in 2026 🧾');
 });
 
 test('the year is configurable and falls back to this year', () => {

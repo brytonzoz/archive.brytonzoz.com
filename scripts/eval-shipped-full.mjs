@@ -10,6 +10,7 @@ const heldOut = JSON.parse(readFileSync(new URL('../docs/shipped-heldout-ground-
 const builders = [
   ...original.builders.map((b) => ({ ...b, set: 'original' })),
   ...heldOut.builders.map((b) => ({ ...b, set: 'held-out' })),
+  ...LEADERS,
 ];
 
 const { readQuery } = await import('../lib/shipped-year.ts');
@@ -27,9 +28,21 @@ const env = {
   BRANDFETCH_API: pick('BRANDFETCH_API'),
   ANTHROPIC_API_KEY: pick('CLAUDE_KEY', 'ANTHROPIC_API_KEY'),
   ANTHROPIC_WORKSPACE_ID: pick('CLAUDE_WORKSPACE', 'ANTHROPIC_WORKSPACE_ID', 'ANTHROPIC_WORKSPACE_DEFAULT'),
+  XAI_API_KEY: pick('XAI_API_KEY'),
+  OPENAI_API_KEY: pick('OPENAI_API_KEY'),
   SHIPPED_MODEL: process.env.SHIPPED_MODEL || 'claude-haiku-5-5',
   SHIPPED_MAX_SEARCHES: process.env.SHIPPED_MAX_SEARCHES || '3',
+  SHIPPED_XAI_MAX_POSTS: process.env.SHIPPED_XAI_MAX_POSTS || '8',
 };
+
+const LEADERS = [
+  { query: 'Tibo from OpenAI', set: 'leaders', ships: [], stats: [], prolific: true },
+  { query: 'CEO of Higgsfield', set: 'leaders', ships: [], stats: [], prolific: true },
+  { query: 'sama', set: 'leaders', ships: [], stats: [], prolific: true },
+  { query: 'Michael Truell', set: 'leaders', ships: [], stats: [], prolific: true },
+  { query: 'rauchg', set: 'leaders', ships: [], stats: [], prolific: true },
+  { query: 'amasad', set: 'leaders', ships: [], stats: [], prolific: true },
+];
 
 const loose = (text) => String(text || '').toLowerCase().normalize('NFKD').replace(/[^a-z0-9]/g, '');
 const hostOf = (url) => {
@@ -132,6 +145,11 @@ for (const builder of builders) {
     names: (draft?.items ?? []).map((i) => i.name),
     costMicros,
     costUsd: Number((costMicros / 1_000_000).toFixed(4)),
+    xaiMicros: gathered?.costs?.xaiMicros ?? 0,
+    xaiUsd: Number(((gathered?.costs?.xaiMicros ?? 0) / 1_000_000).toFixed(4)),
+    decisionsMicros: gathered?.costs?.decisionsMicros ?? 0,
+    decisionsUsd: Number(((gathered?.costs?.decisionsMicros ?? 0) / 1_000_000).toFixed(6)),
+    sampleLines: (draft?.items ?? []).slice(0, 8).map((i) => `${i.name}${i.via ? ` (${i.via})` : ''}`),
     searches,
     model,
     usedClaude: Boolean(env.ANTHROPIC_API_KEY && !error),
@@ -159,12 +177,17 @@ const report = {
     TINYFISH: Boolean(env.TINYFISH_API_KEY),
     ANTHROPIC: Boolean(env.ANTHROPIC_API_KEY),
     WORKSPACE: Boolean(env.ANTHROPIC_WORKSPACE_ID),
+    XAI: Boolean(env.XAI_API_KEY),
+    OPENAI_DECISIONS: Boolean(env.OPENAI_API_KEY),
   },
   medianRecall: Number(median(recalls).toFixed(3)),
   medianRecallOriginal: Number(median(rows.filter((r) => r.set === 'original').map((r) => r.recall)).toFixed(3)),
   medianRecallHeldOut: Number(median(rows.filter((r) => r.set === 'held-out').map((r) => r.recall)).toFixed(3)),
   totalCostUsd: Number((rows.reduce((n, r) => n + r.costUsd, 0)).toFixed(4)),
   meanCostUsd: Number((rows.reduce((n, r) => n + r.costUsd, 0) / Math.max(1, rows.length)).toFixed(4)),
+  meanXaiUsd: Number((rows.reduce((n, r) => n + r.xaiUsd, 0) / Math.max(1, rows.length)).toFixed(4)),
+  meanDecisionsUsd: Number((rows.reduce((n, r) => n + r.decisionsUsd, 0) / Math.max(1, rows.length)).toFixed(6)),
+  meanReceiptItems: Number((rows.reduce((n, r) => n + r.receiptItems, 0) / Math.max(1, rows.length)).toFixed(1)),
   templatedNotes: rows.filter((r) => r.noteTemplated).map((r) => r.query),
   rows,
 };
@@ -178,22 +201,33 @@ const md = [
   `# Shipped full-pipeline eval`,
   '',
   `- At: ${report.at}`,
-  `- Claude: ${report.usedClaude ? 'yes' : 'NO (demoReceipt placeholders)'}`,
+  `- Claude: ${report.usedClaude ? 'yes (note only on long tapes)' : 'NO (demoReceipt placeholders)'}`,
   `- Product Hunt: ${report.envPresent.PRODUCTHUNT ? 'yes' : 'no'}`,
   `- GitHub token: ${report.envPresent.GITHUB_TOKEN ? 'yes' : 'no'}`,
+  `- xAI X search: ${report.envPresent.XAI ? 'yes' : 'no'}`,
+  `- OpenAI Decisions: ${report.envPresent.OPENAI_DECISIONS ? 'yes (/v1/decisions only)' : 'no (heuristics)'}`,
   `- Median recall original: ${(report.medianRecallOriginal * 100).toFixed(0)}%`,
   `- Median recall held-out: ${(report.medianRecallHeldOut * 100).toFixed(0)}%`,
-  `- Total cost: $${report.totalCostUsd}`,
-  `- Mean cost / receipt: $${report.meanCostUsd}`,
+  `- Mean items / receipt: ${report.meanReceiptItems}`,
+  `- Total Claude cost: $${report.totalCostUsd}`,
+  `- Mean Claude / receipt: $${report.meanCostUsd}`,
+  `- Mean xAI / receipt: $${report.meanXaiUsd}`,
+  `- Mean Decisions / receipt: $${report.meanDecisionsUsd}`,
   report.templatedNotes.length ? `- Templated notes: ${report.templatedNotes.join(', ')}` : '- Templated notes: none',
   `- Notes naming a receipt item: ${rows.filter((r) => r.noteMentionsItem).length}/${rows.length}`,
   '',
-  '| Set | Query | Recall | PH | Cost | Note |',
-  '| --- | --- | ---: | --- | ---: | --- |',
+  '| Set | Query | Items | Recall | Decisions | xAI | Note |',
+  '| --- | --- | ---: | ---: | ---: | ---: | --- |',
   ...rows.map(
     (r) =>
-      `| ${r.set} | ${r.query} | ${(r.recall * 100).toFixed(0)}% | ${r.phUpvotes[0] || '—'} | $${r.costUsd.toFixed(4)} | ${r.note.replace(/\|/g, '/')} |`,
+      `| ${r.set} | ${r.query} | ${r.receiptItems} | ${r.set === 'leaders' ? '—' : `${(r.recall * 100).toFixed(0)}%`} | $${r.decisionsUsd.toFixed(6)} | $${r.xaiUsd.toFixed(4)} | ${r.note.replace(/\|/g, '/')} |`,
   ),
+  '',
+  '## Leader sample lines',
+  '',
+  ...rows
+    .filter((r) => r.set === 'leaders')
+    .map((r) => `- **${r.query}** (${r.receiptItems} lines): ${r.sampleLines.join('; ') || 'none'}`),
   '',
   '## Notes verbatim',
   '',

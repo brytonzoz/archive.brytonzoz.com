@@ -1,7 +1,22 @@
 // The "SHIPPED IN <year>" receipt as an ESC/POS print job: the same order and emphasis as YearReceipt.tsx
 // (double-height store and customer, one inverse band, dotted leaders, the PAID FOR BY box), set on the
 // printer's own grid. Pure: tests and the Worker can call it without a DOM.
-import type { Align, PrintDoc, PrintLine, ThermalReceipt } from './types';
+import type { Align, PrintDoc, PrintLine, ThermalItem, ThermalReceipt } from './types';
+
+const SIG_LABELS = ['MINOR FIX', 'FEATURE', 'NOTABLE LAUNCH', 'MAJOR PRODUCT', 'LANDMARK'] as const;
+
+function groupBySignificance(items: ThermalItem[]): { key: string; label: string; items: ThermalItem[] }[] {
+  const buckets = new Map<number, ThermalItem[]>();
+  for (const item of items) {
+    const band = Math.max(0, Math.min(4, Math.round(item.significance ?? 0)));
+    const list = buckets.get(band) ?? [];
+    list.push(item);
+    buckets.set(band, list);
+  }
+  return [...buckets.keys()]
+    .sort((a, b) => b - a)
+    .map((band) => ({ key: String(band), label: SIG_LABELS[band], items: buckets.get(band) ?? [] }));
+}
 
 /** Font A: 48 columns of 12 x 24 dots. Font B ("small"): 64 columns of 9 x 17 dots. */
 export const COLS = 48;
@@ -81,14 +96,29 @@ export function receiptToDoc(receipt: ThermalReceipt): PrintDoc {
   lines.push({ kind: 'rule' });
 
   lines.push({ kind: 'text', text: `ITEM${' '.repeat(COLS_SMALL - 10)}STATUS`, align: 'left', small: true, faint: true });
-  receipt.items.forEach((item, index) => {
-    if (index > 0) feed(receipt.compact ? 4 : 12);
-    if (item.logo && !receipt.compact) lines.push({ kind: 'logo', src: item.logo, align: 'left' });
-    lead(lines, item.name, item.status, { bold: true });
-    if (!receipt.compact && (item.description || item.date)) {
-      const detail = [item.description, item.date].filter(Boolean).join('  ');
-      text(lines, detail, 'left', { small: true });
+  const groups =
+    receipt.items.length >= 8 && receipt.items.some((item) => item.significance != null)
+      ? groupBySignificance(receipt.items)
+      : [{ key: 'all', label: '', items: receipt.items }];
+  let printed = 0;
+  groups.forEach((group) => {
+    if (group.label) {
+      if (printed) feed(10);
+      text(lines, group.label, 'left', { small: true, faint: true });
+      feed(4);
     }
+    group.items.forEach((item) => {
+      if (printed > 0 && !group.label) feed(receipt.compact ? 4 : 12);
+      else if (printed > 0 && group.label) feed(receipt.compact ? 4 : 10);
+      if (item.logo && !receipt.compact) lines.push({ kind: 'logo', src: item.logo, align: 'left' });
+      const mark = typeof item.confidence === 'number' && item.confidence < 0.85 ? ' ~' : '';
+      lead(lines, item.name, `${item.status}${mark}`, { bold: true });
+      if (!receipt.compact && (item.description || item.date || item.via)) {
+        const detail = [item.via, item.description, item.date].filter(Boolean).join('  ');
+        text(lines, detail, 'left', { small: true });
+      }
+      printed += 1;
+    });
   });
   lines.push({ kind: 'rule', heavy: true });
   const shipped = typeof receipt.shipScore === 'number' ? `ITEMS SHIPPED · SCORE ${receipt.shipScore}` : 'ITEMS SHIPPED';

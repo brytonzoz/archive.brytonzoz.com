@@ -10,6 +10,8 @@
 //   PRODUCTHUNT_SECRET    client_credentials grant, cached until it expires (PRODUCTHUNT_TOKEN also works)
 //   TINYFISH_API_KEY      TinyFish Search + Fetch (free endpoints only)
 //   BRANDFETCH_API        Brandfetch Brand API: a brand's real icon before the site's own icon or favicon
+//   XAI_API_KEY           xAI Responses (X search + web) for launch posts. Absent → skip
+//   OPENAI_API_KEY        OpenAI Decisions only (POST /v1/decisions, gpt-6-luna). Never any other OpenAI endpoint
 import type { Candidate, ItemSource, ItemStatus, Subject } from '../lib/shipped-year';
 import { isDomain, isGithubLogin, isXHandle } from '../lib/shipped-year';
 import { hasBlockedWord } from '../lib/shipped-sponsors';
@@ -56,6 +58,12 @@ export interface SourceEnv {
   PRODUCTHUNT_SECRET?: string;
   TINYFISH_API_KEY?: string;
   BRANDFETCH_API?: string;
+  XAI_API_KEY?: string;
+  XAI_API_BASE?: string;
+  SHIPPED_XAI_MODEL?: string;
+  SHIPPED_XAI_MAX_POSTS?: string;
+  OPENAI_API_KEY?: string;
+  OPENAI_API_BASE?: string;
 }
 
 export type DateConfidence = 'exact' | 'year' | 'inferred' | 'unknown';
@@ -77,6 +85,14 @@ export type Found = {
   thisYear?: boolean;
   /** Proven public numbers for this line (stars, downloads, votes…), each with a source URL. */
   metrics?: import('./shipped-research').SourcedStat[];
+  /** Company/product attribution printed on the tape. */
+  via?: string | null;
+  /** is_real_ship × in_2026 from Decisions (or the heuristic fallback). */
+  confidence?: number;
+  isRealShip?: number;
+  inYear?: number;
+  significance?: number;
+  attribution?: import('./shipped-affiliation').Attribution;
 };
 
 export type WebResult = { title: string; url: string; snippet: string; date: string | null };
@@ -94,6 +110,7 @@ export type Profile = {
   sites?: string[];
   phUsers?: string[];
   npmUsers?: string[];
+  affiliation?: import('./shipped-affiliation').Affiliation;
 };
 
 export const emptyProfile = (): Profile => ({
@@ -125,6 +142,7 @@ export type Gathered = {
   stats?: import('./shipped-research').SourcedStat[];
   gaps?: string[];
   coverageCapped?: boolean;
+  costs?: { xaiMicros: number; decisionsMicros: number };
 };
 
 export type SourceContext = {
@@ -228,7 +246,7 @@ export const tinyfishAccess = (env: SourceEnv, meter: TinyfishMeter | null): Tin
 const memo = new Map<string, { until: number; value: unknown }>();
 
 /** This isolate's memory, then the data center's cache. Failures aren't cached; a definite "no" (null) is. */
-async function cached<T>(key: string, ttl: number, load: () => Promise<T>): Promise<T> {
+export async function cached<T>(key: string, ttl: number, load: () => Promise<T>): Promise<T> {
   const hit = memo.get(key);
   if (hit && hit.until > Date.now()) return hit.value as T;
   const url = `https://shipped-cache.brytonzoz.com/v1/${encodeURIComponent(key)}`;
@@ -392,7 +410,7 @@ function reposFromSearchHtml(html: string, login: string): string[] {
   };
   const owner = login.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
   for (const match of html.matchAll(new RegExp(`(?:github\\.com|href=")/${owner}/([A-Za-z0-9._-]+)`, 'gi'))) add(match[1]);
-  return names.slice(0, 20);
+  return names.slice(0, 80);
 }
 
 /** Repos created this year: github.com search HTML (no API quota), then TinyFish if the page is empty. */
@@ -409,7 +427,7 @@ async function searchCreated(login: string, year: number, tinyfish: TinyfishAcce
   if (!tinyfish) return [];
   const page = await tinyfishPage(`${GH}${path}`, tinyfish);
   const fromText = [...page.text.matchAll(/github\.com\/[^/\s)]+\/[^/\s)?#]+/gi)].map((m) => `https://${m[0]}`);
-  return reposLinked(login, [...page.links, ...fromText]).slice(0, 20);
+  return reposLinked(login, [...page.links, ...fromText]).slice(0, 80);
 }
 
 type FeedEvent = { kind: 'created' | 'released'; repo: string; tag: string | null; date: string | null; link: string | null };
@@ -716,7 +734,7 @@ const npm: SourceProvider = {
     const recent = objects
       .filter((entry) => inYear(day(entry.package.date), year))
       .sort((a, b) => (b.score?.final ?? 0) - (a.score?.final ?? 0))
-      .slice(0, 20);
+      .slice(0, 80);
     const downloads = await Promise.all(
       recent.map(({ package: pkg }) =>
         getJson<{ downloads?: number }>(`https://api.npmjs.org/downloads/point/last-week/${encodeURIComponent(String(pkg.name))}`).catch(() => null),
@@ -1537,14 +1555,14 @@ function dedupeFound(found: Found[]): Found[] {
       seen.add(key);
       return true;
     })
-    .slice(0, 30);
+    .slice(0, 200);
 }
 
 /** Everything the free sources and TinyFish know, de-duplicated, best first. Cached 24h per identity. */
 export async function gather(subject: Subject, env: SourceEnv, year: number, meter: TinyfishMeter | null = null): Promise<Gathered> {
   const tinyfish = tinyfishAccess(env, meter);
   const resolved = await resolveIdentity(subject, env, tinyfish);
-  return cached(`gather:v5:${year}:${resolved.cacheKey}`, 1440 * MIN, () => gatherFresh(subject, resolved.profile, env, year, meter, tinyfish, resolved.notes));
+  return cached(`gather:v7:${year}:${resolved.cacheKey}`, 1440 * MIN, () => gatherFresh(subject, resolved.profile, env, year, meter, tinyfish, resolved.notes));
 }
 
 async function gatherFresh(
@@ -1705,5 +1723,76 @@ async function gatherFresh(
     draft = { ...draft, found: deduped, stats };
   }
 
-  return { ...draft, found: deduped, stats, gaps: detectGaps({ ...draft, found: deduped, stats }), coverageCapped: false };
+  // Person → role → company, then company harvest + person X, then Decisions ranks every line.
+  // Dynamic import keeps company/xai/decisions from cycling back into this module.
+  const { parseAffiliationQuery, affiliationFromBio, mergeAffiliation, viaLabel, defaultAttribution, companySlug } = await import('./shipped-affiliation');
+  const typed = parseAffiliationQuery(subject.display || subject.id);
+  const affiliation = mergeAffiliation(typed, affiliationFromBio(profile.bio || '', typed));
+  if (!affiliation.name) affiliation.name = who;
+  if (!affiliation.companyX && affiliation.company) {
+    const slug = companySlug(affiliation.company);
+    if (slug && slug.length <= 15) affiliation.companyX = slug;
+  }
+  if (!affiliation.companyGithub && affiliation.company) affiliation.companyGithub = companySlug(affiliation.company);
+  profile.affiliation = affiliation;
+
+  let xaiMicros = 0;
+  let decisionsMicros = 0;
+  try {
+    const { harvestCompany } = await import('./shipped-company');
+    const company = await harvestCompany({ affiliation, year, env });
+    if (company.found.length) found.push(...company.found);
+    ran.push(...company.ran);
+    xaiMicros += company.spend.costMicros;
+  } catch {
+    failed.push('company-harvest');
+  }
+
+  try {
+    const { searchXShips, xaiEnabled } = await import('./shipped-xai');
+    if (xaiEnabled(env) && profile.x) {
+      const personX = await searchXShips({
+        env,
+        year,
+        handles: [profile.x],
+        who,
+        company: affiliation.company,
+        kind: 'person',
+        maxPosts: 4,
+      });
+      found.push(...personX.found);
+      xaiMicros += personX.spend.costMicros;
+      if (personX.found.length || personX.spend.costMicros) ran.push('xai-person');
+    }
+  } catch {
+    failed.push('xai-person');
+  }
+
+  deduped = dedupeFound(found).map((item) => ({ ...item, description: describeWithStat(item) }));
+  const via = viaLabel(affiliation, defaultAttribution(affiliation.role));
+  try {
+    const { verifyCandidates, dedupeSameShips, sortBySignificance } = await import('./shipped-decisions');
+    const verified = await verifyCandidates({ env, items: deduped, year, who, affiliation, via });
+    decisionsMicros += verified.spend.costMicros;
+    ran.push(verified.usedDecisions ? 'decisions' : 'decisions:heuristic');
+    const same = await dedupeSameShips({ env, items: verified.items });
+    decisionsMicros += same.spend.costMicros;
+    deduped = sortBySignificance(same.items);
+  } catch {
+    failed.push('decisions');
+    ran.push('decisions:heuristic');
+  }
+
+  stats = mergeStats([pageStats, deduped.flatMap((item) => item.metrics ?? [])]);
+  return {
+    ...draft,
+    found: deduped,
+    profile,
+    stats,
+    gaps: detectGaps({ ...draft, found: deduped, stats, profile }),
+    coverageCapped: false,
+    costs: { xaiMicros, decisionsMicros },
+    ran,
+    failed,
+  };
 }

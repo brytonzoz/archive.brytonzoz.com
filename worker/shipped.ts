@@ -31,7 +31,7 @@
 // Every guardrail (rate limits, locks, the budget, kill switches, the human check, headers) lives in
 // worker/shipped-guard.ts; the threat list is docs/shipped-security.md.
 // Tables are created (and new columns added) on first use; see SCHEMA below.
-import { DEFAULT_MODEL, PrintError, assembleReceipt, demoReceipt, maxSearches, promptFor, worstCaseMicros, type AiEnv, type DraftItem } from './shipped-ai';
+import { DEFAULT_MODEL, PrintError, assembleReceipt, costMicros, demoReceipt, maxSearches, promptFor, worstCaseMicros, type AiEnv, type DraftItem } from './shipped-ai';
 import { ICON_HASH, bytesDataUri, iconDataUri, iconKey, reencodeLogo, storeIcon } from './shipped-icons';
 import { houseMark } from './shipped-marks';
 import { yearCardPng, yearRolloPdf, yearRolloPng, yearTallPng, type LogoResolver } from './shipped-og';
@@ -179,9 +179,25 @@ export function withKeyAliases<T extends ShippedEnv>(env: T): T {
   const anthropic = pick('claude_key', 'CLAUDE_KEY', 'ANTHROPIC_API_KEY');
   const tinyfish = pick('tinyfish', 'TINYFISH', 'TINYFISH_API_KEY');
   const workspace = pick('claude_workspace', 'CLAUDE_WORKSPACE', 'claude_workspace_id', 'ANTHROPIC_WORKSPACE_ID', 'ANTHROPIC_WORKSPACE_DEFAULT');
-  if (anthropic === env.ANTHROPIC_API_KEY && tinyfish === env.TINYFISH_API_KEY && workspace === env.ANTHROPIC_WORKSPACE_ID) return env;
+  const xai = pick('XAI_API_KEY', 'xai_api_key');
+  const openai = pick('OPENAI_API_KEY', 'openai_api_key');
+  if (
+    anthropic === env.ANTHROPIC_API_KEY &&
+    tinyfish === env.TINYFISH_API_KEY &&
+    workspace === env.ANTHROPIC_WORKSPACE_ID &&
+    xai === env.XAI_API_KEY &&
+    openai === env.OPENAI_API_KEY
+  ) {
+    return env;
+  }
   // A prototype link keeps every binding (DB, R2, ASSETS) reachable without copying them.
-  return Object.assign(Object.create(env) as T, { ANTHROPIC_API_KEY: anthropic, TINYFISH_API_KEY: tinyfish, ANTHROPIC_WORKSPACE_ID: workspace });
+  return Object.assign(Object.create(env) as T, {
+    ANTHROPIC_API_KEY: anthropic,
+    TINYFISH_API_KEY: tinyfish,
+    ANTHROPIC_WORKSPACE_ID: workspace,
+    XAI_API_KEY: xai,
+    OPENAI_API_KEY: openai,
+  });
 }
 
 /** Where Shipped's Stripe return URLs point: this request's origin when it's already on the Shipped host. */
@@ -294,6 +310,8 @@ function sourceNames(env: ShippedEnv): string[] {
   const names = ['github', 'appstore', 'hn', 'npm'];
   if (env.PRODUCTHUNT_TOKEN || (env.PRODUCTHUNT_KEY && env.PRODUCTHUNT_SECRET)) names.push('producthunt');
   if (env.TINYFISH_API_KEY) names.push('tinyfish');
+  if (env.XAI_API_KEY) names.push('xai');
+  if (env.OPENAI_API_KEY) names.push('decisions');
   return names;
 }
 
@@ -445,7 +463,20 @@ async function withLogos(items: DraftItem[], env: ShippedEnv): Promise<YearItem[
         : [null, null];
       const source = item.icon ?? brand ?? page?.icon ?? (own ? faviconUrl(item.link!) : null);
       const logo = source ? await Promise.race([storeIcon(source, env.SHIPPED).catch(() => null), late]) : null;
-      return { name: item.name, description: item.description, date: item.date, status: item.status, link: item.link, logo, source: item.source };
+      return {
+        name: item.name,
+        description: item.description,
+        date: item.date,
+        status: item.status,
+        link: item.link,
+        logo,
+        source: item.source,
+        via: item.via ?? null,
+        confidence: item.confidence,
+        isRealShip: item.isRealShip,
+        inYear: item.inYear,
+        significance: item.significance,
+      };
     }),
   );
 }
@@ -551,7 +582,10 @@ async function generate(
     } else {
       // The worst this print could cost is held against today's budget first, so a burst can't overspend it.
       model = env.SHIPPED_MODEL || DEFAULT_MODEL;
-      const worst = worstCaseMicros(model, promptFor(subject, gathered, year).length, maxSearches(env));
+      const harvestedEnough = gathered.found.length >= 3 || gathered.ran.some((tag) => tag.includes('xai'));
+      const worst = harvestedEnough
+        ? costMicros(model, 4_000, 256, 0)
+        : worstCaseMicros(model, promptFor(subject, gathered, year).length, maxSearches(env));
       const cap = await cycleBudgetCap(db, env);
       if (cap === null) return json({ error: 'out-of-paper' }, 503);
       if (!(await reserveBudget(db, cap, worst, budgetKey()))) return json({ error: 'out-of-paper' }, 503);
@@ -618,7 +652,24 @@ async function generate(
     if (!replaces) {
       await bump(db, 'printed');
     }
-    console.log(JSON.stringify({ shipped: 'print', id: inserted.id, kind: subject.kind, items: receipt.items.length, potential: receipt.potential, ran: gathered.ran, failed: gathered.failed, costMicros: usage.cost, costUsd: Number((usage.cost / 1_000_000).toFixed(4)), searches: usage.searches }));
+    console.log(
+      JSON.stringify({
+        shipped: 'print',
+        id: inserted.id,
+        kind: subject.kind,
+        items: receipt.items.length,
+        potential: receipt.potential,
+        ran: gathered.ran,
+        failed: gathered.failed,
+        costMicros: usage.cost,
+        costUsd: Number((usage.cost / 1_000_000).toFixed(4)),
+        searches: usage.searches,
+        xaiMicros: gathered.costs?.xaiMicros ?? 0,
+        xaiUsd: Number(((gathered.costs?.xaiMicros ?? 0) / 1_000_000).toFixed(4)),
+        decisionsMicros: gathered.costs?.decisionsMicros ?? 0,
+        decisionsUsd: Number(((gathered.costs?.decisionsMicros ?? 0) / 1_000_000).toFixed(6)),
+      }),
+    );
     return json({ id: inserted.id, pile: await pileToken(env, inserted.id) });
   } catch (error) {
     if (error instanceof PrintError) return json({ error: error.code, ...(error.detail && !isProduction(env) ? { detail: error.detail } : {}) }, error.status);

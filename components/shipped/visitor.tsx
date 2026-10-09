@@ -70,6 +70,9 @@ export function VisitorReceipt({ receipt, sponsors }: Loaded) {
         description: item.description,
         href: item.link,
         logo: item.logo ? { src: item.logo, width: 24, height: 24 } : null,
+        via: item.via ?? null,
+        confidence: item.confidence,
+        significance: item.significance,
       }))}
       count={itemsShipped(receipt)}
       note={receipt.note}

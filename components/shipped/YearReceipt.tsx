@@ -7,7 +7,7 @@ import React, { useEffect, useState } from 'react';
 import Link from 'next/link';
 import { qr } from '../../lib/shipped-qr';
 import { HERO_SLOT } from '../../lib/shipped-sponsors';
-import { QR_PATH, type SponsorBlock, type SponsorSlot } from '../../lib/shipped-year';
+import { QR_PATH, groupItemsBySignificance, type SponsorBlock, type SponsorSlot } from '../../lib/shipped-year';
 import { Barcode, Line, Rule, Tall, ExternalLink } from './paper';
 
 export type ViewItem = {
@@ -21,6 +21,9 @@ export type ViewItem = {
   /** Same-origin page: next/link keeps the music playing. */
   internal?: boolean;
   logo: { src: string; width: number; height: number } | null;
+  via?: string | null;
+  confidence?: number;
+  significance?: number;
 };
 
 export type YearReceiptProps = {
@@ -117,7 +120,42 @@ export function SponsorBlockView({ block }: { block: SponsorBlock | null }) {
   );
 }
 
+function ItemRow({ item, compact }: { item: ViewItem; compact?: boolean }) {
+  const low = typeof item.confidence === 'number' && item.confidence < 0.85;
+  return (
+    <li className="shipped-year-item">
+      {item.logo ? (
+        // eslint-disable-next-line @next/next/no-img-element
+        <img src={item.logo.src} width={item.logo.width} height={item.logo.height} alt="" loading="lazy" decoding="async" className="shipped-item-logo shipped-logo mb-1" />
+      ) : null}
+      <div className="shipped-lead">
+        <h3 className="min-w-0 break-words text-[13.5px] font-semibold leading-snug">
+          <ItemName item={item} />
+        </h3>
+        <span className="shipped-lead-fill" aria-hidden="true" />
+        <p className="shrink-0 text-[12px] font-semibold">
+          <span className="sr-only">Status: </span>
+          {item.status}
+          {low ? (
+            <span className="ml-1 font-normal opacity-40" title={`confidence ${(item.confidence! * 100).toFixed(0)}%`}>
+              ~
+            </span>
+          ) : null}
+        </p>
+      </div>
+      {!compact && (item.date || item.description || item.via) ? (
+        <p className="mt-0.5 text-[11.5px] leading-[1.45] opacity-80">
+          {item.via ? <span className="mr-1.5 opacity-60">{item.via}</span> : null}
+          {item.description}
+          {item.date ? <span className="whitespace-nowrap opacity-75">{item.description || item.via ? '  ' : ''}{item.date}</span> : null}
+        </p>
+      ) : null}
+    </li>
+  );
+}
+
 function ItemList({ props }: { props: YearReceiptProps }) {
+  const groups = props.items.length >= 8 && props.items.some((item) => item.significance != null) ? groupItemsBySignificance(props.items) : [{ key: 'all', label: '', items: props.items }];
   return (
     <>
       <Rule />
@@ -127,29 +165,13 @@ function ItemList({ props }: { props: YearReceiptProps }) {
         <span>STATUS</span>
       </p>
       <ol className="mt-1">
-        {props.items.map((item) => (
-          <li key={item.key} className="shipped-year-item">
-            {item.logo ? (
-              // eslint-disable-next-line @next/next/no-img-element
-              <img src={item.logo.src} width={item.logo.width} height={item.logo.height} alt="" loading="lazy" decoding="async" className="shipped-item-logo shipped-logo mb-1" />
-            ) : null}
-            <div className="shipped-lead">
-              <h3 className="min-w-0 break-words text-[13.5px] font-semibold leading-snug">
-                <ItemName item={item} />
-              </h3>
-              <span className="shipped-lead-fill" aria-hidden="true" />
-              <p className="shrink-0 text-[12px] font-semibold">
-                <span className="sr-only">Status: </span>
-                {item.status}
-              </p>
-            </div>
-            {!props.compact && (item.date || item.description) ? (
-              <p className="mt-0.5 text-[11.5px] leading-[1.45] opacity-80">
-                {item.description}
-                {item.date ? <span className="whitespace-nowrap opacity-75">{item.description ? '  ' : ''}{item.date}</span> : null}
-              </p>
-            ) : null}
-          </li>
+        {groups.map((group) => (
+          <React.Fragment key={group.key}>
+            {group.label ? <li className="mt-3 mb-1 list-none text-[10px] tracking-[0.14em] opacity-45">{group.label}</li> : null}
+            {group.items.map((item) => (
+              <ItemRow key={item.key} item={item} compact={props.compact} />
+            ))}
+          </React.Fragment>
         ))}
       </ol>
       <Rule heavy />

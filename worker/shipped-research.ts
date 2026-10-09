@@ -140,7 +140,7 @@ export function itemsFromProjectList(opts: { text: string; url: string; year: nu
       if (bullet) add(bullet[1], null, `Under the ${year} heading`);
     }
   }
-  return found.slice(0, 20);
+  return found.slice(0, 80);
 }
 
 // Only monthly/MRR figures — a bare "$70" next to an "M" is not $70 million.

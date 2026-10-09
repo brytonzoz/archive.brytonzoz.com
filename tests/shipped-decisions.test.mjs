@@ -1,0 +1,139 @@
+import './resolve-ts.mjs';
+import assert from 'node:assert/strict';
+import { test } from 'node:test';
+
+const affiliation = await import('../worker/shipped-affiliation.ts');
+const decisions = await import('../worker/shipped-decisions.ts');
+const xai = await import('../worker/shipped-xai.ts');
+const year = await import('../lib/shipped-year.ts');
+const ai = await import('../worker/shipped-ai.ts');
+
+const found = (over = {}) => ({
+  name: 'Codex',
+  description: 'Agent that writes code',
+  date: '2026-04-12',
+  link: 'https://openai.com/codex',
+  icon: null,
+  source: 'x',
+  status: 'LAUNCHED',
+  score: 8,
+  thisYear: true,
+  ...over,
+});
+
+test('typed queries become person → role → company', () => {
+  assert.deepEqual(affiliation.parseAffiliationQuery('CEO of Higgsfield'), {
+    ...affiliation.emptyAffiliation(),
+    role: 'ceo',
+    company: 'Higgsfield',
+  });
+  assert.equal(affiliation.parseAffiliationQuery('Higgsfield CEO').role, 'ceo');
+  assert.equal(affiliation.parseAffiliationQuery('Higgsfield CEO').company, 'Higgsfield');
+  const tibo = affiliation.parseAffiliationQuery('Tibo from OpenAI');
+  assert.equal(tibo.name, 'Tibo');
+  assert.equal(tibo.company, 'OpenAI');
+  const lead = affiliation.parseAffiliationQuery('Codex lead at OpenAI');
+  assert.equal(lead.role, 'lead');
+  assert.equal(lead.product, 'Codex');
+  assert.equal(lead.company, 'OpenAI');
+  assert.equal(affiliation.companyScope('ceo'), 'all');
+  assert.equal(affiliation.companyScope('lead'), 'product');
+  assert.equal(affiliation.companyScope('unknown'), 'all');
+  assert.equal(affiliation.companyScope('employee'), 'none');
+  assert.equal(affiliation.viaLabel({ ...affiliation.emptyAffiliation(), company: 'OpenAI', product: 'Codex', role: 'lead' }, 'company-led-by-person'), 'via OpenAI · Codex');
+});
+
+test('bio lines upgrade a typed "from Company" into a lead or CEO', () => {
+  const typed = affiliation.parseAffiliationQuery('Tibo from OpenAI');
+  const bio = affiliation.affiliationFromBio('Codex lead at OpenAI. Shipping agents.', typed);
+  assert.equal(bio.role, 'lead');
+  assert.equal(bio.product, 'Codex');
+  assert.equal(bio.company, 'OpenAI');
+  const ceo = affiliation.affiliationFromBio('CEO @higgsfield', affiliation.emptyAffiliation());
+  assert.equal(ceo.role, 'ceo');
+  assert.equal(ceo.company, 'higgsfield');
+});
+
+test('heuristic keep/drop matches the Decisions product threshold', () => {
+  const person = affiliation.emptyAffiliation();
+  const keep = decisions.heuristicMark(found(), 2026, person);
+  assert.ok(decisions.shouldKeep(keep), JSON.stringify(keep));
+  assert.ok(keep.isRealShip * keep.inYear >= decisions.KEEP_PRODUCT);
+  const tease = decisions.heuristicMark(found({ name: 'Coming soon', description: 'we are hiring', date: null, thisYear: false, link: null }), 2026, person);
+  assert.equal(decisions.shouldKeep(tease), false);
+  const old = decisions.heuristicMark(found({ date: '2025-11-01', thisYear: false }), 2026, person);
+  assert.equal(decisions.shouldKeep(old), false);
+});
+
+test('Decisions and xAI skip when the key is missing', async () => {
+  assert.equal(decisions.decisionsEnabled({}), false);
+  assert.equal(xai.xaiEnabled({}), false);
+  const verified = await decisions.verifyCandidates({
+    env: {},
+    items: [found(), found({ name: 'Hiring thread', description: 'we are hiring', date: null, thisYear: false, link: null, score: 1 })],
+    year: 2026,
+    who: 'Tibo',
+    affiliation: affiliation.parseAffiliationQuery('Tibo from OpenAI'),
+    via: 'via OpenAI',
+  });
+  assert.equal(verified.usedDecisions, false);
+  assert.equal(verified.spend.costMicros, 0);
+  assert.ok(verified.items.some((item) => item.name === 'Codex'));
+  assert.equal(verified.items.some((item) => /hiring/i.test(item.name)), false);
+  const x = await xai.searchXShips({ env: {}, year: 2026, handles: ['sama'], who: 'sama', kind: 'person' });
+  assert.deepEqual(x.found, []);
+  assert.equal(x.spend.costMicros, 0);
+});
+
+test('same_ship pairs share keywords; weaker duplicate is dropped', async () => {
+  assert.equal(decisions.shareKeywords(found(), found({ name: 'OpenAI Codex', link: 'https://github.com/openai/codex' })), true);
+  assert.equal(decisions.shareKeywords(found(), found({ name: 'Sora', link: 'https://openai.com/sora' })), false);
+  const same = await decisions.dedupeSameShips({
+    env: {},
+    items: [
+      decisions.applyMark(found({ score: 9, significance: 3 }), decisions.heuristicMark(found(), 2026, affiliation.emptyAffiliation()), null),
+      decisions.applyMark(found({ name: 'codex', score: 2, significance: 1, link: 'https://github.com/openai/codex' }), decisions.heuristicMark(found({ name: 'codex' }), 2026, affiliation.emptyAffiliation()), null),
+    ],
+  });
+  assert.equal(same.items.length, 1);
+  assert.equal(same.items[0].name, 'Codex');
+});
+
+test('long tapes group by significance and month', () => {
+  const items = [
+    { name: 'A', date: '2026-01-02', significance: 4 },
+    { name: 'B', date: '2026-03-01', significance: 2 },
+    { name: 'C', date: null, significance: 2 },
+    { name: 'D', date: '2026-01-20', significance: 0 },
+  ];
+  const bySig = year.groupItemsBySignificance(items);
+  assert.equal(bySig[0].label, 'LANDMARK');
+  assert.equal(bySig[0].items[0].name, 'A');
+  assert.ok(bySig.some((g) => g.label === 'NOTABLE LAUNCH' && g.items.length === 2));
+  const byMonth = year.groupItemsByMonth(items);
+  assert.equal(byMonth[0].label, 'JANUARY 2026');
+  assert.equal(byMonth.at(-1).label, 'UNDATED');
+});
+
+test('harvest prints up to 200 verified lines without asking Claude to list them', () => {
+  assert.equal(ai.MAX_ITEMS, 200);
+  const many = Array.from({ length: 40 }, (_, i) =>
+    found({ name: `Ship ${i}`, link: `https://example.com/p${i}`, date: `2026-0${(i % 9) + 1}-01`, significance: i % 5 }),
+  );
+  const gathered = {
+    found: many,
+    web: [],
+    pages: [],
+    site: null,
+    profile: { name: 'Ada', bio: '', site: null, x: null, github: 'ada' },
+    ran: ['decisions:heuristic'],
+    failed: [],
+    stats: [],
+  };
+  const items = ai.harvestItems(gathered, 2026);
+  assert.equal(items.length, 40);
+  assert.ok(items[0].link.startsWith('https://example.com/'));
+  const demo = ai.demoReceipt(gathered, 2026, 1);
+  assert.equal(demo.items.length, 40);
+  assert.equal(demo.potential, false);
+});

@@ -17,7 +17,7 @@ export const SITE_YEAR = shippedYear(process.env.NEXT_PUBLIC_SHIPPED_YEAR);
 export type ItemStatus = 'LIVE' | 'SHIPPED' | 'LAUNCHED' | 'RELEASED' | 'BETA' | 'ACTIVE' | 'PROTOTYPE' | 'IN PROGRESS' | 'HIATUS' | 'DECEASED' | 'PRE-ORDER';
 export const ITEM_STATUSES: ItemStatus[] = ['LIVE', 'SHIPPED', 'LAUNCHED', 'RELEASED', 'BETA', 'ACTIVE', 'PROTOTYPE', 'IN PROGRESS', 'HIATUS', 'DECEASED', 'PRE-ORDER'];
 
-export type ItemSource = 'github' | 'appstore' | 'hn' | 'npm' | 'producthunt' | 'site' | 'web' | 'bryton' | 'none';
+export type ItemSource = 'github' | 'appstore' | 'hn' | 'npm' | 'producthunt' | 'site' | 'web' | 'x' | 'changelog' | 'company' | 'bryton' | 'none';
 
 export type YearItem = {
   name: string;
@@ -31,6 +31,14 @@ export type YearItem = {
   /** Same-origin URL of a 1-bit logo, or null. */
   logo: string | null;
   source: ItemSource;
+  /** "via OpenAI · Codex" when the line is a company/product ship. */
+  via?: string | null;
+  /** is_real_ship × in_2026 (Decisions API, or a heuristic fallback). */
+  confidence?: number;
+  isRealShip?: number;
+  inYear?: number;
+  /** Probability-weighted significance 0–4 (minor … landmark). */
+  significance?: number;
 };
 
 export type SubjectKind = 'github' | 'x' | 'domain' | 'name';
@@ -127,6 +135,42 @@ export function itemDate(date: string | null): string | null {
 }
 
 export const itemsShipped = (receipt: Pick<YearReceipt, 'items' | 'potential'>) => (receipt.potential ? 1 : receipt.items.length);
+
+const MONTHS_LONG = ['JANUARY', 'FEBRUARY', 'MARCH', 'APRIL', 'MAY', 'JUNE', 'JULY', 'AUGUST', 'SEPTEMBER', 'OCTOBER', 'NOVEMBER', 'DECEMBER'];
+
+export const SIGNIFICANCE_LABELS = ['MINOR FIX', 'FEATURE', 'NOTABLE LAUNCH', 'MAJOR PRODUCT', 'LANDMARK'] as const;
+
+/** Group a long tape by Decisions significance (landmark first). */
+export function groupItemsBySignificance<T extends { significance?: number }>(items: T[]): { key: string; label: string; items: T[] }[] {
+  const buckets = new Map<number, T[]>();
+  for (const item of items) {
+    const band = Math.max(0, Math.min(4, Math.round(item.significance ?? 0)));
+    const list = buckets.get(band) ?? [];
+    list.push(item);
+    buckets.set(band, list);
+  }
+  return [...buckets.keys()]
+    .sort((a, b) => b - a)
+    .map((band) => ({ key: String(band), label: SIGNIFICANCE_LABELS[band], items: buckets.get(band) ?? [] }));
+}
+
+/** Group a long tape by month (undated last). */
+export function groupItemsByMonth<T extends { date: string | null }>(items: T[]): { key: string; label: string; items: T[] }[] {
+  const buckets = new Map<string, T[]>();
+  for (const item of items) {
+    const match = item.date?.match(/^(\d{4})-(\d{2})/);
+    const key = match ? `${match[1]}-${match[2]}` : 'undated';
+    const list = buckets.get(key) ?? [];
+    list.push(item);
+    buckets.set(key, list);
+  }
+  const keys = [...buckets.keys()].sort((a, b) => (a === 'undated' ? 1 : b === 'undated' ? -1 : a.localeCompare(b)));
+  return keys.map((key) => {
+    if (key === 'undated') return { key, label: 'UNDATED', items: buckets.get(key) ?? [] };
+    const month = MONTHS_LONG[Number(key.slice(5, 7)) - 1] ?? key;
+    return { key, label: `${month} ${key.slice(0, 4)}`, items: buckets.get(key) ?? [] };
+  });
+}
 
 /** The name a receipt is made out to: the real name when a source gave one, else the @handle. */
 export function subjectLabel(subject: Subject): string {

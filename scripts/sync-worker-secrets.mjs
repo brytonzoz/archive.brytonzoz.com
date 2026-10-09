@@ -25,6 +25,8 @@ const secrets = {
   PRODUCTHUNT_SECRET: pick('PRODUCTHUNT_SECRET'),
   PRODUCTHUNT_TOKEN: pick('PRODUCTHUNT_TOKEN'),
   BRANDFETCH_API: pick('BRANDFETCH_API', 'BRANDFETCH_KEY'),
+  XAI_API_KEY: pick('XAI_API_KEY'),
+  OPENAI_API_KEY: pick('OPENAI_API_KEY'),
   STRIPE_SHIPPED_WEBHOOK_SECRET:
     target === 'staging' ? pick('STRIPE_TEST_SHIPPED_WEBHOOK_SECRET', 'STRIPE_SHIPPED_WEBHOOK_SECRET') : pick('STRIPE_SHIPPED_WEBHOOK_SECRET'),
   TURNSTILE_SITE_KEY: pick('TURNSTILE_SITE_KEY'),
@@ -40,6 +42,8 @@ const WHY_SKIPPED = {
   PRODUCTHUNT_SECRET: 'receipts skip Product Hunt',
   PRODUCTHUNT_TOKEN: 'Product Hunt uses PRODUCTHUNT_KEY + PRODUCTHUNT_SECRET',
   BRANDFETCH_API: "logos come from each site's own icon or favicon",
+  XAI_API_KEY: 'receipts skip X search',
+  OPENAI_API_KEY: 'receipts skip Decisions verification and rank with heuristics',
   STRIPE_SHIPPED_WEBHOOK_SECRET: "payments are confirmed on return; refunds made in Stripe's dashboard aren't seen",
   TURNSTILE_SITE_KEY: target === 'staging' ? 'staging uses the Turnstile test keys' : 'printing relies on rate limits and the spend cap',
   TURNSTILE_SECRET_KEY: target === 'staging' ? 'staging uses the Turnstile test keys' : 'printing relies on rate limits and the spend cap',

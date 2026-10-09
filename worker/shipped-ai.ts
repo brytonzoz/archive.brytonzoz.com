@@ -1,8 +1,7 @@
-// "Shipped in <year>": Claude only assembles and writes the receipt from what the free sources and TinyFish
-// gathered (worker/shipped-sources.ts). Anthropic's paid web_search is a last resort: only when the free
-// sources found fewer than 2 items from the year, and at most SHIPPED_MAX_SEARCHES (2). It returns JSON. Everything it returns is cleaned and clamped here: items must be from the
-// year, links must have come from a source or a search result (never invented), and personal details
-// are filtered out. Without an API key (staging), demoReceipt prints the free sources as they are.
+// "Shipped in <year>": harvest (free sources, xAI X search, company changelogs) prints the lines.
+// OpenAI Decisions (gpt-6-luna, /v1/decisions only) verifies and ranks them. Claude writes the
+// cashier note; Anthropic web_search is a last resort when the tape is still thin and xAI did not run.
+// Without ANTHROPIC_API_KEY (staging), demoReceipt prints the harvested lines with a canned note.
 import type { ItemStatus, Subject } from '../lib/shipped-year';
 import { ITEM_STATUSES } from '../lib/shipped-year';
 import { hasBlockedWord } from '../lib/shipped-sponsors';
@@ -59,11 +58,25 @@ export function isCreditError(status: number, body: string): boolean {
 }
 
 /** A receipt line before its logo is fetched. */
-export type DraftItem = { name: string; description: string; date: string | null; status: ItemStatus; link: string | null; icon: string | null; source: Found['source'] };
+export type DraftItem = {
+  name: string;
+  description: string;
+  date: string | null;
+  status: ItemStatus;
+  link: string | null;
+  icon: string | null;
+  source: Found['source'];
+  via?: string | null;
+  confidence?: number;
+  isRealShip?: number;
+  inYear?: number;
+  significance?: number;
+};
 export type Draft = { items: DraftItem[]; note: string; stats: string[]; potential: boolean; layout: ModuleId[] };
 export type AiResult = Draft & { model: string; inputTokens: number; outputTokens: number; searches: number; costMicros: number };
 
-const MAX_ITEMS = 25;
+/** Long tapes: harvest prints the lines. Claude writes the note, it does not invent 200 JSON items. */
+export const MAX_ITEMS = 200;
 
 // Things a "shipped" receipt never prints, whatever a page or the model says.
 const PERSONAL =
@@ -147,6 +160,9 @@ const SOURCE_LABEL: Record<string, string> = {
   producthunt: 'Product Hunt',
   site: 'their site',
   web: 'the web',
+  x: 'X',
+  changelog: 'the changelog',
+  company: 'the company',
   bryton: 'the tape',
   none: '',
 };
@@ -159,7 +175,7 @@ export function formatStats(items: { source?: string }[], sourced: SourcedStat[]
   const counts = new Map<string, number>();
   for (const item of real) counts.set(item.source!, (counts.get(item.source!) ?? 0) + 1);
   const bits = [`${real.length} launch${real.length === 1 ? '' : 'es'}`];
-  for (const source of ['producthunt', 'appstore', 'hn', 'npm', 'github', 'site', 'web'] as const) {
+  for (const source of ['producthunt', 'appstore', 'hn', 'npm', 'github', 'site', 'web', 'x', 'changelog', 'company'] as const) {
     const n = counts.get(source) ?? 0;
     if (!n) continue;
     const label = SOURCE_LABEL[source];
@@ -230,12 +246,47 @@ export const potentialItem = (): DraftItem => ({
   source: 'none',
 });
 
+function toDraftItem(item: Found, year: number): DraftItem | null {
+  if (!ok(item.name) || !publicUrl(item.link)) return null;
+  if (yearDate(item.date, year) === false) return null;
+  return {
+    name: upper(item.name, 40),
+    description: ok(item.description) ? item.description : '',
+    date: (yearDate(item.date, year) as string | null) ?? item.date ?? null,
+    status: item.status,
+    link: item.link,
+    icon: item.icon,
+    source: item.source,
+    via: item.via ?? null,
+    confidence: item.confidence,
+    isRealShip: item.isRealShip,
+    inYear: item.inYear,
+    significance: item.significance,
+  };
+}
+
+/** Harvest already verified the lines. Date order, significance already on each item. */
+export function harvestItems(gathered: Gathered, year: number): DraftItem[] {
+  const seen = new Set<string>();
+  const items: DraftItem[] = [];
+  for (const item of gathered.found) {
+    const draft = toDraftItem(item, year);
+    if (!draft) continue;
+    const key = loose(draft.name);
+    if (!key || seen.has(key)) continue;
+    seen.add(key);
+    items.push(draft);
+    if (items.length === MAX_ITEMS) break;
+  }
+  return items;
+}
+
 function finish(items: DraftItem[], note: string, seed: number, modulesRaw?: unknown, statsRaw?: unknown): Draft {
   const layout = sanitizeLayout(modulesRaw, seed);
   if (!items.length) {
     return { items: [potentialItem()], note: POTENTIAL_NOTES[seed % POTENTIAL_NOTES.length], stats: [], potential: true, layout };
   }
-  const sorted = items.slice(0, MAX_ITEMS).sort(byDate);
+  const sorted = items.slice(0, MAX_ITEMS).sort((a, b) => (b.significance ?? 0) - (a.significance ?? 0) || byDate(a, b));
   const stats = Array.isArray(statsRaw)
     ? statsRaw
         .filter((line): line is string => typeof line === 'string' && !hasBlockedWord(line) && !/[<>{}`\\]/.test(line))
@@ -262,21 +313,25 @@ function printNote(note: string, stats: string[]): string {
   return clipSentence(text, 180);
 }
 
-/** Without the AI: the free sources' best finds from the year, in date order, and a canned note. */
+/** Without the AI: the harvested, verified lines as they are, and a canned note. */
 export function demoReceipt(gathered: Gathered, year: number, seed: number): Draft {
-  const items: DraftItem[] = gathered.found
-    .filter((item) => yearDate(item.date, year) !== false && ok(item.name) && publicUrl(item.link))
-    .slice(0, 20)
-    .map((item) => ({
-      name: upper(item.name, 40),
-      description: ok(item.description) ? item.description : '',
-      date: (yearDate(item.date, year) as string | null) ?? null,
-      status: item.status,
-      link: item.link,
-      icon: item.icon,
-      source: item.source,
-    }));
+  const items = harvestItems(gathered, year);
   return finish(items, groundedNote(items, seed, gathered.profile.name), seed, undefined, formatStats(items, gathered.stats ?? []));
+}
+
+function noteOnlyPrompt(subject: Subject, items: DraftItem[], stats: string[], year: number): string {
+  const tape = items.slice(0, 40).map((item) => ({ name: item.name, description: item.description, date: item.date, via: item.via ?? undefined }));
+  return `<found>\n${JSON.stringify({ who: clean(subject.display, 60), year, items: tape, stats })}\n</found>\nWrite the cashier note for the SHIPPED IN ${year} receipt. JSON only: {"note":""}`;
+}
+
+function noteOnlySystem(year: number) {
+  return [
+    `You write only the cashier note on a SHIPPED IN ${year} receipt. The items are already on the tape — do not list or invent any.`,
+    'Cashier "note": 80-140 characters, one or two COMPLETE sentences (never cut a word). Deadpan. MUST copy one product name from <found>.items and one exact number from <found>.stats. The joke is about what THAT product does, not about cashiers.',
+    'Banned phrases: night shift, publish button, the tape, the register, receipt paper, stock the shelves, "is first on the tape", "led the year", "closed the year", "set the tone", "through-line", "N launches ·", "Someone likes". Do not start by counting items. Never generic, never inspirational, never invented facts.',
+    'Banned words: delve, testament, journey, innovative, seamless, elevate, unlock, empower, leverage, cutting-edge, game-changer, robust, passion, incredible, amazing, "truly", loser, pathetic, scam, flop, cringe, exclamation marks, emoji, em dashes.',
+    'Finish with only a JSON object, no markdown: {"note":""}',
+  ].join('\n');
 }
 
 function systemPrompt(year: number, searches: number) {
@@ -409,6 +464,11 @@ function normalize(raw: unknown, gathered: Gathered, allowed: Allowed, year: num
       link: source,
       icon: match?.icon ?? null,
       source: match?.source ?? 'web',
+      via: match?.via ?? null,
+      confidence: match?.confidence,
+      isRealShip: match?.isRealShip,
+      inYear: match?.inYear,
+      significance: match?.significance,
     });
     seen.add(key);
     if (items.length === MAX_ITEMS) break;
@@ -478,6 +538,8 @@ function upstreamError(text: string): string {
 export async function assembleReceipt(subject: Subject, gathered: Gathered, year: number, seed: number, env: AiEnv, budgetMicros = Number.MAX_SAFE_INTEGER): Promise<AiResult> {
   const model = env.SHIPPED_MODEL || DEFAULT_MODEL;
   const searches = maxSearches(env);
+  const harvested = harvestItems(gathered, year);
+  const xaiRan = gathered.ran.some((tag) => tag.includes('xai'));
   const allowed = new Allowed();
   for (const item of gathered.found) allowed.add(item.link);
   for (const result of gathered.web) allowed.add(result.url);
@@ -489,8 +551,9 @@ export async function assembleReceipt(subject: Subject, gathered: Gathered, year
 
   for (const page of gathered.pages) allowed.add(page.url);
   const gaps = gathered.gaps ?? [];
-  const thin = inYearCount(gathered, year) < SEARCH_BELOW || gaps.length > 0;
-  const want = thin ? searches : 0;
+  const thin = harvested.length < SEARCH_BELOW && (inYearCount(gathered, year) < SEARCH_BELOW || gaps.length > 0);
+  // xAI already searched X + web. Don't pay Claude for another search on a long tape.
+  const want = thin && !xaiRan && harvested.length < 3 ? searches : 0;
   const searchCap = searchBudget({ remainingMicros: Math.min(budgetMicros, RECEIPT_BUDGET_MICROS), want, searchMicros: SEARCH_MICROS });
   if (want > searchCap) gathered.coverageCapped = true;
   const toolSets: unknown[][] = searchCap ? [[{ type: 'web_search_20250305', name: 'web_search', max_uses: searchCap }], []] : [[]];
@@ -531,6 +594,44 @@ export async function assembleReceipt(subject: Subject, gathered: Gathered, year
     workspace = found.id;
     return send(body);
   };
+
+  if (harvested.length && !want) {
+    const stats = formatStats(harvested, gathered.stats ?? []);
+    let note = groundedNote(harvested, seed, gathered.profile.name, stats);
+    try {
+      const request = {
+        model,
+        max_tokens: 256,
+        system: noteOnlySystem(year),
+        messages: [{ role: 'user', content: noteOnlyPrompt(subject, harvested, stats, year) }],
+        thinking: { type: 'disabled' },
+      };
+      let response = await call(request);
+      if (!response.ok) {
+        const text = await response.clone().text();
+        if (response.status === 400 && /thinking/i.test(text)) {
+          response = await call({ ...request, thinking: undefined });
+        }
+      }
+      if (response.ok) {
+        const message = (await response.json()) as Message;
+        const u = message.usage ?? {};
+        usage.input += (u.input_tokens ?? 0) + (u.cache_creation_input_tokens ?? 0) + (u.cache_read_input_tokens ?? 0);
+        usage.output += u.output_tokens ?? 0;
+        const parsed = parseJson(message.content ?? []);
+        const raw = parsed && typeof parsed === 'object' ? (parsed as { note?: unknown }).note : '';
+        if (typeof raw === 'string' && raw.trim()) note = clean(raw, 180).replace(/\s*[\u2014\u2013]\s*/g, '. ').replace(/!+/g, '.');
+      } else if (isCreditError(response.status, await response.text())) {
+        throw fail('out-of-credit');
+      }
+    } catch (error) {
+      if (error instanceof PrintError && error.code === 'out-of-credit') throw error;
+    }
+    const draft = finish(harvested, note, seed, undefined, stats);
+    const cost = spent();
+    console.log(JSON.stringify({ shipped: 'ai', model, mode: 'note-only', items: harvested.length, inputTokens: usage.input, outputTokens: usage.output, costMicros: cost }));
+    return { ...draft, model, inputTokens: usage.input, outputTokens: usage.output, searches: 0, costMicros: cost };
+  }
 
   let tools = toolSets[0];
   let messages: unknown[] = [user];

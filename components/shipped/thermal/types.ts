@@ -10,6 +10,9 @@ export type ThermalItem = {
   description: string;
   /** Same-origin URL of a 1-bit logo (already dithered), or null. */
   logo?: string | null;
+  via?: string | null;
+  confidence?: number;
+  significance?: number;
 };
 
 export type ThermalReceipt = {

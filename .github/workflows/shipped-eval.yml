@@ -14,6 +14,10 @@ on:
       - worker/shipped-sources.ts
       - worker/shipped-identity.ts
       - worker/shipped-research.ts
+      - worker/shipped-affiliation.ts
+      - worker/shipped-xai.ts
+      - worker/shipped-decisions.ts
+      - worker/shipped-company.ts
       - docs/shipped-ground-truth.json
       - docs/shipped-heldout-ground-truth.json
 
@@ -28,7 +32,7 @@ jobs:
   eval:
     name: Gather + Claude over 20 builders
     runs-on: ubuntu-latest
-    timeout-minutes: 30
+    timeout-minutes: 45
     steps:
       - uses: actions/checkout@v5
 
@@ -52,8 +56,11 @@ jobs:
           PRODUCTHUNT_TOKEN: ${{ secrets.PRODUCTHUNT_TOKEN }}
           TINYFISH: ${{ secrets.TINYFISH }}
           TINYFISH_API_KEY: ${{ secrets.TINYFISH_API_KEY }}
+          XAI_API_KEY: ${{ secrets.XAI_API_KEY }}
+          OPENAI_API_KEY: ${{ secrets.OPENAI_API_KEY }}
           SHIPPED_YEAR: '2026'
           SHIPPED_MAX_SEARCHES: '3'
+          SHIPPED_XAI_MAX_POSTS: '8'
         run: |
           if [ -z "$CLAUDE_KEY" ] && [ -z "$ANTHROPIC_API_KEY" ]; then
             echo "::error::CLAUDE_KEY (or ANTHROPIC_API_KEY) is not set. Commentary cannot be tested."

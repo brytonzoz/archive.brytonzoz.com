@@ -1199,8 +1199,17 @@
   touch-action: none;
 }
 
+.shipped-turnstile {
+  position: absolute;
+  width: 0;
+  height: 0;
+  overflow: hidden;
+  clip-path: inset(50%);
+  pointer-events: none;
+}
+
 .shipped-turnstile:not(:empty) {
-  margin-top: 0.75rem;
+  margin-top: 0;
 }
 
 .is-torn .shipped-ticket {

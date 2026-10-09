@@ -63,9 +63,11 @@ export const metadata: Metadata = {
     apple: [{ url: shareImages.icons['180'], sizes: '180x180', type: 'image/png' }],
   },
   appleWebApp: {
-    capable: true,
     title: 'Bryton Zoz',
     statusBarStyle: 'black-translucent',
+  },
+  other: {
+    'mobile-web-app-capable': 'yes',
   },
 }
 

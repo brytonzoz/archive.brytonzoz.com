@@ -33,9 +33,11 @@ export const metadata: Metadata = {
   keywords: [],
   category: undefined,
   appleWebApp: {
-    capable: true,
     title: SHIPPED_APP_TITLE,
     statusBarStyle: 'black-translucent',
+  },
+  other: {
+    'mobile-web-app-capable': 'yes',
   },
   robots: {
     index: false,

@@ -104,7 +104,8 @@ export const Turnstile = forwardRef<TurnstileHandle, TurnstileProps>(function Tu
           theme,
           appearance,
           execution: appearance === 'always' ? 'render' : 'execute',
-          size: appearance === 'always' ? 'flexible' : 'flexible',
+          // Invisible widgets don't paint the Success badge into the share sheet or the print form.
+          size: appearance === 'always' ? 'flexible' : 'invisible',
           callback: (value: string) => emit(value),
           'expired-callback': () => emit(null),
           'error-callback': () => emit(null),

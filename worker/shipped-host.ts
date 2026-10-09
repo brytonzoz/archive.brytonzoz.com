@@ -43,6 +43,10 @@ function debrand(response: Response): Response {
         const name = (el.getAttribute('name') ?? el.getAttribute('property') ?? '').toLowerCase();
         if (DROP_META.has(name)) el.remove();
         else if (name === 'apple-mobile-web-app-title' || name === 'application-name') el.setAttribute('content', SHIPPED_APP_TITLE);
+        else if (name === 'apple-mobile-web-app-capable') {
+          el.setAttribute('name', 'mobile-web-app-capable');
+          el.setAttribute('content', 'yes');
+        }
       },
     })
     .transform(response);

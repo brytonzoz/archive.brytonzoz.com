@@ -138,17 +138,16 @@ function ProofSheet({ onClose }: { onClose: () => void }) {
   );
 }
 
-function Count({ value }: { value: number }) {
-  return (
-    <span className="shipped-ticker-n tabular-nums" suppressHydrationWarning>
-      {fmt(useConfirmedCount(value))}
-    </span>
-  );
+function Count({ value, live }: { value: number; live: boolean }) {
+  const shown = useConfirmedCount(live ? value : 0);
+  return <span className="shipped-ticker-n tabular-nums">{fmt(shown)}</span>;
 }
 
 export function Ticker() {
   const state = useShippedState();
   const [open, setOpen] = useState(false);
+  const [live, setLive] = useState(false);
+  useEffect(() => setLive(true), []);
   const printed = state?.printed ?? 0;
   const shared = state?.shared ?? 0;
   const shipped = state?.shipped ?? 0;
@@ -162,10 +161,10 @@ export function Ticker() {
         aria-label={`Printed ${printed}, shared ${shared}, shipped ${shipped}, views ${views}. Open proof.`}
         onClick={() => setOpen(true)}
       >
-        <Count value={printed} />
+        <Count value={printed} live={live} />
         <span className="shipped-ticker-k">printed</span>
         <span className="shipped-ticker-rest">
-          · <Count value={shared} /> shared · <Count value={shipped} /> mailed · <Count value={views} /> views
+          · <Count value={shared} live={live} /> shared · <Count value={shipped} live={live} /> mailed · <Count value={views} live={live} /> views
         </span>
       </button>
       {open ? <ProofSheet onClose={() => setOpen(false)} /> : null}

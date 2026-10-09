@@ -10,6 +10,7 @@ import {
   CARD_PATH,
   RECEIPT_PATH,
   ROLLO_PATH,
+  SHIPPED_URL,
   TALL_PATH,
   itemDate,
   itemsShipped,
@@ -135,6 +136,37 @@ function MailedPrint({ receipt }: { receipt: Printed }) {
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const payments = state?.payments;
+
+  // Stripe is a same-tab navigation. Coming back (bfcache, tab restore, or a hung request)
+  // must never leave MAIL ME stuck as OPENING CHECKOUT….
+  useEffect(() => {
+    const reset = () => {
+      setBusy(false);
+      setAsked(false);
+    };
+    const onPageShow = (event: PageTransitionEvent) => {
+      if (event.persisted) reset();
+    };
+    const onVis = () => {
+      if (document.visibilityState === 'visible') reset();
+    };
+    window.addEventListener('pageshow', onPageShow);
+    document.addEventListener('visibilitychange', onVis);
+    return () => {
+      window.removeEventListener('pageshow', onPageShow);
+      document.removeEventListener('visibilitychange', onVis);
+    };
+  }, []);
+
+  useEffect(() => {
+    if (!busy) return;
+    const timer = window.setTimeout(() => {
+      setBusy(false);
+      setAsked(false);
+    }, 14_000);
+    return () => window.clearTimeout(timer);
+  }, [busy]);
+
   if (!payments?.prints) return null;
 
   async function order() {
@@ -234,7 +266,11 @@ function RemoveMine({ receipt, onRemoved }: { receipt: Printed; onRemoved?: () =
 export function ShareBar({ receipt, onRemoved }: { receipt: Printed; onRemoved?: () => void }) {
   const [copied, setCopied] = useState(false);
   const [sharing, setSharing] = useState(false);
-  const url = typeof window === 'undefined' ? RECEIPT_PATH(receipt.id) : new URL(RECEIPT_PATH(receipt.id), window.location.origin).toString();
+  const path = RECEIPT_PATH(receipt.id);
+  // Same on the server and the first client paint so React doesn't throw #418. Staging swaps origin after mount.
+  const [origin, setOrigin] = useState(SHIPPED_URL);
+  useEffect(() => setOrigin(window.location.origin), []);
+  const url = `${origin}${path}`;
   const intent = `https://x.com/intent/post?text=${encodeURIComponent(shareText(receipt))}&url=${encodeURIComponent(url)}`;
 
   async function shareImage() {

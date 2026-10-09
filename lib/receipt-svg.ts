@@ -1,6 +1,5 @@
-// Thermal-receipt images as SVG, rendered by resvg with IBM Plex Mono (worker/fonts/): the master
-// /shipped/ card by scripts/build-shipped-og.mjs at build time; Shipped-in-<year> share images and
-// supporter receipts by the Worker. Self-contained (no imports) so Node can load it directly.
+// Thermal-receipt images as SVG, rendered by resvg with IBM Plex Mono (worker/fonts/): the home page
+// card by scripts/build-shipped-og.mjs at build time; Shipped-in-<year> share images by the Worker. Self-contained (no imports) so Node can load it directly.
 // Drawn like a photo of the page: hand-torn paper with a soft shadow and curled edges on a dark counter
 // under one warm lamp, set like the receipt on the site (double-height store name, one inverse band).
 
@@ -170,101 +169,48 @@ function header(c: number, date: string, number: string) {
   ];
 }
 
-// ---- The master /shipped/ card -------------------------------------------------------------------------
+// ---- The home page card -----------------------------------------------------------------------------
 
 export type MasterOg = {
+  year: number;
   date: string;
-  items: number;
-  /** "2020–2026" */
-  span: string | null;
-  counts: OgLine[];
-  groups: { label: string; items: { name: string; status: string }[] }[];
-};
-
-function yearDivider(y: number, label: string) {
-  const c = PAPER_W / 2;
-  const half = (charW(12) * label.length) / 2 + 12;
-  return [
-    `<line x1="28" y1="${y - 4}" x2="${c - half}" y2="${y - 4}" stroke="${INK}" stroke-width="1" stroke-dasharray="3 3" opacity="0.5"/>`,
-    txt(c, y, label, 12, { weight: 600, anchor: 'middle' }),
-    `<line x1="${c + half}" y1="${y - 4}" x2="${PAPER_W - 28}" y2="${y - 4}" stroke="${INK}" stroke-width="1" stroke-dasharray="3 3" opacity="0.5"/>`,
-  ].join('');
-}
-
-/** The /shipped/ card: the totals on the left, Bryton's receipt hanging from the printer on the right. */
-export function masterReceiptSvg(data: MasterOg): string {
-  const left: string[] = [
-    txt(72, 104, 'BZ-80 · BRYTON ZOZ', 18, { spacing: 2.5, fill: CREAM, opacity: 0.5 }),
-    txt(68, 196, 'Shipped.', 84, { spacing: -4, fill: CREAM }),
-    txt(72, 246, `${data.items} things${data.span ? `, ${data.span}` : ''}`, 26, { fill: CREAM, opacity: 0.75 }),
-  ];
-  let y = 318;
-  for (const line of data.counts) {
-    left.push(txt(72, y, line.value.padStart(2, ' '), 28, { weight: 600, fill: CREAM }), txt(130, y, line.label, 22, { fill: CREAM, opacity: 0.7 }));
-    y += 42;
-  }
-  left.push(txt(72, 586, 'shipped.brytonzoz.com', 18, { fill: CREAM, opacity: 0.5 }));
-
-  const c = PAPER_W / 2;
-  const body: string[] = [...header(c, data.date, 'BZ-SHIPPED'), inverse(c, 180, 'SHIPPED', 15), leader(212, 'ITEMS', String(data.items), 12)];
-  let py = 244;
-  for (const group of data.groups) {
-    if (py > 640) break;
-    body.push(yearDivider(py, group.label));
-    py += 24;
-    for (const item of group.items) {
-      if (py > 640) break;
-      body.push(leader(py, item.name.toUpperCase(), item.status, 12));
-      py += 20;
-    }
-    py += 6;
-  }
-  return scene(1200, 630, `${sheet(640, body.join(''), 'translate(736 40) rotate(0.6 200 0)', 'master', { open: true, soft: true })}${printerLip(706, 40, 460)}${left.join('')}`);
-}
-
-// ---- Supporter receipt ------------------------------------------------------------------------------------
-
-export type SupporterOg = {
-  number: string;
-  date: string;
-  text: string;
-  link: string | null;
-  details: OgLine[];
-  charges: OgLine[];
-  total: string;
-  status: string;
+  /** "OCT 26, 12:00 PM ET" */
+  closes: string;
+  url: string;
   barcode: number[];
 };
 
-/** The supporter's own receipt (portrait, 2× for a sharp download): their shout-out, what they paid. */
-export function supporterReceiptSvg(data: SupporterOg): string {
+/** The home page link preview: the pitch on the left, the "how it works" slip hanging from the printer on the right. */
+export function masterReceiptSvg(data: MasterOg): string {
+  const left: string[] = [
+    txt(72, 104, `SHIPPED ${data.year} · THE PUBLIC RECEIPT PRINTER`, 16, { spacing: 2, fill: CREAM, opacity: 0.5 }),
+    txt(68, 206, 'Shipped.', 96, { spacing: -4, fill: CREAM }),
+    txt(72, 264, `What did you ship in ${data.year}?`, 28, { fill: CREAM, opacity: 0.85 }),
+    txt(72, 306, 'Print the receipt. Free.', 28, { fill: CREAM, opacity: 0.85 }),
+    txt(72, 392, 'TWO WEEKS ONLY', 20, { weight: 600, spacing: 2, fill: CREAM }),
+    txt(72, 424, `The printer shuts off ${data.closes}.`, 20, { fill: CREAM, opacity: 0.7 }),
+    txt(72, 586, data.url, 18, { fill: CREAM, opacity: 0.5 }),
+  ];
+
   const c = PAPER_W / 2;
-  const body: string[] = [...header(c, data.date, data.number), inverse(c, 180, 'SUPPORTER RECEIPT', 13), txt(c, 212, 'YOUR SHOUT-OUT', 10.5, { anchor: 'middle', opacity: 0.65 })];
-  body.push(tall(c, 244, fit(data.text, 30), 14, { anchor: 'middle' }));
-  let y = 270;
-  if (data.link) {
-    body.push(txt(c, y, fit(data.link, 44), 11, { anchor: 'middle', opacity: 0.7 }));
-    y += 8;
+  const body: string[] = [...header(c, data.date, '000000'), inverse(c, 182, 'HOW IT WORKS', 15)];
+  let y = 216;
+  for (const [label, value] of [
+    ['1. TYPE A NAME OR @HANDLE', 'FREE'],
+    [`2. IT PRINTS YOUR ${data.year}`, 'AUTO'],
+    ['3. POST IT, TOSS IT ON THE PILE', 'FREE'],
+    ['MAILED THERMAL PRINT (US)', '$5'],
+  ]) {
+    body.push(leader(y, label, value, 12, 500));
+    y += 22;
   }
-  y += 20;
-  for (const line of data.details) {
-    body.push(leader(y, line.label, line.value, 12, 500));
-    y += 20;
-  }
-  body.push(rule(y - 4));
-  y += 22;
-  for (const line of data.charges) {
-    body.push(leader(y, line.label, line.value, 12, 500));
-    y += 20;
-  }
-  body.push(rule(y - 4, true), leader(y + 20, 'TOTAL', data.total, 16), rule(y + 34, true));
-  y += 64;
-  body.push(txt(c, y, data.status, 11, { weight: 600, anchor: 'middle' }));
-  body.push(txt(c, y + 20, 'THANK YOU FOR SUPPORTING.', 11, { anchor: 'middle', opacity: 0.7 }));
-  body.push(barcode(64, y + 40, 272, 34, data.barcode));
-  body.push(txt(c, y + 96, 'SHIPPED.BRYTONZOZ.COM', 10, { anchor: 'middle', opacity: 0.6 }));
-  const height = y + 126;
-  return scene(PAPER_W + 120, height + 120, sheet(height, body.join(''), 'translate(60 50) rotate(-0.8 200 0)', `supporter:${data.number}`), 2);
+  body.push(rule(y, true));
+  y += 26;
+  body.push(txt(c, y, 'PUBLIC, PROFESSIONAL WORK ONLY.', 11, { anchor: 'middle', opacity: 0.75 }));
+  body.push(txt(c, y + 18, 'EVERY ITEM LINKS TO ITS SOURCE.', 11, { anchor: 'middle', opacity: 0.75 }));
+  body.push(barcode(64, y + 44, 272, 40, data.barcode));
+  body.push(txt(c, y + 108, '*** TEAR HERE ***', 10.5, { anchor: 'middle', opacity: 0.6 }));
+  return scene(1200, 630, `${sheet(640, body.join(''), 'translate(736 40) rotate(0.6 200 0)', 'master', { open: true, soft: true })}${printerLip(706, 40, 460)}${left.join('')}`);
 }
 
 // ---- Shipped in <year> ---------------------------------------------------------------------------

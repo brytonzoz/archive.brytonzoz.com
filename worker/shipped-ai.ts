@@ -134,9 +134,9 @@ function matchFound(found: Found[], name: string, link: string | null): Found | 
 }
 
 const POTENTIAL_NOTES = [
-  'Nothing public in 2026 turned up. The register is still open.',
+  'Nothing public in 2026 turned up. Come back when something ships.',
   'Item on back order. Ships when you do.',
-  'The register is open. Go ship something.',
+  'Empty drawer. Go ship something.',
 ];
 
 const SOURCE_LABEL: Record<string, string> = {
@@ -168,25 +168,54 @@ export function formatStats(items: { source?: string }[], sourced: SourcedStat[]
   return [bits.join(' · ')];
 }
 
+const TEMPLATE_NOTE =
+  /is first on the tape|led the year|closed the year|set the tone|through-line|Receipt paper running low|Someone likes the publish button|\d+\s+launches?\s+·|night shift|publish button|\bthe tape\b|the register is|stock the shelves|counted receipts|got the paperwork|rings the publish|cashier has seen worse|mostly i just/i;
+
+/** Notes that read like a leftover slogan, a fallback stat line, or the same cashier bit. */
+export function cashierNoteLooksCanned(note: string): boolean {
+  const text = note.trim();
+  if (!text) return true;
+  if (TEMPLATE_NOTE.test(text) || AI_VOICE.test(text)) return true;
+  return false;
+}
+
+function statPhrase(line: string): string {
+  return line.replace(/\s*·\s*.*$/, '').replace(/\s+/g, ' ').trim();
+}
+
+function clipSentence(text: string, max: number): string {
+  const trimmed = text.replace(/\s+/g, ' ').trim();
+  if (trimmed.length <= max) return trimmed;
+  const cut = trimmed.slice(0, max);
+  const space = cut.lastIndexOf(' ');
+  let out = (space > Math.floor(max * 0.55) ? cut.slice(0, space) : cut).replace(/[,:;–—-]+$/, '');
+  if (!/[.!?]$/.test(out)) out += '.';
+  return out;
+}
+
 /** Deadpan, specific, grounded in the items. Never a stock slogan. */
-export function groundedNote(items: DraftItem[], seed: number, profileName = ''): string {
+export function groundedNote(items: DraftItem[], seed: number, profileName = '', stats: string[] = []): string {
   const real = items.filter((item) => item.source !== 'none');
   if (!real.length) return POTENTIAL_NOTES[seed % POTENTIAL_NOTES.length];
-  const stats = formatStats(real)[0] ?? `${real.length} launches`;
   const first = real[0]?.name ?? 'THIS';
-  const last = real[real.length - 1]?.name ?? first;
-  const niche = real.find((item) => /ai|app|cli|kit|sdk|shop|scan|cast|mail/i.test(`${item.name} ${item.description}`));
-  const pick = (seed + real.length + first.length) % 6;
+  const loud = real[(seed + first.length) % real.length] ?? real[0];
+  const phrase = statPhrase(stats.find((line) => /\d/.test(line)) ?? '');
+  const who = profileName.split(/\s+/)[0] ?? '';
+  if (phrase && loud?.name) {
+    const variants = [
+      `${loud.name} brought ${phrase}. The rest of the pile is quieter.`,
+      `${phrase} on ${loud.name}. Same maker, more SKUs.`,
+      `${loud.name} is the loud line: ${phrase}.`,
+    ];
+    return clipSentence(variants[seed % variants.length], 160);
+  }
+  const extra = Math.max(0, real.length - 1);
   const variants = [
-    `${stats}. ${first} is first on the tape.`,
-    `${stats}. ${last} closed the year.`,
-    `${real.length} public things${profileName ? ` for ${profileName.split(' ')[0]}` : ''}. ${first} set the tone.`,
-    niche ? `${stats}. ${niche.name} is the through-line.` : `${stats}. ${first} led.`,
-    `${stats}. ${first} led the year.`,
-    `${stats}. ${last} is still on the tape.`,
+    `${first} plus ${extra} more. ${loud.name} is the one still warm.`,
+    `${real.length} public things${who ? ` under ${who}` : ''}, and ${first} is the one people will ask about.`,
+    `${first} and ${loud.name} share the same ink. ${real.length} lines, no returns.`,
   ];
-  const note = variants[pick];
-  return note.length > 140 ? `${stats}. ${first} led.` : note;
+  return clipSentence(variants[(seed + real.length) % variants.length], 160);
 }
 
 const cannedNote = (items: DraftItem[], seed: number, profileName = '') => groundedNote(items, seed, profileName);
@@ -215,28 +244,22 @@ function finish(items: DraftItem[], note: string, seed: number, modulesRaw?: unk
         .slice(0, 4)
     : formatStats(sorted);
   const whoNote =
-    ok(note) && !AI_VOICE.test(note) && !TEMPLATE_NOTE.test(note)
+    ok(note) && !cashierNoteLooksCanned(note) && /\d/.test(note)
       ? note
-      : stats[0] && /\d/.test(stats[0])
-        ? stats[0]
-        : groundedNote(sorted, seed);
+      : groundedNote(sorted, seed, '', stats);
   const printed = printNote(whoNote, stats);
   return { items: sorted, note: printed, stats, potential: false, layout };
 }
 
-const TEMPLATE_NOTE =
-  /is first on the tape|led the year|closed the year|set the tone|through-line|Receipt paper running low|Someone likes the publish button|\d+\s+launches?\s+·/i;
-
 function printNote(note: string, stats: string[]): string {
-  if (TEMPLATE_NOTE.test(note)) {
-    const stat = stats[0];
-    return stat && !TEMPLATE_NOTE.test(stat) ? `${stat}. ${note}`.slice(0, 160) : note.slice(0, 160);
+  let text = note.trim();
+  if (cashierNoteLooksCanned(text) || !/\d/.test(text)) {
+    const phrase = statPhrase(stats.find((line) => /\d/.test(line) && !cashierNoteLooksCanned(line)) ?? '');
+    if (phrase && !text.toLowerCase().includes(phrase.toLowerCase().slice(0, 12))) {
+      text = `${phrase}. ${text}`;
+    }
   }
-  if (/\d/.test(note)) return note.slice(0, 160);
-  const stat = stats[0];
-  if (!stat) return note;
-  const combined = `${stat}. ${note}`;
-  return (combined.length <= 160 ? combined : note).slice(0, 160);
+  return clipSentence(text, 180);
 }
 
 /** Without the AI: the free sources' best finds from the year, in date order, and a canned note. */
@@ -269,7 +292,7 @@ function systemPrompt(year: number, searches: number) {
     '"link" must be a URL that appears in the data or your search results, copied exactly, or null. Never make up a URL.',
     'Status (one allowed word) goes where a price would. LIVE for a running product or site, RELEASED for a version/release, LAUNCHED for a launch post, SHIPPED otherwise, BETA if it says beta, DECEASED if shut down.',
     'Item names: the product name as people know it, max 32 characters. Description: a specific one-liner grounded in the source (what it is, not a slogan), max 70 characters. "Menu bar app that keeps the Mac awake", not "An innovative solution".',
-    'Cashier "note": max 110 characters. Deadpan night-shift cashier. MUST name one real product from <found> and one real number from <found>.stats (stars, downloads, upvotes, MRR). Funny about the shipping pattern; never cruel. Banned templates: "is first on the tape", "led the year", "closed the year", "set the tone", "through-line", "Receipt paper running low", "Someone likes the publish button", "N launches ·". Never generic, never inspirational, never invented facts.',
+    'Cashier "note": 80-140 characters, one or two COMPLETE sentences (never cut a word). Deadpan. MUST copy one product name from <found> and one exact number from <found>.stats or an item metric (stars, weekly downloads, upvotes, public MRR). The joke is about what THAT product does, not about cashiers. Good: "SuperX pulled 929 hunters in February. The other tabs are just merch." Good: "cn is at 8.2M weekly downloads. The other seven packages are the opening act." Bad: "Eighteen repos on the tape, and the night shift counted publish buttons." Banned phrases: night shift, publish button, the tape, the register, receipt paper, stock the shelves, "is first on the tape", "led the year", "closed the year", "set the tone", "through-line", "N launches ·", "Someone likes". Do not start by counting items ("Eighteen repos", "Ten packages"). Never generic, never inspirational, never invented facts.',
     'Also output "stats": 1-4 short lines copied from <found>.stats (GitHub stars, npm weekly downloads, PH upvotes, App Store ratings, public MRR, user counts, HN points). Keep the source host/path on each line. Never invent a number.',
     'Banned words and moves everywhere: delve, testament, journey, innovative, seamless, elevate, unlock, empower, leverage, cutting-edge, game-changer, robust, passion, incredible, amazing, "truly", loser, pathetic, scam, flop, cringe, exclamation marks, emoji, em dashes, and praise like "impressive year".',
     `Do not add extra receipt bands. The tape is short: items, a one-line cashier note, stamp and serial. If you output modules, ids only from ${REQUIRED_MODULES.join(', ')}. Never output HTML, markdown, CSS, filler ids (deep-cut, first-last, platforms, still-running, volume, friend, sources, serial) or extra keys.`,
@@ -390,7 +413,7 @@ function normalize(raw: unknown, gathered: Gathered, allowed: Allowed, year: num
     seen.add(key);
     if (items.length === MAX_ITEMS) break;
   }
-  const note = typeof data.note === 'string' ? clean(data.note, 140).replace(/\s*[\u2014\u2013]\s*/g, '. ').replace(/!+/g, '.') : '';
+  const note = typeof data.note === 'string' ? clean(data.note, 180).replace(/\s*[\u2014\u2013]\s*/g, '. ').replace(/!+/g, '.') : '';
   return finish(items, note, seed, data.modules, data.stats);
 }
 

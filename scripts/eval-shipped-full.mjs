@@ -14,7 +14,7 @@ const builders = [
 
 const { readQuery } = await import('../lib/shipped-year.ts');
 const { gather, inYearCount } = await import('../worker/shipped-sources.ts');
-const { assembleReceipt, demoReceipt } = await import('../worker/shipped-ai.ts');
+const { assembleReceipt, demoReceipt, cashierNoteLooksCanned } = await import('../worker/shipped-ai.ts');
 
 const pick = (...names) => names.map((n) => process.env[n]).find((v) => typeof v === 'string' && v.trim()) || '';
 
@@ -72,10 +72,7 @@ function seed(query) {
   return { kind: 'name', id: parsed.value, display: parsed.value };
 }
 
-const templated = (note) =>
-  /is first on the tape|led the year|closed the year|set the tone|through-line|Receipt paper running low|Someone likes the publish button|Thank you for shipping/i.test(
-    note || '',
-  );
+const templated = (note) => cashierNoteLooksCanned(note || '');
 
 const rows = [];
 for (const builder of builders) {
@@ -130,6 +127,8 @@ for (const builder of builders) {
     phUpvotes: phStats.map((s) => `${s.label} · ${s.url.replace(/^https?:\/\/(www\.)?/, '')}`),
     note: draft?.note ?? '',
     noteTemplated: templated(draft?.note),
+    noteMentionsItem: (draft?.items ?? []).some((item) => loose(draft?.note).includes(loose(item.name)) && loose(item.name).length >= 3),
+    noteHasNumber: /\d/.test(draft?.note || ''),
     names: (draft?.items ?? []).map((i) => i.name),
     costMicros,
     costUsd: Number((costMicros / 1_000_000).toFixed(4)),
@@ -187,6 +186,7 @@ const md = [
   `- Total cost: $${report.totalCostUsd}`,
   `- Mean cost / receipt: $${report.meanCostUsd}`,
   report.templatedNotes.length ? `- Templated notes: ${report.templatedNotes.join(', ')}` : '- Templated notes: none',
+  `- Notes naming a receipt item: ${rows.filter((r) => r.noteMentionsItem).length}/${rows.length}`,
   '',
   '| Set | Query | Recall | PH | Cost | Note |',
   '| --- | --- | ---: | --- | ---: | --- |',
@@ -212,6 +212,7 @@ console.log(
       medianRecallHeldOut: report.medianRecallHeldOut,
       totalCostUsd: report.totalCostUsd,
       templatedNotes: report.templatedNotes,
+      notesNamingItem: rows.filter((r) => r.noteMentionsItem).length,
     },
     null,
     2,

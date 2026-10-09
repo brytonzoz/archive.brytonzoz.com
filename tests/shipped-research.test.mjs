@@ -109,13 +109,21 @@ test('cashier note and stats are specific to the items, never stock copy', () =>
     { name: 'INTERIORAI', description: 'Rooms', date: '2026-04', status: 'LIVE', link: 'https://interiorai.com/', icon: null, source: 'site' },
     { name: 'SUPERLEVELS', description: 'Repo', date: '2026-04-23', status: 'SHIPPED', link: 'https://github.com/levelsio/superlevels', icon: null, source: 'github' },
   ];
-  const note = ai.groundedNote(items, 1, 'levelsio');
+  const note = ai.groundedNote(items, 1, 'levelsio', ['553 GitHub stars SuperLevels · github.com/levelsio/superlevels']);
   const stats = ai.formatStats(items);
   assert.match(stats[0], /3 launches/);
   assert.match(stats[0], /GitHub/);
-  assert.doesNotMatch(note, /Thank you for shipping|Come again|No refunds on momentum|Receipt paper running low|Someone likes the publish button/i);
-  assert.match(note, /PHOTOAI|INTERIORAI|SUPERLEVELS|3 launch|tape/i);
-  const draft = ai.demoReceipt(
+  assert.doesNotMatch(note, /Thank you for shipping|Come again|No refunds on momentum|Receipt paper running low|Someone likes the publish button|night shift|publish button|\bthe tape\b/i);
+  assert.match(note, /PHOTOAI|INTERIORAI|SUPERLEVELS/i);
+  assert.match(note, /553|stars/i);
+  assert.equal(ai.cashierNoteLooksCanned(note), false);
+  assert.equal(ai.cashierNoteLooksCanned('Hallmark passed 30k stars while the night shift counted receipts.'), true);
+  const draft = ai.validateDraft(
+    {
+      items: items.map((item) => ({ name: item.name, description: item.description, date: item.date, status: item.status, link: item.link })),
+      note: 'workbench at 450 stars is the crowd favorite, and the night shift has counted a lot of publish buttons since April.',
+      stats: ['450 GitHub stars workbench · github.com/pontusab/workbench'],
+    },
     {
       found: items.map((item) => ({ ...item, name: item.name.toLowerCase(), score: 4, thisYear: !item.date })),
       web: [],
@@ -124,13 +132,50 @@ test('cashier note and stats are specific to the items, never stock copy', () =>
       profile: { name: 'levelsio', bio: '', site: 'https://levels.io/', x: 'levelsio', github: 'levelsio' },
       ran: [],
       failed: [],
+      stats: [],
     },
+    items.map((item) => item.link),
     2026,
     2,
   );
   assert.ok(draft.items.length >= 3);
   assert.ok(draft.stats[0]);
-  assert.match(draft.note, /launch/i);
+  assert.doesNotMatch(draft.note, /night shift|publish button/i);
+  assert.match(draft.note, /PHOTOAI|INTERIORAI|SUPERLEVELS|553|450/i);
+  const okNote = ai.validateDraft(
+    {
+      items: [{ name: 'SuperX', description: 'Growth', date: '2026-02-09', status: 'LAUNCHED', link: 'https://www.producthunt.com/posts/superx' }],
+      note: 'SuperX pulled 929 hunters in February. The other tabs are just the merch table.',
+      stats: ['929 Product Hunt upvotes SuperX · producthunt.com/posts/superx'],
+    },
+    {
+      found: [{ name: 'SuperX', description: 'Growth', date: '2026-02-09', link: 'https://www.producthunt.com/posts/superx', icon: null, source: 'producthunt', status: 'LAUNCHED', score: 8 }],
+      web: [],
+      pages: [],
+      site: null,
+      profile: { name: 'Tibo', bio: '', site: 'https://www.tmaker.io/', x: 'tibo_maker', github: null },
+      ran: [],
+      failed: [],
+    },
+    ['https://www.producthunt.com/posts/superx'],
+    2026,
+    1,
+  );
+  assert.match(okNote.note, /SuperX/i);
+  assert.match(okNote.note, /929/);
+  assert.doesNotMatch(okNote.note, /night shift|the tape|publish button/i);
+});
+
+test('Product Hunt lookups follow X, handle tokens, and product sites', () => {
+  const profile = { name: 'Tibo', bio: '', site: 'https://superx.so/', x: 'tibo_maker', github: null, sites: ['https://superx.so/', 'https://www.tmaker.io/'], phUsers: ['tibo_maker'] };
+  const handles = sources.phLookupHandles(profile);
+  assert.ok(handles.some((h) => h.username.toLowerCase() === 'tibo_maker' && !h.guessed));
+  assert.ok(handles.some((h) => h.username.toLowerCase() === 'tibo' && h.guessed));
+  assert.equal(handles.some((h) => h.username.toLowerCase() === 'maker'), false);
+  assert.ok(sources.phTwitterUrls('tibo_maker').includes('https://twitter.com/tibo_maker'));
+  const sites = sources.phSiteLookups(profile.sites);
+  assert.ok(sites.urls.some((u) => /superx\.so/i.test(u)));
+  assert.ok(sites.slugs.includes('superx'));
 });
 
 test('paid search still runs when harvest is gappy, not only when the tape is empty', () => {

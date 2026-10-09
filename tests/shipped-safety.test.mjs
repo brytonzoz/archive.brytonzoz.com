@@ -98,7 +98,7 @@ test('content safety: private life, contact details, slurs, mockery and markup n
   }
 });
 
-test('a mocking or AI-sounding note is replaced, items are capped at 20', () => {
+test('a mocking or AI-sounding note is replaced, items are capped at 25', () => {
   const many = Array.from({ length: 60 }, (_, i) => found({ name: `Package ${i}`, link: `https://www.npmjs.com/package/p${i}`, source: 'npm' }));
   const draft = ai.validateDraft(
     { items: many.map((item) => ({ name: item.name, description: 'npm package', date: '2026-04', status: 'RELEASED', link: item.link })), note: 'What a pathetic year, lol' },
@@ -106,7 +106,7 @@ test('a mocking or AI-sounding note is replaced, items are capped at 20', () => 
     [],
     2026,
   );
-  assert.equal(draft.items.length, 20);
+  assert.equal(draft.items.length, 25);
   assert.doesNotMatch(draft.note, /pathetic|lol/);
   const voice = ai.validateDraft({ items: [{ name: 'Keepawake', link: 'https://github.com/someone/keepawake', date: '2026-03' }], note: 'An incredible journey of innovation' }, gathered(), [], 2026);
   assert.doesNotMatch(voice.note, /incredible|journey/);

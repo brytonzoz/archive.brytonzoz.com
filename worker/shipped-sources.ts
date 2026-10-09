@@ -127,7 +127,15 @@ export type Gathered = {
   coverageCapped?: boolean;
 };
 
-export type SourceContext = { subject: Subject; profile: Profile; year: number; env: SourceEnv; tinyfish: TinyfishAccess };
+export type SourceContext = {
+  subject: Subject;
+  profile: Profile;
+  year: number;
+  env: SourceEnv;
+  tinyfish: TinyfishAccess;
+  /** Extra product/site URLs to look up on Product Hunt (gap-fill after harvest). */
+  extraUrls?: string[];
+};
 
 export interface SourceProvider {
   id: string;
@@ -760,49 +768,210 @@ async function productHuntAuth(env: SourceEnv): Promise<string | null> {
   return body.access_token;
 }
 
+const GENERIC_PH_USER = new Set(['maker', 'user', 'official', 'team', 'dev', 'the', 'app', 'hq', 'inc', 'labs', 'admin', 'news']);
+
+/** PH usernames to try: the X/GitHub handle, underscore variants, then a first-token guess (`tibo_maker` → `tibo`). */
+export function phLookupHandles(profile: Profile): { username: string; guessed: boolean }[] {
+  const raw = [...phUsersOf(profile), profile.x, profile.github].filter((h): h is string => Boolean(h));
+  const out: { username: string; guessed: boolean }[] = [];
+  const add = (value: string | null | undefined, guessed: boolean) => {
+    const username = (value ?? '').replace(/^@/, '').trim();
+    if (!username || username.length < 2 || GENERIC_PH_USER.has(username.toLowerCase())) return;
+    if (out.some((row) => row.username.toLowerCase() === username.toLowerCase())) return;
+    out.push({ username, guessed });
+  };
+  for (const handle of raw) {
+    add(handle, false);
+    for (const variant of handleVariants(handle)) add(variant, false);
+    const first = handle.replace(/^@/, '').split(/[_-]/)[0];
+    if (first && first.length >= 4 && first.toLowerCase() !== handle.replace(/^@/, '').toLowerCase()) add(first, true);
+    for (const token of handleTokens(handle)) add(token, true);
+  }
+  return out.slice(0, 6);
+}
+
+/** PH `posts(twitterUrl:)` keys. The API's `postedAfter` defaults to one month ago unless we pass a year window. */
+export function phTwitterUrls(handle: string | null | undefined): string[] {
+  const id = (handle ?? '').replace(/^@/, '').trim();
+  if (!id) return [];
+  return [`https://twitter.com/${id}`, `https://x.com/${id}`];
+}
+
+const GENERIC_PH_SLUG = new Set(['www', 'app', 'www2', 'mail', 'blog', 'shop', 'store', 'docs', 'dev', 'api', 'status']);
+
+/** Product-site hosts → PH slugs (`superx.so` → `superx`) plus the raw URLs for `posts(url:)`. */
+export function phSiteLookups(urls: (string | null | undefined)[]): { urls: string[]; slugs: string[] } {
+  const seenUrl = new Set<string>();
+  const seenSlug = new Set<string>();
+  const outUrls: string[] = [];
+  const slugs: string[] = [];
+  for (const raw of urls) {
+    const url = publicUrl(raw);
+    if (!url) continue;
+    const host = hostOf(url);
+    if (!host || /(^|\.)(github\.com|npmjs\.com|producthunt\.com|x\.com|twitter\.com)$/.test(host)) continue;
+    const key = url.replace(/\/+$/, '').toLowerCase();
+    if (!seenUrl.has(key)) {
+      seenUrl.add(key);
+      outUrls.push(url);
+    }
+    const label = host.split('.')[0] ?? '';
+    if (label.length >= 3 && !GENERIC_PH_SLUG.has(label) && !seenSlug.has(label)) {
+      seenSlug.add(label);
+      slugs.push(label);
+    }
+  }
+  return { urls: outUrls.slice(0, 6), slugs: slugs.slice(0, 4) };
+}
+
+const PH_POST_FIELDS = 'name tagline createdAt url website votesCount thumbnail{url} makers{username twitterUsername}';
+
+type PhPost = Record<string, unknown> & { makers?: { username?: string; twitterUsername?: string }[] };
+
+function phUserMatches(user: { username?: string | null; twitterUsername?: string | null } | null | undefined, profile: Profile, guessed: boolean): boolean {
+  if (!user) return false;
+  const twitter = (user.twitterUsername ?? '').replace(/^@/, '').toLowerCase();
+  const want = (profile.x ?? '').replace(/^@/, '').toLowerCase();
+  if (want && twitter && twitter === want) return true;
+  if (want && twitter && handleVariants(want).some((v) => v.toLowerCase() === twitter)) return true;
+  return !guessed;
+}
+
+function phMakerMatches(post: PhPost, profile: Profile, siteHosts: Set<string>): boolean {
+  const makers = post.makers ?? [];
+  const want = (profile.x ?? '').replace(/^@/, '').toLowerCase();
+  const handles = new Set(
+    [...phUsersOf(profile), profile.x, profile.github, ...phLookupHandles(profile).map((h) => h.username)]
+      .filter((h): h is string => Boolean(h))
+      .map((h) => h.replace(/^@/, '').toLowerCase()),
+  );
+  if (
+    makers.some((maker) => {
+      const username = (maker.username ?? '').toLowerCase();
+      const twitter = (maker.twitterUsername ?? '').replace(/^@/, '').toLowerCase();
+      return (username && handles.has(username)) || (twitter && (twitter === want || handles.has(twitter)));
+    })
+  ) {
+    return true;
+  }
+  const website = hostOf(publicUrl(post.website as string) ?? '');
+  return Boolean(website && siteHosts.has(website));
+}
+
+function foundFromPhPost(post: PhPost, year: number): Found | null {
+  const date = day(post.createdAt);
+  if (date && !inYear(date, year)) return null;
+  const votes = Number(post.votesCount) || 0;
+  const link = publicUrl(post.url) ?? publicUrl(post.website as string);
+  return {
+    name: clean(post.name, 60),
+    description: clean(post.tagline, 140),
+    date,
+    dateConfidence: inYear(date, year) ? 'exact' : date ? 'exact' : 'unknown',
+    link,
+    icon: publicUrl((post.thumbnail as Record<string, unknown> | undefined)?.url),
+    source: 'producthunt',
+    status: 'LAUNCHED',
+    score: 5 + Math.log10(1 + votes),
+    metrics: votes
+      ? [sourcedStat('upvotes', `${votes} Product Hunt upvotes`, votes, link ?? 'https://www.producthunt.com/', clean(post.name, 40))].filter((s): s is SourcedStat => Boolean(s))
+      : [],
+  };
+}
+
+async function phGraphql<T>(token: string, query: string, variables: Record<string, unknown>): Promise<T | null> {
+  return getJson<T>('https://api.producthunt.com/v2/api/graphql', {
+    method: 'POST',
+    headers: { authorization: `Bearer ${token}`, 'content-type': 'application/json' },
+    body: JSON.stringify({ query, variables }),
+  }).catch(() => null);
+}
+
 /** Product Hunt launches the subject made (needs PRODUCTHUNT_KEY + PRODUCTHUNT_SECRET, or PRODUCTHUNT_TOKEN). */
 const productHunt: SourceProvider = {
   id: 'producthunt',
-  enabled: ({ env, profile }) =>
-    Boolean((env.PRODUCTHUNT_TOKEN || (env.PRODUCTHUNT_KEY && env.PRODUCTHUNT_SECRET)) && (phUsersOf(profile).length || profile.x || profile.github)),
-  async run({ env, profile, year }) {
+  enabled: ({ env, profile, extraUrls }) =>
+    Boolean(
+      (env.PRODUCTHUNT_TOKEN || (env.PRODUCTHUNT_KEY && env.PRODUCTHUNT_SECRET)) &&
+        (phUsersOf(profile).length || profile.x || profile.github || (extraUrls && extraUrls.length)),
+    ),
+  async run({ env, profile, year, extraUrls }) {
     const token = await productHuntAuth(env);
     if (!token) throw new SourceError('no-token');
-    const listed = phUsersOf(profile);
-    const usernames = [...new Set((listed.length ? listed : [profile.x, profile.github]).filter((h): h is string => Boolean(h)))].slice(0, 3);
-    const pages = await Promise.allSettled(
-      usernames.map((username) =>
-        getJson<{ data?: { user?: { madePosts?: { edges?: { node: Record<string, unknown> }[] } } } }>('https://api.producthunt.com/v2/api/graphql', {
-          method: 'POST',
-          headers: { authorization: `Bearer ${token}`, 'content-type': 'application/json' },
-          body: JSON.stringify({
-            query: 'query($u:String!){user(username:$u){madePosts(first:20){edges{node{name tagline createdAt url website votesCount thumbnail{url}}}}}}',
-            variables: { u: username },
-          }),
-        }),
+    const after = `${year}-01-01T00:00:00Z`;
+    const before = `${year + 1}-01-01T00:00:00Z`;
+    const handles = phLookupHandles(profile);
+    const twitterUrls = phTwitterUrls(profile.x);
+    const sites = phSiteLookups([...sitesOf(profile), profile.site, ...(extraUrls ?? [])]);
+    const siteHosts = new Set(sites.urls.map((url) => hostOf(url)).filter((h): h is string => Boolean(h)));
+
+    type PhUserData = { data?: { user?: { username?: string; twitterUsername?: string; madePosts?: { edges?: { node: PhPost }[] } } } };
+    type PhPostsData = { data?: { posts?: { edges?: { node: PhPost }[] } } };
+    type PhSlugData = { data?: { post?: PhPost | null } };
+
+    const userPages = await Promise.all(
+      handles.map((row) =>
+        phGraphql<PhUserData>(
+          token,
+          `query($u:String!){user(username:$u){username twitterUsername madePosts(first:20){edges{node{${PH_POST_FIELDS}}}}}}`,
+          { u: row.username },
+        ).then((page) => ({ row, page })),
       ),
     );
-    return pages
-      .flatMap((page) => (page.status === 'fulfilled' ? page.value.data?.user?.madePosts?.edges ?? [] : []))
-      .map((edge) => edge.node)
-      .filter((post) => inYear(day(post.createdAt), year) || !post.createdAt)
-      .map((post): Found => ({
-        name: clean(post.name, 60),
-        description: clean(post.tagline, 140),
-        date: day(post.createdAt),
-        dateConfidence: inYear(day(post.createdAt), year) ? 'exact' : day(post.createdAt) ? 'exact' : 'unknown',
-        link: publicUrl(post.url) ?? publicUrl(post.website as string),
-        icon: publicUrl((post.thumbnail as Record<string, unknown> | undefined)?.url),
-        source: 'producthunt',
-        status: 'LAUNCHED',
-        score: 5 + Math.log10(1 + (Number(post.votesCount) || 0)),
-        metrics: Number(post.votesCount)
-          ? [sourcedStat('upvotes', `${Number(post.votesCount)} Product Hunt upvotes`, Number(post.votesCount), publicUrl(post.url) ?? 'https://www.producthunt.com/', clean(post.name, 40))].filter(
-              (s): s is SourcedStat => Boolean(s),
-            )
-          : [],
-      }))
-      .filter((item) => !item.date || inYear(item.date, year));
+    const twitterPages = await Promise.all(
+      twitterUrls.slice(0, 2).map((url) =>
+        phGraphql<PhPostsData>(
+          token,
+          `query($u:String!,$a:DateTime!,$b:DateTime!){posts(twitterUrl:$u,postedAfter:$a,postedBefore:$b,first:20){edges{node{${PH_POST_FIELDS}}}}}`,
+          { u: url, a: after, b: before },
+        ),
+      ),
+    );
+    const urlPages = await Promise.all(
+      sites.urls.slice(0, 6).map((url) =>
+        phGraphql<PhPostsData>(
+          token,
+          `query($u:String!,$a:DateTime!,$b:DateTime!){posts(url:$u,postedAfter:$a,postedBefore:$b,first:5){edges{node{${PH_POST_FIELDS}}}}}`,
+          { u: url, a: after, b: before },
+        ),
+      ),
+    );
+    const slugPages = await Promise.all(
+      sites.slugs.slice(0, 4).map((slug) =>
+        phGraphql<PhSlugData>(token, `query($s:String!){post(slug:$s){${PH_POST_FIELDS}}}`, { s: slug }),
+      ),
+    );
+
+    const posts: PhPost[] = [];
+    for (const { row, page } of userPages) {
+      const user = page?.data?.user;
+      if (!phUserMatches(user, profile, row.guessed)) continue;
+      for (const edge of user?.madePosts?.edges ?? []) posts.push(edge.node);
+    }
+    for (const page of twitterPages) {
+      for (const edge of page?.data?.posts?.edges ?? []) posts.push(edge.node);
+    }
+    for (const page of urlPages) {
+      for (const edge of page?.data?.posts?.edges ?? []) {
+        if (phMakerMatches(edge.node, profile, siteHosts)) posts.push(edge.node);
+      }
+    }
+    for (const page of slugPages) {
+      const post = page?.data?.post;
+      if (post && phMakerMatches(post, profile, siteHosts)) posts.push(post);
+    }
+
+    const seen = new Set<string>();
+    const found: Found[] = [];
+    for (const post of posts) {
+      const item = foundFromPhPost(post, year);
+      if (!item?.name) continue;
+      const key = `${loose(item.name)}|${item.link ?? ''}`;
+      if (seen.has(key)) continue;
+      seen.add(key);
+      found.push(item);
+    }
+    return found;
   },
 };
 
@@ -1375,7 +1544,7 @@ function dedupeFound(found: Found[]): Found[] {
 export async function gather(subject: Subject, env: SourceEnv, year: number, meter: TinyfishMeter | null = null): Promise<Gathered> {
   const tinyfish = tinyfishAccess(env, meter);
   const resolved = await resolveIdentity(subject, env, tinyfish);
-  return cached(`gather:v4:${year}:${resolved.cacheKey}`, 1440 * MIN, () => gatherFresh(subject, resolved.profile, env, year, meter, tinyfish, resolved.notes));
+  return cached(`gather:v5:${year}:${resolved.cacheKey}`, 1440 * MIN, () => gatherFresh(subject, resolved.profile, env, year, meter, tinyfish, resolved.notes));
 }
 
 async function gatherFresh(
@@ -1512,14 +1681,29 @@ async function gatherFresh(
     }
   }
 
-  const deduped = dedupeFound(found).map((item) => ({ ...item, description: describeWithStat(item) }));
-  const stats = mergeStats([pageStats]);
-  const draft: Gathered = { found: deduped, web: web.slice(0, 12), pages, site, profile, ran, failed, stats };
+  let deduped = dedupeFound(found).map((item) => ({ ...item, description: describeWithStat(item) }));
+  let stats = mergeStats([pageStats, deduped.flatMap((item) => item.metrics ?? [])]);
+  let draft: Gathered = { found: deduped, web: web.slice(0, 12), pages, site, profile, ran, failed, stats };
   const gaps = detectGaps(draft);
   ran.push(`research-pass:gaps:${gaps.join(',') || 'none'}`);
 
   // Pass 3 — gap-fill from already-fetched pages first (free). Paid TinyFish/Claude only if still thin.
   if (gaps.includes('thin-for-prolific') || gaps.includes('own-site')) ran.push('research-pass:gap-fill');
+  if (gaps.includes('producthunt') && productHunt.enabled(ctx)) {
+    try {
+      const extra = deduped.map((item) => item.link).filter((url): url is string => Boolean(url));
+      const more = await productHunt.run({ ...ctx, extraUrls: extra });
+      if (more.length) {
+        found.push(...more);
+        ran.push('producthunt-sites');
+      }
+    } catch {
+      failed.push('producthunt-sites');
+    }
+    deduped = dedupeFound(found).map((item) => ({ ...item, description: describeWithStat(item) }));
+    stats = mergeStats([pageStats, deduped.flatMap((item) => item.metrics ?? [])]);
+    draft = { ...draft, found: deduped, stats };
+  }
 
-  return { ...draft, found: deduped, stats, gaps, coverageCapped: false };
+  return { ...draft, found: deduped, stats, gaps: detectGaps({ ...draft, found: deduped, stats }), coverageCapped: false };
 }

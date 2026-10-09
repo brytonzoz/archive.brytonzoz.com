@@ -64,8 +64,8 @@ type Vec = { x: number; y: number; r: number };
 const REST_Y = 30;
 const STUB = 14;
 const GRIP = 112;
-const SETTLE = spring(0.55, 0.22);
-const SNAP_BACK = spring(0.42, 0.12);
+const SETTLE = spring(0.38, 0.32);
+const SNAP_BACK = spring(0.32, 0.08);
 const TILT = spring(0.35, 0);
 
 const useIsoLayoutEffect = typeof window === 'undefined' ? useEffect : useLayoutEffect;

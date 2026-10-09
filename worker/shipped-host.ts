@@ -10,7 +10,7 @@ import { hardenPage, secure, switchedOff } from './shipped-guard';
 import { SHIPPED_URL } from '../lib/shipped-year';
 
 const NOINDEX = 'noindex, nofollow, noarchive';
-const PAGES = /^\/(?:(refunds|remove|sandbox-pay|terms)(?:\/.*)?)?$/;
+const PAGES = /^\/(?:(lab|refunds|remove|sandbox-pay|terms)(?:\/.*)?)?$/;
 /** Static files the app itself loads from /shipped/ (Bryton's dithered logos). */
 const OWN_FILES = /^\/shipped\/logos\//;
 

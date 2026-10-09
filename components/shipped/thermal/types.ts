@@ -38,6 +38,10 @@ export type ThermalReceipt = {
   /** Honest chips: FIRST RUN, DEEP CUT, SOURCED… */
   badges?: string[];
   firstRun?: boolean;
+  /** Chosen modules in print order. Absent on old sample receipts. */
+  modules?: { id: string; title: string; lines: string[] }[];
+  /** 0–100 from sourced public work. Absent when unknown. */
+  shipScore?: number;
 };
 
 export type Align = 'left' | 'center' | 'right';

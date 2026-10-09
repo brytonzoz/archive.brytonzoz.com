@@ -49,5 +49,7 @@ export function fromLoaded({ receipt, sponsors }: LoadedReceipt): ThermalReceipt
     deepCut: cut ? { name: cut.name, why: `Sourced · ${cut.source}` } : null,
     badges: receiptBadges(modules),
     firstRun: isFirstRun(receipt.id),
+    modules: modules.map((band) => ({ id: band.id, title: band.title, lines: band.lines })),
+    shipScore: receipt.shipScore,
   };
 }

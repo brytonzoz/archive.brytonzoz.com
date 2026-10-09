@@ -29,7 +29,7 @@ export type ModuleId =
   | 'friend'
   | 'stamp';
 
-/** The twelve we ship first. Order is print order. */
+/** The twelve we ship first. Catalog order; a receipt may rearrange them. */
 export const MODULE_ORDER: ModuleId[] = [
   'deep-cut',
   'items',
@@ -44,6 +44,85 @@ export const MODULE_ORDER: ModuleId[] = [
   'friend',
   'stamp',
 ];
+
+const MODULE_IDS = new Set<string>(MODULE_ORDER);
+
+/** Always on the tape. The AI may reorder them; it cannot drop them. */
+export const REQUIRED_MODULES: ModuleId[] = ['items', 'serial', 'cashier', 'stamp'];
+
+export const isModuleId = (value: unknown): value is ModuleId => typeof value === 'string' && MODULE_IDS.has(value);
+
+function rng(seed: number): () => number {
+  let a = (Math.floor(seed) >>> 0) || 1;
+  return () => {
+    a = (a + 0x6d2b79f5) | 0;
+    let t = Math.imul(a ^ (a >>> 15), 1 | a);
+    t = (t + Math.imul(t ^ (t >>> 7), 61 | t)) ^ t;
+    return ((t ^ (t >>> 14)) >>> 0) / 4294967296;
+  };
+}
+
+/**
+ * Known ids only, no HTML, no dupes. Missing required bands are appended.
+ * Garbage input falls back to a seeded layout so a bad model reply still prints.
+ */
+export function sanitizeLayout(raw: unknown, seed: number, opts?: { hasDeepCut?: boolean }): ModuleId[] {
+  const seen = new Set<ModuleId>();
+  const out: ModuleId[] = [];
+  if (Array.isArray(raw)) {
+    for (const entry of raw) {
+      if (typeof entry !== 'string' || /[<>{}`\\]/.test(entry)) continue;
+      const id = entry.trim().toLowerCase();
+      if (!isModuleId(id) || seen.has(id)) continue;
+      seen.add(id);
+      out.push(id);
+    }
+  }
+  if (!out.length) return seededLayout(seed, opts);
+  for (const id of REQUIRED_MODULES) {
+    if (!seen.has(id)) out.push(id);
+  }
+  return out;
+}
+
+/** Deterministic pick-and-order of the twelve. Same seed, same tape. */
+export function seededLayout(seed: number, opts?: { hasDeepCut?: boolean }): ModuleId[] {
+  const rand = rng(seed);
+  const optional = MODULE_ORDER.filter((id) => !REQUIRED_MODULES.includes(id) && (id !== 'deep-cut' || opts?.hasDeepCut !== false));
+  for (let i = optional.length - 1; i > 0; i--) {
+    const j = Math.floor(rand() * (i + 1));
+    const swap = optional[i];
+    optional[i] = optional[j];
+    optional[j] = swap;
+  }
+  const keep = optional.filter((id) => id === 'deep-cut');
+  const droppable = optional.filter((id) => id !== 'deep-cut');
+  const drop = Math.floor(rand() * 3);
+  const picked = [...keep, ...droppable.slice(0, Math.max(2, droppable.length - drop))];
+  const rest = picked.filter((id) => id !== 'deep-cut');
+  const head: ModuleId[] = picked.includes('deep-cut') ? ['deep-cut'] : [];
+  return [...head, 'items', ...rest, 'serial', 'cashier', 'stamp'];
+}
+
+/**
+ * Honest 0–100 from what is actually on the tape (count, sourced links, dates, platforms, still-running).
+ * Never views, bids, or made-up ranks. Potential receipts score 0.
+ */
+export function shipScore(receipt: Pick<YearReceipt, 'items' | 'potential'>): number {
+  if (receipt.potential) return 0;
+  const items = receipt.items;
+  const sourced = items.filter((item) => item.source !== 'none' && item.link).length;
+  const dated = items.filter((item) => item.date).length;
+  const platforms = new Set(items.map((item) => item.source).filter((source) => source !== 'none')).size;
+  const running = items.filter((item) => item.status === 'LIVE' || item.status === 'ACTIVE' || item.status === 'BETA').length;
+  const n =
+    Math.min(40, items.length * 4) +
+    Math.min(25, sourced * 5) +
+    Math.min(15, dated * 3) +
+    Math.min(10, platforms * 3) +
+    Math.min(10, running * 3);
+  return Math.max(0, Math.min(100, n));
+}
 
 /** Seed / first-day receipts. Honest: the serial itself is the proof. */
 export const FIRST_RUN_THROUGH = 250;
@@ -131,7 +210,7 @@ export type ModuleContext = {
   printed?: number;
 };
 
-export function receiptModules({ receipt, printed }: ModuleContext): ReceiptModule[] {
+export function catalogModules({ receipt, printed }: ModuleContext): ReceiptModule[] {
   const items = receipt.potential ? [] : receipt.items;
   const count = itemsShipped(receipt);
   const cut = pickDeepCut(items);
@@ -144,6 +223,7 @@ export function receiptModules({ receipt, printed }: ModuleContext): ReceiptModu
   const volume = volumeLine(count, receipt.potential);
   const serial = receiptNumber(receipt.id);
   const of = printed && printed >= receipt.id ? ` of ${printed.toLocaleString('en-US')}` : '';
+  const score = receipt.shipScore ?? shipScore(receipt);
 
   const modules: ReceiptModule[] = [
     {
@@ -198,7 +278,7 @@ export function receiptModules({ receipt, printed }: ModuleContext): ReceiptModu
     {
       id: 'serial',
       title: 'SERIAL',
-      lines: [`#${serial}${of}`, firstRun ? 'FIRST RUN' : 'CUSTOMER COPY'],
+      lines: [`#${serial}${of}`, firstRun ? 'FIRST RUN' : 'CUSTOMER COPY', `Ship score ${score}`],
       rarity: firstRun ? 'first-run' : 'common',
       badge: firstRun ? 'FIRST RUN' : `#${serial}`,
     },
@@ -244,6 +324,15 @@ export function receiptModules({ receipt, printed }: ModuleContext): ReceiptModu
   ];
 
   return MODULE_ORDER.map((id) => modules.find((band) => band.id === id)!);
+}
+
+/** The bands this receipt actually prints, in the stored or seeded order. */
+export function receiptModules(ctx: ModuleContext): ReceiptModule[] {
+  const catalog = catalogModules(ctx);
+  const hasDeepCut = catalog.some((band) => band.id === 'deep-cut' && band.badge === 'DEEP CUT');
+  const seed = ctx.receipt.id || 1;
+  const layout = ctx.receipt.layout?.length ? sanitizeLayout(ctx.receipt.layout, seed, { hasDeepCut }) : seededLayout(seed, { hasDeepCut });
+  return layout.map((id) => catalog.find((band) => band.id === id)).filter((band): band is ReceiptModule => Boolean(band));
 }
 
 export function receiptBadges(modules: ReceiptModule[]): string[] {

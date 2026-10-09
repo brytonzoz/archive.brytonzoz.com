@@ -55,7 +55,8 @@ export function VisitorReceipt({ receipt, sponsors }: Loaded) {
   const kicker = receipt.subject.kind === 'github' && receipt.subject.display !== who ? `@${receipt.subject.id} · GITHUB` : KICKER[receipt.subject.kind];
   const ordered = itemsForPrint(receipt.potential ? [] : receipt.items);
   const cut = pickDeepCut(ordered);
-  const badges = receiptBadges(receiptModules({ receipt }));
+  const modules = receiptModules({ receipt });
+  const badges = receiptBadges(modules);
   return (
     <YearReceipt
       year={receipt.year}
@@ -79,6 +80,8 @@ export function VisitorReceipt({ receipt, sponsors }: Loaded) {
       deepCut={cut ? { name: cut.name, why: `Sourced from ${cut.source}` } : null}
       badges={badges}
       firstRun={isFirstRun(receipt.id)}
+      modules={modules.map((band) => ({ id: band.id, title: band.title, lines: band.lines }))}
+      shipScore={receipt.shipScore}
       fine={
         <>
           <p>

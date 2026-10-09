@@ -239,6 +239,8 @@ export type YearOg = {
   deepCut?: { name: string; why: string } | null;
   badges?: string[];
   firstRun?: boolean;
+  modules?: { id: string; title: string; lines: string[] }[];
+  shipScore?: number;
 };
 
 function qrMark(x: number, y: number, width: number, code: { size: number; path: string }) {
@@ -346,20 +348,7 @@ export function yearCardSvg(data: YearOg): string {
   return scene(1200, 675, `${sheet(680, body.join(''), 'translate(736 40) rotate(0.6 200 0)', `card:${data.number}`, { open: true, soft: true })}${printerLip(706, 40, 460)}${left.join('')}`);
 }
 
-function yearReceiptPaint(data: YearOg): { body: string; height: number } {
-  const c = PAPER_W / 2;
-  const body: string[] = [...headerFull(c, data), ...customer(c, data.firstRun ? 214 : 180, data.year, data.who), rule(data.firstRun ? 292 : 258)];
-  let y = data.firstRun ? 322 : 288;
-  if (data.deepCut) {
-    body.push(inverse(c, y, 'HOW DID IT KNOW?', 12));
-    y += 28;
-    body.push(txt(c, y, fit(data.deepCut.name.toUpperCase(), 30), 13, { weight: 600, anchor: 'middle' }));
-    y += 18;
-    body.push(txt(c, y, fit(data.deepCut.why, 48), 10.5, { anchor: 'middle', opacity: 0.7 }));
-    y += 24;
-    body.push(rule(y));
-    y += 20;
-  }
+function paintItems(body: string[], data: YearOg, y: number): number {
   for (const item of data.items) {
     const indent = item.logo ? 64 : 28;
     if (item.logo) body.push(logoImage(28, y - 16, 28, item.logo));
@@ -370,14 +359,70 @@ function yearReceiptPaint(data: YearOg): { body: string; height: number } {
     y += 22 + Math.max(lines.length, item.logo ? 1 : 0) * 14 + 10;
   }
   body.push(rule(y - 4, true), txt(28, y + 22, 'ITEMS SHIPPED', 13, { weight: 600 }), tall(PAPER_W - 28, y + 24, String(data.count), 16, { anchor: 'end' }), rule(y + 38, true));
-  y += 66;
+  return y + 66;
+}
+
+function paintDeepCut(body: string[], data: YearOg, c: number, y: number): number {
+  if (!data.deepCut) return y;
+  body.push(inverse(c, y, 'HOW DID IT KNOW?', 12));
+  y += 28;
+  body.push(txt(c, y, fit(data.deepCut.name.toUpperCase(), 30), 13, { weight: 600, anchor: 'middle' }));
+  y += 18;
+  body.push(txt(c, y, fit(data.deepCut.why, 48), 10.5, { anchor: 'middle', opacity: 0.7 }));
+  y += 24;
+  body.push(rule(y));
+  return y + 20;
+}
+
+function paintCashier(body: string[], data: YearOg, y: number): number {
   body.push(txt(28, y, 'CASHIER’S NOTE', 10.5, { opacity: 0.6 }));
   y += 18;
   for (const line of wrap(data.note, 52, 3)) {
     body.push(txt(28, y, line, 12));
     y += 17;
   }
-  y += 14;
+  return y + 14;
+}
+
+function yearReceiptPaint(data: YearOg): { body: string; height: number } {
+  const c = PAPER_W / 2;
+  const body: string[] = [...headerFull(c, data), ...customer(c, data.firstRun ? 214 : 180, data.year, data.who), rule(data.firstRun ? 292 : 258)];
+  let y = data.firstRun ? 322 : 288;
+  if (typeof data.shipScore === 'number') {
+    body.push(txt(c, y, `SHIP SCORE ${data.shipScore}`, 10, { anchor: 'middle', opacity: 0.65 }));
+    y += 18;
+  }
+  if (data.modules?.length) {
+    for (const band of data.modules) {
+      if (band.id === 'items') {
+        y = paintItems(body, data, y);
+        continue;
+      }
+      if (band.id === 'deep-cut') {
+        y = paintDeepCut(body, data, c, y);
+        continue;
+      }
+      if (band.id === 'cashier') {
+        y = paintCashier(body, data, y);
+        continue;
+      }
+      body.push(txt(c, y, fit(band.title, 40), 10.5, { weight: 600, anchor: 'middle', opacity: 0.65 }));
+      y += 16;
+      for (const line of band.lines) {
+        wrap(line, 48, 2).forEach((part) => {
+          body.push(txt(c, y, fit(part, 48), 11, { anchor: 'middle' }));
+          y += 15;
+        });
+      }
+      y += 8;
+      body.push(rule(y));
+      y += 16;
+    }
+  } else {
+    y = paintDeepCut(body, data, c, y);
+    y = paintItems(body, data, y);
+    y = paintCashier(body, data, y);
+  }
   y = sponsorBlock(body, c, y, data.sponsors);
   y += 24;
   body.push(barcode(64, y, 272, 34, data.barcode));

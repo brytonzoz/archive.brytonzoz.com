@@ -6,6 +6,7 @@
 import type { ItemStatus, Subject } from '../lib/shipped-year';
 import { ITEM_STATUSES } from '../lib/shipped-year';
 import { hasBlockedWord } from '../lib/shipped-sponsors';
+import { MODULE_ORDER, REQUIRED_MODULES, sanitizeLayout, type ModuleId } from '../lib/shipped-modules';
 import { clean, hostOf, inYearCount, publicUrl, type Found, type Gathered } from './shipped-sources';
 
 export interface AiEnv {
@@ -58,7 +59,7 @@ export function isCreditError(status: number, body: string): boolean {
 
 /** A receipt line before its logo is fetched. */
 export type DraftItem = { name: string; description: string; date: string | null; status: ItemStatus; link: string | null; icon: string | null; source: Found['source'] };
-export type Draft = { items: DraftItem[]; note: string; potential: boolean };
+export type Draft = { items: DraftItem[]; note: string; potential: boolean; layout: ModuleId[] };
 export type AiResult = Draft & { model: string; inputTokens: number; outputTokens: number; searches: number; costMicros: number };
 
 const MAX_ITEMS = 20;
@@ -156,9 +157,10 @@ export const potentialItem = (): DraftItem => ({
   source: 'none',
 });
 
-function finish(items: DraftItem[], note: string, seed: number): Draft {
-  if (!items.length) return { items: [potentialItem()], note: POTENTIAL_NOTES[seed % POTENTIAL_NOTES.length], potential: true };
-  return { items: items.slice(0, MAX_ITEMS).sort(byDate), note, potential: false };
+function finish(items: DraftItem[], note: string, seed: number, modulesRaw?: unknown): Draft {
+  const layout = sanitizeLayout(modulesRaw, seed);
+  if (!items.length) return { items: [potentialItem()], note: POTENTIAL_NOTES[seed % POTENTIAL_NOTES.length], potential: true, layout };
+  return { items: items.slice(0, MAX_ITEMS).sort(byDate), note, potential: false, layout };
 }
 
 /** Without the AI: the free sources' best finds from the year, in date order, and a canned note. */
@@ -193,7 +195,8 @@ function systemPrompt(year: number, searches: number) {
     'Item names: the product name as people know it, max 32 characters. Description: what it is, plainly, max 70 characters. Write like a terse spec sheet: "Menu bar app that keeps the Mac awake", not "An innovative solution that empowers users".',
     'Then one "note" from the cashier, max 90 characters. Voice: a deadpan night-shift cashier who has rung up a lot of receipts. Dry, specific, warm, never at the person\'s expense. It must mention something concrete from THIS receipt (an item, the count, the month most things shipped). Good: "Four npm packages in one spring. Strong Tuesday energy." / "One app, eleven releases. Someone likes the publish button." Bad: anything generic, inspirational, congratulatory, or teasing.',
     'Banned words and moves everywhere: delve, testament, journey, innovative, seamless, elevate, unlock, empower, leverage, cutting-edge, game-changer, robust, passion, incredible, amazing, "truly", exclamation marks, emoji, em dashes, and praise like "impressive year".',
-    `Finish with only a JSON object, no markdown: {"items":[{"name":"","description":"","date":"YYYY-MM or YYYY-MM-DD or null","status":"${ITEM_STATUSES.join('|')}","link":"url or null"}],"note":""}`,
+    `Then choose which receipt modules to print, and in what order. Ids only, from this list: ${MODULE_ORDER.join(', ')}. Always include ${REQUIRED_MODULES.join(', ')}. Never output HTML, markdown, CSS or extra keys. Module body copy is filled in on the server from sourced data; you only pick the ids.`,
+    `Finish with only a JSON object, no markdown: {"items":[{"name":"","description":"","date":"YYYY-MM or YYYY-MM-DD or null","status":"${ITEM_STATUSES.join('|')}","link":"url or null"}],"note":"","modules":["${MODULE_ORDER.slice(0, 3).join('","')}"]}`,
   ].join('\n');
 }
 
@@ -301,7 +304,7 @@ function normalize(raw: unknown, gathered: Gathered, allowed: Allowed, year: num
     if (items.length === MAX_ITEMS) break;
   }
   const note = typeof data.note === 'string' ? clean(data.note, 110).replace(/\s*[\u2014\u2013]\s*/g, '. ').replace(/!+/g, '.') : '';
-  return finish(items, ok(note) && !AI_VOICE.test(note) ? note : cannedNote(items.length, seed), seed);
+  return finish(items, ok(note) && !AI_VOICE.test(note) ? note : cannedNote(items.length, seed), seed, data.modules);
 }
 
 /** The model's raw reply checked against the receipt schema, with only these links allowed. Exported for tests. */

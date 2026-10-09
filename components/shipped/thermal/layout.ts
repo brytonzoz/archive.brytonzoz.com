@@ -81,36 +81,66 @@ export function receiptToDoc(receipt: ThermalReceipt): PrintDoc {
   text(lines, receipt.who.toUpperCase(), 'center', { bold: true, tall: true });
   if (receipt.kicker) text(lines, receipt.kicker, 'center', { small: true, faint: true });
   if (receipt.badges?.length) text(lines, receipt.badges.join(' · '), 'center', { small: true });
+  if (typeof receipt.shipScore === 'number') text(lines, `SHIP SCORE ${receipt.shipScore}`, 'center', { small: true, faint: true });
   lines.push({ kind: 'rule' });
 
-  if (receipt.deepCut) {
+  const printItems = () => {
+    lines.push({ kind: 'text', text: `ITEM${' '.repeat(COLS_SMALL - 10)}STATUS`, align: 'left', small: true, faint: true });
+    receipt.items.forEach((item, index) => {
+      if (index > 0) feed(receipt.compact ? 4 : 12);
+      if (item.logo && !receipt.compact) lines.push({ kind: 'logo', src: item.logo, align: 'left' });
+      lead(lines, item.name, item.status, { bold: true });
+      if (!receipt.compact && (item.description || item.date)) {
+        const detail = [item.description, item.date].filter(Boolean).join('  ');
+        text(lines, detail, 'left', { small: true });
+      }
+    });
+    lines.push({ kind: 'rule', heavy: true });
+    lead(lines, 'ITEMS SHIPPED', String(receipt.count), { bold: true, tall: true });
+    lines.push({ kind: 'rule', heavy: true });
+  };
+
+  const printDeepCut = () => {
+    if (!receipt.deepCut) return;
     feed(6);
     text(lines, 'HOW DID IT KNOW?', 'center', { bold: true, invert: true });
     feed(8);
     text(lines, receipt.deepCut.name, 'center', { bold: true });
     text(lines, receipt.deepCut.why, 'center', { small: true });
     lines.push({ kind: 'rule' });
-  }
+  };
 
-  lines.push({ kind: 'text', text: `ITEM${' '.repeat(COLS_SMALL - 10)}STATUS`, align: 'left', small: true, faint: true });
-  receipt.items.forEach((item, index) => {
-    if (index > 0) feed(receipt.compact ? 4 : 12);
-    if (item.logo && !receipt.compact) lines.push({ kind: 'logo', src: item.logo, align: 'left' });
-    lead(lines, item.name, item.status, { bold: true });
-    if (!receipt.compact && (item.description || item.date)) {
-      const detail = [item.description, item.date].filter(Boolean).join('  ');
-      text(lines, detail, 'left', { small: true });
+  if (receipt.modules?.length) {
+    for (const band of receipt.modules) {
+      if (band.id === 'items') {
+        printItems();
+        continue;
+      }
+      if (band.id === 'deep-cut') {
+        printDeepCut();
+        continue;
+      }
+      if (band.id === 'cashier') {
+        feed(8);
+        text(lines, "CASHIER'S NOTE", 'left', { small: true, faint: true });
+        text(lines, receipt.note, 'left');
+        feed(8);
+        continue;
+      }
+      feed(6);
+      text(lines, band.title, 'center', { bold: true, small: true });
+      for (const line of band.lines) text(lines, line, 'center', { small: true });
+      lines.push({ kind: 'rule' });
     }
-  });
-
-  lines.push({ kind: 'rule', heavy: true });
-  lead(lines, 'ITEMS SHIPPED', String(receipt.count), { bold: true, tall: true });
-  lines.push({ kind: 'rule', heavy: true });
-
-  feed(8);
-  text(lines, "CASHIER'S NOTE", 'left', { small: true, faint: true });
-  text(lines, receipt.note, 'left');
-  feed(16);
+    feed(8);
+  } else {
+    printDeepCut();
+    printItems();
+    feed(8);
+    text(lines, "CASHIER'S NOTE", 'left', { small: true, faint: true });
+    text(lines, receipt.note, 'left');
+    feed(16);
+  }
 
   lines.push({ kind: 'box-top' });
   text(lines, 'THIS RECEIPT WAS PAID FOR BY', 'center', { small: true, bold: true, boxed: true });

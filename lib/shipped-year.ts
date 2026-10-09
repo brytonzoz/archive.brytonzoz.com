@@ -58,6 +58,10 @@ export type YearReceipt = {
   demo: boolean;
   /** Listed in "recently printed" (the printer opted in). */
   listed: boolean;
+  /** Print order of the 12 modules (ids only; content is always derived). */
+  layout?: string[];
+  /** 0–100 from sourced public work on this tape. Never engagement. */
+  shipScore?: number;
 };
 
 export type Candidate = Subject & { detail: string };

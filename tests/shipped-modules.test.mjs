@@ -32,13 +32,39 @@ const receipt = (over = {}) => ({
 });
 
 test('the 12 modules are all present; deep-cut prefers a sourced surprise', () => {
-  const list = modules.receiptModules({ receipt: receipt(), printed: 40 });
+  const list = modules.catalogModules({ receipt: receipt(), printed: 40 });
   assert.deepEqual(list.map((row) => row.id), modules.MODULE_ORDER);
   assert.equal(list.length, 12);
   const cut = modules.pickDeepCut(receipt().items);
   assert.equal(cut?.name, 'Show HN app');
-  assert.equal(list[0].lines[0], 'Show HN app');
+  assert.equal(list.find((row) => row.id === 'deep-cut').lines[0], 'Show HN app');
   assert.equal(modules.itemsForPrint(receipt().items)[0].name, 'Show HN app');
+});
+
+test('layout is ids only: HTML and unknown ids are dropped; required bands stay', () => {
+  const layout = modules.sanitizeLayout(['items', '<script>', 'not-a-module', 'deep-cut', 'items'], 7);
+  assert.deepEqual(layout.filter((id) => id === 'items'), ['items']);
+  assert.ok(!layout.some((id) => /[<>]/.test(id)));
+  for (const id of modules.REQUIRED_MODULES) assert.ok(layout.includes(id));
+  assert.ok(layout.includes('deep-cut'));
+  assert.deepEqual(modules.sanitizeLayout(['<b>items</b>', null, 12], 3), modules.seededLayout(3));
+});
+
+test('seeded layout is deterministic and never invents ids', () => {
+  assert.deepEqual(modules.seededLayout(42), modules.seededLayout(42));
+  assert.notDeepEqual(modules.seededLayout(1), modules.seededLayout(99));
+  const a = modules.receiptModules({ receipt: receipt({ id: 7 }) });
+  const b = modules.receiptModules({ receipt: receipt({ id: 7 }) });
+  assert.deepEqual(a.map((row) => row.id), b.map((row) => row.id));
+  assert.ok(a.every((row) => modules.MODULE_ORDER.includes(row.id)));
+});
+
+test('ship score is 0–100 from sourced work, 0 for potential, never engagement', () => {
+  assert.equal(modules.shipScore({ items: [], potential: true }), 0);
+  const one = modules.shipScore(receipt({ items: [item({ name: 'Repo', source: 'github' })] }));
+  const many = modules.shipScore(receipt());
+  assert.ok(one > 0 && one <= 100);
+  assert.ok(many > one && many <= 100);
 });
 
 test('nothing unsourced is a deep-cut; FIRST RUN is #0001–#0250', () => {
@@ -53,7 +79,7 @@ test('nothing unsourced is a deep-cut; FIRST RUN is #0001–#0250', () => {
 
 test('volume labels are honest counts, not fake percentiles', () => {
   const tape = (n) =>
-    modules.receiptModules({
+    modules.catalogModules({
       receipt: receipt({
         items: Array.from({ length: n }, (_, i) => item({ name: `P${i}`, source: 'github' })),
       }),

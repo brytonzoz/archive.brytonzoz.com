@@ -55,6 +55,7 @@ async function yearOg(receipt: YearReceipt, block: SponsorBlock, origin: string,
   const logos = await Promise.all(items.map((item) => logo(item.logo).catch(() => null)));
   const sponsorLogos = await Promise.all(block.slots.map((slot) => logo(slot.logo).catch(() => null)));
   const cut = pickDeepCut(ordered);
+  const modules = receiptModules({ receipt });
   return {
     number: receiptNumber(receipt.id),
     year: receipt.year,
@@ -74,8 +75,10 @@ async function yearOg(receipt: YearReceipt, block: SponsorBlock, origin: string,
     url: new URL(RECEIPT_PATH(receipt.id), origin).toString().replace(/^https?:\/\//, ''),
     barcode: receiptBarcodeUnits(`BZ${receiptNumber(receipt.id)}${receipt.year}`),
     deepCut: cut ? { name: cut.name, why: `Sourced from ${cut.source}` } : null,
-    badges: receiptBadges(receiptModules({ receipt })),
+    badges: receiptBadges(modules),
     firstRun: isFirstRun(receipt.id),
+    modules: modules.map((band) => ({ id: band.id, title: band.title, lines: band.lines })),
+    shipScore: receipt.shipScore,
   };
 }
 

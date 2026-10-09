@@ -41,6 +41,8 @@ export type YearReceiptProps = {
   deepCut?: { name: string; why: string } | null;
   badges?: string[];
   firstRun?: boolean;
+  modules?: { id: string; title: string; lines: string[] }[];
+  shipScore?: number;
 };
 
 function ItemName({ item }: { item: ViewItem }) {
@@ -113,46 +115,20 @@ export function SponsorBlockView({ block }: { block: SponsorBlock | null }) {
   );
 }
 
-export function YearReceipt(props: YearReceiptProps) {
+function DeepCut({ cut }: { cut: YearReceiptProps['deepCut'] }) {
+  if (!cut) return null;
   return (
-    <article className="shipped-receipt">
-      <header className="text-center">
-        <p>
-          <Tall className="text-[15px] font-semibold">SHIPPED {props.year}</Tall>
-        </p>
-        <p className="mt-1 text-[11px] opacity-75">THE PUBLIC RECEIPT PRINTER</p>
-      </header>
+    <section className="mt-3 text-center" aria-label="How did it know?">
+      <p className="shipped-inverse">HOW DID IT KNOW?</p>
+      <p className="mt-2 text-[13px] font-semibold">{cut.name}</p>
+      <p className="mt-0.5 text-[11px] opacity-70">{cut.why}</p>
+    </section>
+  );
+}
 
-      <Rule />
-      <div className="space-y-0.5 text-[12px]">
-        <Line label="DATE" value={props.date} />
-        <Line label="RECEIPT" value={`#${props.number}`} />
-        <Line label="CASHIER" value="NIGHT SHIFT" />
-        {props.firstRun ? <Line label="RUN" value="FIRST RUN" /> : null}
-      </div>
-      <Rule />
-
-      <h2 className="text-center">
-        <span className="shipped-inverse">SHIPPED IN {props.year}</span>
-        <span className="sr-only">: </span>
-        <span className="mt-3 block text-[11px] font-normal opacity-70" aria-hidden="true">
-          CUSTOMER
-        </span>
-        <span className="mt-0.5 block break-words">
-          <Tall className="text-[16px] font-semibold">{props.who.toUpperCase()}</Tall>
-        </span>
-      </h2>
-      {props.kicker ? <p className="mt-1 text-center text-[11px] opacity-70">{props.kicker}</p> : null}
-      {props.badges?.length ? <p className="mt-2 text-center text-[10px] font-semibold tracking-[0.14em] opacity-70">{props.badges.join(' · ')}</p> : null}
-
-      {props.deepCut ? (
-        <section className="mt-3 text-center" aria-label="How did it know?">
-          <p className="shipped-inverse">HOW DID IT KNOW?</p>
-          <p className="mt-2 text-[13px] font-semibold">{props.deepCut.name}</p>
-          <p className="mt-0.5 text-[11px] opacity-70">{props.deepCut.why}</p>
-        </section>
-      ) : null}
-
+function ItemList({ props }: { props: YearReceiptProps }) {
+  return (
+    <>
       <Rule />
       <p className="shipped-lead text-[10.5px] opacity-60" aria-hidden="true">
         <span>ITEM</span>
@@ -185,7 +161,6 @@ export function YearReceipt(props: YearReceiptProps) {
           </li>
         ))}
       </ol>
-
       <Rule heavy />
       <div className="shipped-lead items-end py-1 text-[13px] font-semibold">
         <span>ITEMS SHIPPED</span>
@@ -193,11 +168,79 @@ export function YearReceipt(props: YearReceiptProps) {
         <Tall className="text-[18px] tabular-nums">{String(props.count)}</Tall>
       </div>
       <Rule heavy />
+    </>
+  );
+}
 
-      <section className="mt-3" aria-label="Cashier’s note">
-        <p className="text-[10.5px] opacity-60">CASHIER’S NOTE</p>
-        <p className="mt-1 text-[12.5px] leading-[1.5]">{props.note}</p>
-      </section>
+function CashierNote({ note }: { note: string }) {
+  return (
+    <section className="mt-3" aria-label="Cashier’s note">
+      <p className="text-[10.5px] opacity-60">CASHIER’S NOTE</p>
+      <p className="mt-1 text-[12.5px] leading-[1.5]">{note}</p>
+    </section>
+  );
+}
+
+function ModuleBand({ band, props }: { band: { id: string; title: string; lines: string[] }; props: YearReceiptProps }) {
+  if (band.id === 'items') return <ItemList props={props} />;
+  if (band.id === 'deep-cut') return <DeepCut cut={props.deepCut} />;
+  if (band.id === 'cashier') return <CashierNote note={props.note} />;
+  return (
+    <section className="mt-3 text-center" aria-label={band.title}>
+      <p className="text-[10.5px] font-semibold tracking-[0.14em] opacity-60">{band.title}</p>
+      {band.lines.map((line, i) => (
+        <p key={`${band.id}-${i}`} className="mt-1 text-[12px] leading-[1.45]">
+          {line}
+        </p>
+      ))}
+    </section>
+  );
+}
+
+export function YearReceipt(props: YearReceiptProps) {
+  return (
+    <article className="shipped-receipt">
+      <header className="text-center">
+        <p>
+          <Tall className="text-[15px] font-semibold">SHIPPED {props.year}</Tall>
+        </p>
+        <p className="mt-1 text-[11px] opacity-75">THE PUBLIC RECEIPT PRINTER</p>
+      </header>
+
+      <Rule />
+      <div className="space-y-0.5 text-[12px]">
+        <Line label="DATE" value={props.date} />
+        <Line label="RECEIPT" value={`#${props.number}`} />
+        <Line label="CASHIER" value="NIGHT SHIFT" />
+        {props.firstRun ? <Line label="RUN" value="FIRST RUN" /> : null}
+      </div>
+      <Rule />
+
+      <h2 className="text-center">
+        <span className="shipped-inverse">SHIPPED IN {props.year}</span>
+        <span className="sr-only">: </span>
+        <span className="mt-3 block text-[11px] font-normal opacity-70" aria-hidden="true">
+          CUSTOMER
+        </span>
+        <span className="mt-0.5 block break-words">
+          <Tall className="text-[16px] font-semibold">{props.who.toUpperCase()}</Tall>
+        </span>
+      </h2>
+      {props.kicker ? <p className="mt-1 text-center text-[11px] opacity-70">{props.kicker}</p> : null}
+      {props.badges?.length ? <p className="mt-2 text-center text-[10px] font-semibold tracking-[0.14em] opacity-70">{props.badges.join(' · ')}</p> : null}
+      {typeof props.shipScore === 'number' ? <p className="mt-1 text-center text-[10px] opacity-60">SHIP SCORE {props.shipScore}</p> : null}
+
+      {props.modules?.length ? (
+        props.modules.map((band) => (
+          <ModuleBand key={band.id} band={band} props={props} />
+        ))
+      ) : (
+        <>
+          <DeepCut cut={props.deepCut} />
+          <ItemList props={props} />
+          <CashierNote note={props.note} />
+        </>
+      )}
 
       <SponsorBlockView block={props.sponsors} />
 

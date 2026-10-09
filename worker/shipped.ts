@@ -113,6 +113,7 @@ import {
   type YearItem,
   type YearReceipt,
 } from '../lib/shipped-year';
+import { shipScore } from '../lib/shipped-modules';
 import {
   BID_RULES,
   HERO_SLOT,
@@ -188,7 +189,7 @@ const FAILED_FOR = 10 * MINUTE;
 /** Longest a print may hold its locks (gathering + up to three 40 s model calls). */
 const PRINT_LOCK = 3 * MINUTE;
 /** Bump when the share images change, so cached ones are redrawn. */
-const IMAGE_VERSION = 5;
+const IMAGE_VERSION = 6;
 
 const SCHEMA = [
   `CREATE TABLE IF NOT EXISTS shipped_receipts (
@@ -588,6 +589,8 @@ async function generate(
       potential: draft.potential,
       demo: state.demo,
       listed,
+      layout: draft.layout,
+      shipScore: shipScore({ items: draft.items, potential: draft.potential }),
     };
     const day = today();
     // Only a new row adds to "printed"; a second print of the same subject the same day replaces the first.

@@ -35,7 +35,9 @@ test('schema: only documented keys, only sourced items, only links the sources r
     [],
     2026,
   );
-  assert.deepEqual(Object.keys(draft).sort(), ['items', 'note', 'potential']);
+  assert.deepEqual(Object.keys(draft).sort(), ['items', 'layout', 'note', 'potential']);
+  assert.ok(Array.isArray(draft.layout));
+  assert.ok(draft.layout.every((id) => typeof id === 'string' && !/[<>]/.test(id)));
   assert.deepEqual(draft.items.map((item) => item.name), ['KEEPAWAKE']);
   assert.equal(draft.items[0].link, 'https://github.com/someone/keepawake');
   assert.deepEqual(Object.keys(draft.items[0]).sort(), ['date', 'description', 'icon', 'link', 'name', 'source', 'status']);
@@ -121,6 +123,25 @@ test('nothing found prints YOUR POTENTIAL, never invented items; garbage replies
 test('the demo receipt (no AI) also needs a public source for every line', () => {
   const draft = ai.demoReceipt(gathered([found(), found({ name: 'No Link', link: null }), found({ name: 'Local', link: 'https://localhost/x' })]), 2026, 0);
   assert.deepEqual(draft.items.map((item) => item.name), ['KEEPAWAKE']);
+  assert.ok(draft.layout.includes('items'));
+});
+
+test('AI module ids are validated; HTML never becomes a band', () => {
+  const draft = ai.validateDraft(
+    {
+      items: [{ name: 'Keepawake', link: 'https://github.com/someone/keepawake', date: '2026-03', status: 'RELEASED' }],
+      note: 'One app, eleven releases.',
+      modules: ['items', '<img src=x>', 'not-real', 'serial', 'cashier', 'stamp', 'deep-cut'],
+    },
+    gathered(),
+    [],
+    2026,
+    4,
+  );
+  assert.deepEqual(draft.layout.filter((id) => id === 'items' || id === 'deep-cut' || id === 'serial'), ['items', 'serial', 'deep-cut']);
+  assert.ok(!draft.layout.some((id) => /[<>]/.test(id)));
+  const garbage = ai.validateDraft({ items: [{ name: 'Keepawake', link: 'https://github.com/someone/keepawake', date: '2026-03' }], note: 'x', modules: '<html>' }, gathered(), [], 2026, 4);
+  assert.ok(garbage.layout.includes('items'));
 });
 
 test('the worst case of one receipt is bounded and covers a normal one', () => {

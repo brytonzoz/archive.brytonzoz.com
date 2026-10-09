@@ -75,6 +75,26 @@ test('the sourced deep-cut prints first as HOW DID IT KNOW', () => {
   assert.ok(how >= 0 && how < itemsHead);
 });
 
+test('chosen modules print in that order; ship score is the stored number', () => {
+  const doc = receiptToDoc({
+    ...RECEIPT,
+    shipScore: 42,
+    modules: [
+      { id: 'items', title: 'ITEMS', lines: [] },
+      { id: 'volume', title: 'TAPE', lines: ['Two public things. A short list.'] },
+      { id: 'serial', title: 'SERIAL', lines: ['#000042'] },
+      { id: 'cashier', title: "CASHIER'S NOTE", lines: [] },
+      { id: 'stamp', title: 'STAMP', lines: ['2026-10-09'] },
+    ],
+  });
+  assert.match(doc.text, /SHIP SCORE 42/);
+  assert.match(doc.text, /TAPE/);
+  const itemsHead = doc.lines.findIndex((line) => line.kind === 'text' && line.text.startsWith('ITEM'));
+  const tape = doc.lines.findIndex((line) => line.kind === 'text' && line.text === 'TAPE');
+  const note = doc.lines.findIndex((line) => line.kind === 'text' && line.text === "CASHIER'S NOTE");
+  assert.ok(itemsHead < tape && tape < note);
+});
+
 test('the plain-text copy carries every item and the note', () => {
   const text = docText(receiptToDoc(RECEIPT).lines);
   assert.match(text, /SHORT: SHIPPED/);

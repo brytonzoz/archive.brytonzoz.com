@@ -7,7 +7,6 @@ import { receiptDate } from '../../lib/shipped';
 import { money } from '../../lib/shipped-receipt';
 import { isFirstRun } from '../../lib/shipped-modules';
 import {
-  CARD_PATH,
   RECEIPT_PATH,
   ROLLO_PATH,
   SHIPPED_URL,
@@ -245,23 +244,47 @@ function RemoveMine({ receipt, onRemoved }: { receipt: Printed; onRemoved?: () =
   );
 }
 
-/** Sharing is the obvious next step: one-tap image share, then X, save and copy-link. */
+/** Sharing is the obvious next step: one-tap image share, then X, copy and mail. */
 function pageUrl(id: number): string {
   const path = RECEIPT_PATH(id);
   return typeof window === 'undefined' ? `${SHIPPED_URL}${path}` : `${window.location.origin}${path}`;
 }
 
-export function ShareBar({ receipt, onRemoved }: { receipt: Printed; onRemoved?: () => void }) {
+/** Floating pill after a print. Collapsed it never covers the tape; open it is a compact action card. */
+export function SharePill({
+  receipt,
+  onPrintAnother,
+  onRemoved,
+}: {
+  receipt: Printed;
+  onPrintAnother: () => void;
+  onRemoved?: () => void;
+}) {
+  const [open, setOpen] = useState(false);
   const [copied, setCopied] = useState(false);
   const [sharing, setSharing] = useState(false);
+  const panel = useRef<HTMLDivElement>(null);
+  const drag = useRef<{ y: number; last: number; vy: number } | null>(null);
   const path = RECEIPT_PATH(receipt.id);
-  // Relative hrefs work on staging; absolute URLs for copy/share are built at click time from this origin.
   const [origin, setOrigin] = useState('');
   useEffect(() => setOrigin(window.location.origin), []);
-  const url = origin ? `${origin}${path}` : path;
   const intent = origin
     ? `https://x.com/intent/post?text=${encodeURIComponent(shareText(receipt))}&url=${encodeURIComponent(`${origin}${path}`)}`
     : `https://x.com/intent/post?text=${encodeURIComponent(shareText(receipt))}`;
+
+  const close = () => {
+    setOpen(false);
+    if (panel.current) panel.current.style.transform = '';
+  };
+
+  useEffect(() => {
+    if (!open) return;
+    const onKey = (event: KeyboardEvent) => {
+      if (event.key === 'Escape') close();
+    };
+    window.addEventListener('keydown', onKey);
+    return () => window.removeEventListener('keydown', onKey);
+  }, [open]);
 
   async function shareImage() {
     setSharing(true);
@@ -291,49 +314,102 @@ export function ShareBar({ receipt, onRemoved }: { receipt: Printed; onRemoved?:
     }
   }
 
+  async function copyLink() {
+    const link = pageUrl(receipt.id);
+    try {
+      await navigator.clipboard.writeText(link);
+      setCopied(true);
+      tap(12);
+      window.setTimeout(() => setCopied(false), 2000);
+    } catch {
+      window.prompt('Copy this link', link);
+    }
+    beacon(receipt.id, 'copy');
+  }
+
+  function onHandleDown(event: React.PointerEvent<HTMLDivElement>) {
+    if (!open || event.button > 0) return;
+    drag.current = { y: event.clientY, last: event.clientY, vy: 0 };
+    (event.currentTarget as HTMLElement).setPointerCapture(event.pointerId);
+  }
+
+  function onHandleMove(event: React.PointerEvent<HTMLDivElement>) {
+    const d = drag.current;
+    if (!d || !panel.current) return;
+    const y = event.clientY;
+    d.vy = y - d.last;
+    d.last = y;
+    const dy = Math.max(0, y - d.y);
+    panel.current.style.transform = `translate3d(0, ${dy}px, 0)`;
+  }
+
+  function onHandleUp() {
+    const d = drag.current;
+    drag.current = null;
+    if (!d || !panel.current) return;
+    const dy = Math.max(0, d.last - d.y);
+    if (dy > 56 || d.vy > 10) {
+      close();
+      return;
+    }
+    panel.current.style.transform = '';
+  }
+
   return (
-    <div className="shipped-share" role="group" aria-label="Share your receipt">
-      <button type="button" className="shipped-button is-big" onPointerDown={press} onClick={shareImage} disabled={sharing}>
-        {sharing ? 'SHARING…' : 'SHARE IMAGE'}
-      </button>
-      <a href={intent} target="_blank" rel="noopener noreferrer" className="shipped-button is-ghost" onPointerDown={press} onClick={() => beacon(receipt.id, 'x')}>
-        POST TO X
-      </a>
-      <div className="shipped-share-row">
-        <a href={`${CARD_PATH(receipt.id)}?download=1`} download className="shipped-button is-ghost" aria-label="Save the share card image" onClick={() => beacon(receipt.id, 'card')}>
-          SAVE CARD
-        </a>
-        <a href={`${TALL_PATH(receipt.id)}?download=1`} download className="shipped-button is-ghost" aria-label="Save the full receipt image" onClick={() => beacon(receipt.id, 'tall')}>
-          SAVE FULL
-        </a>
-        <a href={`${ROLLO_PATH(receipt.id)}?download=1`} download className="shipped-button is-ghost" aria-label="Save a 4-inch Rollo PDF" onClick={() => beacon(receipt.id, 'rollo')}>
-          4-IN ROLLO
-        </a>
-        <button
-          type="button"
-          className={`shipped-button is-ghost${copied ? ' is-copied' : ''}`}
-          onPointerDown={press}
-          onClick={async () => {
-            const link = pageUrl(receipt.id);
-            try {
-              await navigator.clipboard.writeText(link);
-              setCopied(true);
-              tap(12);
-              window.setTimeout(() => setCopied(false), 2000);
-            } catch {
-              window.prompt('Copy this link', link);
-            }
-            beacon(receipt.id, 'copy');
-          }}
-        >
-          {copied ? 'COPIED' : 'COPY LINK'}
+    <div className={`shipped-pill-root${open ? ' is-open' : ''}`}>
+      {open ? <button type="button" className="shipped-pill-scrim" aria-label="Close share" onClick={close} /> : null}
+      <div className="shipped-pill-slot">
+        <button type="button" className="shipped-print-another" onPointerDown={press} onClick={onPrintAnother}>
+          Print another
         </button>
+        <div
+          ref={panel}
+          className={`shipped-pill${open ? ' is-open' : ''}`}
+          role={open ? 'dialog' : 'group'}
+          aria-label={open ? 'Share your receipt' : undefined}
+        >
+          {open ? (
+            <>
+              <div
+                className="shipped-pill-handle"
+                aria-hidden="true"
+                onPointerDown={onHandleDown}
+                onPointerMove={onHandleMove}
+                onPointerUp={onHandleUp}
+                onPointerCancel={onHandleUp}
+              />
+              <div className="shipped-pill-head">
+                <p className="shipped-pill-kicker">Share</p>
+                <button type="button" className="shipped-pill-x" aria-label="Close" onPointerDown={press} onClick={close}>
+                  ×
+                </button>
+              </div>
+              <div className="shipped-share">
+                <button type="button" className="shipped-button is-big" onPointerDown={press} onClick={shareImage} disabled={sharing}>
+                  {sharing ? 'SHARING…' : 'SHARE IMAGE'}
+                </button>
+                <a href={intent} target="_blank" rel="noopener noreferrer" className="shipped-button is-ghost" onPointerDown={press} onClick={() => beacon(receipt.id, 'x')}>
+                  POST TO X
+                </a>
+                <div className="shipped-share-row">
+                  <button type="button" className={`shipped-button is-ghost${copied ? ' is-copied' : ''}`} onPointerDown={press} onClick={() => void copyLink()}>
+                    {copied ? 'COPIED' : 'COPY LINK'}
+                  </button>
+                  <a href={`${ROLLO_PATH(receipt.id)}?download=1`} download className="shipped-button is-ghost" aria-label="Save a 4-inch Rollo PDF" onClick={() => beacon(receipt.id, 'rollo')}>
+                    4-IN ROLLO
+                  </a>
+                </div>
+                <MailedPrint receipt={receipt} />
+                <RemoveMine receipt={receipt} onRemoved={onRemoved} />
+              </div>
+            </>
+          ) : (
+            <button type="button" className="shipped-pill-hit" onPointerDown={press} onClick={() => setOpen(true)}>
+              <span aria-hidden="true">↗</span> Share · $5 print
+            </button>
+          )}
+        </div>
       </div>
-      <MailedPrint receipt={receipt} />
-      <RemoveMine receipt={receipt} onRemoved={onRemoved} />
-      <p className={`shipped-copied${copied ? ' is-on' : ''}`} role="status" aria-live="polite">
-        {copied ? 'Copied' : '\u00a0'}
-      </p>
     </div>
   );
 }

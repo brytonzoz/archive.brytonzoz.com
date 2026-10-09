@@ -52,6 +52,8 @@ export type MachineProps = {
   tearSignal?: number;
   /** Tallest the paper may hang (px) so the page never scrolls; a longer receipt scrolls inside once torn. */
   paperMax?: number;
+  /** Torn visitor receipt fills the viewport; printer recedes. */
+  focus?: boolean;
   console?: Console;
   inputRef?: React.Ref<HTMLInputElement>;
 };
@@ -108,7 +110,7 @@ function runSpring(el: HTMLElement, from: Vec, to: Vec, velocity: Vec, config: S
   return () => cancelAnimationFrame(frame);
 }
 
-export function Machine({ job, display, tone, onPrinted, onTorn, tearSignal = 0, paperMax, console: desk, inputRef }: MachineProps) {
+export function Machine({ job, display, tone, onPrinted, onTorn, tearSignal = 0, paperMax, focus = false, console: desk, inputRef }: MachineProps) {
   const [phase, setPhase] = useState<Phase>(phaseFor(job));
   const [more, setMore] = useState(false);
   const [leaving, setLeaving] = useState<{ key: string; job: Job; transform: string } | null>(null);
@@ -414,15 +416,15 @@ export function Machine({ job, display, tone, onPrinted, onTorn, tearSignal = 0,
         ? 'Type a name, handle, GitHub or website on the printer, then press Print.'
         : ''
       : phase === 'feeding'
-      ? display
-      : phase === 'printing'
-        ? `Printing: ${shown.label}`
-        : phase === 'hanging'
-          ? houseSlip
-            ? 'How it works. Drag the slip down to tear it off, or type a name and press Print.'
-            : 'Printed. Drag the receipt down to tear it off, tap it, or press Tear.'
-          : phase === 'torn'
-            ? 'Torn off.'
+        ? display
+        : phase === 'printing'
+          ? houseSlip || (shown.kind === 'print' && shown.fast)
+            ? ''
+            : `Printing: ${shown.label}`
+          : phase === 'hanging'
+            ? houseSlip
+              ? 'How it works. Drag the slip down to tear it off, or type a name and press Print.'
+              : 'Printed. Tear it off to share.'
             : '';
 
   const keys = (
@@ -512,7 +514,7 @@ export function Machine({ job, display, tone, onPrinted, onTorn, tearSignal = 0,
   );
 
   return (
-    <div className={`shipped-printer is-${phase} tone-${tone}`} data-sound={sound ? 'on' : 'off'}>
+    <div className={`shipped-printer is-${phase} tone-${tone}${focus ? ' is-focus' : ''}`} data-sound={sound ? 'on' : 'off'}>
       <div className="shipped-printer-body" ref={body}>
         {desk ? (
           <form
@@ -547,6 +549,7 @@ export function Machine({ job, display, tone, onPrinted, onTorn, tearSignal = 0,
         ) : (
           <div className={`shipped-stub${phase === 'feeding' ? ' is-on' : ''}${lead ? ' is-feeding' : ''}`} aria-hidden="true" />
         )}
+        {phase === 'feeding' ? <div className="shipped-lead-paper" aria-hidden="true" /> : null}
 
         {leaving && leaving.job.kind === 'print' ? (
           <div className="shipped-leaving" ref={leavingEl} aria-hidden="true">
@@ -575,11 +578,11 @@ export function Machine({ job, display, tone, onPrinted, onTorn, tearSignal = 0,
             >
               {phase === 'hanging' ? <div className="shipped-grip" aria-hidden="true" style={{ height: GRIP }} /> : null}
               <div
-                className={`shipped-tilt${phase === 'torn' ? ' is-scroll' : ''}${more ? ' is-more' : ''}`}
+                className={`shipped-tilt${phase === 'torn' || focus ? ' is-scroll' : ''}${more ? ' is-more' : ''}${phase === 'hanging' && !houseSlip && paperMax ? ' is-fade' : ''}`}
                 ref={tilt}
-                style={paperMax ? { maxHeight: paperMax } : undefined}
-                tabIndex={phase === 'torn' && more ? 0 : undefined}
-                aria-label={phase === 'torn' && more ? `${shown.label}, scrollable` : undefined}
+                style={paperMax && !focus ? { maxHeight: paperMax } : undefined}
+                tabIndex={(phase === 'torn' || focus) && more ? 0 : undefined}
+                aria-label={(phase === 'torn' || focus) && more ? `${shown.label}, scrollable` : undefined}
               >
                 <Ticket seed={shown.key} label={shown.label} slip={shown.slip} className={shown.end ? 'is-end' : ''}>
                   {shown.content}

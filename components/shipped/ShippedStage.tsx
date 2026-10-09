@@ -6,14 +6,14 @@
 import React, { useEffect, useRef, useState } from 'react';
 import { track } from '../../lib/analytics';
 import { countdown } from '../../lib/shipped-event';
-import { RECEIPT_PATH, SHIPPED_HOST, readQuery, receiptNumber, type Candidate } from '../../lib/shipped-year';
+import { readQuery, receiptNumber, type Candidate } from '../../lib/shipped-year';
 import { press } from './feel';
 import { HumanCheck, type HumanCheckHandle } from './HumanCheck';
 import { Machine, type Job, type Tone } from './Machine';
 import { Line, Rule, Tall } from './paper';
 import { Ticker } from './Ticker';
 import { refreshShippedState, useShippedClock, useShippedState } from './state';
-import { ShareBar, VisitorReceipt, rememberPile, type Loaded } from './visitor';
+import { SharePill, VisitorReceipt, rememberPile, type Loaded } from './visitor';
 
 const ERRORS: Record<string, string> = {
   'invalid-query': 'Type a name, an @handle, a GitHub username or a website.',
@@ -91,7 +91,13 @@ const outOfPaper = (
 function openingJob(opening: Opening): Job {
   if (opening.kind === 'house') return { key: 'house', kind: 'print', slip: true, label: 'How it works', content: opening.content };
   if (opening.kind === 'loaded') {
-    return { key: `r${opening.loaded.receipt.id}`, kind: 'print', label: `Shipped receipt #${receiptNumber(opening.loaded.receipt.id)}`, content: <VisitorReceipt {...opening.loaded} /> };
+    return {
+      key: `r${opening.loaded.receipt.id}`,
+      kind: 'print',
+      fast: true,
+      label: `Shipped receipt #${receiptNumber(opening.loaded.receipt.id)}`,
+      content: <VisitorReceipt {...opening.loaded} />,
+    };
   }
   if (opening.kind === 'missing') {
     return {
@@ -105,15 +111,19 @@ function openingJob(opening: Opening): Job {
   return { key: 'loading', kind: 'feed', label: 'Loading receipt' };
 }
 
-/** Cap hanging paper so a long receipt never shoves the desk (no layout jump while clip-path feeds). */
-function usePaperMax() {
-  const [max, setMax] = useState(280);
+/** Hanging house slip is never clipped. Focused receipts fill the viewport. Other hanging paper fades into the desk. */
+function usePaperMax(focus: boolean, house: boolean) {
+  const [max, setMax] = useState<number | undefined>(undefined);
   useEffect(() => {
-    const measure = () => setMax(Math.max(160, Math.round(window.innerHeight * 0.42)));
+    if (focus || house) {
+      setMax(undefined);
+      return;
+    }
+    const measure = () => setMax(Math.max(200, Math.round(window.innerHeight - 360)));
     measure();
     window.addEventListener('resize', measure);
     return () => window.removeEventListener('resize', measure);
-  }, []);
+  }, [focus, house]);
   return max;
 }
 
@@ -138,7 +148,6 @@ function Countdown() {
 export function ShippedStage({ opening, title }: { opening: Opening; title: React.ReactNode }) {
   const state = useShippedState();
   const generator = state?.generator;
-  const paperMax = usePaperMax();
   const [query, setQuery] = useState('');
   const [listed, setListed] = useState(false);
   const [token, setToken] = useState<string | null>(null);
@@ -153,8 +162,10 @@ export function ShippedStage({ opening, title }: { opening: Opening; title: Reac
   const input = useRef<HTMLInputElement>(null);
   const human = useRef<HumanCheckHandle>(null);
   const prints = useRef(0);
-  const after = useRef<HTMLDivElement>(null);
   const run = useRef(0);
+  const house = job.key === 'house' || Boolean(job.kind === 'print' && job.slip);
+  const focus = paper === 'torn' && Boolean(current) && job.kind === 'print' && !house;
+  const paperMax = usePaperMax(focus, house);
 
   useEffect(() => {
     try {
@@ -305,21 +316,29 @@ export function ShippedStage({ opening, title }: { opening: Opening; title: Reac
   }
 
   const busy = step.name === 'looking' || step.name === 'feeding';
-  const torn = paper === 'torn' && job.kind === 'print';
-  const sheetOpen = Boolean(current && torn);
-
-  // Sharing can't be tabbed to until the receipt is torn off and the bar is showing.
-  useEffect(() => {
-    after.current?.toggleAttribute('inert', !torn);
-  }, [torn, current]);
 
   useEffect(() => {
-    document.documentElement.classList.toggle('shipped-sheet-open', sheetOpen);
-    return () => document.documentElement.classList.remove('shipped-sheet-open');
-  }, [sheetOpen]);
+    document.documentElement.classList.toggle('shipped-focus', focus);
+    return () => document.documentElement.classList.remove('shipped-focus');
+  }, [focus]);
+
+  function printAnother() {
+    if (opening.kind === 'loaded' || opening.kind === 'missing' || opening.kind === 'loading') {
+      window.location.assign('/');
+      return;
+    }
+    touched.current = true;
+    setCurrent(null);
+    setPaper('printing');
+    setJob(openingJob(opening));
+    setStep({ name: 'idle' });
+    setQuery('');
+    setError(null);
+    input.current?.focus();
+  }
 
   return (
-    <div className={`shipped-stage${sheetOpen ? ' has-sheet' : ''}`}>
+    <div className={`shipped-stage${focus ? ' is-focus' : ''}`}>
       <div className="shipped-ticker-pin">
         <Ticker />
         <Countdown />
@@ -335,9 +354,15 @@ export function ShippedStage({ opening, title }: { opening: Opening; title: Reac
           display={display}
           tone={tone}
           tearSignal={tearSignal}
-          onPrinted={() => setPaper('hanging')}
+          onPrinted={() => {
+            setPaper('hanging');
+            if (opening.kind === 'loaded' && !touched.current) {
+              window.setTimeout(() => setTearSignal((n) => n + 1), 120);
+            }
+          }}
           onTorn={() => setPaper('torn')}
           paperMax={paperMax}
+          focus={focus}
           inputRef={input}
           console={
             empty || (offline && !busy)
@@ -401,19 +426,7 @@ export function ShippedStage({ opening, title }: { opening: Opening; title: Reac
           </p>
         ) : null}
 
-        {current ? (
-          <div className={`shipped-share-sheet${torn ? ' is-ready' : ''}`} ref={after} role="dialog" aria-label="Share your receipt">
-            <div className="shipped-share-sheet-handle" aria-hidden="true" />
-            <ShareBar receipt={current.receipt} />
-            <p className="shipped-share-page">
-              Its own page:{' '}
-              <a href={RECEIPT_PATH(current.receipt.id)} className="underline">
-                {SHIPPED_HOST}
-                {RECEIPT_PATH(current.receipt.id)}
-              </a>
-            </p>
-          </div>
-        ) : null}
+        {focus && current ? <SharePill receipt={current.receipt} onPrintAnother={printAnother} /> : null}
       </section>
     </div>
   );

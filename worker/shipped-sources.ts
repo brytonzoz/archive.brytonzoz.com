@@ -24,6 +24,7 @@ import {
   githubLoginsFromText,
   handleTokens,
   handleVariants,
+  isJunkProfileText,
   nameLogins,
   makerMentions,
   mergeSites,
@@ -1369,9 +1370,12 @@ async function resolveIdentityFresh(subject: Subject, env: SourceEnv, tinyfish: 
       }
     : undefined;
   const xProfile: XProfile | null = xHandle
-    ? await cached(`x:${xHandle.toLowerCase()}`, 30 * MIN, () => readXProfile(xHandle, fetchXPage)).catch(() => null)
+    ? await cached(`x:v2:${xHandle.toLowerCase()}`, 30 * MIN, () => readXProfile(xHandle, fetchXPage)).catch(() => null)
     : null;
-  if (xProfile) {
+  if (xProfile && isJunkProfileText(xProfile.bio)) {
+    notes.push('x-profile:junk');
+    profile.x ||= xHandle;
+  } else if (xProfile) {
     notes.push(`x-profile:${xProfile.handle}`);
     profile.x = xProfile.handle;
     profile.name ||= xProfile.name;
@@ -1595,7 +1599,7 @@ export async function gather(
   const tinyfish = tinyfishAccess(env, meter);
   const resolved = await resolveIdentity(subject, env, tinyfish);
   const mode: GatherMode = opts?.mode === 'full' ? 'full' : 'free';
-  const key = mode === 'full' ? `gather:full:v5:${year}:${resolved.cacheKey}` : `gather:v14:${year}:${resolved.cacheKey}`;
+  const key = mode === 'full' ? `gather:full:v6:${year}:${resolved.cacheKey}` : `gather:v15:${year}:${resolved.cacheKey}`;
   return cached(key, 1440 * MIN, () => gatherFresh(subject, resolved.profile, env, year, meter, tinyfish, resolved.notes, mode));
 }
 
@@ -1771,6 +1775,7 @@ async function gatherFresh(
     companyFromSites,
     needsPersonResolve,
     needsCompanyResolve,
+    needsIdentityRetry,
     cleanGithubCompany,
   } = await import('./shipped-affiliation');
   const typed = parseAffiliationQuery(subject.display || subject.id);
@@ -1860,7 +1865,13 @@ async function gatherFresh(
     role: affiliation.role,
     bio: profile.bio,
   });
-  if (xaiConfigured(env) && (wantPerson || wantCompany)) {
+  const wantRetry = needsIdentityRetry({
+    handle: profile.x,
+    company: affiliation.company,
+    bio: profile.bio,
+    site: profile.site,
+  });
+  if (xaiConfigured(env) && (wantPerson || wantCompany || wantRetry)) {
     try {
       await applyResolved(affiliation.name || who);
       // Legal name landed without a handle (CEO of Higgsfield → Alex Mashrabov).

@@ -6,6 +6,7 @@ const changelog = await import('../worker/shipped-changelog.ts');
 const affiliation = await import('../worker/shipped-affiliation.ts');
 const company = await import('../worker/shipped-company.ts');
 const decisions = await import('../worker/shipped-decisions.ts');
+const identity = await import('../worker/shipped-identity.ts');
 
 test('name queries without a handle need a cheap person resolve', () => {
   const tibo = affiliation.parseAffiliationQuery('Tibo from OpenAI');
@@ -23,6 +24,24 @@ test('handle-only CEOs resolve a company; unknown builders stay free', () => {
   assert.equal(affiliation.needsCompanyResolve({ handle: 'rauchg', company: null, role: 'ceo' }), true);
   assert.equal(affiliation.needsCompanyResolve({ handle: 'steventey', company: null, role: 'unknown', bio: 'building stuff' }), false);
   assert.equal(affiliation.needsCompanyResolve({ handle: 'sama', company: 'OpenAI', role: 'unknown' }), false);
+  assert.equal(
+    affiliation.needsIdentityRetry({
+      handle: 'sama',
+      company: null,
+      bio: 'We’ve detected that JavaScript is disabled in this browser.',
+      site: null,
+    }),
+    true,
+  );
+  assert.equal(
+    affiliation.needsIdentityRetry({
+      handle: 'rauchg',
+      company: null,
+      bio: 'CEO of Vercel',
+      site: 'https://rauchg.com/',
+    }),
+    false,
+  );
   assert.equal(affiliation.cleanGithubCompany('@openai'), 'openai');
   assert.deepEqual(affiliation.companyTokens('Cursor (Anysphere)'), ['Cursor', 'Anysphere']);
   assert.equal(affiliation.companyOrgGuess('Cursor (Anysphere)'), 'cursor');
@@ -44,6 +63,12 @@ test('bio CEO patterns and host guesses cover OpenAI / Cursor / Vercel', () => {
     affiliation.emptyAffiliation(),
   );
   assert.equal(mission.company, 'OpenAI');
+  const junk = affiliation.affiliationFromBio(
+    'We’ve detected that JavaScript is disabled in this browser. Please enable JavaScript. Terms of Service',
+    affiliation.emptyAffiliation(),
+  );
+  assert.equal(junk.company, null);
+  assert.equal(identity.isJunkProfileText('Please enable JavaScript or switch to a supported browser'), true);
   const hosts = company.hostGuesses('Cursor (Anysphere)');
   assert.ok(hosts.some((url) => url.includes('cursor.com')), JSON.stringify(hosts));
   assert.ok(hosts.some((url) => url.includes('anysphere.com')));

@@ -1,7 +1,7 @@
 // Person → role → company. Founders/CEOs take the company's ships; a lead takes the product
 // they run plus their own. No eval-name tables: typed "CEO of X" / "Ada at Vercel" plus a
 // public bio are enough.
-import { cleanText, parsePersonName, xHandlesFromText } from './shipped-identity';
+import { cleanText, isJunkProfileText, parsePersonName, xHandlesFromText } from './shipped-identity';
 
 export type RoleKind = 'founder' | 'ceo' | 'lead' | 'employee' | 'unknown';
 export type Attribution = 'personal' | 'company-led-by-person' | 'company-founded-by-person' | 'unrelated';
@@ -118,37 +118,45 @@ export function parseAffiliationQuery(text: string): Affiliation {
   return out;
 }
 
+const NOT_COMPANY = /^(the|a|an|this|that|our|all|humanity|people|life|course|things|stuff|code|service|privacy|policy|center|terms|javascript|browser|cookie|imprint|help|content|information|mission)$/i;
+
+function usableCompany(raw: string | null | undefined): string | null {
+  const name = cleanText(raw, 40);
+  if (name.length < 3 || NOT_COMPANY.test(name)) return null;
+  return name;
+}
+
 /** Bio lines like "Codex lead at OpenAI" / "CEO @higgsfield" / "founder of Vercel". */
 export function affiliationFromBio(bio: string, hint: Affiliation = emptyAffiliation()): Affiliation {
+  if (isJunkProfileText(bio)) return { ...hint };
   const text = cleanText(bio, 400);
   const out: Affiliation = { ...hint };
   const ceo = text.match(/\b(ceo|founder|co-?founder)\b(?:\s*(?:of|at|@|,|[/|-]|–)\s*@?([A-Za-z][A-Za-z0-9._-]{1,39}))?/i);
   if (ceo) {
     const role = ceo[1].toLowerCase().includes('founder') ? 'founder' : 'ceo';
     if (out.role === 'unknown' || role === 'ceo' || role === 'founder') out.role = role;
-    if (ceo[2] && !out.company) out.company = cleanText(ceo[2], 40);
+    if (ceo[2] && !out.company) out.company = usableCompany(ceo[2]);
   }
   const titled = text.match(/\b([A-Z][A-Za-z0-9._-]{1,39})\s+(ceo|founder|co-?founder)\b/i);
   if (titled) {
     if (out.role === 'unknown') out.role = titled[2].toLowerCase().includes('founder') ? 'founder' : 'ceo';
-    if (!out.company) out.company = cleanText(titled[1], 40);
+    if (!out.company) out.company = usableCompany(titled[1]);
   }
   const lead = text.match(/\b([A-Za-z][A-Za-z0-9 ._-]{1,32}?)\s+(?:lead|head|director)\s+(?:of|at|@)\s+([A-Za-z0-9._-]{2,40})/i);
   if (lead) {
     if (out.role === 'unknown') out.role = 'lead';
     out.product ||= cleanText(lead[1], 40);
-    out.company ||= cleanText(lead[2], 40);
+    out.company ||= usableCompany(lead[2]);
   }
   const atCo = text.match(/\b(?:at|@)\s+([A-Z][A-Za-z0-9._-]{1,39})\b/);
-  if (atCo && !out.company) out.company = cleanText(atCo[1], 40);
+  if (atCo && !out.company) out.company = usableCompany(atCo[1]);
   if (!out.company) {
-    const ofCo = text.match(/\bof\s+([A-Z][A-Za-z0-9]{2,39})\b/);
-    const stop = /^(the|a|an|this|that|our|all|humanity|people|life|course|things|stuff|code)$/i;
-    if (ofCo && !stop.test(ofCo[1])) out.company = cleanText(ofCo[1], 40);
+    const missionOf = text.match(/\b(?:mission|ceo|founder|co-?founder|team|staff)\s+of\s+([A-Z][A-Za-z0-9]{2,39})\b/i);
+    if (missionOf) out.company = usableCompany(missionOf[1]);
   }
   if (!out.company) {
     const camel = text.match(/\b([A-Z][a-z]+[A-Z][A-Za-z0-9]+)\b/);
-    if (camel) out.company = cleanText(camel[1], 40);
+    if (camel) out.company = usableCompany(camel[1]);
   }
   const handles = xHandlesFromText(text);
   if (!out.companyX && out.company) {
@@ -200,7 +208,20 @@ export function needsCompanyResolve(opts: {
   if (opts.company) return false;
   if (!opts.handle) return false;
   if (opts.role === 'ceo' || opts.role === 'founder') return true;
-  return Boolean(opts.bio && /\b(ceo|founder|co-?founder)\b/i.test(opts.bio));
+  return Boolean(opts.bio && !isJunkProfileText(opts.bio) && /\b(ceo|founder|co-?founder)\b/i.test(opts.bio));
+}
+
+/** Handle exists but X returned a cookie wall / empty bio and no site — one identity lookup. */
+export function needsIdentityRetry(opts: {
+  handle?: string | null;
+  company?: string | null;
+  bio?: string;
+  site?: string | null;
+}): boolean {
+  if (!opts.handle || opts.company) return false;
+  if (opts.site) return false;
+  if (opts.bio && !isJunkProfileText(opts.bio) && opts.bio.length > 20) return false;
+  return true;
 }
 
 /** GitHub `company` is often `@openai`. */

@@ -23,6 +23,14 @@ export type XProfile = {
   github: string[];
 };
 
+/** x.com interstitial / cookie wall — not a real bio. */
+export function isJunkProfileText(text: string | null | undefined): boolean {
+  if (!text) return false;
+  return /javascript is disabled|enable javascript|supported browser|switch to a supported browser|please enable javascript/i.test(
+    text,
+  );
+}
+
 export type NameParts = { name: string; company: string | null; tokens: string[]; product: string | null };
 
 /**
@@ -292,6 +300,7 @@ export async function readXProfile(
   if (!page) return null;
   const title = cleanText(page.title.replace(/\s*[|/·].*$/, ''), 60);
   const bio = cleanText(page.description || page.text.slice(0, 400), 280);
+  if (isJunkProfileText(bio) || isJunkProfileText(page.text) || isJunkProfileText(page.description)) return null;
   const urls = await expandShortUrls([
     ...urlsFromText(`${page.description}\n${page.text}`),
     ...page.links.map((u) => httpsUrl(u)).filter((u): u is string => Boolean(u)),

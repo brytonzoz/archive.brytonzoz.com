@@ -13,11 +13,7 @@ export function HouseSlip() {
         </p>
         <p className="mt-1 text-[11px] opacity-75">THE PUBLIC RECEIPT PRINTER</p>
       </header>
-      <Rule />
-      <h2 className="text-center">
-        <span className="shipped-inverse">HOW IT WORKS</span>
-      </h2>
-      <Rule />
+      <h2 className="shipped-inverse">HOW IT WORKS</h2>
       <div className="space-y-1 text-[12px]">
         <Line label="1. TYPE A NAME OR @HANDLE" value="FREE" />
         <Line label={`2. IT PRINTS YOUR ${SITE_YEAR}`} value="AUTO" />

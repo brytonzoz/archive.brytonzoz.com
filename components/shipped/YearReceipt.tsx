@@ -227,8 +227,6 @@ export function YearReceipt(props: YearReceiptProps) {
         </span>
       </h2>
       {props.kicker ? <p className="mt-1 text-center text-[11px] opacity-70">{props.kicker}</p> : null}
-      {props.badges?.length ? <p className="mt-2 text-center text-[10px] font-semibold tracking-[0.14em] opacity-70">{props.badges.join(' · ')}</p> : null}
-      {typeof props.shipScore === 'number' ? <p className="mt-1 text-center text-[10px] opacity-60">SHIP SCORE {props.shipScore}</p> : null}
 
       {props.modules?.length ? (
         props.modules.map((band) => (

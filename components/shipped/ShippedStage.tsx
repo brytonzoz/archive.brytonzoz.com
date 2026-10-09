@@ -1,13 +1,11 @@
 'use client';
 
-// The top of / and /r/<id>/: one receipt printer on the counter and the self-serve panel next to it. The
-// printer opens with a slip (or the receipt the link points at). PRINT YOURS looks the
-// name up, lets the visitor pick if it could be more than one person, tears off whatever is hanging, feeds
-// while the sources are searched, and prints theirs. Jams and an empty roll print a slip instead.
+// The top of / and /r/<id>/: one receipt printer on the desk. Type a name on its LCD and press PRINT.
+// It looks the name up, lets the visitor pick if it could be more than one person, tears off whatever is
+// hanging, feeds while the sources are searched, and prints theirs. Jams and an empty roll print a slip.
 import React, { useEffect, useRef, useState } from 'react';
-import Link from 'next/link';
 import { track } from '../../lib/analytics';
-import { closingLabel, countdown } from '../../lib/shipped-event';
+import { countdown } from '../../lib/shipped-event';
 import { RECEIPT_PATH, SHIPPED_HOST, readQuery, receiptNumber, type Candidate } from '../../lib/shipped-year';
 import { press } from './feel';
 import { HumanCheck, type HumanCheckHandle } from './HumanCheck';
@@ -115,15 +113,14 @@ function Countdown() {
   const left = state.event.closesAt - now;
   if (state.event.phase === 'closed' || left <= 0) {
     return (
-      <p className="shipped-kiosk-status" role="status">
-        THE PRINTER IS OFF. {state.event.name.toUpperCase()} IS ARCHIVED.
+      <p className="shipped-clock" role="status">
+        THE PRINTER IS OFF
       </p>
     );
   }
   return (
-    <p className="shipped-kiosk-hint" aria-live="off">
-      <span className="font-semibold tabular-nums">PRINTER SHUTS OFF IN {countdown(left)}</span> · {closingLabel(state.event.closesAt)}. Then the pile and
-      the sponsors freeze for good.
+    <p className="shipped-clock" aria-live="off">
+      shuts off in {countdown(left)}
     </p>
   );
 }
@@ -169,6 +166,7 @@ export function ShippedStage({ opening, title }: { opening: Opening; title: Reac
   let tone: Tone;
   if (empty) [display, tone] = ['OUT OF PAPER', 'empty'];
   else if (step.name === 'jammed') [display, tone] = ['PAPER JAM', 'error'];
+  else if (step.name === 'pick') [display, tone] = ['WHICH ONE?', 'ready'];
   else if (step.name === 'looking') [display, tone] = ['LOOKING UP', 'busy'];
   else if (step.name === 'feeding') [display, tone] = [searching[Math.min(tick, searching.length - 1)], 'busy'];
   else if (job.kind === 'feed') [display, tone] = ['LOADING', 'busy'];
@@ -236,8 +234,8 @@ export function ShippedStage({ opening, title }: { opening: Opening; title: Reac
     }
   }
 
-  async function submit(event: React.FormEvent) {
-    event.preventDefault();
+  async function submit(event?: React.FormEvent) {
+    event?.preventDefault();
     if (!readQuery(query)) {
       setError(ERRORS['invalid-query']);
       input.current?.focus();
@@ -264,118 +262,30 @@ export function ShippedStage({ opening, title }: { opening: Opening; title: Reac
 
   const busy = step.name === 'looking' || step.name === 'feeding';
   const torn = paper === 'torn' && job.kind === 'print';
+  const sheetOpen = Boolean(current && torn);
 
   // Sharing can't be tabbed to until the receipt is torn off and the bar is showing.
   useEffect(() => {
     after.current?.toggleAttribute('inert', !torn);
   }, [torn, current]);
 
+  useEffect(() => {
+    document.documentElement.classList.toggle('shipped-sheet-open', sheetOpen);
+    return () => document.documentElement.classList.remove('shipped-sheet-open');
+  }, [sheetOpen]);
+
   return (
-    <div className="shipped-stage">
+    <div className={`shipped-stage${sheetOpen ? ' has-sheet' : ''}`}>
       <div className="shipped-ticker-pin">
         <Ticker />
-      </div>
-      <section className="shipped-kiosk" id="print" aria-labelledby="shipped-title">
-        <h2 id="shipped-title" className="shipped-kiosk-title">
-          {title}
-        </h2>
-        <p className="shipped-kiosk-lede">Type a name. The printer itemizes what they shipped this year.</p>
-
         <Countdown />
+      </div>
 
-        {empty ? (
-          <p className="shipped-kiosk-status" role="status">
-            {closed ? 'The printer is off for good. Receipts already printed still open and share.' : 'Out of paper. Receipts already printed still open and share.'}
-          </p>
-        ) : offline ? (
-          <p className="shipped-kiosk-status" role="status">
-            The printer is offline. Check back soon.
-          </p>
-        ) : (
-          <form className="shipped-kiosk-form" onSubmit={submit} noValidate>
-            <label className="shipped-kiosk-label" htmlFor="shipped-query">
-              Name, @handle, GitHub or website
-            </label>
-            <div className="shipped-kiosk-row">
-              <input
-                ref={input}
-                id="shipped-query"
-                className="shipped-kiosk-input"
-                value={query}
-                onChange={(event) => {
-                  setQuery(event.target.value);
-                  if (step.name === 'pick' || step.name === 'jammed') setStep({ name: 'idle' });
-                  if (error) setError(null);
-                }}
-                autoComplete="off"
-                autoCapitalize="none"
-                spellCheck={false}
-                maxLength={80}
-                enterKeyHint="go"
-                placeholder="levelsio"
-                aria-invalid={error ? true : undefined}
-                aria-describedby={error ? 'shipped-print-error' : 'shipped-print-hint'}
-              />
-              <button type="submit" className="shipped-kiosk-go" disabled={busy || !generator} onPointerDown={press}>
-                {step.name === 'looking' ? 'Looking' : step.name === 'feeding' ? 'Printing' : 'Print'}
-              </button>
-            </div>
-            {error ? (
-              <p id="shipped-print-error" className="shipped-kiosk-error" role="alert">
-                {error}
-              </p>
-            ) : (
-              <p id="shipped-print-hint" className="shipped-kiosk-hint">
-                Public pages only. Wrong? Remove or correct it after it prints. First line usually lands in about 15
-                seconds; a reprint of the same name is instant.
-              </p>
-            )}
+      <section className="shipped-counter" id="print" aria-labelledby="shipped-title">
+        <h1 id="shipped-title" className="sr-only">
+          {title}
+        </h1>
 
-            {step.name === 'pick' ? (
-              <fieldset className="shipped-kiosk-pick">
-                <legend className="shipped-kiosk-label">Which one is you?</legend>
-                <ul>
-                  {step.candidates.map((candidate) => (
-                    <li key={`${candidate.kind}:${candidate.id}`}>
-                      <button type="button" className="shipped-kiosk-choice" onPointerDown={press} onClick={() => print(candidate)} disabled={busy}>
-                        <span className="block font-semibold">{candidate.display}</span>
-                        <span className="block opacity-60">{candidate.detail}</span>
-                      </button>
-                    </li>
-                  ))}
-                </ul>
-              </fieldset>
-            ) : null}
-
-            <label className="shipped-kiosk-check">
-              <input type="checkbox" checked={listed} onChange={(event) => setListed(event.target.checked)} />
-              <span>List it under “Recently printed”</span>
-            </label>
-
-            <HumanCheck ref={human} check={generator?.enabled ? generator.human : null} onToken={setToken} theme="dark" appearance="execute" />
-            {generator?.demo ? <p className="shipped-kiosk-hint">Staging: no AI key here, so receipts print from the free sources only.</p> : null}
-          </form>
-        )}
-
-        <dl className="shipped-kiosk-count">
-          <div>
-            <dt>Printed</dt>
-            <dd>{state ? state.printed.toLocaleString('en-US') : '—'}</dd>
-          </div>
-          <div>
-            <dt>Shared</dt>
-            <dd>{state ? state.shared.toLocaleString('en-US') : '—'}</dd>
-          </div>
-        </dl>
-        <p className="shipped-kiosk-fine">
-          Free. Public, professional work only, and every item links to its source. The same name within 7 days reprints the same receipt.{' '}
-          <a href="/terms/" className="underline">
-            Terms &amp; privacy
-          </a>
-        </p>
-      </section>
-
-      <div className="shipped-counter">
         <Machine
           job={job}
           display={display}
@@ -383,12 +293,66 @@ export function ShippedStage({ opening, title }: { opening: Opening; title: Reac
           tearSignal={tearSignal}
           onPrinted={() => setPaper('hanging')}
           onTorn={() => setPaper('torn')}
+          inputRef={input}
+          console={
+            empty || (offline && !busy)
+              ? undefined
+              : {
+                  query,
+                  onQuery: (value) => {
+                    setQuery(value);
+                    if (step.name === 'pick' || step.name === 'jammed') setStep({ name: 'idle' });
+                    if (error) setError(null);
+                  },
+                  onPrint: () => void submit(),
+                  printing: busy,
+                  listed,
+                  onListed: setListed,
+                  closed,
+                  invalid: Boolean(error),
+                }
+          }
         />
 
+        <HumanCheck ref={human} check={generator?.enabled ? generator.human : null} onToken={setToken} theme="dark" appearance="execute" />
+
+        {error ? (
+          <p id="shipped-print-error" className="shipped-desk-error" role="alert">
+            {error}
+          </p>
+        ) : null}
+
+        {step.name === 'pick' ? (
+          <fieldset className="shipped-pick">
+            <legend className="shipped-pick-legend">Which one is you?</legend>
+            <ul>
+              {step.candidates.map((candidate) => (
+                <li key={`${candidate.kind}:${candidate.id}`}>
+                  <button type="button" className="shipped-pick-choice" onPointerDown={press} onClick={() => print(candidate)} disabled={busy}>
+                    <span className="block font-semibold">{candidate.display}</span>
+                    <span className="block opacity-60">{candidate.detail}</span>
+                  </button>
+                </li>
+              ))}
+            </ul>
+          </fieldset>
+        ) : null}
+
+        {empty ? (
+          <p className="shipped-desk-status" role="status">
+            {closed ? 'The printer is off for good. Receipts already printed still open and share.' : 'Out of paper. Receipts already printed still open and share.'}
+          </p>
+        ) : offline && !busy ? (
+          <p className="shipped-desk-status" role="status">
+            The printer is offline. Check back soon.
+          </p>
+        ) : null}
+
         {current ? (
-          <div className={`shipped-after${torn ? ' is-ready' : ''}`} ref={after}>
+          <div className={`shipped-share-sheet${torn ? ' is-ready' : ''}`} ref={after} role="dialog" aria-label="Share your receipt">
+            <div className="shipped-share-sheet-handle" aria-hidden="true" />
             <ShareBar receipt={current.receipt} />
-            <p className="mt-2 text-center text-[11px] text-[#f3ead8]/55">
+            <p className="shipped-share-page">
               Its own page:{' '}
               <a href={RECEIPT_PATH(current.receipt.id)} className="underline">
                 {SHIPPED_HOST}
@@ -396,22 +360,8 @@ export function ShippedStage({ opening, title }: { opening: Opening; title: Reac
               </a>
             </p>
           </div>
-        ) : job.key === 'house' && torn ? (
-          <div className="shipped-after is-ready is-cta">
-            <button
-              type="button"
-              className="shipped-kiosk-go"
-              onPointerDown={press}
-              onClick={() => {
-                input.current?.scrollIntoView({ behavior: 'smooth', block: 'center' });
-                input.current?.focus({ preventScroll: true });
-              }}
-            >
-              Print yours
-            </button>
-          </div>
         ) : null}
-      </div>
+      </section>
     </div>
   );
 }

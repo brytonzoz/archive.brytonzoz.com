@@ -113,8 +113,8 @@ async function route(request: Request, env: HostEnv, ctx: ExecutionContext): Pro
         start_url: '/',
         scope: '/',
         display: 'standalone',
-        background_color: '#121316',
-        theme_color: '#121316',
+        background_color: '#161310',
+        theme_color: '#161310',
         icons: [
           { src: shareImages.icons['192'], sizes: '192x192', type: 'image/png', purpose: 'any' },
           { src: shareImages.icons['512'], sizes: '512x512', type: 'image/png', purpose: 'any' },

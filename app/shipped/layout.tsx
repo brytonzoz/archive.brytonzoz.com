@@ -1,6 +1,6 @@
 import React from 'react';
 import type { Metadata } from 'next';
-import { IBM_Plex_Mono, Inter } from 'next/font/google';
+import { Fragment_Mono, Inter } from 'next/font/google';
 import { SHIPPED_APP_TITLE, SHIPPED_DESCRIPTION, SHIPPED_TITLE } from '../../lib/shipped-brand';
 import { SHIPPED_OG_IMAGE } from '../../lib/shipped';
 import { EVENT_NAME } from '../../lib/shipped-event';
@@ -13,9 +13,9 @@ const uiSans = Inter({
   variable: '--font-ui',
 });
 
-const receiptMono = IBM_Plex_Mono({
+const receiptMono = Fragment_Mono({
   subsets: ['latin'],
-  weight: ['400', '500', '600'],
+  weight: '400',
   display: 'swap',
   variable: '--font-receipt',
 });

@@ -8,6 +8,7 @@
 // counter, and the stub left in the slot is the other half of the tear. A torn receipt tilts toward a mouse.
 // prefers-reduced-motion: the receipt is already printed and torn, nothing moves.
 import React, { useCallback, useEffect, useLayoutEffect, useRef, useState } from 'react';
+import { press } from './feel';
 import { Ticket } from './paper';
 import { feedFrames, rubber, spring, springStep, stubClip, tornEdge, type SpringConfig } from './physics';
 import { click, motorOff, motorOn, rip, tick, useSound } from './sound';
@@ -26,6 +27,18 @@ export type Job =
 
 export type Tone = 'ready' | 'busy' | 'error' | 'empty';
 
+/** The name field and Print live on the printer itself. */
+export type Console = {
+  query: string;
+  onQuery: (value: string) => void;
+  onPrint: () => void;
+  printing: boolean;
+  listed: boolean;
+  onListed: (value: boolean) => void;
+  closed?: boolean;
+  invalid?: boolean;
+};
+
 export type MachineProps = {
   job: Job;
   /** What the printer's little display says. */
@@ -37,6 +50,8 @@ export type MachineProps = {
   tearSignal?: number;
   /** Tallest the paper may hang (px) so the page never scrolls; a longer receipt scrolls inside once torn. */
   paperMax?: number;
+  console?: Console;
+  inputRef?: React.Ref<HTMLInputElement>;
 };
 
 type Phase = 'idle' | 'feeding' | 'printing' | 'hanging' | 'tearing' | 'torn';
@@ -92,7 +107,7 @@ function runSpring(el: HTMLElement, from: Vec, to: Vec, velocity: Vec, config: S
   return () => cancelAnimationFrame(frame);
 }
 
-export function Machine({ job, display, tone, onPrinted, onTorn, tearSignal = 0, paperMax }: MachineProps) {
+export function Machine({ job, display, tone, onPrinted, onTorn, tearSignal = 0, paperMax, console: desk, inputRef }: MachineProps) {
   const [phase, setPhase] = useState<Phase>(phaseFor(job));
   const [more, setMore] = useState(false);
   const [leaving, setLeaving] = useState<{ key: string; job: Job; transform: string } | null>(null);
@@ -387,9 +402,12 @@ export function Machine({ job, display, tone, onPrinted, onTorn, tearSignal = 0,
   const stubKey = ownStub ? shown.key : stubSeed;
   const stubVisible = ownStub || phase === 'feeding' || (phase === 'idle' && stubKey !== null);
   const lead = shown.kind === 'feed';
+  const showInput = Boolean(desk && !desk.closed && !desk.printing && (phase === 'idle' || phase === 'hanging' || phase === 'torn'));
   const status =
     phase === 'idle'
-      ? ''
+      ? showInput
+        ? 'Type a name, handle, GitHub or website on the printer, then press Print.'
+        : ''
       : phase === 'feeding'
       ? display
       : phase === 'printing'
@@ -400,42 +418,111 @@ export function Machine({ job, display, tone, onPrinted, onTorn, tearSignal = 0,
             ? 'Torn off.'
             : '';
 
+  const keys = (
+    <div className="shipped-keys">
+      <button
+        type="button"
+        className="shipped-key"
+        aria-pressed={sound}
+        aria-label={sound ? 'Sound on. Turn printer sound off' : 'Sound off. Turn printer sound on'}
+        onPointerDown={press}
+        onClick={toggleSound}
+      >
+        <span aria-hidden="true">{sound ? 'SND ON' : 'SND OFF'}</span>
+      </button>
+      {desk ? (
+        <button
+          type="button"
+          className="shipped-key"
+          aria-pressed={desk.listed}
+          aria-label={desk.listed ? 'Listed under recently printed. Tap to unlist' : 'List it under recently printed'}
+          onPointerDown={press}
+          onClick={() => desk.onListed(!desk.listed)}
+        >
+          <span aria-hidden="true">{desk.listed ? 'PILE ON' : 'PILE'}</span>
+        </button>
+      ) : null}
+      <span className="shipped-keys-space" aria-hidden="true" />
+      <button
+        type="button"
+        className="shipped-key is-tear"
+        aria-disabled={phase !== 'hanging'}
+        onPointerDown={press}
+        onClick={() => {
+          if (phase !== 'hanging') return;
+          click();
+          tear({ x: (Math.random() - 0.5) * 300, y: 640, r: 0 });
+        }}
+      >
+        TEAR
+      </button>
+      {desk ? (
+        <button type="submit" className="shipped-key is-print" disabled={!showInput} onPointerDown={press}>
+          PRINT
+        </button>
+      ) : null}
+    </div>
+  );
+
+  const chrome = (
+    <>
+      <div className="shipped-printer-face">
+        <span className="shipped-led" aria-hidden="true" />
+        <label className={`shipped-lcd${showInput ? ' is-input' : ''}`}>
+          {showInput && desk ? (
+            <>
+              <span className="sr-only">Name, @handle, GitHub or website</span>
+              <input
+                ref={inputRef}
+                id="shipped-query"
+                className="shipped-lcd-input"
+                value={desk.query}
+                onChange={(event) => desk.onQuery(event.target.value)}
+                autoComplete="off"
+                autoCapitalize="none"
+                spellCheck={false}
+                maxLength={80}
+                enterKeyHint="go"
+                placeholder="TYPE A NAME"
+                aria-invalid={desk.invalid ? true : undefined}
+                disabled={desk.closed || desk.printing}
+              />
+              <span className="shipped-lcd-block" aria-hidden="true" />
+            </>
+          ) : (
+            <span key={display} className="shipped-lcd-text" aria-hidden="true">
+              {display}
+            </span>
+          )}
+        </label>
+        <span className="shipped-plate" aria-hidden="true">
+          BZ-80
+        </span>
+      </div>
+      {keys}
+    </>
+  );
+
   return (
     <div className={`shipped-printer is-${phase} tone-${tone}`} data-sound={sound ? 'on' : 'off'}>
       <div className="shipped-printer-body" ref={body}>
-        <div className="shipped-printer-face">
-          <span className="shipped-led" aria-hidden="true" />
-          <span className="shipped-lcd" aria-hidden="true">
-            <span key={display} className="shipped-lcd-text">
-              {display}
-            </span>
-          </span>
-          <span className="shipped-plate" aria-hidden="true">
-            BZ-80
-          </span>
-          <button
-            type="button"
-            className="shipped-key"
-            aria-pressed={sound}
-            aria-label={sound ? 'Sound on. Turn printer sound off' : 'Sound off. Turn printer sound on'}
-            onClick={toggleSound}
-          >
-            <span aria-hidden="true">{sound ? 'SND ON' : 'SND OFF'}</span>
-          </button>
-          <button
-            type="button"
-            className="shipped-key is-tear"
-            aria-disabled={phase !== 'hanging'}
-            onClick={() => {
-              if (phase !== 'hanging') return;
-              click();
-              tear({ x: (Math.random() - 0.5) * 300, y: 640, r: 0 });
+        {desk ? (
+          <form
+            className="shipped-printer-form"
+            onSubmit={(event) => {
+              event.preventDefault();
+              if (desk.closed || desk.printing) return;
+              desk.onPrint();
             }}
+            noValidate
           >
-            TEAR
-          </button>
-        </div>
+            {chrome}
+          </form>
+        ) : (
+          chrome
+        )}
         <div className="shipped-mouth" aria-hidden="true">
+          <span className="shipped-head" />
           <span className="shipped-aperture" />
           <span className="shipped-bar" />
         </div>

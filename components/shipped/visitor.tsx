@@ -20,6 +20,7 @@ import {
   type SponsorBlock,
   type YearReceipt as Printed,
 } from '../../lib/shipped-year';
+import { press } from './feel';
 import { HumanCheck, type HumanCheckHandle } from './HumanCheck';
 import { refreshShippedState, useShippedState } from './state';
 import { YearReceipt } from './YearReceipt';
@@ -195,7 +196,7 @@ function MailedPrint({ receipt }: { receipt: Printed }) {
 
   return (
     <div className="mt-3 text-center">
-      <button type="button" className="shipped-button is-ghost w-full" onClick={order} disabled={busy}>
+      <button type="button" className="shipped-button is-ghost w-full" onPointerDown={press} onClick={order} disabled={busy}>
         {busy ? 'OPENING CHECKOUT…' : `MAIL ME THE REAL PRINT · ${money(payments.printCents)}`}
       </button>
       <p className="mt-1 text-[11px] text-[#f3ead8]/55">
@@ -302,10 +303,10 @@ export function ShareBar({ receipt, onRemoved }: { receipt: Printed; onRemoved?:
 
   return (
     <div className="shipped-share" role="group" aria-label="Share your receipt">
-      <button type="button" className="shipped-button is-big" onClick={shareImage} disabled={sharing}>
+      <button type="button" className="shipped-button is-big" onPointerDown={press} onClick={shareImage} disabled={sharing}>
         {sharing ? 'SHARING…' : 'SHARE IMAGE'}
       </button>
-      <a href={intent} target="_blank" rel="noopener noreferrer" className="shipped-button is-ghost" onClick={() => beacon(receipt.id, 'x')}>
+      <a href={intent} target="_blank" rel="noopener noreferrer" className="shipped-button is-ghost" onPointerDown={press} onClick={() => beacon(receipt.id, 'x')}>
         POST TO X
       </a>
       <div className="shipped-share-row">

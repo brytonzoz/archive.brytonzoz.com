@@ -73,19 +73,21 @@ export function feedFrames(height: number, seed: string, speed = 0.8): { frames:
   }
   const total = weights.reduce((sum, w) => sum + w.move + w.hold, 0);
   const duration = Math.round(Math.min(4200, Math.max(1300, height / speed)));
-  const frames: FeedFrame[] = [{ offset: 0, transform: 'translateY(0)', clipPath: clipFor(height), easing: 'linear' }];
+  const frames: FeedFrame[] = [{ offset: 0, transform: 'translateY(0) rotate(0deg)', clipPath: clipFor(height), easing: 'linear' }];
   let t = 0;
   for (let i = 0; i < steps; i++) {
     const printed = Math.min(height, (i + 1) * line);
     const hidden = height - printed;
     const moved = (t + weights[i].move) / total;
     t += weights[i].move + weights[i].hold;
+    const skew = ((random() - 0.45) * 0.45).toFixed(3);
     frames[frames.length - 1].easing = 'cubic-bezier(0.23, 1, 0.32, 1)';
-    frames.push({ offset: +Math.min(1, moved).toFixed(5), transform: 'translateY(0)', clipPath: clipFor(hidden), easing: 'linear' });
-    if (i < steps - 1) frames.push({ offset: +Math.min(1, t / total).toFixed(5), transform: 'translateY(0)', clipPath: clipFor(hidden), easing: 'linear' });
+    frames.push({ offset: +Math.min(1, moved).toFixed(5), transform: `translateY(0) rotate(${skew}deg)`, clipPath: clipFor(hidden), easing: 'linear' });
+    if (i < steps - 1) frames.push({ offset: +Math.min(1, t / total).toFixed(5), transform: `translateY(0) rotate(${skew}deg)`, clipPath: clipFor(hidden), easing: 'linear' });
   }
   frames[frames.length - 1].offset = 1;
   frames[frames.length - 1].clipPath = clipFor(0);
+  frames[frames.length - 1].transform = 'translateY(0) rotate(0.28deg)';
   return { frames, duration };
 }
 

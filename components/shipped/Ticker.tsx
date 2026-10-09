@@ -1,7 +1,7 @@
 'use client';
 
-// Compact live counters under the printer: printed first, then shared / mailed / views. They start at 0
-// and only ever show numbers the Worker has confirmed. Tap to open the proof sheet.
+// Mechanical counters pinned above the printer: printed first (odometer), then shared / mailed / views.
+// They start at 0 and only ever show numbers the Worker has confirmed. Tap to open the proof sheet.
 import React, { useEffect, useRef, useState } from 'react';
 import { moneyShort } from '../../lib/shipped-receipt';
 import { slotLabel } from '../../lib/shipped-sponsors';
@@ -138,9 +138,27 @@ function ProofSheet({ onClose }: { onClose: () => void }) {
   );
 }
 
-function Count({ value, live }: { value: number; live: boolean }) {
-  const shown = useConfirmedCount(live ? value : 0);
-  return <span className="shipped-ticker-n tabular-nums">{fmt(shown)}</span>;
+function Digit({ n }: { n: number }) {
+  return (
+    <span className="shipped-odo-cell">
+      <span className="shipped-odo-strip" style={{ transform: `translate3d(0, ${-n * 10}%, 0)` }}>
+        {Array.from({ length: 10 }, (_, i) => (
+          <span key={i}>{i}</span>
+        ))}
+      </span>
+    </span>
+  );
+}
+
+function Odometer({ value, places, size = 'md' }: { value: number; places: number; size?: 'md' | 'sm' }) {
+  const padded = String(Math.max(0, Math.floor(value))).padStart(places, '0').slice(-places);
+  return (
+    <span className={`shipped-odo is-${size}`} aria-hidden="true">
+      {padded.split('').map((d, i) => (
+        <Digit key={i} n={Number(d)} />
+      ))}
+    </span>
+  );
 }
 
 export function Ticker() {
@@ -148,23 +166,34 @@ export function Ticker() {
   const [open, setOpen] = useState(false);
   const [live, setLive] = useState(false);
   useEffect(() => setLive(true), []);
-  const printed = state?.printed ?? 0;
-  const shared = state?.shared ?? 0;
-  const shipped = state?.shipped ?? 0;
-  const views = state?.views ?? 0;
+  const printed = useConfirmedCount(live ? (state?.printed ?? 0) : 0);
+  const shared = useConfirmedCount(live ? (state?.shared ?? 0) : 0);
+  const shipped = useConfirmedCount(live ? (state?.shipped ?? 0) : 0);
+  const views = useConfirmedCount(live ? (state?.views ?? 0) : 0);
+  const places = Math.max(4, String(Math.max(printed, 1)).length);
 
   return (
     <>
       <button
         type="button"
         className="shipped-ticker"
-        aria-label={`Printed ${printed}, shared ${shared}, shipped ${shipped}, views ${views}. Open proof.`}
+        aria-label={`Printed ${fmt(printed)}, shared ${fmt(shared)}, mailed ${fmt(shipped)}, views ${fmt(views)}. Open proof.`}
         onClick={() => setOpen(true)}
       >
-        <Count value={printed} live={live} />
-        <span className="shipped-ticker-k">printed</span>
+        <span className="shipped-ticker-primary">
+          <Odometer value={printed} places={places} />
+          <span className="shipped-ticker-k">printed</span>
+        </span>
         <span className="shipped-ticker-rest">
-          · <Count value={shared} live={live} /> shared · <Count value={shipped} live={live} /> mailed · <Count value={views} live={live} /> views
+          <span>
+            <Odometer value={shared} places={3} size="sm" /> shared
+          </span>
+          <span>
+            <Odometer value={shipped} places={3} size="sm" /> mailed
+          </span>
+          <span>
+            <Odometer value={views} places={3} size="sm" /> views
+          </span>
         </span>
       </button>
       {open ? <ProofSheet onClose={() => setOpen(false)} /> : null}

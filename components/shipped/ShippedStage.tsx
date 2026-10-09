@@ -198,7 +198,8 @@ export function ShippedStage({ opening, title }: { opening: Opening; title: Reac
   }
 
   async function print(candidate: Candidate) {
-    if (!token) return setError('One second, checking you’re human…');
+    const humanToken = token ?? (await human.current?.execute()) ?? null;
+    if (!humanToken) return setError(ERRORS.turnstile);
     setError(null);
     setTick(0);
     setStep({ name: 'feeding' });
@@ -207,7 +208,7 @@ export function ShippedStage({ opening, title }: { opening: Opening; title: Reac
       const response = await fetch('/api/shipped/print', {
         method: 'POST',
         headers: { 'content-type': 'application/json' },
-        body: JSON.stringify({ subject: { kind: candidate.kind, id: candidate.id, display: candidate.display }, token, listed }),
+        body: JSON.stringify({ subject: { kind: candidate.kind, id: candidate.id, display: candidate.display }, token: humanToken, listed }),
       });
       const result = (await response.json().catch(() => ({}))) as { id?: number; pile?: string; error?: string };
       human.current?.reset();
@@ -262,7 +263,6 @@ export function ShippedStage({ opening, title }: { opening: Opening; title: Reac
   }
 
   const busy = step.name === 'looking' || step.name === 'feeding';
-  const waitingForHuman = Boolean(generator?.human) && !token;
   const torn = paper === 'torn' && job.kind === 'print';
 
   // Sharing can't be tabbed to until the receipt is torn off and the bar is showing.
@@ -337,7 +337,7 @@ export function ShippedStage({ opening, title }: { opening: Opening; title: Reac
                 <ul>
                   {step.candidates.map((candidate) => (
                     <li key={`${candidate.kind}:${candidate.id}`}>
-                      <button type="button" className="shipped-kiosk-choice" onPointerDown={press} onClick={() => print(candidate)} disabled={waitingForHuman}>
+                      <button type="button" className="shipped-kiosk-choice" onPointerDown={press} onClick={() => print(candidate)} disabled={busy}>
                         <span className="block font-semibold">{candidate.display}</span>
                         <span className="block opacity-60">{candidate.detail}</span>
                       </button>
@@ -352,7 +352,7 @@ export function ShippedStage({ opening, title }: { opening: Opening; title: Reac
               <span>List it under “Recently printed”</span>
             </label>
 
-            <HumanCheck ref={human} check={generator?.enabled ? generator.human : null} onToken={setToken} theme="dark" appearance="interaction-only" />
+            <HumanCheck ref={human} check={generator?.enabled ? generator.human : null} onToken={setToken} theme="dark" appearance="execute" />
             {generator?.demo ? <p className="shipped-kiosk-hint">Staging: no AI key here, so receipts print from the free sources only.</p> : null}
           </form>
         )}

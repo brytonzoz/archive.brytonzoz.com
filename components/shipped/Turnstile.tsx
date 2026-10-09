@@ -6,6 +6,7 @@ type TurnstileApi = {
   render: (el: HTMLElement, options: Record<string, unknown>) => string;
   reset: (id: string) => void;
   remove: (id: string) => void;
+  execute: (id: string) => void;
 };
 
 declare global {
@@ -16,7 +17,6 @@ declare global {
 
 let script: Promise<TurnstileApi> | null = null;
 
-// Loaded only when a form that needs it is on screen, so /shipped/ stays light.
 function loadTurnstile(): Promise<TurnstileApi> {
   script ??= new Promise((resolve, reject) => {
     if (window.turnstile) return resolve(window.turnstile);
@@ -33,29 +33,61 @@ function loadTurnstile(): Promise<TurnstileApi> {
   return script;
 }
 
-export type TurnstileHandle = { reset: () => void };
+export type TurnstileHandle = { reset: () => void; execute: () => Promise<string | null> };
 
 type TurnstileProps = {
   siteKey: string;
   onToken: (token: string | null) => void;
   theme?: 'light' | 'dark';
-  /** interaction-only: invisible unless Cloudflare actually needs the visitor to click. */
-  appearance?: 'always' | 'interaction-only';
+  /** execute: invisible until Print runs it. always: the checkbox. */
+  appearance?: 'always' | 'interaction-only' | 'execute';
 };
 
 export const Turnstile = forwardRef<TurnstileHandle, TurnstileProps>(function Turnstile(
-  { siteKey, onToken, theme = 'light', appearance = 'always' },
+  { siteKey, onToken, theme = 'light', appearance = 'execute' },
   ref,
 ) {
   const box = useRef<HTMLDivElement>(null);
   const widget = useRef<string | null>(null);
+  const api = useRef<TurnstileApi | null>(null);
+  const token = useRef<string | null>(null);
+  const waiters = useRef<((value: string | null) => void)[]>([]);
   const callback = useRef(onToken);
   callback.current = onToken;
 
+  function emit(value: string | null) {
+    token.current = value;
+    callback.current(value);
+    const pending = waiters.current.splice(0);
+    pending.forEach((resolve) => resolve(value));
+  }
+
   useImperativeHandle(ref, () => ({
     reset: () => {
+      token.current = null;
       callback.current(null);
       if (widget.current && window.turnstile) window.turnstile.reset(widget.current);
+    },
+    execute: () => {
+      if (token.current) return Promise.resolve(token.current);
+      return new Promise((resolve) => {
+        waiters.current.push(resolve);
+        const start = Date.now();
+        let kicked = false;
+        const run = () => {
+          if (token.current) return;
+          if (appearance !== 'always' && widget.current && api.current && !kicked) {
+            kicked = true;
+            api.current.execute(widget.current);
+          }
+          if (Date.now() - start > 12_000) {
+            emit(null);
+            return;
+          }
+          if (!token.current) window.setTimeout(run, 50);
+        };
+        run();
+      });
     },
   }));
 
@@ -63,34 +95,28 @@ export const Turnstile = forwardRef<TurnstileHandle, TurnstileProps>(function Tu
     const el = box.current;
     if (!el) return;
     let cancelled = false;
-    const start = () => {
-      loadTurnstile()
-        .then((api) => {
-          if (cancelled || widget.current) return;
-          widget.current = api.render(el, {
-            sitekey: siteKey,
-            theme,
-            appearance,
-            size: 'flexible',
-            callback: (token: string) => callback.current(token),
-            'expired-callback': () => callback.current(null),
-            'error-callback': () => callback.current(null),
-          });
-        })
-        .catch(() => callback.current(null));
-    };
-    const observer = new IntersectionObserver((entries) => {
-      if (entries.some((entry) => entry.isIntersecting)) {
-        observer.disconnect();
-        start();
-      }
-    }, { rootMargin: '300px' });
-    observer.observe(el);
+    loadTurnstile()
+      .then((loaded) => {
+        if (cancelled || widget.current) return;
+        api.current = loaded;
+        widget.current = loaded.render(el, {
+          sitekey: siteKey,
+          theme,
+          appearance,
+          execution: appearance === 'always' ? 'render' : 'execute',
+          size: appearance === 'always' ? 'flexible' : 'flexible',
+          callback: (value: string) => emit(value),
+          'expired-callback': () => emit(null),
+          'error-callback': () => emit(null),
+        });
+      })
+      .catch(() => emit(null));
     return () => {
       cancelled = true;
-      observer.disconnect();
+      waiters.current.splice(0).forEach((resolve) => resolve(null));
       if (widget.current && window.turnstile) window.turnstile.remove(widget.current);
       widget.current = null;
+      api.current = null;
     };
   }, [siteKey, theme, appearance]);
 

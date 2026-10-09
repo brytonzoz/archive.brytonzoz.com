@@ -138,16 +138,17 @@ function MailedPrint({ receipt }: { receipt: Printed }) {
   if (!payments?.prints) return null;
 
   async function order() {
-    if (!token) {
+    const humanToken = token ?? (await human.current?.execute()) ?? null;
+    if (!humanToken) {
       setAsked(true);
-      return setError('One second, checking you’re human…');
+      return setError(ORDER_ERRORS.turnstile);
     }
     setBusy(true);
     setError(null);
     const response = await fetch('/api/shipped/print-order', {
       method: 'POST',
       headers: { 'content-type': 'application/json' },
-      body: JSON.stringify({ id: receipt.id, token }),
+      body: JSON.stringify({ id: receipt.id, token: humanToken }),
     }).catch(() => null);
     const result = (await response?.json().catch(() => ({}))) as { url?: string; error?: string } | undefined;
     if (response?.ok && result?.url) {
@@ -171,7 +172,7 @@ function MailedPrint({ receipt }: { receipt: Printed }) {
           Terms
         </a>
       </p>
-      <HumanCheck ref={human} check={state?.generator.human} onToken={setToken} theme="dark" appearance={asked ? 'always' : 'interaction-only'} />
+      <HumanCheck ref={human} check={state?.generator.human} onToken={setToken} theme="dark" appearance={asked ? 'always' : 'execute'} />
       {error ? (
         <p className="mt-1 text-[12px] font-semibold text-[#f3ead8]" role="alert">
           {error}

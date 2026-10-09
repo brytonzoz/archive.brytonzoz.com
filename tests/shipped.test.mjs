@@ -111,4 +111,20 @@ test('the year is configurable and falls back to this year', () => {
   assert.equal(shippedYear('2025'), 2025);
   assert.equal(shippedYear(undefined), new Date().getUTCFullYear());
   assert.equal(shippedYear('banana'), new Date().getUTCFullYear());
+  const RealDate = Date;
+  class EpochDate extends RealDate {
+    constructor(...args) {
+      if (args.length === 0) super(0);
+      else super(...args);
+    }
+    static now() {
+      return 0;
+    }
+  }
+  globalThis.Date = EpochDate;
+  try {
+    assert.equal(shippedYear(undefined), 2026);
+  } finally {
+    globalThis.Date = RealDate;
+  }
 });

@@ -7,7 +7,7 @@
 // Only paths listed in wrangler.jsonc's run_worker_first reach this; the rest are served as plain assets.
 import { handleShippedPage, outOfPaper, qrRedirect, type ShippedEnv } from './shipped';
 import { hardenPage, secure, switchedOff } from './shipped-guard';
-import { SHIPPED_APP_TITLE, SHIPPED_DESCRIPTION, SHIPPED_MANIFEST_NAME, SHIPPED_MANIFEST_SHORT } from '../lib/shipped-brand';
+import { SHIPPED_APP_TITLE, SHIPPED_MANIFEST_NAME, SHIPPED_MANIFEST_SHORT, shippedDescription } from '../lib/shipped-brand';
 import { SHIPPED_URL } from '../lib/shipped-year';
 import shareImages from '../lib/share-images.json';
 
@@ -105,7 +105,7 @@ async function route(request: Request, env: HostEnv, ctx: ExecutionContext): Pro
       JSON.stringify({
         name: SHIPPED_MANIFEST_NAME,
         short_name: SHIPPED_MANIFEST_SHORT,
-        description: SHIPPED_DESCRIPTION,
+        description: shippedDescription(env.SHIPPED_YEAR),
         start_url: '/',
         scope: '/',
         display: 'standalone',

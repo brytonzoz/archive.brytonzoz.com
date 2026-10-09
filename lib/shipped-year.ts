@@ -2,10 +2,15 @@
 // Shared by the Worker (worker/shipped.ts builds and stores receipts, worker/shipped-og.ts draws the
 // share images) and the pages (components/shipped/).
 
+/** The year on the tape. Workers evaluate Date at isolate start as 1970 — never use that. */
+export const EVENT_YEAR = 2026;
+
 /** The year being itemized: SHIPPED_YEAR (Worker) / NEXT_PUBLIC_SHIPPED_YEAR (build), else this year. */
 export function shippedYear(value?: string | number | null): number {
   const year = Number(value);
-  return Number.isInteger(year) && year >= 2000 && year <= 2100 ? year : new Date().getUTCFullYear();
+  if (Number.isInteger(year) && year >= 2000 && year <= 2100) return year;
+  const now = new Date().getUTCFullYear();
+  return now >= 2000 && now <= 2100 ? now : EVENT_YEAR;
 }
 export const SITE_YEAR = shippedYear(process.env.NEXT_PUBLIC_SHIPPED_YEAR);
 

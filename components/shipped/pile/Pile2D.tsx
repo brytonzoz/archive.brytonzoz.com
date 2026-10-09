@@ -158,11 +158,29 @@ export function Pile2D({ receipts, own, ownRaster, reduced, fontFamily, active, 
   const latest = useRef({ onOpen, onAdd, onLanded, receipts, own, reduced });
   latest.current = { onOpen, onAdd, onLanded, receipts, own, reduced };
 
-  // Draw the mound at the canvas's real size (and again when it changes).
+  useIsoLayoutEffect(() => {
+    const hand = handEl.current;
+    const rootEl = root.current;
+    if (!hand || !rootEl || !own || !active) return;
+    const layout = () => {
+      const handH = hand.offsetHeight;
+      const rootH = rootEl.offsetHeight || 1;
+      const visible = Math.min(0.42 * handH, 0.32 * rootH);
+      hand.style.setProperty('--hand-shift', `${Math.max(0, handH - visible)}px`);
+      rootEl.style.setProperty('--hand-visible', `${visible}px`);
+    };
+    layout();
+    const observer = new ResizeObserver(layout);
+    observer.observe(hand);
+    observer.observe(rootEl);
+    return () => observer.disconnect();
+  }, [own, active, ownBurned]);
+
+  // Draw the mound at the canvas's real size (and again when it changes). Hidden 2D (3D showing) skips the paint.
   useEffect(() => {
     const el = canvas.current;
     const box = mound.current;
-    if (!el || !box) return;
+    if (!el || !box || !active) return;
     const draw = () => {
       const dpr = Math.min(2, window.devicePixelRatio || 1);
       const w = Math.max(1, Math.round(box.clientWidth * dpr));
@@ -182,7 +200,7 @@ export function Pile2D({ receipts, own, ownRaster, reduced, fontFamily, active, 
       cancel();
       observer.disconnect();
     };
-  }, [balls, flying]);
+  }, [balls, flying, active]);
 
   const openRef = useRef<ThermalReceipt | null>(null);
   const openReceipt = useCallback((receipt: ThermalReceipt) => {
@@ -222,6 +240,7 @@ export function Pile2D({ receipts, own, ownRaster, reduced, fontFamily, active, 
       const rootEl = root.current;
       if (!to || !rootEl || latest.current.reduced) {
         done();
+        queueMicrotask(() => latest.current.onLanded(receipt));
         return;
       }
       setFlying((set) => new Set(set).add(receipt.id));
@@ -337,7 +356,7 @@ export function Pile2D({ receipts, own, ownRaster, reduced, fontFamily, active, 
     const el = handEl.current;
     if (!el || !own || !active) return;
     let drag: { id: number; x: number; y: number; t: number; lx: number; ly: number; lt: number; vx: number; vy: number } | null = null;
-    const base = 'translate(-50%, 58%) rotate(-4deg)';
+    const base = 'translate(-50%, var(--hand-shift, 58%)) rotate(-4deg)';
     el.style.transform = base;
     const down = (event: PointerEvent) => {
       if (event.button > 0) return;

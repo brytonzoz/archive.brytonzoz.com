@@ -53,8 +53,7 @@ type Job = {
   priority: number;
   raster: Raster | null;
   loading: boolean;
-  resolve: (raster: Raster) => void;
-  reject: (reason: unknown) => void;
+  waiters: { resolve: (raster: Raster) => void; reject: (reason: unknown) => void }[];
   cancelled: boolean;
 };
 
@@ -86,18 +85,42 @@ export class BurnQueue {
       preburned.burn();
       return { promise: Promise.resolve(preburned), cancel() {} };
     }
+    const queued = this.jobs.find((job) => job.receipt.id === receipt.id && !job.cancelled);
+    if (queued) {
+      queued.priority = Math.max(queued.priority, priority);
+      this.jobs.sort((a, b) => b.priority - a.priority);
+      let waiter!: { resolve: (raster: Raster) => void; reject: (reason: unknown) => void };
+      const promise = new Promise<Raster>((resolve, reject) => {
+        waiter = { resolve, reject };
+        queued.waiters.push(waiter);
+      });
+      return {
+        promise,
+        cancel: () => {
+          queued.waiters = queued.waiters.filter((w) => w !== waiter);
+          if (!queued.waiters.length) {
+            queued.cancelled = true;
+            this.jobs = this.jobs.filter((j) => j !== queued);
+          }
+        },
+      };
+    }
     let job!: Job;
     const promise = new Promise<Raster>((resolve, reject) => {
-      job = { receipt, priority, raster: null, loading: false, resolve, reject, cancelled: false };
+      job = { receipt, priority, raster: null, loading: false, waiters: [{ resolve, reject }], cancelled: false };
     });
     this.jobs.push(job);
     this.jobs.sort((a, b) => b.priority - a.priority);
     this.schedule();
+    const waiter = job.waiters[0];
     return {
       promise,
       cancel: () => {
-        job.cancelled = true;
-        this.jobs = this.jobs.filter((j) => j !== job);
+        job.waiters = job.waiters.filter((w) => w !== waiter);
+        if (!job.waiters.length) {
+          job.cancelled = true;
+          this.jobs = this.jobs.filter((j) => j !== job);
+        }
       },
     };
   }
@@ -150,7 +173,7 @@ export class BurnQueue {
       while (raster.burned < total && now() < end) raster.burn(raster.burned + 4);
       if (raster.burned >= total) {
         this.jobs.shift();
-        job.resolve(raster);
+        job.waiters.forEach((waiter) => waiter.resolve(raster));
         this.onProgress?.();
       }
     }

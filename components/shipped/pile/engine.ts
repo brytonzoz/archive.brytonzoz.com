@@ -130,8 +130,17 @@ const SCROLL_BACK = spring(0.4, 0);
 /** physics.ts's springStep without the tuple: returns the new position, leaves the new velocity in springV. */
 let springV = 0;
 function springTo(x: number, v: number, target: number, config: SpringConfig, dt: number): number {
-  springV = v + (-config.stiffness * (x - target) - config.damping * v) * dt;
-  return x + springV * dt;
+  const h = 1 / 120;
+  let pos = x;
+  let vel = v;
+  for (let left = dt; left > 0; ) {
+    const step = Math.min(h, left);
+    vel += (-config.stiffness * (pos - target) - config.damping * vel) * step;
+    pos += vel * step;
+    left -= step;
+  }
+  springV = vel;
+  return pos;
 }
 const ELEVATION = (55 * Math.PI) / 180;
 const UP = new THREE.Vector3(0, 1, 0);
@@ -295,7 +304,7 @@ export class PileEngine {
 
     // Counter and contact shadows.
     this.counterMaterial = createCounterMaterial();
-    this.counter = new THREE.Mesh(new THREE.PlaneGeometry(60, 60), this.counterMaterial);
+    this.counter = new THREE.Mesh(new THREE.PlaneGeometry(8, 8), this.counterMaterial);
     this.counter.rotation.x = -Math.PI / 2;
     this.counter.receiveShadow = true;
     scene.add(this.counter);
@@ -328,7 +337,7 @@ export class PileEngine {
     this.lamp.shadow.focus = 0.62;
     scene.add(this.lamp);
     scene.add(this.lamp.target);
-    this.fill = new THREE.HemisphereLight(0xe4e9f0, 0x141518, 1.3);
+    this.fill = new THREE.HemisphereLight(0xe4e9f0, 0x121316, 1.55);
     scene.add(this.fill);
 
     // Physics bounds from the pile's size.
@@ -379,6 +388,8 @@ export class PileEngine {
 
   /** Put a receipt in a free instance (evicting the lowest ball if the pile is full). */
   private insert(input: ReturnType<PileEngine['makeSlotInput']>, crumpleNow?: number, lengthNow?: number, source?: Raster | Tile | null): number {
+    const existing = this.slots.findIndex((slot) => slot?.receipt.id === input.receipt.id);
+    if (existing >= 0) this.release(existing);
     let index = this.slots.indexOf(null);
     if (index < 0) index = this.evict();
     const slot: Slot = {
@@ -671,7 +682,8 @@ export class PileEngine {
     const showing = Math.min(length * 0.42, hhh * 2 * (aspect < 0.8 ? 0.4 : 0.36));
     this.handBase = { d: hd, x: aspect < 0.8 ? 0.06 * hhh : 0.18 * hhh * aspect, y: -hhh - length / 2 + showing, unit, tilt: -0.07, lean: -0.3 };
     this.updateHandPose();
-    this.emitHandRect();
+    if (this.held) this.cb.onHandRect(null);
+    else this.emitHandRect();
     this.emitAnchors(true);
   }
 
@@ -1134,6 +1146,7 @@ export class PileEngine {
       })
       .catch(() => undefined);
     this.layout();
+    this.settleHand();
   }
 
   /** Where the receipt in hand is, `dx`/`dy` css px from where it rests. */
@@ -1200,6 +1213,10 @@ export class PileEngine {
   }
 
   private emitHandRect() {
+    if (this.held) {
+      this.cb.onHandRect(null);
+      return;
+    }
     const hand = this.hand;
     if (!hand || !this.ready) {
       this.cb.onHandRect(null);
@@ -1230,7 +1247,7 @@ export class PileEngine {
   /** Flick or key: ball it up and throw it on the pile. `velocity` in css px/s (+y down), from a flick. */
   tossOwn(velocity?: { x: number; y: number }) {
     const hand = this.hand;
-    if (!hand || !this.ready) return;
+    if (!hand || !this.ready || this.held) return;
     this.updateHandPose();
     const input = this.makeSlotInput(hand.receipt, null);
     const index = this.insert(input, this.o.reduced ? input.rest : 0, this.o.reduced ? input.length : hand.length, hand.tile ?? hand.raster);
@@ -1305,6 +1322,32 @@ export class PileEngine {
     this.emitAnchors(true);
   }
 
+  /** Receipts tossed while this engine was building: drop them at rest on top. */
+  adoptMissing(receipts: ThermalReceipt[]) {
+    let added = 0;
+    for (const receipt of receipts) {
+      if (this.slots.some((slot) => slot?.receipt.id === receipt.id)) continue;
+      const input = this.makeSlotInput(receipt, this.o.crumple);
+      const index = this.insert(input, input.rest);
+      const slot = this.slots[index]!;
+      this.p.set((Math.random() - 0.5) * 0.4, this.top + slot.hull.radius + 0.15, (Math.random() - 0.5) * 0.3);
+      this.q.setFromEuler(new THREE.Euler(Math.random() * 6, Math.random() * 6, Math.random() * 6));
+      this.world.add(index, {
+        hull: slot.hull.points,
+        radius: slot.hull.radius,
+        position: this.p,
+        quaternion: this.q,
+        still: true,
+      });
+      added++;
+    }
+    if (!added) return;
+    this.measureTop();
+    this.writeAll();
+    this.emitAnchors(true);
+    this.kick();
+  }
+
   // ---- a ball from elsewhere on the page ------------------------------------------------------------------
 
   receive(payload: TossPayload, rect: DOMRect): boolean {
@@ -1370,10 +1413,12 @@ export class PileEngine {
   // ---- input -------------------------------------------------------------------------------------------
 
   pointerDown(event: PointerEvent, hand: boolean) {
-    if (!this.ready || this.gesture || event.button > 0) return;
+    if (!this.ready || event.button > 0) return;
+    if (this.gesture && this.gesture.id !== event.pointerId) this.gesture = null;
+    if (this.gesture) return;
     const now = performance.now();
     const kind: Gesture['kind'] = hand ? 'hand' : this.held && this.held.phase === 'read' ? 'scroll' : 'tap';
-    if (kind === 'hand' && !this.hand) return;
+    if (kind === 'hand' && (!this.hand || this.held)) return;
     this.gesture = { id: event.pointerId, kind, x0: event.clientX, y0: event.clientY, t0: now, lx: event.clientX, ly: event.clientY, lt: now, vx: 0, vy: 0, moved: false, scroll0: this.held?.scroll ?? 0 };
     if (kind === 'scroll' && this.held) this.held.scrollV = 0;
     if (kind === 'hand' && this.hand) {
@@ -1540,6 +1585,11 @@ export class PileEngine {
   dispose() {
     this.disposed = true;
     window.clearTimeout(this.settleTimer);
+    if (this.held) {
+      this.held = null;
+      this.cb.onOpen(null);
+    }
+    this.cb.onHandRect(null);
     this.queue.dispose();
     this.slots.forEach((slot) => slot?.burning?.cancel());
     this.held?.texture?.dispose();

@@ -55,6 +55,7 @@
 .scene canvas {
   display: block;
   outline: none;
+  background: transparent;
 }
 
 /* Holding a receipt: every drag scrolls it, none scrolls the page. */
@@ -121,7 +122,7 @@
 }
 
 .withHand .mound {
-  bottom: 37%;
+  bottom: calc(var(--hand-visible, 32%) + 8px);
   width: min(94%, calc(44cqh * 100 / 46));
 }
 
@@ -155,6 +156,7 @@
   left: 50%;
   bottom: 0;
   width: min(74%, 300px);
+  transform: translate(-50%, var(--hand-shift, 58%)) rotate(-4deg);
   background-color: var(--paper);
   background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='120' height='120'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='.9' numOctaves='2' stitchTiles='stitch'/%3E%3CfeColorMatrix values='0 0 0 0 .11 0 0 0 0 .1 0 0 0 0 .09 0 0 0 .045 0'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)'/%3E%3C/svg%3E");
   transform-origin: 50% 100%;

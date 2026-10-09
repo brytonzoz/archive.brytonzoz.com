@@ -13,6 +13,7 @@ export class InkAtlas {
   readonly texture: THREE.DataTexture;
   private data: Uint8Array;
   private owners: (string | null)[] = new Array(ATLAS_SLOTS).fill(null);
+  private refs: number[] = new Array(ATLAS_SLOTS).fill(0);
   private origin = new THREE.Vector2();
 
   constructor() {
@@ -31,15 +32,21 @@ export class InkAtlas {
   /** A slot for this receipt (its old one if it has one), or -1 when full. */
   allocate(id: string): number {
     const existing = this.owners.indexOf(id);
-    if (existing >= 0) return existing;
+    if (existing >= 0) {
+      this.refs[existing] += 1;
+      return existing;
+    }
     const free = this.owners.indexOf(null);
     if (free < 0) return -1;
     this.owners[free] = id;
+    this.refs[free] = 1;
     return free;
   }
 
   release(slot: number) {
-    if (slot >= 0) this.owners[slot] = null;
+    if (slot < 0) return;
+    this.refs[slot] = Math.max(0, this.refs[slot] - 1);
+    if (this.refs[slot] === 0) this.owners[slot] = null;
   }
 
   /** Copy a tile into its slot; returns the uv rect (x, y, width, height). */

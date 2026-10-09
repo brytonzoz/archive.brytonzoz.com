@@ -18,6 +18,7 @@ export type SceneApi = {
   close(): void;
   tossOwn(): void;
   receive(payload: TossPayload): boolean;
+  adopt(receipts: ThermalReceipt[]): void;
   rect(): ScreenRect | null;
   scrollBy(px: number): void;
   /** Lab timings: [time, ms] per frame of the engine's own work, of the render, of each physics step. */
@@ -129,7 +130,15 @@ function Engine(props: EngineProps) {
         timed.recordRender(start, performance.now() - start);
       };
     }
+    const canvas = gl.domElement;
+    const onLost = (event: Event) => {
+      (event as WebGLContextEvent).preventDefault();
+      if (!canvas.isConnected) return;
+      latest.current.onError(new Error('webgl context lost'));
+    };
+    canvas.addEventListener('webglcontextlost', onLost);
     return () => {
+      canvas.removeEventListener('webglcontextlost', onLost);
       gl.render = render;
       p.engineRef.current = null;
       engine?.dispose();
@@ -225,6 +234,7 @@ export default function PileScene(props: SceneProps) {
         const el = wrap.current;
         return el ? use((engine) => engine.receive(payload, el.getBoundingClientRect()), false) : false;
       },
+      adopt: (receipts) => use((engine) => engine.adoptMissing(receipts), undefined),
       rect: () => use((engine) => engine.rect(), null),
       scrollBy: (px) => use((engine) => engine.scrollBy(px), undefined),
       stats: () => use((engine) => engine.frameStats(), { frame: [], render: [], step: [] }),
@@ -245,14 +255,13 @@ export default function PileScene(props: SceneProps) {
     const box = () => el.getBoundingClientRect();
     const down = (event: PointerEvent) => {
       if (event.target instanceof Element && event.target.closest('[data-pile-hand]')) return;
-      use((engine) => {
-        if (engine.isHolding) capture(el, event.pointerId);
-        engine.pointerDown(event, false);
-      }, undefined);
+      capture(el, event.pointerId);
+      use((engine) => engine.pointerDown(event, false), undefined);
     };
     const move = (event: PointerEvent) => use((engine) => engine.pointerMove(event, box()), undefined);
     const up = (event: PointerEvent) => use((engine) => engine.pointerUp(event, box()), undefined);
     const cancel = (event: PointerEvent) => use((engine) => engine.pointerUp(event, box(), true), undefined);
+    const lost = (event: PointerEvent) => use((engine) => engine.pointerUp(event, box(), true), undefined);
     const wheel = (event: WheelEvent) => {
       if (!engineRef.current?.isHolding) return;
       event.preventDefault();
@@ -262,6 +271,7 @@ export default function PileScene(props: SceneProps) {
     el.addEventListener('pointermove', move);
     el.addEventListener('pointerup', up);
     el.addEventListener('pointercancel', cancel);
+    el.addEventListener('lostpointercapture', lost);
     el.addEventListener('wheel', wheel, { passive: false });
 
     let onScreen = true;
@@ -277,6 +287,7 @@ export default function PileScene(props: SceneProps) {
       el.removeEventListener('pointermove', move);
       el.removeEventListener('pointerup', up);
       el.removeEventListener('pointercancel', cancel);
+      el.removeEventListener('lostpointercapture', lost);
       el.removeEventListener('wheel', wheel);
       observer.disconnect();
       document.removeEventListener('visibilitychange', sync);
@@ -324,12 +335,9 @@ export default function PileScene(props: SceneProps) {
     () => (state: { gl: THREE.WebGLRenderer }) => {
       state.gl.setClearColor(0x000000, 0);
       const canvas = state.gl.domElement;
+      canvas.style.background = 'transparent';
       canvas.setAttribute('role', 'img');
       canvas.setAttribute('aria-label', latest.current.label);
-      canvas.addEventListener('webglcontextlost', (event) => {
-        event.preventDefault();
-        latest.current.onFail(new Error('webgl context lost'));
-      });
     },
     [],
   );

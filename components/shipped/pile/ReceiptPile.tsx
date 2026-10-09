@@ -93,6 +93,7 @@ export function ReceiptPile({
   const [live, setLive] = useState('');
   const sceneApi = useRef<SceneApi | null>(null);
   const flatApi = useRef<Pile2DApi | null>(null);
+  const allRef = useRef<ThermalReceipt[]>([]);
   const putBack = useRef<HTMLButtonElement>(null);
   const lastOpened = useRef<string | null>(null);
   const callbacks = useRef({ onOpen, onToss });
@@ -118,7 +119,7 @@ export function ReceiptPile({
     return () => media?.removeEventListener?.('change', change);
   }, [mode, motion, crumple, debug]);
 
-  const limit = Math.max(1, Math.min(28, maxBodies ?? (config?.phone ? 18 : 28)));
+  const limit = Math.max(1, Math.min(28, maxBodies ?? (config && !config.phone ? 28 : 18)));
   const base = useMemo(() => receipts.slice(0, limit), [receipts, limit]);
   const all = useMemo(() => {
     const ids = new Set(base.map((r) => r.id));
@@ -126,6 +127,8 @@ export function ReceiptPile({
   }, [base, tossed]);
   const inHand = own && !ownTossed ? own : null;
   const baseKey = base.map((r) => r.id).join(',');
+  allRef.current = all;
+  const sceneKey = `${baseKey}:${config?.reduced ? 'still' : 'moving'}`;
 
   useEffect(() => setOwnTossed(false), [own?.id]);
 
@@ -164,9 +167,21 @@ export function ReceiptPile({
 
   // The scene starts from the pile as it is when it mounts (later tosses go to it directly).
   useEffect(() => {
-    if (Scene) setSceneReceipts(all);
+    if (Scene) setSceneReceipts(allRef.current);
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [Scene, baseKey]);
+  }, [Scene, sceneKey]);
+
+  // A keyed remount: show the 2D pile until the new engine is ready, and drop any held receipt.
+  useEffect(() => {
+    if (!Scene) return;
+    setStage('loading');
+    setAnchors([]);
+    if (openRef.current) {
+      openRef.current = null;
+      setOpen(null);
+      callbacks.current.onOpen?.(null);
+    }
+  }, [sceneKey, Scene]);
 
   // WebGL went away (or never came up): the 2D pile takes over, nothing held.
   const fail = useCallback(() => {
@@ -210,12 +225,16 @@ export function ReceiptPile({
   useEffect(() => {
     if (!open) return;
     const key = (event: KeyboardEvent) => {
+      const target = event.target as Node | null;
+      const editable = target instanceof HTMLElement && (target.closest('input, textarea, [contenteditable="true"]') || target.isContentEditable);
+      if (editable) return;
       if (event.key === 'Escape') {
         event.preventDefault();
         (stage === '3d' ? sceneApi.current : flatApi.current)?.close();
         return;
       }
       if (stage !== '3d') return;
+      if (root.current && target && !root.current.contains(target)) return;
       const step = event.key === 'ArrowDown' ? 60 : event.key === 'ArrowUp' ? -60 : event.key === 'PageDown' ? 400 : event.key === 'PageUp' ? -400 : 0;
       if (step) {
         event.preventDefault();
@@ -237,12 +256,13 @@ export function ReceiptPile({
     }
     if (!restore.current) return;
     const id = lastOpened.current;
-    const target = id ? root.current?.querySelector<HTMLButtonElement>(`button[data-receipt="${CSS.escape(id)}"]`) : null;
+    const layer = stage === '3d' ? `.${styles.anchors}` : `.${styles.balls}`;
+    const target = id ? root.current?.querySelector<HTMLButtonElement>(`${layer} button[data-receipt="${CSS.escape(id)}"]`) : null;
     if (target && !target.closest('[aria-hidden="true"]')) {
       restore.current = false;
       target.focus({ preventScroll: true });
     }
-  }, [open, anchors]);
+  }, [open, anchors, stage]);
 
   // The page's printer throws to whichever pile is showing.
   useTossTarget(
@@ -315,7 +335,7 @@ export function ReceiptPile({
       {Scene && config && sceneReceipts ? (
         <div className={`${styles.layer} ${styles.layer3d}${show3d ? ` ${styles.shown}` : ''}`}>
           <Scene
-            key={`${baseKey}:${reduced ? 'still' : 'moving'}`}
+            key={sceneKey}
             receipts={sceneReceipts}
             own={inHand}
             ownRaster={null}
@@ -327,7 +347,10 @@ export function ReceiptPile({
             debug={config.debug}
             label={`A pile of ${sceneReceipts.length} crumpled receipts from other people`}
             apiRef={sceneApi}
-            onReady={() => setStage('3d')}
+            onReady={() => {
+              sceneApi.current?.adopt(allRef.current);
+              setStage('3d');
+            }}
             // A remount (new pile, or the motion preference changed) shows the 2D pile until it's ready again.
             onFail={fail}
             onOpen={opened}
@@ -340,8 +363,8 @@ export function ReceiptPile({
 
       {show3d ? (
         <ul className={styles.anchors}>
-          {anchors.map((anchor) => (
-            <li key={anchor.id}>
+          {anchors.map((anchor, i) => (
+            <li key={`${anchor.id}:${i}`}>
               <button
                 type="button"
                 className={styles.anchor}

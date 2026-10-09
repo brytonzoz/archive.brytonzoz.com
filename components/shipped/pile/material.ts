@@ -15,7 +15,7 @@ export const PAPER_HEX = '#f2eee6';
 export const BACK_HEX = '#e5e1d9';
 export const INK_HEX = '#1d1b19';
 /** The counter's albedo: lit only by the fill at the edge of the frame it comes out as the page (#121316). */
-export const COUNTER_HEX = '#13171e';
+export const COUNTER_HEX = '#121316';
 export const PAGE_HEX = '#121316';
 
 /** Which channel of the ink texture holds coverage: the atlas is R8, a burned canvas is RGBA ink. */

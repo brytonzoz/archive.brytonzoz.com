@@ -105,6 +105,18 @@ function openingJob(opening: Opening): Job {
   return { key: 'loading', kind: 'feed', label: 'Loading receipt' };
 }
 
+/** Cap hanging paper so a long receipt never shoves the desk (no layout jump while clip-path feeds). */
+function usePaperMax() {
+  const [max, setMax] = useState(280);
+  useEffect(() => {
+    const measure = () => setMax(Math.max(160, Math.round(window.innerHeight * 0.42)));
+    measure();
+    window.addEventListener('resize', measure);
+    return () => window.removeEventListener('resize', measure);
+  }, []);
+  return max;
+}
+
 /** "PRINTER SHUTS OFF IN 13d 4h": ticks against the server's clock, not the visitor's. */
 function Countdown() {
   const { left, closed } = useShippedClock();
@@ -126,6 +138,7 @@ function Countdown() {
 export function ShippedStage({ opening, title }: { opening: Opening; title: React.ReactNode }) {
   const state = useShippedState();
   const generator = state?.generator;
+  const paperMax = usePaperMax();
   const [query, setQuery] = useState('');
   const [listed, setListed] = useState(false);
   const [token, setToken] = useState<string | null>(null);
@@ -322,6 +335,7 @@ export function ShippedStage({ opening, title }: { opening: Opening; title: Reac
           tearSignal={tearSignal}
           onPrinted={() => setPaper('hanging')}
           onTorn={() => setPaper('torn')}
+          paperMax={paperMax}
           inputRef={input}
           console={
             empty || (offline && !busy)

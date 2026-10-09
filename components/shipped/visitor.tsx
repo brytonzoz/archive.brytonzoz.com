@@ -357,11 +357,9 @@ export function ShareBar({ receipt, onRemoved }: { receipt: Printed; onRemoved?:
       </div>
       <MailedPrint receipt={receipt} />
       <RemoveMine receipt={receipt} onRemoved={onRemoved} />
-      {copied ? (
-        <p className="shipped-copied" role="status">
-          Copied
-        </p>
-      ) : null}
+      <p className={`shipped-copied${copied ? ' is-on' : ''}`} role="status" aria-live="polite">
+        {copied ? 'Copied' : '\u00a0'}
+      </p>
     </div>
   );
 }

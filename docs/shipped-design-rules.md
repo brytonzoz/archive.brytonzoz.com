@@ -98,6 +98,13 @@ These eight are the ones that belong on a physical printer. Confetti, 3D camera 
 | 13 · copy toast | Label swap, easy to miss | Visible Copied + haptic |
 | 19 · hydration | Time/origin on first paint | Client-only origin, clock, status |
 | 18 · status bar | Root `#000` | Shipped `theme-color: #161310` |
+| 21 · 4/8 chrome | 13/14px body, rem mix | 8/12/16px on desk, ticker, keys, sheet |
+| 22 · LCD / BID 44px | LCD 38px, BID ~30px | LCD, keys, BID, pick, choose all ≥ 44 |
+| 1 · glow 60fps | PRINT glow animated `box-shadow` | Opacity on `::after` only |
+| 11 · no CLS | Copied toast mounted/unmounted; hanging paper used full ticket height | Reserved toast slot; `paperMax` ~42vh + overflow hidden while feeding |
+| 23 · sticky safe-area | Ticker `top: 0` slid under notch | Pin owns `safe-area-inset-top` |
+| 15 · LCD focus | `outline: none` on the field | Cream ring on `.shipped-lcd:focus-within` |
+| optical | Letter-spacing shoved legends right | Extra left padding on keys |
 
 ---
 

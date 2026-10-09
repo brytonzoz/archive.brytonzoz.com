@@ -25,9 +25,11 @@
     linear-gradient(180deg, #1c1814 0%, #120f0c 42%, #0c0a08 100%),
     url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='180' height='180'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='.72' numOctaves='3' stitchTiles='stitch'/%3E%3CfeColorMatrix values='0 0 0 0 .62 0 0 0 0 .52 0 0 0 0 .4 0 0 0 .11 0'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)'/%3E%3C/svg%3E");
   background-blend-mode: normal, normal, multiply, overlay;
-  padding: 0.55rem 0.8rem 2.5rem;
-  padding-top: calc(0.45rem + env(safe-area-inset-top, 0px));
-  padding-bottom: calc(2.5rem + env(safe-area-inset-bottom, 0px) + var(--player-offset, 0px));
+  /* 4/8pt: ticker pin owns the top safe-area so the sticky counters cover the notch. */
+  padding: 0 16px 40px;
+  padding-left: calc(16px + env(safe-area-inset-left, 0px));
+  padding-right: calc(16px + env(safe-area-inset-right, 0px));
+  padding-bottom: calc(40px + env(safe-area-inset-bottom, 0px) + var(--player-offset, 0px));
 }
 
 .shipped-page button,
@@ -61,9 +63,9 @@
   order: -2;
   width: 100%;
   margin: 0;
-  padding: 0.2rem 0 0.55rem;
+  padding: calc(8px + env(safe-area-inset-top, 0px)) 0 8px;
   background:
-    linear-gradient(180deg, rgba(18, 15, 12, 0.96) 70%, rgba(18, 15, 12, 0));
+    linear-gradient(180deg, rgba(18, 15, 12, 0.98) 72%, rgba(18, 15, 12, 0));
 }
 
 .shipped-board {
@@ -80,12 +82,12 @@
   flex-direction: column;
   align-items: center;
   justify-content: center;
-  gap: 0.4rem;
+  gap: 8px;
   width: 100%;
   margin: 0;
-  padding: 0.45rem 0.55rem 0.5rem;
+  padding: 8px;
   border: 0;
-  border-radius: 10px;
+  border-radius: 12px;
   background:
     linear-gradient(180deg, rgba(255, 255, 255, 0.04), rgba(255, 255, 255, 0) 40%),
     linear-gradient(180deg, #1c1916, #14110e);
@@ -111,7 +113,7 @@
 .shipped-ticker-primary {
   display: flex;
   align-items: center;
-  gap: 0.55rem;
+  gap: 8px;
 }
 
 .shipped-ticker-k {
@@ -127,7 +129,7 @@
   align-items: center;
   justify-content: center;
   flex-wrap: wrap;
-  gap: 0.55rem 0.85rem;
+  gap: 8px 12px;
   font-size: 10px;
   letter-spacing: 0.12em;
   text-transform: uppercase;
@@ -143,23 +145,25 @@
 .shipped-odo {
   display: inline-flex;
   gap: 1px;
-  padding: 3px 4px;
+  padding: 4px;
   border-radius: 4px;
   background: #0a0908;
   box-shadow: inset 0 1px 2px rgba(0, 0, 0, 0.85), 0 1px 0 rgba(255, 255, 255, 0.05);
   font-family: var(--font-receipt), ui-monospace, monospace;
-  font-variant-numeric: tabular-nums;
+  font-variant-numeric: tabular-nums lining-nums;
+  font-feature-settings: 'tnum' 1, 'lnum' 1;
+  contain: layout;
 }
 
 .shipped-odo-cell {
   display: block;
   width: 0.72em;
-  height: 1.15em;
+  height: 1.2em;
   overflow: hidden;
   background: linear-gradient(180deg, #2c2722 0%, #161310 46%, #0e0c0a 100%);
   color: var(--cream);
   font-size: 18px;
-  line-height: 1.15em;
+  line-height: 1.2em;
   text-align: center;
   box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.1), inset 0 -10px 10px rgba(0, 0, 0, 0.35);
 }
@@ -180,8 +184,8 @@
 
 .shipped-odo-strip > span {
   display: block;
-  height: 1.15em;
-  line-height: 1.15em;
+  height: 1.2em;
+  line-height: 1.2em;
 }
 
 .shipped-odo.is-sm .shipped-odo-strip > span {
@@ -190,12 +194,12 @@
 }
 
 .shipped-clock {
-  font-variant-numeric: tabular-nums;
-  font-feature-settings: 'tnum' 1;
-  min-height: 1.1em;
-  margin: 0.35rem 0 0;
+  font-variant-numeric: tabular-nums lining-nums;
+  font-feature-settings: 'tnum' 1, 'lnum' 1;
+  min-height: 16px;
+  margin: 8px 0 0;
   text-align: center;
-  font-size: 10.5px;
+  font-size: 11px;
   letter-spacing: 0.14em;
   text-transform: lowercase;
   color: rgba(243, 234, 216, 0.38);
@@ -206,8 +210,8 @@
   align-items: center;
   gap: 0.65rem;
   width: 100%;
-  min-height: 2.75rem;
-  padding: 0.5rem 0.75rem 0.5rem 0.95rem;
+  min-height: 44px;
+  padding: 8px 12px 8px 16px;
   border: 1px solid rgba(243, 234, 216, 0.12);
   border-radius: 8px;
   background:
@@ -233,9 +237,11 @@
 .shipped-board-toggle-copy {
   flex: 1 1 auto;
   min-width: 0;
-  font-size: 12.5px;
+  font-size: 13px;
   font-weight: 500;
   letter-spacing: -0.01em;
+  font-variant-numeric: tabular-nums;
+  font-feature-settings: 'tnum' 1;
   color: rgba(243, 234, 216, 0.88);
   white-space: nowrap;
   overflow: hidden;
@@ -368,16 +374,19 @@
 }
 
 .shipped-slot-price {
-  margin-top: 0.12rem;
-  font-size: 11.5px;
+  margin-top: 4px;
+  font-size: 11px;
+  font-variant-numeric: tabular-nums;
+  font-feature-settings: 'tnum' 1;
   color: rgba(243, 234, 216, 0.48);
 }
 
 .shipped-slot-bid {
   flex: none;
-  min-width: 3.1rem;
-  height: 1.85rem;
-  padding: 0 0.7rem;
+  min-width: 44px;
+  min-height: 44px;
+  height: 44px;
+  padding: 0 12px;
   border: 0;
   border-radius: 6px;
   background: rgba(243, 234, 216, 0.1);
@@ -445,7 +454,7 @@
 .shipped-choose-go,
 .shipped-choose-cancel {
   width: 100%;
-  min-height: 2.6rem;
+  min-height: 44px;
   border: 0;
   border-radius: 8px;
   font: inherit;
@@ -761,7 +770,7 @@
   width: min(29rem, 100%);
   display: flex;
   flex-direction: column;
-  gap: 0.7rem;
+  gap: 8px;
 }
 
 .shipped-stage.has-sheet {
@@ -773,7 +782,7 @@
   display: flex;
   flex-direction: column;
   align-items: center;
-  gap: 0.7rem;
+  gap: 8px;
   min-width: 0;
 }
 
@@ -790,7 +799,7 @@
   margin: 0;
   border-radius: 10px;
   border: 1px dashed rgba(243, 234, 216, 0.22);
-  padding: 0.7rem 0.9rem;
+  padding: 8px 16px;
   font-size: 12.5px;
   line-height: 1.5;
   color: rgba(243, 234, 216, 0.7);
@@ -799,7 +808,7 @@
 .shipped-pick {
   width: min(26.5rem, 100%);
   margin: 0;
-  padding: 0.7rem 0.75rem 0.8rem;
+  padding: 8px 12px 12px;
   border: 1px solid rgba(243, 234, 216, 0.12);
   border-radius: 12px;
   background: #1a1612;
@@ -816,16 +825,17 @@
 
 .shipped-pick ul {
   display: grid;
-  gap: 0.4rem;
+  gap: 8px;
 }
 
 .shipped-pick-choice {
   width: 100%;
+  min-height: 44px;
   text-align: left;
   border-radius: 8px;
   border: 1px solid rgba(243, 234, 216, 0.14);
   background: rgba(243, 234, 216, 0.04);
-  padding: 0.65rem 0.85rem;
+  padding: 8px 12px;
   font-size: 13px;
   line-height: 1.45;
   color: inherit;
@@ -843,12 +853,12 @@
 
 @media (min-width: 960px) {
   .shipped-page {
-    padding-top: 1.5rem;
+    padding-top: 24px;
   }
 
   .shipped-stack {
     width: min(40rem, 100%);
-    gap: 1.6rem;
+    gap: 24px;
   }
 
   .shipped-board,
@@ -875,7 +885,7 @@
   position: relative;
   z-index: 3;
   width: 100%;
-  border-radius: 22px 22px 14px 14px;
+  border-radius: 20px 20px 12px 12px;
   background:
     linear-gradient(180deg, rgba(255, 255, 255, 0.1), rgba(255, 255, 255, 0) 36%),
     linear-gradient(90deg, rgba(0, 0, 0, 0.22), transparent 12%, transparent 88%, rgba(0, 0, 0, 0.22)),
@@ -885,7 +895,7 @@
     inset 0 -1px 0 rgba(0, 0, 0, 0.75),
     0 2px 2px rgba(0, 0, 0, 0.45),
     0 28px 48px -14px rgba(0, 0, 0, 0.8);
-  padding: 13px 14px 0;
+  padding: 12px 16px 0;
   color: var(--cream);
 }
 
@@ -902,11 +912,11 @@
 
 .shipped-led {
   flex: none;
-  width: 7px;
-  height: 7px;
+  width: 8px;
+  height: 8px;
   border-radius: 50%;
   background: #3ddc84;
-  box-shadow: 0 0 0 1.5px rgba(0, 0, 0, 0.5), 0 0 8px rgba(61, 220, 132, 0.8);
+  box-shadow: 0 0 0 2px rgba(0, 0, 0, 0.5), 0 0 8px rgba(61, 220, 132, 0.8);
 }
 
 .tone-busy .shipped-led {
@@ -941,11 +951,11 @@
   position: relative;
   flex: 1 1 auto;
   min-width: 0;
-  height: 38px;
+  height: 44px;
   display: flex;
   align-items: center;
   overflow: hidden;
-  border-radius: 5px;
+  border-radius: 4px;
   background:
     repeating-linear-gradient(0deg, rgba(20, 32, 10, 0.07) 0 1px, transparent 1px 2px),
     repeating-linear-gradient(90deg, rgba(20, 32, 10, 0.05) 0 1px, transparent 1px 2px),
@@ -986,6 +996,14 @@
   caret-color: var(--lcd-ink);
 }
 
+.shipped-lcd.is-input:focus-within {
+  box-shadow:
+    inset 0 2px 4px rgba(0, 0, 0, 0.55),
+    inset 0 -1px 0 rgba(255, 255, 255, 0.18),
+    0 0 0 2px #12100e,
+    0 0 0 4px rgba(243, 234, 216, 0.45);
+}
+
 .shipped-lcd-input::placeholder {
   color: rgba(26, 38, 16, 0.45);
   text-transform: uppercase;
@@ -1001,9 +1019,9 @@
 
 .shipped-lcd-block {
   flex: none;
-  width: 7px;
-  height: 14px;
-  margin-left: 1px;
+  width: 8px;
+  height: 16px;
+  margin-left: 4px;
   background: var(--lcd-ink);
   animation: shipped-blink 1.05s steps(2, jump-none) infinite;
 }
@@ -1055,18 +1073,20 @@
 .shipped-key {
   position: relative;
   flex: none;
-  height: 32px;
+  height: 44px;
   min-width: 44px;
   min-height: 44px;
   border: 0;
   border-radius: 8px;
   background: linear-gradient(180deg, #4a4540, #2e2a26);
   box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.16), 0 2px 0 #0d0c0b, 0 3px 4px rgba(0, 0, 0, 0.45);
-  padding: 0 12px;
+  /* Extra left padding counters letter-spacing so the legend sits optically centred. */
+  padding: 0 8px 0 12px;
   font-size: 10px;
   font-weight: 600;
   letter-spacing: 0.1em;
   color: rgba(243, 234, 216, 0.78);
+  text-shadow: 0 1px 0 rgba(0, 0, 0, 0.45);
   transition: transform 90ms var(--ease-out), box-shadow 90ms var(--ease-out);
 }
 
@@ -1085,18 +1105,29 @@
 
 .shipped-key.is-print {
   height: 44px;
-  min-width: 4.5rem;
-  padding: 0 16px;
+  min-width: 72px;
+  padding: 0 12px 0 16px;
   border-radius: 8px;
   background: linear-gradient(180deg, #f7f0e2, #e6dcc6);
   color: #1a1612;
   font-size: 12px;
   letter-spacing: 0.14em;
+  text-shadow: 0 1px 0 rgba(255, 255, 255, 0.55);
   box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.75), 0 2px 0 #8a8170, 0 3px 5px rgba(0, 0, 0, 0.45);
 }
 
-.tone-ready .shipped-key.is-print:not(:disabled) {
-  animation: shipped-print-glow 2.4s ease-in-out infinite;
+.shipped-key.is-print::after {
+  content: '';
+  position: absolute;
+  inset: -2px;
+  border-radius: 10px;
+  box-shadow: 0 0 16px 2px rgba(247, 240, 226, 0.42);
+  opacity: 0;
+  pointer-events: none;
+}
+
+.tone-ready .shipped-key.is-print:not(:disabled)::after {
+  animation: shipped-glow 2.4s ease-in-out infinite;
 }
 
 .shipped-key.is-print:active:not(:disabled) {
@@ -1124,9 +1155,9 @@
 /* The mouth: a dark slot, and the serrated steel tear bar in front of it. */
 .shipped-mouth {
   position: relative;
-  margin: 12px -14px 0;
+  margin: 12px -16px 0;
   height: 24px;
-  border-radius: 0 0 14px 14px;
+  border-radius: 0 0 12px 12px;
   background: linear-gradient(180deg, #1a1714, #080706);
   box-shadow: inset 0 3px 5px rgba(0, 0, 0, 0.85);
 }
@@ -1189,6 +1220,16 @@
   width: 100%;
 }
 
+.shipped-tilt {
+  overflow: hidden;
+}
+
+.shipped-tilt.is-scroll {
+  overflow: auto;
+  overscroll-behavior: contain;
+  -webkit-overflow-scrolling: touch;
+}
+
 .shipped-stub {
   position: absolute;
   z-index: 3;
@@ -1225,6 +1266,11 @@
   transform-origin: 50% 0;
   perspective: 900px;
   touch-action: pan-y;
+}
+
+.is-printing .shipped-pull,
+.is-hanging .shipped-pull,
+.is-tearing .shipped-pull {
   will-change: transform;
 }
 
@@ -1396,11 +1442,13 @@
   z-index: 50;
   width: 100%;
   max-width: none;
-  padding: 0.75rem 1rem calc(1rem + env(safe-area-inset-bottom, 0px));
+  padding: 12px 16px calc(16px + env(safe-area-inset-bottom, 0px));
+  padding-left: calc(16px + env(safe-area-inset-left, 0px));
+  padding-right: calc(16px + env(safe-area-inset-right, 0px));
   border-radius: 16px 16px 0 0;
   background: #1a1612;
   box-shadow: 0 -16px 40px rgba(0, 0, 0, 0.55);
-  transform: translateY(0) scale(1);
+  transform: translateY(0);
 }
 
 .shipped-share-sheet-handle {
@@ -1409,15 +1457,15 @@
 
 .shipped-share-sheet.is-ready .shipped-share-sheet-handle {
   display: block;
-  width: 2.4rem;
+  width: 40px;
   height: 4px;
-  margin: 0 auto 0.75rem;
+  margin: 0 auto 12px;
   border-radius: 99px;
   background: rgba(243, 234, 216, 0.22);
 }
 
 .shipped-share-page {
-  margin-top: 0.65rem;
+  margin-top: 12px;
   text-align: center;
   font-size: 11px;
   color: rgba(243, 234, 216, 0.5);
@@ -1431,7 +1479,7 @@
     bottom: auto;
     width: min(26.5rem, 100%);
     border-radius: 16px;
-    padding: 0.85rem 0.85rem 0.95rem;
+    padding: 16px;
     box-shadow: 0 18px 36px -18px rgba(0, 0, 0, 0.7);
   }
 
@@ -1447,20 +1495,20 @@
 .shipped-share {
   display: flex;
   flex-direction: column;
-  gap: 0.5rem;
+  gap: 8px;
   color: var(--cream);
 }
 
 .shipped-share-row {
   display: grid;
   grid-template-columns: repeat(2, minmax(0, 1fr));
-  gap: 0.5rem;
+  gap: 8px;
 }
 
 .shipped-share-row .shipped-button {
   min-height: 44px;
-  padding: 0.5rem 0.35rem;
-  font-size: 10.5px;
+  padding: 8px 4px;
+  font-size: 11px;
   letter-spacing: 0.08em;
 }
 
@@ -1517,10 +1565,12 @@
   border-radius: 8px;
   background: var(--ink);
   color: var(--paper);
-  padding: 0.5rem 0.9rem;
+  padding: 8px 16px;
   font-size: 13px;
   font-weight: 550;
   letter-spacing: 0.02em;
+  font-variant-numeric: tabular-nums;
+  font-feature-settings: 'tnum' 1;
   text-decoration: none;
   transition: transform 110ms var(--ease-out), opacity 110ms var(--ease-out);
 }
@@ -1545,13 +1595,18 @@
 }
 
 .shipped-copied {
-  margin: 0.35rem 0 0;
+  margin: 8px 0 0;
+  min-height: 16px;
   text-align: center;
   font-size: 11px;
   font-weight: 650;
   letter-spacing: 0.16em;
   text-transform: uppercase;
   color: #d8f5c8;
+  opacity: 0;
+}
+
+.shipped-copied.is-on {
   animation: shipped-copied-in 180ms var(--ease-out) both;
 }
 
@@ -1583,7 +1638,7 @@
 }
 
 .shipped-button.is-big {
-  min-height: 2.75rem;
+  min-height: 44px;
   background: var(--cream);
   color: #141417;
   font-size: 14px;
@@ -1650,16 +1705,6 @@
   }
 }
 
-@keyframes shipped-print-glow {
-  0%,
-  100% {
-    box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.75), 0 2px 0 #8a8170, 0 3px 5px rgba(0, 0, 0, 0.45), 0 0 0 0 rgba(247, 240, 226, 0);
-  }
-  50% {
-    box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.75), 0 2px 0 #8a8170, 0 3px 5px rgba(0, 0, 0, 0.45), 0 0 18px 2px rgba(247, 240, 226, 0.35);
-  }
-}
-
 @keyframes shipped-twitch {
   from {
     transform: translateY(0);
@@ -1707,7 +1752,8 @@
   .shipped-hint-arrow,
   .shipped-head,
   .tone-busy .shipped-lcd::before,
-  .tone-ready .shipped-key.is-print:not(:disabled) {
+  .tone-ready .shipped-key.is-print:not(:disabled),
+  .tone-ready .shipped-key.is-print:not(:disabled)::after {
     animation: none !important;
   }
 

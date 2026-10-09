@@ -82,11 +82,11 @@ Completeness (recall vs hand-built 2026 ships) is the 10-builder table in [`ship
 | marclou | 30 | 100% | partial MRR | TrustMRR $44k is on a newsletter |
 | tibo_maker | 30 | 100% | PH votes need token | SuperX + Revid + Outrank |
 | shadcn | 16 | 80% | 2/2 | improve 9.2k stars |
-| steventey | 13 | 100% | npm weekly | site hint |
-| pontusab | 12 | 100% | 2/2 | Workbench 450 stars |
-| arvidkahl | 12 | 100% must | 1/1 | Podscan $5k/mo |
-| nutlope | 21 | 100% | 3/3 | Hallmark 29.8k stars |
-| simonw | 30 | 83% | repos | prolific GH |
-| dannypostmaa | 3 | 100% | 2/2 | AgentBar + HeadshotPro |
+| steventey | 8 | 25% | 1/1 | Dub only — site-hint table removed |
+| pontusab | 11 | 100% | 2/2 | Workbench 450 stars |
+| arvidkahl | 11 | 100% must | 1/1 | Podscan $5k/mo |
+| nutlope | 30 | 75% | 1/3 | Hallmark; two older toys dropped |
+| simonw | 30 | 83% | 1/1 | prolific GH |
+| dannypostmaa | 2 | 100% | 2/2 | AgentBar + HeadshotPro |
 
-Median must-find recall **100%**. The other 40 rows on this list use the same gather path; swap a handle here if identity lands on a decoy.
+Median must-find recall on this original set **87.5%** after deleting the alias tables (was 100% — overfit). Held-out 20 / truth 10: [`shipped-heldout-builders.md`](./shipped-heldout-builders.md), median **100%**. The other 40 rows on this list use the same gather path; swap a handle here if identity lands on a decoy.

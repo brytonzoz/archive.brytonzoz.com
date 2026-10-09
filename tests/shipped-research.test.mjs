@@ -113,8 +113,8 @@ test('cashier note and stats are specific to the items, never stock copy', () =>
   const stats = ai.formatStats(items);
   assert.match(stats[0], /3 launches/);
   assert.match(stats[0], /GitHub/);
-  assert.doesNotMatch(note, /Thank you for shipping|Come again|No refunds on momentum/i);
-  assert.match(note, /PHOTOAI|3 launch|publish|tape|receipt/i);
+  assert.doesNotMatch(note, /Thank you for shipping|Come again|No refunds on momentum|Receipt paper running low|Someone likes the publish button/i);
+  assert.match(note, /PHOTOAI|INTERIORAI|SUPERLEVELS|3 launch|tape/i);
   const draft = ai.demoReceipt(
     {
       found: items.map((item) => ({ ...item, name: item.name.toLowerCase(), score: 4, thisYear: !item.date })),

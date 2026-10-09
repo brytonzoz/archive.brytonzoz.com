@@ -145,18 +145,41 @@ A must-find is a named public product/repo/app with 2026 evidence from the perso
 
 | Query | Must-find | Recall | Sourced stats (found / public) | Example sourced stat |
 | --- | ---: | ---: | ---: | --- |
-| levelsio | 7 / 8 | 88% | stars + repos + $86k/mo from X bio (Photo AI $105k/mo post is a TinyFish/Claude gap-fill) | `553 GitHub stars · github.com/levelsio/superlevels` |
-| marclou | 7 / 7 | 100% | 1 / 2 (TrustMRR $44k/mo lives on a newsletter; site/TrustMRR page did not print it) | repos + product list |
-| tibo_maker | 7 / 7 | 100% | 0 / 1 SuperX 929 PH upvotes — **needs Product Hunt token** (staging has it; this env does not) | $1M/mo from tmaker.io (self-stated) |
-| shadcn | 4 / 5 | 80% | 2 / 2 | `9.2k GitHub stars · github.com/shadcn/improve` |
-| steventey | 4 / 4 | 100% | 1 / 1 npm weekly | Dub + Novel + ShareGPT + One Word Domains |
-| pontusab | 8 / 8 | 100% | 2 / 2 | `450 GitHub stars · github.com/pontusab/workbench` |
-| arvidkahl | 2 / 2 must | 100% must (0-star GH toys optional) | 1 / 1 | `5k/mo · podscan.fm` · `51 public GitHub repos` |
-| nutlope | 8 / 8 | 100% | 3 / 3 | `29.8k GitHub stars · github.com/Nutlope/hallmark` |
-| simonw | 5 / 6 | 83% | 1 / 1 | `992 public GitHub repos · github.com/simonw` |
-| dannypostmaa | 2 / 2 | 100% | 2 / 2 | `28 GitHub stars · github.com/dannypostma/agentbar` |
+| levelsio | 7 / 8 | 88% | 4 / 4 | SuperLevels stars + $86k/mo from X bio |
+| marclou | 7 / 7 | 100% | 2 / 2 | TrustMRR list + repos |
+| tibo_maker | 7 / 7 | 100% | 0 / 1 PH SuperX — needs Product Hunt token | $1M/mo · tmaker.io (X bio + site, no alias table) |
+| shadcn | 4 / 5 | 80% | 2 / 2 | improve 9.2k stars |
+| steventey | 1 / 4 | **25%** | 1 / 1 npm | Dub only. Novel / ShareGPT / One Word Domains lived on a `steventey.com` site hint — that table is gone |
+| pontusab | 8 / 8 | 100% | 2 / 2 | Workbench 450 stars |
+| arvidkahl | 2 / 2 must | 100% must | 1 / 1 | $5k/mo · podscan.fm |
+| nutlope | 6 / 8 | 75% | 1 / 3 | Hallmark still prints; two older toys dropped without a hint |
+| simonw | 5 / 6 | 83% | 1 / 1 | 992 public repos |
+| dannypostmaa | 2 / 2 | 100% | 2 / 2 | AgentBar 28 stars (`dannypostmaa` → `dannypostma` via doubled-letter variant, not a table) |
 
-**Median must-find recall: 100%.** Pass threshold was ~80%.
+**Median must-find recall on the original set: 87.5%.** The earlier 100% was overfit to `HANDLE_ALIASES` / `PRODUCT_OWNERS` / `SITE_HINTS`. Those tables are gone (`IDENTITY_COLLISIONS` is `{}`).
+
+## Held-out completeness (the bar that matters)
+
+20 builders not in `docs/shipped-eval-builders.md` and not in any identity table: [`docs/shipped-heldout-builders.md`](./shipped-heldout-builders.md). Ground truth for 10 of them: [`docs/shipped-heldout-ground-truth.json`](./shipped-heldout-ground-truth.json). Raw: [`docs/shipped-heldout-recall.json`](./shipped-heldout-recall.json).
+
+`mckaywrigley` was on the first draft of the 20 and was swapped for `keijiro`: Chatbot UI last moved in 2024, so it is not a 2026 ship.
+
+| Query | Recall | Sourced stats | Note (demoReceipt) | Cost | Time |
+| --- | ---: | ---: | --- | ---: | ---: |
+| kitze | 80% (4/5, missed Sizzy) | 1 / 3 (unclutter/skillbox stars crowded by other GH stars) | names a GitHub/npm line | $0 | 4.1s |
+| rameerez | 100% | 1 / 1 | MAPPO + allgood 272 stars | $0 | 2.9s |
+| steipete | 75% (3/4, missed accesskit.dev under npm flood) | 1 / 1 repos | names an npm/OpenClaw line | $0 | 5.5s |
+| insidegui | 100% | 1 / 2 | names GitHub utilities | $0 | 2.5s |
+| fofrAI | 100% | 1 / 1 nano-banana 26 stars | resolved **fofr** (X miss + 0-repo `fofrai` decoy; token `fofr` + twitter cross-check) | $0 | 3.5s |
+| dabit3 | 100% | 2 / 2 | jev-experiments 401 stars | $0 | 4.4s |
+| joshpuckett | 100% | 2 / 2 | dialkit 1.2k stars | $0 | 2.4s |
+| yacineMTB | 100% | 1 / 1 dingcad 507 stars | dingcad on the tape | $0 | 2.9s |
+| johnrushx | 50% (MarsX yes; x-algorithm drowned by marsx.dev chrome) | 1 / 1 TrustMRR $39k/mo | names a MarsX/site line | $0 | 1.4s |
+| keijiro | 100% | 2 / 2 Jacquard 240 stars + 947 repos | AudioTailor through-line | $0 | 3.4s |
+
+**Held-out median must-find recall: 100%** (pass was ≥80%). Average time ~3.3s. Deterministic harvest **$0**; Haiku + 3 searches on staging still ~$0.03–$0.04 of the $0.05 cap.
+
+Identity is general: public Fx/Vx Twitter (browser UA), t.co expand, follow site GitHub links, `fullname:` / `in:name` search, camelCase handle tokens, 0-repo decoy cap. No eval person is in `IDENTITY_COLLISIONS`.
 
 Stats still missing without paid/token surfaces:
 - Product Hunt upvotes/ranks — local $0; staging with `PRODUCTHUNT_*` fills SuperX 929 / #1 day.

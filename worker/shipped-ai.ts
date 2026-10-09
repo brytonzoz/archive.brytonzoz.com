@@ -181,9 +181,9 @@ export function groundedNote(items: DraftItem[], seed: number, profileName = '')
     `${stats}. ${first} is first on the tape.`,
     `${stats}. ${last} closed the year.`,
     `${real.length} public things${profileName ? ` for ${profileName.split(' ')[0]}` : ''}. ${first} set the tone.`,
-    niche ? `${stats}. ${niche.name} is the through-line.` : `${stats}. No empty aisle.`,
-    real.length >= 8 ? `${stats}. Receipt paper running low.` : `${stats}. Keep the carbon copy.`,
-    `${stats}. Someone likes the publish button.`,
+    niche ? `${stats}. ${niche.name} is the through-line.` : `${stats}. ${first} led.`,
+    `${stats}. ${first} led the year.`,
+    `${stats}. ${last} is still on the tape.`,
   ];
   const note = variants[pick];
   return note.length > 140 ? `${stats}. ${first} led.` : note;

@@ -3,7 +3,7 @@
 // no floor ladder. Takeovers are logged. A bid in the last 10 minutes of a slot extends that slot only.
 import { SLOT_COUNT, extendClose } from '../lib/shipped-sponsors';
 
-export type Counter = 'printed' | 'shared' | 'impressions' | 'views';
+export type Counter = 'printed' | 'shared' | 'impressions' | 'views' | 'shipped';
 export type PriceKind = 'takeover';
 
 /** Needs shipped_receipts (the seeds count it) and shipped_flags (worker/shipped-guard.ts). */
@@ -16,6 +16,7 @@ export const MARKET_SCHEMA = [
   `INSERT INTO shipped_counters (name, n) SELECT 'printed', COUNT(*) FROM shipped_receipts WHERE 1 ON CONFLICT(name) DO NOTHING`,
   `INSERT INTO shipped_counters (name, n) SELECT 'shared', COALESCE(SUM(shares), 0) FROM shipped_receipts WHERE 1 ON CONFLICT(name) DO NOTHING`,
   `INSERT INTO shipped_counters (name, n) SELECT 'views', COALESCE(SUM(views), 0) FROM shipped_receipts WHERE 1 ON CONFLICT(name) DO NOTHING`,
+  `INSERT INTO shipped_counters (name, n) SELECT 'shipped', 0 WHERE 1 ON CONFLICT(name) DO NOTHING`,
 ];
 
 export const MARKET_COLUMNS = [
@@ -24,7 +25,7 @@ export const MARKET_COLUMNS = [
   'ALTER TABLE shipped_bids ADD COLUMN seen_at_end INTEGER',
 ];
 
-const emptyCounts = (): Record<Counter, number> => ({ printed: 0, shared: 0, impressions: 0, views: 0 });
+const emptyCounts = (): Record<Counter, number> => ({ printed: 0, shared: 0, impressions: 0, views: 0, shipped: 0 });
 
 /** Next global sponsor number (SPONSOR #001…). Gaps are fine if a promote races and loses. House ads never take a number. */
 export async function nextSponsorSerial(db: D1Database): Promise<number> {

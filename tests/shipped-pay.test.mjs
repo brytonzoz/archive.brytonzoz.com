@@ -57,6 +57,17 @@ test('there is no floor ladder: a house hero and a small slot both open at $1', 
   assert.equal('parseLadder' in sponsors, false);
 });
 
+test('ticker interpolation never shows more than the confirmed count', async () => {
+  const { stepCount } = await import('../lib/shipped-ticker.ts');
+  assert.equal(stepCount(0, 0, 1), 0);
+  assert.equal(stepCount(12, 10, 1), 10, 'drops to the confirmed number, never stays high');
+  let n = 0;
+  for (let i = 0; i < 40; i++) n = stepCount(n, 100, 0.016);
+  assert.ok(n <= 100, n);
+  assert.ok(n > 0, 'moves toward the target');
+  assert.equal(stepCount(99.99, 100, 1), 100);
+});
+
 test('takeovers stay open until that slot closes; prorated refunds never exceed what was paid', () => {
   const close = Date.UTC(2026, 9, 26, 16);
   assert.equal(sponsors.takeoversOpen(close - 1, close), true);

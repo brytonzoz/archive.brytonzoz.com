@@ -67,15 +67,46 @@
   color: rgba(243, 234, 216, 0.48);
 }
 
-.shipped-board-ticker {
-  margin: 0.55rem -0.25rem 0;
-  overflow: hidden;
-  white-space: nowrap;
-  text-overflow: ellipsis;
-  font-size: 10.5px;
-  letter-spacing: 0.08em;
-  text-transform: uppercase;
-  color: rgba(243, 234, 216, 0.42);
+.shipped-ticker {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 0.35rem;
+  width: 100%;
+  margin: 0.65rem 0 0;
+  padding: 0.45rem 0.2rem 0.4rem;
+  border: 0;
+  border-radius: 10px;
+  background: rgba(243, 234, 216, 0.06);
+  color: inherit;
+  font: inherit;
+  cursor: pointer;
+}
+
+.shipped-ticker:focus-visible {
+  outline: 2px solid var(--cream);
+  outline-offset: 2px;
+}
+
+.shipped-ticker-stat {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 0.12rem;
+  min-width: 0;
+}
+
+.shipped-ticker-n {
+  font-size: 15px;
+  font-weight: 600;
+  letter-spacing: -0.02em;
+  color: var(--cream);
+}
+
+.shipped-ticker-k {
+  font-size: 9px;
+  font-weight: 600;
+  letter-spacing: 0.14em;
+  color: rgba(243, 234, 216, 0.5);
 }
 
 .shipped-board-hero,

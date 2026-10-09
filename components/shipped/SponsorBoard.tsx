@@ -10,6 +10,7 @@ import { BID_RULES, HERO_SLOT, HOUSE_SLOTS, bidRange, slotLabel, sponsorTag, tak
 import type { SponsorSlot } from '../../lib/shipped-year';
 import { openSponsor } from './sponsor-pick';
 import { useShippedState } from './state';
+import { Ticker } from './Ticker';
 
 function housePreview(slot: number): SponsorSlot {
   const ad = HOUSE_SLOTS[slot];
@@ -62,7 +63,6 @@ function BidButtons({ slot, open, frozen, now }: { slot: SponsorSlot; open: bool
   const slotClosed = Boolean(now && slot.closesAt && !takeoversOpen(now, slot.closesAt));
   const disabled = !open || frozen || maxed || cooling || slotClosed;
   const wait = cooling && now && slot.cooldownUntil ? Math.max(1, Math.ceil((slot.cooldownUntil - now) / 1000)) : 0;
-  const same = slot.next === slot.maxNext;
   if (frozen || slotClosed) {
     return (
       <button type="button" className="shipped-board-take" disabled>
@@ -87,13 +87,11 @@ function BidButtons({ slot, open, frozen, now }: { slot: SponsorSlot; open: bool
   return (
     <div className="shipped-board-bids">
       <button type="button" className="shipped-board-take" disabled={disabled} onClick={() => openSponsor(slot.slot, slot.next)}>
-        {same ? `Bid ${moneyShort(slot.next)}` : `Lowest bid ${moneyShort(slot.next)}`}
+        Lowest bid {moneyShort(slot.next)}
       </button>
-      {same ? null : (
-        <button type="button" className="shipped-board-take is-high" disabled={disabled} onClick={() => openSponsor(slot.slot, slot.maxNext)}>
-          Highest bid {moneyShort(slot.maxNext)}
-        </button>
-      )}
+      <button type="button" className="shipped-board-take is-high" disabled={disabled} onClick={() => openSponsor(slot.slot, slot.maxNext)}>
+        Highest bid {moneyShort(slot.maxNext)}
+      </button>
     </div>
   );
 }
@@ -126,24 +124,10 @@ export function SponsorBoard() {
           The public receipt printer
         </h1>
         <p className="shipped-board-pitch">Pay and your logo is on every receipt printed.</p>
+        <Ticker />
         <p className="shipped-board-proof">
-          {state ? `${state.printed.toLocaleString('en-US')} printed` : '·· printed'}
-          {state ? ` · ${state.shared.toLocaleString('en-US')} shared` : null}
-          {state && now !== null ? (
-            <>
-              {' · '}
-              {closed ? 'printer is off' : `printer shuts off in ${countdown(left)}`}
-            </>
-          ) : null}
+          {state && now !== null ? (closed ? 'printer is off' : `printer shuts off in ${countdown(left)}`) : '··'}
         </p>
-        {state?.recent.length ? (
-          <p className="shipped-board-ticker" aria-label="Recently printed">
-            {state.recent
-              .slice(0, 8)
-              .map((row) => `${row.who.toUpperCase()} · ${row.potential ? 'POTENTIAL' : `${row.count} SHIPPED`}`)
-              .join('  ·  ')}
-          </p>
-        ) : null}
       </header>
 
       <article className="shipped-board-hero" aria-label={slotLabel(hero.slot)}>

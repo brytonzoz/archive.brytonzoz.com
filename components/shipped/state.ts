@@ -12,6 +12,8 @@ export type ShippedState = {
   payments: { open: boolean; prints: boolean; provider: string | null; live: boolean; wallet: boolean; printCents: number; lockMinutes: number };
   printed: number;
   shared: number;
+  shipped: number;
+  views: number;
   piled: number;
   recent: RecentReceipt[];
   generator: { enabled: boolean; demo: boolean; reason: string | null; turnstileSiteKey: string | null; human: HumanCheckConfig; year: number; sources: string[] };

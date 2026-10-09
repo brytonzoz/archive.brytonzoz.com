@@ -3,6 +3,7 @@
 // the two-week event ends, lib/shipped-sponsors.ts) and $5 mailed prints. The event window is lib/shipped-event.ts.
 //
 //   GET  /api/shipped/state            event window, counters, generator, payments, the sponsor block
+//   GET  /api/shipped/proof            PRINTED / SHARED / SHIPPED / VIEWS and how they are counted (starts at 0)
 //   POST /api/shipped/lookup           { q } -> { candidates, auto } (who did they mean?)
 //   POST /api/shipped/print            { subject, token, listed } -> { id, pile } (same subject within 7 days: cached)
 //   GET  /api/shipped/pile             the pile (lib/shipped-pile.ts); POST { id, token } tosses a receipt on
@@ -45,6 +46,7 @@ import {
   logTakeover,
   market,
   nextSponsorSerial,
+  priceLog,
   slotClosesAt,
   slotHistory,
   type Market,
@@ -597,7 +599,11 @@ async function generate(
     if (!state.demo) ctx.waitUntil(recordSpend(db, true, usage.input, usage.output, usage.searches));
     if (!inserted) return json({ error: 'taken-down' }, 410);
     await db.prepare('UPDATE shipped_receipts SET hidden = 0 WHERE id = ? AND hidden = 2').bind(inserted.id).run();
-    if (!replaces) await bump(db, 'printed');
+    if (!replaces) {
+      await bump(db, 'printed');
+      const n = itemsShipped(receipt);
+      if (n > 0) await bump(db, 'shipped', n);
+    }
     console.log(JSON.stringify({ shipped: 'print', id: inserted.id, kind: subject.kind, items: receipt.items.length, potential: receipt.potential, ran: gathered.ran, failed: gathered.failed, costMicros: usage.cost }));
     return json({ id: inserted.id, pile: await pileToken(env, inserted.id) });
   } catch (error) {
@@ -1373,11 +1379,12 @@ async function state(env: ShippedEnv): Promise<Response> {
     printCents: PRINT_PRICE_CENTS,
     lockMinutes: BID_RULES.lockMinutes,
   };
+  const zeros = { printed: 0, shared: 0, shipped: 0, views: 0, piled: 0 };
   const base = { event: { name: EVENT_NAME, opensAt: window.opensAt, closesAt: window.closesAt, phase: window.phase, now: window.now }, payments };
-  if (!db) return json({ ...base, printed: 0, shared: 0, piled: 0, recent: [], generator, sponsors: await sponsorBlock(null, env, off) });
+  if (!db) return json({ ...base, ...zeros, recent: [], generator, sponsors: await sponsorBlock(null, env, off) });
 
-  const [counts, recent, piled, sponsors] = await Promise.all([
-    db.prepare('SELECT COUNT(*) AS printed, COALESCE(SUM(shares), 0) AS shared FROM shipped_receipts').first<{ printed: number; shared: number }>(),
+  const [tallies, recent, piled, sponsors] = await Promise.all([
+    counters(db),
     db
       .prepare(`SELECT id, data FROM shipped_receipts WHERE listed = 1 AND hidden = 0 AND mode = ? ORDER BY id DESC LIMIT 12`)
       .bind(modeOf(generator.year))
@@ -1389,14 +1396,50 @@ async function state(env: ShippedEnv): Promise<Response> {
     {
       ...base,
       generator,
-      printed: counts?.printed ?? 0,
-      shared: counts?.shared ?? 0,
+      printed: tallies.printed,
+      shared: tallies.shared,
+      shipped: tallies.shipped,
+      views: tallies.views,
       piled: piled?.n ?? 0,
       recent: recent.results.flatMap((row) => {
         const receipt = JSON.parse(row.data) as YearReceipt;
         return receipt.version === 2 ? [{ id: row.id, who: subjectLabel(receipt.subject), count: itemsShipped(receipt), potential: receipt.potential }] : [];
       }),
       sponsors,
+    },
+    200,
+    'public, max-age=10',
+  );
+}
+
+const TICKER_HOW = {
+  printed: 'New receipt rows. A reprint of the same subject the same day does not add another. Starts at 0.',
+  shared: 'Share taps, one per visitor / receipt / way / day. Starts at 0.',
+  shipped: 'Items listed as shipped on those receipts. A potential (empty) print adds 0. Starts at 0.',
+  views: 'Opens of a printed receipt page. Starts at 0.',
+};
+
+/** GET /api/shipped/proof: the four ticker counters and how they are counted. Nothing invented. */
+async function proof(env: ShippedEnv): Promise<Response> {
+  const db = await database(env);
+  const empty = { printed: 0, shared: 0, shipped: 0, views: 0 };
+  const tallies = db ? await counters(db) : empty;
+  const takeovers = db ? await priceLog(db, 12) : [];
+  return json(
+    {
+      asOf: Date.now(),
+      printed: { n: tallies.printed, how: TICKER_HOW.printed },
+      shared: { n: tallies.shared, how: TICKER_HOW.shared },
+      shipped: { n: tallies.shipped, how: TICKER_HOW.shipped },
+      views: { n: tallies.views, how: TICKER_HOW.views },
+      takeovers: takeovers.map((row) => ({
+        at: row.at,
+        slot: row.slot,
+        from: row.from,
+        to: row.to,
+        printed: row.printed,
+        note: row.note,
+      })),
     },
     200,
     'public, max-age=10',
@@ -1468,7 +1511,14 @@ async function sharePage(request: Request, env: ShippedEnv & { ASSETS: Fetcher }
     return new Response(shell.body, { status: 404, headers });
   }
 
-  ctx.waitUntil(db.prepare('UPDATE shipped_receipts SET views = views + 1 WHERE id = ?').bind(id).run().catch(() => undefined));
+  ctx.waitUntil(
+    db
+      .prepare('UPDATE shipped_receipts SET views = views + 1 WHERE id = ?')
+      .bind(id)
+      .run()
+      .then(() => bump(db, 'views'))
+      .catch(() => undefined),
+  );
   const sponsors = await sponsorBlock(db, env);
   // JSON inside a <script> data block: "<" escaped so nothing in a receipt can close the tag.
   const payload = JSON.stringify({ receipt, sponsors }).replace(/</g, '\\u003c').replace(/\u2028/g, '\\u2028').replace(/\u2029/g, '\\u2029');
@@ -1539,6 +1589,7 @@ export async function handleShipped(request: Request, env: ShippedEnv, ctx: Exec
   if ((await switchedOff(env, env.DB ?? null)).has('site') && path !== '/api/shipped/checkout') return json({ error: 'out-of-paper' }, 503);
 
   if (path === '/api/shipped/state' && method === 'GET') return cached(request, ctx, 10, () => state(env));
+  if (path === '/api/shipped/proof' && method === 'GET') return cached(request, ctx, 10, () => proof(env));
   if (path === '/api/shipped/challenge' && method === 'GET') return challenge(request, env);
   if (path === '/api/shipped/lookup' && method === 'POST') return lookup(request, env);
   if (path === '/api/shipped/print' && method === 'POST') return print(request, env, ctx);

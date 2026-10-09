@@ -313,7 +313,7 @@ export function SponsorDesk() {
               <button
                 type="button"
                 className={`shipped-button w-full ${bid === picked.maxNext ? '' : 'is-ghost'}`}
-                disabled={busy || soldOut || picked.maxNext === picked.next}
+                disabled={busy || soldOut}
                 onClick={(event) => void submit(event, picked.maxNext)}
               >
                 {busy && bid === picked.maxNext ? 'OPENING…' : `Highest bid ${money(picked.maxNext)}`}

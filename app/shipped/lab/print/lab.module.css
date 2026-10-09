@@ -1,0 +1,139 @@
+/* The print lab: the counter (from the /shipped layout), a strip of keys, the printer, a test tray. */
+
+.lab {
+  width: min(100%, 560px);
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 1.75rem;
+  color: #f3ead8;
+}
+
+.head {
+  width: 100%;
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: center;
+  gap: 8px 10px;
+}
+
+.title {
+  width: 100%;
+  margin: 0;
+  text-align: center;
+  font-size: 10px;
+  font-weight: 600;
+  letter-spacing: 0.24em;
+  color: rgba(243, 234, 216, 0.5);
+}
+
+.row {
+  display: flex;
+  gap: 4px;
+  border-radius: 6px;
+  background: #141518;
+  padding: 4px;
+  box-shadow:
+    inset 0 1px 2px rgba(0, 0, 0, 0.7),
+    0 1px 0 rgba(255, 255, 255, 0.04);
+}
+
+.key {
+  min-width: 44px;
+  min-height: 44px;
+  border: 0;
+  border-radius: 3px;
+  background: #2c2e33;
+  padding: 0 12px;
+  color: rgba(243, 234, 216, 0.78);
+  font: inherit;
+  font-size: 10px;
+  font-weight: 600;
+  letter-spacing: 0.12em;
+  cursor: pointer;
+  box-shadow:
+    inset 0 1px 0 rgba(255, 255, 255, 0.09),
+    inset 0 -2px 0 rgba(0, 0, 0, 0.32),
+    0 1px 0 rgba(0, 0, 0, 0.7);
+}
+
+.key:active {
+  transform: translateY(1px);
+}
+
+/* A latched key sits lower, with its legend lit. */
+.key[aria-pressed='true'] {
+  background: #25272b;
+  color: #f3ead8;
+  box-shadow:
+    inset 0 1px 2px rgba(0, 0, 0, 0.55),
+    0 0 0 rgba(0, 0, 0, 0);
+}
+
+.key:focus-visible {
+  outline: 2px solid #f3ead8;
+  outline-offset: 2px;
+}
+
+.meta {
+  width: 100%;
+  margin: 0;
+  text-align: center;
+  font-size: 10px;
+  letter-spacing: 0.14em;
+  color: rgba(243, 234, 216, 0.38);
+  font-variant-numeric: tabular-nums;
+}
+
+/* ---- Test catcher --------------------------------------------------------------------------------------- */
+
+.catcher {
+  width: min(100%, 300px);
+  margin-top: 1rem;
+}
+
+.tray {
+  position: relative;
+  height: 96px;
+  border-radius: 4px 4px 8px 8px;
+  background: #18191c;
+  box-shadow:
+    inset 0 2px 0 #2a2c31,
+    inset 0 10px 14px -8px rgba(0, 0, 0, 0.8),
+    0 18px 24px -14px rgba(0, 0, 0, 0.8);
+}
+
+.floor {
+  position: absolute;
+  inset: 0 6px 26px;
+}
+
+.ball {
+  position: absolute;
+  left: 0;
+  top: 0;
+  pointer-events: none;
+}
+
+.trayLip {
+  position: absolute;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  height: 26px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  border-radius: 0 0 8px 8px;
+  background: #26282d;
+  padding: 0 10px;
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.08);
+  font-size: 9px;
+  font-weight: 600;
+  letter-spacing: 0.16em;
+  color: rgba(243, 234, 216, 0.45);
+  white-space: nowrap;
+  overflow: hidden;
+}

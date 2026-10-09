@@ -287,6 +287,8 @@ export function ShippedStage({ opening, title }: { opening: Opening; title: Reac
       const result = (await response.json().catch(() => ({}))) as { candidates?: Candidate[]; auto?: boolean; error?: string };
       if (run.current !== gen) return;
       if (!response.ok || !result.candidates?.length) throw new Error(result.error ?? 'invalid-query');
+      // Lookup is done. Clear the 15s timer before Turnstile/print, or TRY AGAIN fires while execute() runs.
+      window.clearTimeout(timer);
       if (result.auto) {
         await print(result.candidates[0], gen);
         return;

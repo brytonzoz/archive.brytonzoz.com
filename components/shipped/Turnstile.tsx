@@ -78,7 +78,6 @@ export const Turnstile = forwardRef<TurnstileHandle, TurnstileProps>(function Tu
       if (token.current) return Promise.resolve(token.current);
       return new Promise((resolve) => {
         waiters.current.push(resolve);
-        if (appearance !== 'always') setNeeded(true);
         const start = Date.now();
         let kicked = false;
         const run = () => {
@@ -121,7 +120,11 @@ export const Turnstile = forwardRef<TurnstileHandle, TurnstileProps>(function Tu
           size: visible ? 'flexible' : 'compact',
           callback: (value: string) => queueMicrotask(() => emit(value)),
           'expired-callback': () => queueMicrotask(() => emit(null)),
-          'error-callback': () => queueMicrotask(() => emit(null)),
+          'error-callback': () =>
+            queueMicrotask(() => {
+              if (appearance !== 'always') setNeeded(true);
+              emit(null);
+            }),
         });
       })
       .catch(() => emit(null));

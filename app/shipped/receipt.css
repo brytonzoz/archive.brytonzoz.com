@@ -266,9 +266,9 @@
 
 .shipped-board-marks .shipped-mark,
 .shipped-board-marks .shipped-mark-logo {
-  width: 1.15rem;
-  height: 1.15rem;
-  margin-left: -0.35rem;
+  width: 16px;
+  height: 16px;
+  margin-left: -6px;
   box-shadow: 0 0 0 1.5px var(--counter);
 }
 
@@ -1321,17 +1321,20 @@
 }
 
 .shipped-turnstile {
-  position: relative;
-  width: min(18.5rem, 100%);
-  max-height: 0;
-  margin: 0 auto;
+  position: absolute;
+  width: 300px;
+  height: 65px;
+  left: -9999px;
   overflow: hidden;
   pointer-events: none;
 }
 
 .shipped-turnstile.is-on {
-  max-height: 5.5rem;
-  margin-top: 0.55rem;
+  position: relative;
+  left: auto;
+  width: min(18.5rem, 100%);
+  height: auto;
+  margin: 8px auto 0;
   overflow: visible;
   pointer-events: auto;
 }

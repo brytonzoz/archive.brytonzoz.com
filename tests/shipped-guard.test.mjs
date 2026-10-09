@@ -146,6 +146,25 @@ test('cycle budget: $180 from the 8th plus 80% of this cycle settled sales; miss
   const printOnly = budget.saleNetCents(500, 0);
   assert.equal(await guard.netSettledCents(five, Date.UTC(2026, 9, 8), Date.UTC(2026, 10, 8)), printOnly, 'unset postage does not invent a cost');
   assert.equal(await guard.netSettledCents(five, Date.UTC(2026, 9, 8), Date.UTC(2026, 10, 8), 80), budget.saleNetCents(500, 80));
+
+  const mixed = memoryD1();
+  mixed.raw.exec(`CREATE TABLE shipped_bids (
+    id INTEGER PRIMARY KEY, status TEXT, amount_cents INTEGER, total_cents INTEGER, refund_cents INTEGER, paid_at INTEGER
+  )`);
+  mixed.raw.exec(`CREATE TABLE print_orders (
+    id INTEGER PRIMARY KEY, status TEXT, amount_cents INTEGER, total_cents INTEGER, refund_cents INTEGER, paid_at INTEGER, kind TEXT
+  )`);
+  mixed.raw.exec(`INSERT INTO print_orders (status, amount_cents, total_cents, refund_cents, paid_at, kind) VALUES
+    ('paid', 300, 300, 0, ${thisCycle}, 'full'),
+    ('to_print', 700, 700, 0, ${thisCycle}, 'bundle'),
+    ('checkout', 300, NULL, NULL, NULL, 'full')`);
+  const mixedNet = budget.saleNetCents(300, 0) + budget.saleNetCents(700, 0);
+  assert.equal(await guard.netSettledCents(mixed, Date.UTC(2026, 9, 8), Date.UTC(2026, 10, 8)), mixedNet, '$3 and $7 settled sales refill the budget; the unpaid hold does not');
+  assert.equal(
+    await guard.netSettledCents(mixed, Date.UTC(2026, 9, 8), Date.UTC(2026, 10, 8), 80),
+    budget.saleNetCents(300, 0) + budget.saleNetCents(700, 80),
+    'postage comes off the mailed bundle only, not the digital full receipt',
+  );
   assert.deepEqual(await guard.configuredPrintPostageCents({}, five), { cents: null, fromEnv: false });
   await guard.setPrintPostageCents(five, 80);
   assert.deepEqual(await guard.configuredPrintPostageCents({}, five), { cents: 80, fromEnv: false });

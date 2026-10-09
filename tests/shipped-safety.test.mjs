@@ -35,12 +35,25 @@ test('schema: only documented keys, only sourced items, only links the sources r
     [],
     2026,
   );
-  assert.deepEqual(Object.keys(draft).sort(), ['items', 'layout', 'note', 'potential']);
+  assert.deepEqual(Object.keys(draft).sort(), ['items', 'layout', 'note', 'potential', 'stats']);
   assert.ok(Array.isArray(draft.layout));
   assert.ok(draft.layout.every((id) => typeof id === 'string' && !/[<>]/.test(id)));
   assert.deepEqual(draft.items.map((item) => item.name), ['KEEPAWAKE']);
   assert.equal(draft.items[0].link, 'https://github.com/someone/keepawake');
-  assert.deepEqual(Object.keys(draft.items[0]).sort(), ['date', 'description', 'icon', 'link', 'name', 'source', 'status']);
+  assert.deepEqual(Object.keys(draft.items[0]).sort(), [
+    'confidence',
+    'date',
+    'description',
+    'icon',
+    'inYear',
+    'isRealShip',
+    'link',
+    'name',
+    'significance',
+    'source',
+    'status',
+    'via',
+  ]);
 });
 
 test('a link on a site the sources found falls back to that site, never a page nobody returned', () => {
@@ -98,15 +111,16 @@ test('content safety: private life, contact details, slurs, mockery and markup n
   }
 });
 
-test('a mocking or AI-sounding note is replaced, items are capped at 20', () => {
-  const many = Array.from({ length: 60 }, (_, i) => found({ name: `Package ${i}`, link: `https://www.npmjs.com/package/p${i}`, source: 'npm' }));
+test('a mocking or AI-sounding note is replaced, items are capped at MAX_ITEMS', () => {
+  const many = Array.from({ length: 260 }, (_, i) => found({ name: `Package ${i}`, link: `https://www.npmjs.com/package/p${i}`, source: 'npm' }));
   const draft = ai.validateDraft(
     { items: many.map((item) => ({ name: item.name, description: 'npm package', date: '2026-04', status: 'RELEASED', link: item.link })), note: 'What a pathetic year, lol' },
     gathered(many),
     [],
     2026,
   );
-  assert.equal(draft.items.length, 20);
+  assert.equal(draft.items.length, ai.MAX_ITEMS);
+  assert.equal(ai.MAX_ITEMS, 200);
   assert.doesNotMatch(draft.note, /pathetic|lol/);
   const voice = ai.validateDraft({ items: [{ name: 'Keepawake', link: 'https://github.com/someone/keepawake', date: '2026-03' }], note: 'An incredible journey of innovation' }, gathered(), [], 2026);
   assert.doesNotMatch(voice.note, /incredible|journey/);

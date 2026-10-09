@@ -1,0 +1,245 @@
+import './resolve-ts.mjs';
+import assert from 'node:assert/strict';
+import { test } from 'node:test';
+
+const identity = await import('../worker/shipped-identity.ts');
+const sources = await import('../worker/shipped-sources.ts');
+const ai = await import('../worker/shipped-ai.ts');
+const research = await import('../worker/shipped-research.ts');
+
+test('handle variants stitch X spellings to GitHub logins', () => {
+  assert.ok(identity.handleVariants('dannypostmaa').includes('dannypostma'));
+  assert.ok(identity.handleVariants('tdinh_me').includes('tdinhme'));
+  assert.ok(identity.handleVariants('tibo_maker').includes('tibo-maker'));
+  assert.equal(identity.handleVariants('tibo_maker').includes('tibo'), false);
+  assert.ok(identity.handleTokens('fofrAI').includes('fofr'));
+  assert.equal(identity.handleVariants('fofrAI').includes('fofr'), false);
+});
+
+test('name queries split "Tibo from OpenAI"', () => {
+  assert.deepEqual(identity.parsePersonName('Tibo from OpenAI'), { name: 'Tibo', company: 'OpenAI', tokens: ['Tibo'], product: null });
+  assert.equal(identity.parsePersonName('Steven Tey').company, null);
+});
+
+test('bio text yields product URLs and skips social hosts', () => {
+  const urls = identity.urlsFromText('PhotoAI.com $86K/m and https://x.com/levelsio plus nomads.com');
+  assert.ok(urls.some((u) => /photoai\.com/i.test(u)));
+  assert.ok(urls.some((u) => /nomads\.com/i.test(u)));
+  assert.equal(urls.some((u) => /x\.com/i.test(u)), false);
+});
+
+test('public X payloads parse without a person table', () => {
+  const vx = identity.xUserFromPayload({
+    screen_name: 'tdinh_me',
+    name: 'Tony Dinh',
+    description: 'Creating software I love to use. https://t.co/p4T2vFYQTt',
+  });
+  assert.equal(vx?.screen_name, 'tdinh_me');
+  const fx = identity.xUserFromPayload({
+    code: 200,
+    user: { screen_name: 'fofrAI', name: 'fofr', description: 'models', website: { url: 'https://fofr.ai' } },
+  });
+  assert.equal(fx?.name, 'fofr');
+});
+
+test('a 0-repo decoy GitHub account scores below the real one', () => {
+  const decoy = { login: 'Dannypostmaa', name: '', bio: '', blog: null, x: null, repos: 0 };
+  const real = { login: 'dannypostma', name: 'Danny Postma', bio: 'HeadshotPro', blog: 'https://www.headshotpro.com', x: 'dannypostma', repos: 18 };
+  const decoyScore = identity.scoreGithubMatch({ user: decoy, wantX: 'dannypostmaa' });
+  const realScore = identity.scoreGithubMatch({ user: real, wantX: 'dannypostmaa', wantName: 'Danny Postma' });
+  assert.ok(realScore > decoyScore, `${realScore} vs ${decoyScore}`);
+  assert.ok(realScore >= 8);
+  const otherTibo = identity.scoreGithubMatch({
+    user: { login: 'T-Dnzt', name: 'Tibo', bio: '', blog: null, x: null, repos: 40 },
+    wantX: 'tibo_maker',
+    wantName: 'Tibo',
+  });
+  assert.ok(otherTibo < 8, `wrong Tibo scored ${otherTibo}`);
+  const nameOnly = identity.scoreGithubMatch({
+    user: { login: 'T-Dnzt', name: 'Tibo', bio: '', blog: null, x: null, repos: 40 },
+    wantName: 'Tibo',
+    wantCompany: 'OpenAI',
+  });
+  assert.ok(nameOnly < 8, `OpenAI-less Tibo scored ${nameOnly}`);
+  const copiedBlog = identity.scoreGithubMatch({
+    user: { login: 'fofrai', name: 'fofrAI', bio: '', blog: 'https://fofr.ai', x: 'fofrai', repos: 0 },
+    wantX: 'fofrAI',
+    wantName: 'fofr',
+    wantSite: 'https://fofr.ai/',
+  });
+  const realFofr = identity.scoreGithubMatch({
+    user: { login: 'fofr', name: 'fofr', bio: '', blog: null, x: 'fofrAI', repos: 164 },
+    wantX: 'fofrAI',
+    wantName: 'fofr',
+    wantSite: 'https://fofr.ai/',
+  });
+  assert.ok(copiedBlog <= 6, `0-repo blog copy scored ${copiedBlog}`);
+  assert.ok(realFofr > copiedBlog, `${realFofr} vs ${copiedBlog}`);
+});
+
+test('undated own-site products become found items; other years do not', () => {
+  const profile = { name: 'Pieter', bio: '', site: 'https://levels.io/', x: 'levelsio', github: 'levelsio', sites: ['https://photoai.com/'] };
+  const items = sources.itemsFromWebEvidence({
+    profile,
+    site: {
+      url: 'https://levels.io/',
+      title: 'blog',
+      description: '',
+      icon: null,
+      text: 'PhotoAI',
+      links: [
+        { text: 'PhotoAI', url: 'https://photoai.com/' },
+        { text: 'Home', url: 'https://levels.io/' },
+      ],
+    },
+    pages: [],
+    web: [{ title: 'Old Thing', url: 'https://old.example/', snippet: '', date: '2024-01-01' }],
+    year: 2026,
+  });
+  assert.ok(items.some((item) => /photoai/i.test(item.name)));
+  assert.equal(items.some((item) => /old thing/i.test(item.name)), false);
+  const photo = items.find((item) => /photoai/i.test(item.name));
+  assert.equal(photo.date, null);
+  assert.ok(photo.dateConfidence === 'unknown' || photo.thisYear);
+});
+
+test('cashier note and stats are specific to the items, never stock copy', () => {
+  const items = [
+    { name: 'PHOTOAI', description: 'Headshots', date: '2026-03', status: 'LIVE', link: 'https://photoai.com/', icon: null, source: 'web' },
+    { name: 'INTERIORAI', description: 'Rooms', date: '2026-04', status: 'LIVE', link: 'https://interiorai.com/', icon: null, source: 'site' },
+    { name: 'SUPERLEVELS', description: 'Repo', date: '2026-04-23', status: 'SHIPPED', link: 'https://github.com/levelsio/superlevels', icon: null, source: 'github' },
+  ];
+  const note = ai.groundedNote(items, 1, 'levelsio', ['553 GitHub stars SuperLevels · github.com/levelsio/superlevels']);
+  const stats = ai.formatStats(items);
+  assert.match(stats[0], /3 launches/);
+  assert.match(stats[0], /GitHub/);
+  assert.doesNotMatch(note, /Thank you for shipping|Come again|No refunds on momentum|Receipt paper running low|Someone likes the publish button|night shift|publish button|\bthe tape\b|\bthe register\b/i);
+  assert.match(note, /PHOTOAI|INTERIORAI|SUPERLEVELS/i);
+  assert.match(note, /553|stars/i);
+  assert.equal(ai.cashierNoteLooksCanned(note), false);
+  assert.equal(ai.cashierNoteLooksCanned('Hallmark passed 30k stars while the night shift counted receipts.'), true);
+  assert.equal(ai.cashierNoteLooksCanned('runs on a wish and a prayer'), true);
+  assert.equal(ai.cashierNoteLooksCanned('Nobody asked for ChatGPT for Research.'), true);
+  assert.equal(ai.cashierNoteLooksCanned('200/mo public revenue. Same maker, more SKUs.'), true);
+  const draft = ai.validateDraft(
+    {
+      items: items.map((item) => ({ name: item.name, description: item.description, date: item.date, status: item.status, link: item.link })),
+      note: 'workbench at 450 stars is the crowd favorite, and the night shift has counted a lot of publish buttons since April.',
+      stats: ['450 GitHub stars workbench · github.com/pontusab/workbench'],
+    },
+    {
+      found: items.map((item) => ({ ...item, name: item.name.toLowerCase(), score: 4, thisYear: !item.date })),
+      web: [],
+      pages: [],
+      site: null,
+      profile: { name: 'levelsio', bio: '', site: 'https://levels.io/', x: 'levelsio', github: 'levelsio' },
+      ran: [],
+      failed: [],
+      stats: [],
+    },
+    items.map((item) => item.link),
+    2026,
+    2,
+  );
+  assert.ok(draft.items.length >= 3);
+  assert.ok(draft.stats[0]);
+  assert.doesNotMatch(draft.note, /night shift|publish button/i);
+  assert.match(draft.note, /PHOTOAI|INTERIORAI|SUPERLEVELS|553|450/i);
+  const okNote = ai.validateDraft(
+    {
+      items: [{ name: 'SuperX', description: 'Growth', date: '2026-02-09', status: 'LAUNCHED', link: 'https://www.producthunt.com/posts/superx' }],
+      note: 'SuperX pulled 929 hunters in February. The other tabs are just the merch table.',
+      stats: ['929 Product Hunt upvotes SuperX · producthunt.com/posts/superx'],
+    },
+    {
+      found: [{ name: 'SuperX', description: 'Growth', date: '2026-02-09', link: 'https://www.producthunt.com/posts/superx', icon: null, source: 'producthunt', status: 'LAUNCHED', score: 8 }],
+      web: [],
+      pages: [],
+      site: null,
+      profile: { name: 'Tibo', bio: '', site: 'https://www.tmaker.io/', x: 'tibo_maker', github: null },
+      ran: [],
+      failed: [],
+    },
+    ['https://www.producthunt.com/posts/superx'],
+    2026,
+    1,
+  );
+  assert.match(okNote.note, /SuperX/i);
+  assert.match(okNote.note, /929/);
+  assert.doesNotMatch(okNote.note, /night shift|the tape|publish button/i);
+});
+
+test('Product Hunt lookups follow X, handle tokens, and product sites', () => {
+  const profile = { name: 'Tibo', bio: '', site: 'https://superx.so/', x: 'tibo_maker', github: null, sites: ['https://superx.so/', 'https://www.tmaker.io/'], phUsers: ['tibo_maker'] };
+  const handles = sources.phLookupHandles(profile);
+  assert.ok(handles.some((h) => h.username.toLowerCase() === 'tibo_maker' && !h.guessed));
+  assert.ok(handles.some((h) => h.username.toLowerCase() === 'tibo' && h.guessed));
+  assert.equal(handles.some((h) => h.username.toLowerCase() === 'maker'), false);
+  assert.ok(sources.phTwitterUrls('tibo_maker').includes('https://twitter.com/tibo_maker'));
+  const sites = sources.phSiteLookups(profile.sites);
+  assert.ok(sites.urls.some((u) => /superx\.so/i.test(u)));
+  assert.ok(sites.slugs.includes('superx'));
+});
+
+test('paid search still runs when harvest is gappy, not only when the tape is empty', () => {
+  assert.equal(ai.SEARCH_BELOW, 8);
+  assert.equal(ai.maxSearches({}), 3);
+  assert.equal(ai.maxSearches({ SHIPPED_MAX_SEARCHES: '9' }), 5);
+  assert.equal(ai.maxSearches({ SHIPPED_MAX_SEARCHES: '0' }), 0);
+  const gathered = {
+    found: [
+      { name: 'A', description: '', date: '2026-01-01', link: 'https://example.com/a', icon: null, source: 'github', status: 'SHIPPED', score: 1, thisYear: true },
+      { name: 'B', description: '', date: '2026-02-01', link: 'https://example.com/b', icon: null, source: 'github', status: 'SHIPPED', score: 1, thisYear: true },
+    ],
+    web: [],
+    pages: [],
+    site: null,
+    profile: { name: '', bio: '', site: null, x: null, github: 'ada' },
+    ran: [],
+    failed: [],
+  };
+  assert.ok(sources.inYearCount(gathered, 2026) < ai.SEARCH_BELOW);
+});
+
+test('identity tables are not an eval cheat sheet', () => {
+  assert.deepEqual(identity.IDENTITY_COLLISIONS, {});
+  assert.equal(identity.parseProductQuery('the guy who made Photo AI'), 'Photo AI');
+  assert.ok(identity.productHostGuesses('Photo AI').some((u) => /photoai\.com/i.test(u)));
+  assert.ok(identity.githubLoginsFromText('see github.com/tony-dinh/app').includes('tony-dinh'));
+  assert.ok(identity.xHandlesFromText('built by @levelsio on photoai.com').includes('levelsio'));
+  assert.ok(identity.makerMentions('Built by @levelsio').x.includes('levelsio'));
+  assert.ok(identity.companyLogins('Tibo', 'OpenAI').includes('tibo-openai'));
+  assert.ok(identity.nameLogins('Steven Tey').includes('steven-tey'));
+});
+
+test('a /projects page dated 2026 becomes found items', () => {
+  const items = research.itemsFromProjectList({
+    text: '2026\n●2026-07 pieter.com Windows XP PC Active\n●2026-04 XDR Boost Active\n2025-03 Old Thing',
+    url: 'https://levels.io/projects',
+    year: 2026,
+  });
+  assert.ok(items.some((item) => /xdr boost/i.test(item.name)));
+  assert.ok(items.some((item) => /pieter/i.test(item.name)));
+  assert.equal(items.some((item) => /old thing/i.test(item.name)), false);
+  const news = research.itemsFromProjectList({
+    text: 'Introducing Codex — January 15, 2026\nSora 2 · 2026-08-07\nLegacy Widget — December 1, 2025',
+    url: 'https://openai.com/news',
+    year: 2026,
+  });
+  assert.ok(news.some((item) => /codex/i.test(item.name)), JSON.stringify(news.map((i) => i.name)));
+  assert.ok(news.some((item) => /sora/i.test(item.name)));
+  assert.equal(news.some((item) => /legacy/i.test(item.name)), false);
+});
+
+test('public MRR and stars keep their source URL', () => {
+  const stats = research.extractPublicStats(
+    'photoai.com is making $105,000/mo revenue and SuperLevels has 553 stars',
+    'https://levels.io/photoai-40870-line-index-php-105k-mo-revenue',
+    'Photo AI',
+  );
+  assert.ok(stats.some((s) => s.kind === 'mrr' && s.value === 105000 && s.url.includes('levels.io')));
+  const lines = research.formatReceiptStats(stats);
+  assert.ok(lines[0].includes('levels.io'));
+  const junk = research.extractPublicStats('Save $70 on monitors and 0000M impressions', 'https://interiorai.com/', 'Interior AI');
+  assert.equal(junk.some((s) => s.kind === 'mrr'), false);
+});

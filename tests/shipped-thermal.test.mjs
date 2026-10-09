@@ -86,6 +86,31 @@ test('filler bands never print, even if a stored layout still names them', () =>
   assert.match(text, /FIRST RUN/);
 });
 
+test('long tapes print significance group headers and a faint confidence mark', () => {
+  const items = Array.from({ length: 8 }, (_, i) => ({
+    name: `SHIP ${i + 1}`,
+    status: 'SHIPPED',
+    date: 'MAR 1',
+    description: 'A real line.',
+    via: i === 0 ? 'via OpenAI · Codex' : null,
+    confidence: i === 1 ? 0.72 : 0.95,
+    significance: i < 2 ? 4 : i < 5 ? 2 : 0,
+  }));
+  const doc = receiptToDoc({ ...RECEIPT, items, count: items.length });
+  const text = doc.text;
+  assert.ok(text.includes('LANDMARK'), text);
+  assert.ok(text.includes('NOTABLE LAUNCH'), text);
+  assert.ok(text.includes('MINOR FIX'), text);
+  assert.ok(text.includes('via OpenAI · Codex'), text);
+  assert.ok(doc.lines.some((line) => line.kind === 'lead' && String(line.right).includes('~')));
+});
+
+test('a paid full tape prints the verified stamp and FULL serial', () => {
+  const doc = receiptToDoc({ ...RECEIPT, full: true });
+  assert.match(doc.text, /VERIFIED FULL RUN/);
+  assert.match(doc.text, /#000042 FULL/);
+});
+
 test('the plain-text copy carries every item and the note', () => {
   const text = docText(receiptToDoc(RECEIPT).lines);
   assert.match(text, /SHORT: SHIPPED/);

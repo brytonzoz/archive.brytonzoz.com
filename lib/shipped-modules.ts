@@ -106,7 +106,7 @@ export function shipScore(receipt: Pick<YearReceipt, 'items' | 'potential'>): nu
   const platforms = new Set(items.map((item) => item.source).filter((source) => source !== 'none')).size;
   const running = items.filter((item) => item.status === 'LIVE' || item.status === 'ACTIVE' || item.status === 'BETA').length;
   const n =
-    Math.min(40, items.length * 4) +
+    Math.min(50, items.length >= 20 ? 40 + Math.min(10, Math.round(items.length / 20)) : items.length * 4) +
     Math.min(25, sourced * 5) +
     Math.min(15, dated * 3) +
     Math.min(10, platforms * 3) +
@@ -122,8 +122,11 @@ export const isFirstRun = (id: number) => Number.isInteger(id) && id > 0 && id <
 const SOURCE_SURPRISE: Record<ItemSource, number> = {
   hn: 6,
   producthunt: 6,
+  x: 5,
   appstore: 5,
+  changelog: 4,
   npm: 4,
+  company: 3,
   site: 3,
   web: 3,
   bryton: 2,
@@ -171,7 +174,7 @@ export function catalogModules({ receipt, printed }: ModuleContext): ReceiptModu
     {
       id: 'cashier',
       title: "CASHIER'S NOTE",
-      lines: [receipt.note],
+      lines: [receipt.note, ...(receipt.stats ?? []).filter((line) => line && line !== receipt.note)].slice(0, 4),
       rarity: 'common',
       badge: null,
     },

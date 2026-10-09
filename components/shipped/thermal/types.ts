@@ -10,6 +10,9 @@ export type ThermalItem = {
   description: string;
   /** Same-origin URL of a 1-bit logo (already dithered), or null. */
   logo?: string | null;
+  via?: string | null;
+  confidence?: number;
+  significance?: number;
 };
 
 export type ThermalReceipt = {
@@ -43,6 +46,8 @@ export type ThermalReceipt = {
   /** 0–100 from sourced public work. Absent when unknown. */
   shipScore?: number;
   printedAt?: string;
+  full?: boolean;
+  teaser?: string | null;
 };
 
 export type Align = 'left' | 'center' | 'right';

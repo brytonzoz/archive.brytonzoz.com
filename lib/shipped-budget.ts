@@ -1,5 +1,6 @@
 // Shipped's AI budget: $180 per cycle (UTC, resets on the 8th of each month, from 8 Oct 2026), plus
-// 80% of each settled sale this cycle (sponsor slots + mailed prints) after Stripe's US card fee,
+// 80% of each settled sale this cycle (sponsor slots, mailed prints, $3 full receipts, $7 bundles)
+// after Stripe's US card fee,
 // refunds, and an optional print/postage cost. Holds (unpaid checkouts) do not count. A sales-ledger
 // read error counts as $0 of sales (the $180 base still stands). Claude errors still fail closed.
 

@@ -161,6 +161,7 @@ test('identity tables are not an eval cheat sheet', () => {
   assert.ok(identity.xHandlesFromText('built by @levelsio on photoai.com').includes('levelsio'));
   assert.ok(identity.makerMentions('Built by @levelsio').x.includes('levelsio'));
   assert.ok(identity.companyLogins('Tibo', 'OpenAI').includes('tibo-openai'));
+  assert.ok(identity.nameLogins('Steven Tey').includes('steven-tey'));
 });
 
 test('a /projects page dated 2026 becomes found items', () => {

@@ -100,6 +100,18 @@ export function makerMentions(text: string): { x: string[]; github: string[]; na
   return { x, github, names: names.slice(0, 4) };
 }
 
+/** `Steven Tey` → `steven-tey` / `steventey`. First+last only; not a person table. */
+export function nameLogins(name: string): string[] {
+  const tokens = name
+    .split(/\s+/)
+    .map((t) => t.replace(/[^A-Za-z0-9]/g, ''))
+    .filter((t) => t.length >= 2);
+  if (tokens.length < 2) return [];
+  const a = tokens[0].toLowerCase();
+  const b = tokens[1].toLowerCase();
+  return [`${a}-${b}`, `${a}${b}`, `${a}_${b}`].filter((v) => isGithubLogin(v));
+}
+
 /** `Tibo` + `OpenAI` → `tibo-openai` / `tiboopenai`. */
 export function companyLogins(name: string, company: string | null | undefined): string[] {
   if (!company) return [];

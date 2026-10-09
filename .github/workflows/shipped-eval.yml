@@ -1,0 +1,77 @@
+name: Shipped eval
+
+# Full gather + Claude assemble over the original 10 and held-out 10.
+# Manual from the Actions tab, or when this workflow / eval script / research code changes on the research branch.
+on:
+  workflow_dispatch:
+  push:
+    branches:
+      - cursor/shipped-research-engine
+    paths:
+      - .github/workflows/shipped-eval.yml
+      - scripts/eval-shipped-full.mjs
+      - worker/shipped-ai.ts
+      - worker/shipped-sources.ts
+      - worker/shipped-identity.ts
+      - worker/shipped-research.ts
+      - docs/shipped-ground-truth.json
+      - docs/shipped-heldout-ground-truth.json
+
+permissions:
+  contents: read
+
+concurrency:
+  group: shipped-eval
+  cancel-in-progress: true
+
+jobs:
+  eval:
+    name: Gather + Claude over 20 builders
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v5
+
+      - uses: actions/setup-node@v5
+        with:
+          node-version: 22
+          cache: npm
+
+      - run: npm ci
+
+      - name: Run full pipeline
+        env:
+          CLAUDE_KEY: ${{ secrets.CLAUDE_KEY }}
+          ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}
+          CLAUDE_WORKSPACE: ${{ secrets.CLAUDE_WORKSPACE }}
+          ANTHROPIC_WORKSPACE_ID: ${{ secrets.ANTHROPIC_WORKSPACE_ID }}
+          ANTHROPIC_WORKSPACE_DEFAULT: wrkspc_015V5D4e1of8jhCEbcx6eP6W
+          SHIPPED_GITHUB_TOKEN: ${{ secrets.SHIPPED_GITHUB_TOKEN }}
+          PRODUCTHUNT_KEY: ${{ secrets.PRODUCTHUNT_KEY }}
+          PRODUCTHUNT_SECRET: ${{ secrets.PRODUCTHUNT_SECRET }}
+          PRODUCTHUNT_TOKEN: ${{ secrets.PRODUCTHUNT_TOKEN }}
+          TINYFISH: ${{ secrets.TINYFISH }}
+          TINYFISH_API_KEY: ${{ secrets.TINYFISH_API_KEY }}
+          SHIPPED_YEAR: '2026'
+          SHIPPED_MAX_SEARCHES: '3'
+        run: |
+          if [ -z "$CLAUDE_KEY" ] && [ -z "$ANTHROPIC_API_KEY" ]; then
+            echo "::error::CLAUDE_KEY (or ANTHROPIC_API_KEY) is not set. Commentary cannot be tested."
+            exit 1
+          fi
+          if [ -z "$PRODUCTHUNT_TOKEN" ] && { [ -z "$PRODUCTHUNT_KEY" ] || [ -z "$PRODUCTHUNT_SECRET" ]; }; then
+            echo "::warning::Product Hunt secrets missing; PH upvotes will be absent."
+          fi
+          mkdir -p artifacts
+          node --experimental-transform-types --no-warnings scripts/eval-shipped-full.mjs artifacts/shipped-eval.json artifacts/shipped-eval.md
+          echo '### Shipped eval' >> "$GITHUB_STEP_SUMMARY"
+          cat artifacts/shipped-eval.md >> "$GITHUB_STEP_SUMMARY"
+
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: shipped-eval
+          path: |
+            artifacts/shipped-eval.json
+            artifacts/shipped-eval.md
+          if-no-files-found: warn

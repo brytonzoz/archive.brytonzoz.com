@@ -22,6 +22,7 @@ import {
   githubLoginsFromText,
   handleTokens,
   handleVariants,
+  nameLogins,
   makerMentions,
   mergeSites,
   parsePersonName,
@@ -472,7 +473,7 @@ const github: SourceProvider = {
             icon: row?.homepage ? faviconUrl(row.homepage) : null,
             source: 'github',
             status: row?.homepage ? 'LIVE' : 'SHIPPED',
-            score: 2 + Math.log10(1 + (row?.stars ?? 0)) * 2 + (row?.homepage ? 1 : 0),
+            score: 6 + Math.log10(1 + (row?.stars ?? 0)) * 2 + (row?.homepage ? 1 : 0),
             dateConfidence: date ? 'exact' : 'year',
             thisYear: true,
           },
@@ -588,10 +589,9 @@ const appStore: SourceProvider = {
         const dev = `${artist}|${seller}`;
         const sellerHost = hostOf(publicUrl(app.sellerUrl));
         if (sellerHost && sites.has(sellerHost)) return true;
-        if (shortName) return false;
-        // "Hassan El Mghari" must not match every Hassan on the store.
-        if (nameTokens.length >= 2) return nameTokens.every((t) => dev.includes(t));
-        return dev.includes(want);
+        // A first name like "Hassan" matches half the store. Need the seller site or both name tokens.
+        if (shortName || nameTokens.length < 2) return false;
+        return nameTokens.every((t) => dev.includes(t));
       })
       .map((app) => {
         const released = day(app.releaseDate);
@@ -1069,7 +1069,7 @@ async function githubRepoOwners(product: string, env: SourceEnv): Promise<string
 
 /** Expand a typed subject to GitHub, X, sites, PH/npm usernames. Cached 24h. */
 export async function resolveIdentity(subject: Subject, env: SourceEnv, tinyfish: TinyfishAccess = null): Promise<ResolvedIdentity> {
-  return cached(`id:v5:${subject.kind}:${subject.id.toLowerCase()}:${loose(subject.display)}`, 1440 * MIN, () => resolveIdentityFresh(subject, env, tinyfish));
+  return cached(`id:v6:${subject.kind}:${subject.id.toLowerCase()}:${loose(subject.display)}`, 1440 * MIN, () => resolveIdentityFresh(subject, env, tinyfish));
 }
 
 async function resolveProductMaker(
@@ -1185,6 +1185,7 @@ async function resolveIdentityFresh(subject: Subject, env: SourceEnv, tinyfish: 
   const followed = await followSitesForGithub(mergeSites(profile.sites, [profile.site]), notes);
   const knownLogins = [
     ...companyLogins(parts.name || subject.id, parts.company),
+    ...nameLogins(profile.name || parts.name || ''),
     ...handleVariants(subject.id),
     ...handleVariants(profile.x ?? ''),
     ...handleTokens(subject.id),
@@ -1200,8 +1201,9 @@ async function resolveIdentityFresh(subject: Subject, env: SourceEnv, tinyfish: 
   const matchOpts = { wantX: profile.x, wantName: profile.name || parts.name, wantSite: profile.site, wantSites, wantCompany: parts.company };
   let matched = await bestGithubFor({ ...matchOpts, logins: knownLogins }, env, tinyfish);
 
-  // A same-string GitHub login is often a decoy (theo, swyx, fofrAI). Search the X name when the hit is weak.
-  if (!matched || matched.score < 40) {
+  // Same-string logins (StevenTey vs steven-tey) score well on the name alone. Search when X/blog are missing.
+  const weaklyLinked = Boolean(matched && !matched.user.x && !matched.user.blog);
+  if (!matched || matched.score < 40 || weaklyLinked) {
     const searchTerms = [
       parts.name && parts.name.length >= 3 ? parts.name : null,
       parts.company ? `${parts.name} ${parts.company}` : null,

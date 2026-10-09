@@ -214,15 +214,27 @@ function finish(items: DraftItem[], note: string, seed: number, modulesRaw?: unk
         .filter(Boolean)
         .slice(0, 4)
     : formatStats(sorted);
-  const whoNote = ok(note) && !AI_VOICE.test(note) ? note : groundedNote(sorted, seed);
+  const whoNote =
+    ok(note) && !AI_VOICE.test(note) && !TEMPLATE_NOTE.test(note)
+      ? note
+      : stats[0] && /\d/.test(stats[0])
+        ? stats[0]
+        : groundedNote(sorted, seed);
   const printed = printNote(whoNote, stats);
   return { items: sorted, note: printed, stats, potential: false, layout };
 }
 
+const TEMPLATE_NOTE =
+  /is first on the tape|led the year|closed the year|set the tone|through-line|Receipt paper running low|Someone likes the publish button|\d+\s+launches?\s+·/i;
+
 function printNote(note: string, stats: string[]): string {
+  if (TEMPLATE_NOTE.test(note)) {
+    const stat = stats[0];
+    return stat && !TEMPLATE_NOTE.test(stat) ? `${stat}. ${note}`.slice(0, 160) : note.slice(0, 160);
+  }
+  if (/\d/.test(note)) return note.slice(0, 160);
   const stat = stats[0];
   if (!stat) return note;
-  if (/\d+\s+launch/i.test(note)) return note.slice(0, 160);
   const combined = `${stat}. ${note}`;
   return (combined.length <= 160 ? combined : note).slice(0, 160);
 }
@@ -257,7 +269,7 @@ function systemPrompt(year: number, searches: number) {
     '"link" must be a URL that appears in the data or your search results, copied exactly, or null. Never make up a URL.',
     'Status (one allowed word) goes where a price would. LIVE for a running product or site, RELEASED for a version/release, LAUNCHED for a launch post, SHIPPED otherwise, BETA if it says beta, DECEASED if shut down.',
     'Item names: the product name as people know it, max 32 characters. Description: a specific one-liner grounded in the source (what it is, not a slogan), max 70 characters. "Menu bar app that keeps the Mac awake", not "An innovative solution".',
-    'Cashier "note": max 110 characters. Voice: a deadpan night-shift cashier. Witty, specific to THIS person and THESE items (launch count, a repeating niche, a platform habit). A playful roast of the pattern is fine; cruelty is not. Every claim must map to a sourced item. Never generic ("thank you for shipping"), never inspirational, never invented facts.',
+    'Cashier "note": max 110 characters. Deadpan night-shift cashier. MUST name one real product from <found> and one real number from <found>.stats (stars, downloads, upvotes, MRR). Funny about the shipping pattern; never cruel. Banned templates: "is first on the tape", "led the year", "closed the year", "set the tone", "through-line", "Receipt paper running low", "Someone likes the publish button", "N launches ·". Never generic, never inspirational, never invented facts.',
     'Also output "stats": 1-4 short lines copied from <found>.stats (GitHub stars, npm weekly downloads, PH upvotes, App Store ratings, public MRR, user counts, HN points). Keep the source host/path on each line. Never invent a number.',
     'Banned words and moves everywhere: delve, testament, journey, innovative, seamless, elevate, unlock, empower, leverage, cutting-edge, game-changer, robust, passion, incredible, amazing, "truly", loser, pathetic, scam, flop, cringe, exclamation marks, emoji, em dashes, and praise like "impressive year".',
     `Do not add extra receipt bands. The tape is short: items, a one-line cashier note, stamp and serial. If you output modules, ids only from ${REQUIRED_MODULES.join(', ')}. Never output HTML, markdown, CSS, filler ids (deep-cut, first-last, platforms, still-running, volume, friend, sources, serial) or extra keys.`,

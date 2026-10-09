@@ -1,6 +1,6 @@
 'use client';
 
-import React, { forwardRef, useEffect, useImperativeHandle, useRef } from 'react';
+import React, { forwardRef, useEffect, useImperativeHandle, useRef, useState } from 'react';
 
 type TurnstileApi = {
   render: (el: HTMLElement, options: Record<string, unknown>) => string;
@@ -39,9 +39,11 @@ type TurnstileProps = {
   siteKey: string;
   onToken: (token: string | null) => void;
   theme?: 'light' | 'dark';
-  /** execute: invisible until Print runs it. always: the checkbox. */
+  /** execute: run on Print. always: the checkbox. */
   appearance?: 'always' | 'interaction-only' | 'execute';
 };
+
+const EXECUTE_MS = 15_000;
 
 export const Turnstile = forwardRef<TurnstileHandle, TurnstileProps>(function Turnstile(
   { siteKey, onToken, theme = 'light', appearance = 'execute' },
@@ -54,12 +56,15 @@ export const Turnstile = forwardRef<TurnstileHandle, TurnstileProps>(function Tu
   const waiters = useRef<((value: string | null) => void)[]>([]);
   const callback = useRef(onToken);
   callback.current = onToken;
+  const [needed, setNeeded] = useState(appearance === 'always');
+  const visible = appearance === 'always';
 
   function emit(value: string | null) {
     token.current = value;
     callback.current(value);
     const pending = waiters.current.splice(0);
     pending.forEach((resolve) => resolve(value));
+    if (appearance !== 'always') setNeeded(false);
   }
 
   useImperativeHandle(ref, () => ({
@@ -67,20 +72,27 @@ export const Turnstile = forwardRef<TurnstileHandle, TurnstileProps>(function Tu
       token.current = null;
       callback.current(null);
       if (widget.current && window.turnstile) window.turnstile.reset(widget.current);
+      if (appearance !== 'always') setNeeded(false);
     },
     execute: () => {
       if (token.current) return Promise.resolve(token.current);
       return new Promise((resolve) => {
         waiters.current.push(resolve);
+        if (appearance !== 'always') setNeeded(true);
         const start = Date.now();
         let kicked = false;
         const run = () => {
           if (token.current) return;
-          if (appearance !== 'always' && widget.current && api.current && !kicked) {
+          if (!visible && widget.current && api.current && !kicked) {
             kicked = true;
-            api.current.execute(widget.current);
+            try {
+              api.current.execute(widget.current);
+            } catch {
+              emit(null);
+              return;
+            }
           }
-          if (Date.now() - start > 12_000) {
+          if (Date.now() - start > EXECUTE_MS) {
             emit(null);
             return;
           }
@@ -99,13 +111,14 @@ export const Turnstile = forwardRef<TurnstileHandle, TurnstileProps>(function Tu
       .then((loaded) => {
         if (cancelled || widget.current) return;
         api.current = loaded;
+        // Turnstile has no size "invisible". Invisible behavior is the widget mode in the
+        // dashboard; here we use compact/flexible in a tiny container and execute() on Print.
         widget.current = loaded.render(el, {
           sitekey: siteKey,
           theme,
-          appearance,
-          execution: appearance === 'always' ? 'render' : 'execute',
-          // Invisible widgets don't paint the Success badge into the share sheet or the print form.
-          size: appearance === 'always' ? 'flexible' : 'invisible',
+          appearance: visible ? 'always' : 'interaction-only',
+          execution: visible ? 'render' : 'execute',
+          size: visible ? 'flexible' : 'compact',
           callback: (value: string) => emit(value),
           'expired-callback': () => emit(null),
           'error-callback': () => emit(null),
@@ -119,7 +132,7 @@ export const Turnstile = forwardRef<TurnstileHandle, TurnstileProps>(function Tu
       widget.current = null;
       api.current = null;
     };
-  }, [siteKey, theme, appearance]);
+  }, [siteKey, theme, appearance, visible]);
 
-  return <div ref={box} className={appearance === 'always' ? 'min-h-[65px]' : 'shipped-turnstile'} />;
+  return <div ref={box} className={visible ? 'min-h-[65px]' : `shipped-turnstile${needed ? ' is-on' : ''}`} />;
 });

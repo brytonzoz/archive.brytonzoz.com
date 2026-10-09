@@ -1443,9 +1443,11 @@ async function proof(env: ShippedEnv): Promise<Response> {
   const empty = { printed: 0, shared: 0, shipped: 0, views: 0 };
   const tallies = db ? await counters(db) : empty;
   const takeovers = db ? await priceLog(db, 12) : [];
+  const window = await liveWindow(env, db);
   return json(
     {
-      asOf: Date.now(),
+      asOf: window.now,
+      event: { opensAt: window.opensAt, closesAt: window.closesAt, phase: window.phase, now: window.now },
       printed: { n: tallies.printed, how: TICKER_HOW.printed },
       shared: { n: tallies.shared, how: TICKER_HOW.shared },
       shipped: { n: tallies.shipped, how: TICKER_HOW.shipped },
@@ -1571,7 +1573,11 @@ async function sharePage(request: Request, env: ShippedEnv & { ASSETS: Fetcher }
     .on('meta[name="twitter:image:alt"]', attr(alt))
     .on('link[rel="canonical"]', { element: (el) => void el.setAttribute('href', page) })
     .on('head', {
-      element: (el) => void el.append(`<script id="shipped-receipt-data" type="application/json">${payload}</script>`, { html: true }),
+      element: (el) => {
+        el.append(`<script id="shipped-receipt-data" type="application/json">${payload}</script>`, { html: true });
+        // Executable so the receipt survives if React later reconciles <head> and drops the JSON tag.
+        el.append(`<script>window.__SHIPPED_RECEIPT__=${payload}</script>`, { html: true });
+      },
     })
     .transform(new Response(shell.body, { status: 200, headers }));
 }

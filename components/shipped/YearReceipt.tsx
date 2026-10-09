@@ -7,7 +7,7 @@ import React, { useEffect, useState } from 'react';
 import Link from 'next/link';
 import { qr } from '../../lib/shipped-qr';
 import { HERO_SLOT } from '../../lib/shipped-sponsors';
-import { QR_PATH, SHIPPED_URL, type SponsorBlock, type SponsorSlot } from '../../lib/shipped-year';
+import { QR_PATH, type SponsorBlock, type SponsorSlot } from '../../lib/shipped-year';
 import { Barcode, Line, Rule, Tall, ExternalLink } from './paper';
 
 export type ViewItem = {
@@ -58,8 +58,8 @@ function ItemName({ item }: { item: ViewItem }) {
 }
 
 /** The printed QR has to point at whichever host is serving the page (staging prints staging codes). */
-function useOrigin(): string {
-  const [origin, setOrigin] = useState(SHIPPED_URL);
+function useOrigin(): string | null {
+  const [origin, setOrigin] = useState<string | null>(null);
   useEffect(() => setOrigin(window.location.origin), []);
   return origin;
 }
@@ -75,12 +75,12 @@ function QrCode({ text, label }: { text: string; label: string }) {
   );
 }
 
-function Slot({ slot, origin, hero }: { slot: SponsorSlot; origin: string; hero: boolean }) {
+function Slot({ slot, origin, hero }: { slot: SponsorSlot; origin: string | null; hero: boolean }) {
   const href = QR_PATH(slot.qr);
   return (
     <a href={href} target="_blank" rel="sponsored nofollow noopener noreferrer" className="shipped-slot">
       <span className={hero ? 'w-[96px]' : 'w-[64px]'}>
-        <QrCode text={new URL(href, origin).toString()} label={`QR code for ${slot.name}`} />
+        {origin ? <QrCode text={new URL(href, origin).toString()} label={`QR code for ${slot.name}`} /> : <span className="shipped-qr" aria-hidden="true" />}
       </span>
       {slot.logo ? (
         // eslint-disable-next-line @next/next/no-img-element

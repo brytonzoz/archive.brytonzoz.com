@@ -9,7 +9,7 @@ import { BID_RULES, HERO_SLOT, HOUSE_SLOTS, SLOT_COUNT, bidRange, houseMarkPath,
 import type { SponsorSlot } from '../../lib/shipped-year';
 import { press } from './feel';
 import { chooseSponsor, closeSponsor, openSponsor, useSponsorPick } from './sponsor-pick';
-import { useShippedState } from './state';
+import { useShippedClock } from './state';
 
 function housePreview(slot: number): SponsorSlot {
   const ad = HOUSE_SLOTS[slot];
@@ -153,30 +153,18 @@ function BidChoose({ slots }: { slots: SponsorSlot[] }) {
 }
 
 export function SponsorBoard() {
-  const state = useShippedState();
+  const { state, now, left, closed } = useShippedClock();
   const slots = state?.sponsors.slots.length ? state.sponsors.slots : PREVIEW;
   const frozen = Boolean(state?.sponsors.frozen);
   const paymentsOpen = Boolean(state?.payments.open) && !frozen;
-  const [now, setNow] = useState<number | null>(null);
   const [open, setOpen] = useState(false);
   const panelId = useId();
-
-  useEffect(() => {
-    if (!state) return;
-    const skew = state.event.now - Date.now();
-    setNow(Date.now() + skew);
-    const timer = window.setInterval(() => setNow(Date.now() + skew), 1000);
-    return () => window.clearInterval(timer);
-  }, [state]);
-
-  const left = state && now !== null ? state.event.closesAt - now : 0;
-  const closed = Boolean(state && (state.event.phase === 'closed' || left <= 0));
   const from = moneyShort(Math.min(...slots.map((s) => s.next)));
 
   return (
     <section className={`shipped-board${open ? ' is-open' : ''}`} id="board">
       <p className="shipped-board-proof">
-        {state && now !== null ? (closed ? 'printer is off' : `shuts off in ${countdown(left)}`) : '··'}
+        {left !== null ? (closed ? 'printer is off' : `shuts off in ${countdown(left)}`) : '··'}
       </p>
 
       <button

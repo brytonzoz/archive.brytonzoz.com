@@ -37,6 +37,8 @@ export type Console = {
   onListed: (value: boolean) => void;
   closed?: boolean;
   invalid?: boolean;
+  /** LCD shows TRY AGAIN; Print is still enabled. */
+  retry?: boolean;
 };
 
 export type MachineProps = {
@@ -115,6 +117,8 @@ export function Machine({ job, display, tone, onPrinted, onTorn, tearSignal = 0,
   const [stubSeed, setStubSeed] = useState<string | null>(null);
   const [hint, setHint] = useState(false);
   const [sound, toggleSound] = useSound();
+  const [live, setLive] = useState(false);
+  useEffect(() => setLive(true), []);
   const body = useRef<HTMLDivElement>(null);
   const feed = useRef<HTMLDivElement>(null);
   const pull = useRef<HTMLDivElement>(null);
@@ -402,7 +406,8 @@ export function Machine({ job, display, tone, onPrinted, onTorn, tearSignal = 0,
   const stubKey = ownStub ? shown.key : stubSeed;
   const stubVisible = ownStub || phase === 'feeding' || (phase === 'idle' && stubKey !== null);
   const lead = shown.kind === 'feed';
-  const showInput = Boolean(desk && !desk.closed && !desk.printing && (phase === 'idle' || phase === 'hanging' || phase === 'torn'));
+  const showInput = Boolean(desk && !desk.closed && !desk.printing && !desk.retry && (phase === 'idle' || phase === 'hanging' || phase === 'torn'));
+  const houseSlip = shown.kind === 'print' && (shown.key === 'house' || Boolean(shown.slip));
   const status =
     phase === 'idle'
       ? showInput
@@ -413,7 +418,9 @@ export function Machine({ job, display, tone, onPrinted, onTorn, tearSignal = 0,
       : phase === 'printing'
         ? `Printing: ${shown.label}`
         : phase === 'hanging'
-          ? 'Printed. Drag the receipt down to tear it off, tap it, or press Tear.'
+          ? houseSlip
+            ? 'How it works. Drag the slip down to tear it off, or type a name and press Print.'
+            : 'Printed. Drag the receipt down to tear it off, tap it, or press Tear.'
           : phase === 'torn'
             ? 'Torn off.'
             : '';
@@ -458,7 +465,7 @@ export function Machine({ job, display, tone, onPrinted, onTorn, tearSignal = 0,
         TEAR
       </button>
       {desk ? (
-        <button type="submit" className="shipped-key is-print" disabled={!showInput} onPointerDown={press}>
+        <button type="submit" className="shipped-key is-print" disabled={desk.closed || desk.printing} onPointerDown={press}>
           PRINT
         </button>
       ) : null}
@@ -587,7 +594,7 @@ export function Machine({ job, display, tone, onPrinted, onTorn, tearSignal = 0,
       </div>
 
       <p className="sr-only" role="status" aria-live="polite">
-        {status}
+        {live ? status : ''}
       </p>
     </div>
   );

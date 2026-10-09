@@ -7,7 +7,8 @@ import { moneyShort } from '../../lib/shipped-receipt';
 import { slotLabel } from '../../lib/shipped-sponsors';
 import { displayCount, stepCount, wholeCount } from '../../lib/shipped-ticker';
 import { Line, Rule, Ticket } from './paper';
-import { useShippedState } from './state';
+import { countdown } from '../../lib/shipped-event';
+import { useShippedClock, useShippedState } from './state';
 
 export type TickerCounts = { printed: number; shared: number; shipped: number; views: number };
 
@@ -93,6 +94,7 @@ function ProofSheet({ onClose }: { onClose: () => void }) {
           <h2 id="shipped-proof-title" className="mt-2 text-[20px] font-semibold leading-none tracking-[0.2em]">
             COUNTERS
           </h2>
+          <ProofClock />
           <p className="mt-2 text-[12px] leading-relaxed text-[#1c1917]/75">
             Real rows only. Nothing is seeded, rounded up, or estimated. The ticker never shows a number the server has not confirmed.
           </p>
@@ -138,6 +140,16 @@ function ProofSheet({ onClose }: { onClose: () => void }) {
   );
 }
 
+function ProofClock() {
+  const { left, closed } = useShippedClock();
+  if (left === null) return <p className="mt-2 text-[12px] tabular-nums text-[#1c1917]/75">··</p>;
+  return (
+    <p className="mt-2 text-[12px] tabular-nums text-[#1c1917]/75">
+      {closed || left <= 0 ? 'THE PRINTER IS OFF' : `shuts off in ${countdown(left)}`}
+    </p>
+  );
+}
+
 function Digit({ n }: { n: number }) {
   return (
     <span className="shipped-odo-cell">
@@ -177,7 +189,7 @@ export function Ticker() {
       <button
         type="button"
         className="shipped-ticker"
-        aria-label={`Printed ${fmt(printed)}, shared ${fmt(shared)}, mailed ${fmt(shipped)}, views ${fmt(views)}. Open proof.`}
+        aria-label={live && state ? `Printed ${fmt(printed)}, shared ${fmt(shared)}, mailed ${fmt(shipped)}, views ${fmt(views)}. Open proof.` : 'Open proof.'}
         onClick={() => setOpen(true)}
       >
         <span className="shipped-ticker-primary">

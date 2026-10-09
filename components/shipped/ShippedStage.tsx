@@ -12,7 +12,7 @@ import { HumanCheck, type HumanCheckHandle } from './HumanCheck';
 import { Machine, type Job, type Tone } from './Machine';
 import { Line, Rule, Tall } from './paper';
 import { Ticker } from './Ticker';
-import { refreshShippedState, useShippedState } from './state';
+import { refreshShippedState, useShippedClock, useShippedState } from './state';
 import { ShareBar, VisitorReceipt, rememberPile, type Loaded } from './visitor';
 
 const ERRORS: Record<string, string> = {
@@ -48,7 +48,15 @@ const SEARCHING: Record<string, string> = {
 
 export type Opening = { kind: 'house'; content: React.ReactNode } | { kind: 'loaded'; loaded: Loaded } | { kind: 'loading' } | { kind: 'missing' };
 
-type Step = { name: 'idle' } | { name: 'looking' } | { name: 'pick'; candidates: Candidate[] } | { name: 'feeding' } | { name: 'jammed' };
+type Step =
+  | { name: 'idle' }
+  | { name: 'looking' }
+  | { name: 'retry' }
+  | { name: 'pick'; candidates: Candidate[] }
+  | { name: 'feeding' }
+  | { name: 'jammed' };
+
+const LOOKUP_MS = 15_000;
 
 function Slip({ title, lines, note }: { title: string; lines: [string, string][]; note: string }) {
   return (
@@ -99,19 +107,9 @@ function openingJob(opening: Opening): Job {
 
 /** "PRINTER SHUTS OFF IN 13d 4h": ticks against the server's clock, not the visitor's. */
 function Countdown() {
-  const state = useShippedState();
-  const [now, setNow] = useState<number | null>(null);
-  const skew = useRef(0);
-  useEffect(() => {
-    if (!state) return;
-    skew.current = state.event.now - Date.now();
-    setNow(Date.now() + skew.current);
-    const timer = window.setInterval(() => setNow(Date.now() + skew.current), 1000);
-    return () => window.clearInterval(timer);
-  }, [state]);
-  if (!state || now === null) return null;
-  const left = state.event.closesAt - now;
-  if (state.event.phase === 'closed' || left <= 0) {
+  const { left, closed } = useShippedClock();
+  if (left === null) return <p className="shipped-clock" aria-hidden="true">&nbsp;</p>;
+  if (closed || left <= 0) {
     return (
       <p className="shipped-clock" role="status">
         THE PRINTER IS OFF
@@ -143,6 +141,15 @@ export function ShippedStage({ opening, title }: { opening: Opening; title: Reac
   const human = useRef<HumanCheckHandle>(null);
   const prints = useRef(0);
   const after = useRef<HTMLDivElement>(null);
+  const run = useRef(0);
+
+  useEffect(() => {
+    try {
+      setListed(window.localStorage.getItem('shipped-pile') === 'on');
+    } catch {
+      // Private mode: PILE lasts for this page only.
+    }
+  }, []);
 
   // /shipped/r/<id>/ finds out which receipt it is after the first render.
   useEffect(() => {
@@ -166,6 +173,7 @@ export function ShippedStage({ opening, title }: { opening: Opening; title: Reac
   let tone: Tone;
   if (empty) [display, tone] = ['OUT OF PAPER', 'empty'];
   else if (step.name === 'jammed') [display, tone] = ['PAPER JAM', 'error'];
+  else if (step.name === 'retry') [display, tone] = ['TRY AGAIN', 'error'];
   else if (step.name === 'pick') [display, tone] = ['WHICH ONE?', 'ready'];
   else if (step.name === 'looking') [display, tone] = ['LOOKING UP', 'busy'];
   else if (step.name === 'feeding') [display, tone] = [searching[Math.min(tick, searching.length - 1)], 'busy'];
@@ -179,7 +187,8 @@ export function ShippedStage({ opening, title }: { opening: Opening; title: Reac
     touched.current = true;
     prints.current += 1;
     setPaper('printing');
-    setCurrent(loaded);
+    // Keep the last printed receipt during the feed so TEAR after a successful print still opens share.
+    if (loaded || next.kind !== 'feed') setCurrent(loaded);
     setJob(next);
   }
 
@@ -195,9 +204,15 @@ export function ShippedStage({ opening, title }: { opening: Opening; title: Reac
     load({ key: `${key}-${prints.current}`, kind: 'print', slip: true, end, label, content }, null);
   }
 
-  async function print(candidate: Candidate) {
+  async function print(candidate: Candidate, gen = run.current) {
     const humanToken = token ?? (await human.current?.execute()) ?? null;
-    if (!humanToken) return setError(ERRORS.turnstile);
+    if (run.current !== gen) return;
+    if (!humanToken) {
+      setStep({ name: 'retry' });
+      return setError(ERRORS.turnstile);
+    }
+    // Invalidate the LOOKING UP timeout so a long print never flips the LCD to TRY AGAIN.
+    if (run.current === gen) ++run.current;
     setError(null);
     setTick(0);
     setStep({ name: 'feeding' });
@@ -241,8 +256,15 @@ export function ShippedStage({ opening, title }: { opening: Opening; title: Reac
       input.current?.focus();
       return;
     }
+    const gen = ++run.current;
     setError(null);
     setStep({ name: 'looking' });
+    const timer = window.setTimeout(() => {
+      if (run.current !== gen) return;
+      ++run.current;
+      setStep({ name: 'retry' });
+      setError(ERRORS.turnstile);
+    }, LOOKUP_MS);
     try {
       const response = await fetch('/api/shipped/lookup', {
         method: 'POST',
@@ -250,13 +272,20 @@ export function ShippedStage({ opening, title }: { opening: Opening; title: Reac
         body: JSON.stringify({ q: query }),
       });
       const result = (await response.json().catch(() => ({}))) as { candidates?: Candidate[]; auto?: boolean; error?: string };
+      if (run.current !== gen) return;
       if (!response.ok || !result.candidates?.length) throw new Error(result.error ?? 'invalid-query');
-      if (result.auto) return print(result.candidates[0]);
+      if (result.auto) {
+        await print(result.candidates[0], gen);
+        return;
+      }
       setStep({ name: 'pick', candidates: result.candidates });
     } catch (failure) {
+      if (run.current !== gen) return;
       const code = failure instanceof Error ? failure.message : '';
       setError(ERRORS[code] ?? 'Couldn’t look that up. Try again.');
       setStep({ name: 'idle' });
+    } finally {
+      window.clearTimeout(timer);
     }
   }
 
@@ -301,13 +330,21 @@ export function ShippedStage({ opening, title }: { opening: Opening; title: Reac
                   query,
                   onQuery: (value) => {
                     setQuery(value);
-                    if (step.name === 'pick' || step.name === 'jammed') setStep({ name: 'idle' });
+                    if (step.name === 'pick' || step.name === 'jammed' || step.name === 'retry') setStep({ name: 'idle' });
                     if (error) setError(null);
                   },
                   onPrint: () => void submit(),
                   printing: busy,
+                  retry: step.name === 'retry',
                   listed,
-                  onListed: setListed,
+                  onListed: (value) => {
+                    setListed(value);
+                    try {
+                      window.localStorage.setItem('shipped-pile', value ? 'on' : 'off');
+                    } catch {
+                      // Private mode: the choice lasts for this page only.
+                    }
+                  },
                   closed,
                   invalid: Boolean(error),
                 }

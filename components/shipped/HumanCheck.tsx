@@ -64,6 +64,8 @@ export const HumanCheck = forwardRef<HumanCheckHandle, Props>(function HumanChec
   const turnstile = useRef<TurnstileHandle>(null);
   const token = useRef<string | null>(null);
   const waiters = useRef<((value: string | null) => void)[]>([]);
+  const checkRef = useRef(check);
+  checkRef.current = check;
   const [round, setRound] = React.useState(0);
 
   function emit(value: string | null) {
@@ -76,13 +78,24 @@ export const HumanCheck = forwardRef<HumanCheckHandle, Props>(function HumanChec
     reset: () => {
       token.current = null;
       onToken(null);
-      if (check?.kind === 'turnstile') turnstile.current?.reset();
+      if (checkRef.current?.kind === 'turnstile') turnstile.current?.reset();
       else setRound((n) => n + 1);
     },
     execute: async () => {
       if (token.current) return token.current;
-      if (check?.kind === 'turnstile') return turnstile.current?.execute() ?? null;
-      return new Promise((resolve) => waiters.current.push(resolve));
+      const start = Date.now();
+      while (!checkRef.current && Date.now() - start < 8_000) {
+        await new Promise((resolve) => window.setTimeout(resolve, 50));
+      }
+      const current = checkRef.current;
+      if (current?.kind === 'turnstile') return turnstile.current?.execute() ?? null;
+      if (current?.kind === 'pow') {
+        return Promise.race([
+          new Promise<string | null>((resolve) => waiters.current.push(resolve)),
+          new Promise<string | null>((resolve) => window.setTimeout(() => resolve(null), 15_000)),
+        ]);
+      }
+      return null;
     },
   }));
 

@@ -104,6 +104,13 @@ async function route(request: Request, env: HostEnv, ctx: ExecutionContext): Pro
 
   // Indexing is off (noindex on every page and header), but crawlers must be allowed in to see that.
   if (path === '/robots.txt') return new Response(ROBOTS, { headers: { 'content-type': 'text/plain; charset=utf-8', 'cache-control': 'public, max-age=3600' } });
+  if (path === '/favicon.ico') {
+    const icon = await env.ASSETS.fetch(new Request(new URL(shareImages.icons['32'], url)));
+    return new Response(icon.body, {
+      status: icon.status,
+      headers: { 'content-type': 'image/png', 'cache-control': 'public, max-age=86400', 'x-robots-tag': NOINDEX },
+    });
+  }
   if (path === '/manifest.webmanifest' || path === '/manifest.json') {
     return new Response(
       JSON.stringify({

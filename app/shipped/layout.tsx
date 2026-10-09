@@ -1,10 +1,11 @@
 import React from 'react';
-import type { Metadata } from 'next';
+import type { Metadata, Viewport } from 'next';
 import { Fragment_Mono, Inter } from 'next/font/google';
 import { SHIPPED_APP_TITLE, SHIPPED_DESCRIPTION, SHIPPED_TITLE } from '../../lib/shipped-brand';
 import { SHIPPED_OG_IMAGE } from '../../lib/shipped';
 import { EVENT_NAME } from '../../lib/shipped-event';
 import { SHIPPED_URL } from '../../lib/shipped-year';
+import shareImages from '../../lib/share-images.json';
 import './receipt.css';
 
 const uiSans = Inter({
@@ -32,6 +33,13 @@ export const metadata: Metadata = {
   publisher: SHIPPED_APP_TITLE,
   keywords: [],
   category: undefined,
+  icons: {
+    icon: [
+      { url: shareImages.icons['32'], sizes: '32x32', type: 'image/png' },
+      { url: '/favicon.svg', type: 'image/svg+xml' },
+    ],
+    apple: [{ url: shareImages.icons['180'], sizes: '180x180', type: 'image/png' }],
+  },
   appleWebApp: {
     title: SHIPPED_APP_TITLE,
     statusBarStyle: 'black-translucent',
@@ -69,6 +77,12 @@ export const metadata: Metadata = {
     creator: '',
     site: '',
   },
+};
+
+export const viewport: Viewport = {
+  themeColor: '#161310',
+  colorScheme: 'dark',
+  viewportFit: 'cover',
 };
 
 export default function ShippedLayout({ children }: { children: React.ReactNode }) {

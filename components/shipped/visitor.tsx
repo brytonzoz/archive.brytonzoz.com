@@ -20,7 +20,7 @@ import {
   type SponsorBlock,
   type YearReceipt as Printed,
 } from '../../lib/shipped-year';
-import { press } from './feel';
+import { press, tap } from './feel';
 import { HumanCheck, type HumanCheckHandle } from './HumanCheck';
 import { refreshShippedState, useShippedState } from './state';
 import { YearReceipt } from './YearReceipt';
@@ -171,13 +171,14 @@ function MailedPrint({ receipt }: { receipt: Printed }) {
   if (!payments?.prints) return null;
 
   async function order() {
+    setBusy(true);
+    setError(null);
     const humanToken = token ?? (await human.current?.execute()) ?? null;
     if (!humanToken) {
+      setBusy(false);
       setAsked(true);
       return setError(ORDER_ERRORS.turnstile);
     }
-    setBusy(true);
-    setError(null);
     const response = await fetch('/api/shipped/print-order', {
       method: 'POST',
       headers: { 'content-type': 'application/json' },
@@ -196,7 +197,14 @@ function MailedPrint({ receipt }: { receipt: Printed }) {
 
   return (
     <div className="mt-3 text-center">
-      <button type="button" className="shipped-button is-ghost w-full" onPointerDown={press} onClick={order} disabled={busy}>
+      <button
+        type="button"
+        className={`shipped-button is-ghost w-full${busy ? ' is-busy' : ''}`}
+        onPointerDown={press}
+        onClick={() => void order()}
+        disabled={busy}
+        aria-busy={busy}
+      >
         {busy ? 'OPENING CHECKOUT…' : `MAIL ME THE REAL PRINT · ${money(payments.printCents)}`}
       </button>
       <p className="mt-1 text-[11px] text-[#f3ead8]/55">
@@ -264,33 +272,41 @@ function RemoveMine({ receipt, onRemoved }: { receipt: Printed; onRemoved?: () =
 }
 
 /** Sharing is the obvious next step: one-tap image share, then X, save and copy-link. */
+function pageUrl(id: number): string {
+  const path = RECEIPT_PATH(id);
+  return typeof window === 'undefined' ? `${SHIPPED_URL}${path}` : `${window.location.origin}${path}`;
+}
+
 export function ShareBar({ receipt, onRemoved }: { receipt: Printed; onRemoved?: () => void }) {
   const [copied, setCopied] = useState(false);
   const [sharing, setSharing] = useState(false);
   const path = RECEIPT_PATH(receipt.id);
-  // Same on the server and the first client paint so React doesn't throw #418. Staging swaps origin after mount.
-  const [origin, setOrigin] = useState(SHIPPED_URL);
+  // Relative hrefs work on staging; absolute URLs for copy/share are built at click time from this origin.
+  const [origin, setOrigin] = useState('');
   useEffect(() => setOrigin(window.location.origin), []);
-  const url = `${origin}${path}`;
-  const intent = `https://x.com/intent/post?text=${encodeURIComponent(shareText(receipt))}&url=${encodeURIComponent(url)}`;
+  const url = origin ? `${origin}${path}` : path;
+  const intent = origin
+    ? `https://x.com/intent/post?text=${encodeURIComponent(shareText(receipt))}&url=${encodeURIComponent(`${origin}${path}`)}`
+    : `https://x.com/intent/post?text=${encodeURIComponent(shareText(receipt))}`;
 
   async function shareImage() {
     setSharing(true);
+    const link = pageUrl(receipt.id);
     try {
       const imageUrl = new URL(`${TALL_PATH(receipt.id)}?download=1`, window.location.origin).toString();
       const blob = await fetch(imageUrl).then((response) => (response.ok ? response.blob() : null));
       const file = blob ? new File([blob], `shipped-${receipt.year}-${receiptNumber(receipt.id)}.png`, { type: 'image/png' }) : null;
       if (file && navigator.canShare?.({ files: [file] })) {
-        await navigator.share({ files: [file], text: shareText(receipt), url });
+        await navigator.share({ files: [file], text: shareText(receipt), url: link });
         beacon(receipt.id, 'share');
         return;
       }
       if (navigator.share) {
-        await navigator.share({ text: shareText(receipt), url });
+        await navigator.share({ text: shareText(receipt), url: link });
         beacon(receipt.id, 'share');
         return;
       }
-      await navigator.clipboard.writeText(url);
+      await navigator.clipboard.writeText(link);
       setCopied(true);
       window.setTimeout(() => setCopied(false), 2000);
       beacon(receipt.id, 'copy');
@@ -321,14 +337,17 @@ export function ShareBar({ receipt, onRemoved }: { receipt: Printed; onRemoved?:
         </a>
         <button
           type="button"
-          className="shipped-button is-ghost"
+          className={`shipped-button is-ghost${copied ? ' is-copied' : ''}`}
+          onPointerDown={press}
           onClick={async () => {
+            const link = pageUrl(receipt.id);
             try {
-              await navigator.clipboard.writeText(url);
+              await navigator.clipboard.writeText(link);
               setCopied(true);
-              setTimeout(() => setCopied(false), 2000);
+              tap(12);
+              window.setTimeout(() => setCopied(false), 2000);
             } catch {
-              window.prompt('Copy this link', url);
+              window.prompt('Copy this link', link);
             }
             beacon(receipt.id, 'copy');
           }}
@@ -338,6 +357,11 @@ export function ShareBar({ receipt, onRemoved }: { receipt: Printed; onRemoved?:
       </div>
       <MailedPrint receipt={receipt} />
       <RemoveMine receipt={receipt} onRemoved={onRemoved} />
+      {copied ? (
+        <p className="shipped-copied" role="status">
+          Copied
+        </p>
+      ) : null}
     </div>
   );
 }

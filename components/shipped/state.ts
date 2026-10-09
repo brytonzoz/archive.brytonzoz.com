@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import type { SponsorBlock } from '../../lib/shipped-year';
 import type { EventPhase } from '../../lib/shipped-event';
 import type { HumanCheckConfig } from './HumanCheck';
@@ -50,4 +50,21 @@ export function useShippedState(): ShippedState | null | undefined {
     };
   }, []);
   return state;
+}
+
+/** One clock for the page, the sponsor rail, and the proof sheet: Worker's closesAt minus skewed now. */
+export function useShippedClock(): { state: ShippedState | null | undefined; now: number | null; left: number | null; closed: boolean } {
+  const state = useShippedState();
+  const [now, setNow] = useState<number | null>(null);
+  const skew = useRef(0);
+  useEffect(() => {
+    if (!state) return;
+    skew.current = state.event.now - Date.now();
+    setNow(Date.now() + skew.current);
+    const timer = window.setInterval(() => setNow(Date.now() + skew.current), 1000);
+    return () => window.clearInterval(timer);
+  }, [state]);
+  const left = state && now !== null ? state.event.closesAt - now : null;
+  const closed = Boolean(state && (state.event.phase === 'closed' || (left !== null && left <= 0)));
+  return { state, now, left, closed };
 }

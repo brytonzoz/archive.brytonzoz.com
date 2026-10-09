@@ -1,10 +1,17 @@
 'use client';
 
-import React, { useEffect, useMemo, useState } from 'react';
+import React, { useLayoutEffect, useMemo, useState } from 'react';
 import { ShippedStage, type Opening } from './ShippedStage';
 import { OrderNotice, type Loaded } from './visitor';
 
+declare global {
+  interface Window {
+    __SHIPPED_RECEIPT__?: Loaded;
+  }
+}
+
 function readInjected(): Loaded | null {
+  if (typeof window !== 'undefined' && window.__SHIPPED_RECEIPT__) return window.__SHIPPED_RECEIPT__;
   const el = document.getElementById('shipped-receipt-data');
   if (!el?.textContent) return null;
   try {
@@ -23,15 +30,32 @@ function idFromPath(): number | null {
 export function PrintedReceiptView() {
   const [loaded, setLoaded] = useState<Loaded | null | undefined>(undefined);
 
-  useEffect(() => {
+  // Layout effect: apply the injected receipt before paint so the first visit never hangs on LOADING.
+  // Hydration still sees `undefined` (same as SSR). The Worker also assigns window.__SHIPPED_RECEIPT__
+  // so a later React head reconcile can't drop the JSON.
+  useLayoutEffect(() => {
     const injected = readInjected();
-    if (injected) return setLoaded(injected);
+    if (injected) {
+      setLoaded(injected);
+      return;
+    }
     const id = idFromPath();
-    if (!id) return setLoaded(null);
+    if (!id) {
+      setLoaded(null);
+      return;
+    }
+    let cancelled = false;
     fetch(`/api/shipped/receipts/${id}`)
       .then((response) => (response.ok ? (response.json() as Promise<Loaded>) : null))
-      .then(setLoaded)
-      .catch(() => setLoaded(null));
+      .then((data) => {
+        if (!cancelled) setLoaded(data);
+      })
+      .catch(() => {
+        if (!cancelled) setLoaded(null);
+      });
+    return () => {
+      cancelled = true;
+    };
   }, []);
 
   const opening = useMemo<Opening>(() => (loaded === undefined ? { kind: 'loading' } : loaded ? { kind: 'loaded', loaded } : { kind: 'missing' }), [loaded]);

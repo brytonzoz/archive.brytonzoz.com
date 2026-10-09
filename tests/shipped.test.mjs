@@ -190,6 +190,8 @@ test('share cards are a 1200×630 desk photo and a 1080×1350 download', async (
   assert.match(card, /id="desk-callout"/);
   assert.match(card, /@marclou/);
   assert.match(card, /scale\(1\.52\)/);
+  const callout = card.slice(card.indexOf('id="desk-callout"'));
+  assert.doesNotMatch(callout, /filter="url\(#(cast|shadow|fiber)"/);
   assert.doesNotMatch(card, /letter-spacing="0"/, 'letter-spacing at 0 doubles the last glyph in resvg');
   assert.equal(card.includes('printerLip') || /url\(#chassis\)/.test(card), false, 'card is a desk photo, not the printer template');
 });

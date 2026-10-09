@@ -404,9 +404,8 @@ function handleTape(handle: string, seed: string): string {
   const height = 44;
   const d = stickyPath(width, height, `${seed}:tape`);
   return [
-    `<path d="${d}" transform="translate(5 8)" fill="#000" opacity="0.32" filter="url(#shadow)"/>`,
+    `<path d="${d}" transform="translate(3 5)" fill="#000" opacity="0.18"/>`,
     `<path d="${d}" fill="#efe4c4"/>`,
-    `<path d="${d}" filter="url(#fiber)" opacity="0.26"/>`,
     `<path d="${d}" fill="url(#tape)"/>`,
     `<g transform="translate(${(width / 2 - 30).toFixed(1)} -8) rotate(-6 30 8)"><rect x="0" y="0" width="60" height="18" fill="url(#tape)"/><rect x="0" y="0" width="60" height="18" fill="none" stroke="#7a5a20" stroke-opacity="0.2"/></g>`,
     txt(width / 2, 30, label, 18, { weight: 600, anchor: 'middle' }),
@@ -422,10 +421,9 @@ function deskCallout(data: YearOg): string {
   const d = stickyPath(w, h, `sticky:${data.number}`);
   const fold = `M${w - 36},2 L${w + 2},38 L${w - 28},44 Z`;
   const sticky = [
-    `<path d="${d}" transform="translate(14 22)" fill="#000" opacity="0.42" filter="url(#cast)"/>`,
-    `<path d="${d}" transform="translate(4 7)" fill="#000" opacity="0.26" filter="url(#shadow)"/>`,
+    `<path d="${d}" transform="translate(7 12)" fill="#000" opacity="0.2"/>`,
+    `<path d="${d}" transform="translate(3 5)" fill="#000" opacity="0.12"/>`,
     `<path d="${d}" fill="#e0c056"/>`,
-    `<path d="${d}" filter="url(#fiber)" opacity="0.36"/>`,
     `<path d="${d}" fill="url(#fox)"/>`,
     `<path d="${fold}" fill="#c9a43a" opacity="0.55"/>`,
     `<g transform="translate(${w / 2 - 52} -11) rotate(8 52 11)"><rect x="0" y="0" width="104" height="24" fill="url(#tape)"/><rect x="0" y="0" width="104" height="24" fill="none" stroke="#7a5a20" stroke-opacity="0.2"/></g>`,

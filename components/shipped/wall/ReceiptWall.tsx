@@ -4,7 +4,7 @@
 // Crumple is localStorage only — the pile API is read, never written, from here.
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import type { PileReceipt, PileResponse } from '../../../lib/shipped-pile';
-import { layoutWall, readCrumpled, setCrumpled, wallColumns, type WallCard } from '../../../lib/shipped-wall';
+import { layoutWall, readCrumpled, setCrumpled, wallColumns, wallGutter, type WallCard } from '../../../lib/shipped-wall';
 import { WallFocus } from './WallFocus';
 import { WallSlip } from './WallSlip';
 
@@ -27,7 +27,9 @@ export function ReceiptWall({ page = false }: { page?: boolean }) {
   const [next, setNext] = useState<number | null>(null);
   const [total, setTotal] = useState(0);
   const [ready, setReady] = useState(false);
-  const [width, setWidth] = useState(390);
+  const [width, setWidth] = useState(() =>
+    typeof window === 'undefined' ? 320 : Math.max(280, Math.round(window.innerWidth - 32)),
+  );
   const [view, setView] = useState({ top: 0, height: 800 });
   const [crumpled, setCrumpledIds] = useState<Set<number>>(() => new Set());
   const [focus, setFocus] = useState<number | null>(null);
@@ -95,9 +97,10 @@ export function ReceiptWall({ page = false }: { page?: boolean }) {
   }, [ready, receipts.length]);
 
   const cols = wallColumns(width);
+  const gutter = wallGutter(width);
   const { cards, height } = useMemo(
-    () => layoutWall(receipts, crumpled, width, cols),
-    [receipts, crumpled, width, cols],
+    () => layoutWall(receipts, crumpled, width, cols, gutter),
+    [receipts, crumpled, width, cols, gutter],
   );
   const byId = useMemo(() => new Map(receipts.map((row) => [row.id, row])), [receipts]);
   const visible = useMemo(() => {

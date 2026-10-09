@@ -25,6 +25,7 @@
     linear-gradient(180deg, #1c1814 0%, #120f0c 42%, #0c0a08 100%),
     url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='180' height='180'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='.72' numOctaves='3' stitchTiles='stitch'/%3E%3CfeColorMatrix values='0 0 0 0 .62 0 0 0 0 .52 0 0 0 0 .4 0 0 0 .11 0'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)'/%3E%3C/svg%3E");
   background-blend-mode: normal, normal, multiply, overlay;
+  overflow-x: clip;
   /* 4/8pt: ticker pin owns the top safe-area so the sticky counters cover the notch. */
   padding: 0 16px 40px;
   padding-left: calc(16px + env(safe-area-inset-left, 0px));
@@ -51,6 +52,7 @@
   align-items: center;
   gap: 16px;
   width: min(29rem, 100%);
+  max-width: 100%;
   margin: 0 auto;
 }
 
@@ -1992,6 +1994,7 @@ html.shipped-focus .shipped-board {
 
 .shipped-wall {
   width: 100%;
+  max-width: 100%;
   color: var(--cream);
 }
 
@@ -2022,6 +2025,7 @@ html.shipped-focus .shipped-board {
 .shipped-wall-board {
   position: relative;
   overflow: hidden;
+  max-width: 100%;
   min-height: 280px;
   border-radius: 4px;
   background:

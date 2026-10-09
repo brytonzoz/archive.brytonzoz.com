@@ -65,7 +65,7 @@ export function wallPinStyle(id: number): WallPinStyle {
   const a = random();
   const b = random();
   return {
-    rotate: Math.round((a * 10 - 5) * 10) / 10,
+    rotate: Math.round((a * 6.4 - 3.2) * 10) / 10,
     kind: b > 0.42 ? 'pin' : 'tape',
     pinX: 0.28 + random() * 0.44,
   };
@@ -87,13 +87,18 @@ export function estimateWallCardHeight(itemCount: number, crumpled: boolean, wid
   return Math.round(88 + Math.min(5, Math.max(1, itemCount)) * 18 + 52);
 }
 
-/** Masonry: shortest-column placement. Returns the cards and the board height. */
+/** Even gutter around and between columns. Wide enough that a slight tilt stays on the board. */
+export function wallGutter(boardWidth: number): number {
+  return boardWidth < 520 ? 22 : 18;
+}
+
+/** Masonry: shortest-column placement. Cards stay inside the board (even gutters, room for tilt). */
 export function layoutWall<T extends { id: number; items: { name: string }[] }>(
   receipts: T[],
   crumpled: ReadonlySet<number>,
   boardWidth: number,
   cols: number,
-  gap = 16,
+  gap = wallGutter(boardWidth),
 ): { cards: WallCard[]; height: number } {
   const columns = Math.max(1, cols);
   const inner = Math.max(0, boardWidth - gap * (columns + 1));

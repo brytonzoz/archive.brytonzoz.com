@@ -204,25 +204,37 @@ test('share pages fill a placeholder instead of appending head scripts', () => {
 });
 
 test('the wall crumples only in this browser and pages from the listed pile', async () => {
-  const { isCrumpled, layoutWall, wallColumns, wallPinStyle, writeCrumpled } = await import('../lib/shipped-wall.ts');
+  const { isCrumpled, layoutWall, wallColumns, wallGutter, wallPinStyle, writeCrumpled } = await import('../lib/shipped-wall.ts');
   assert.deepEqual(writeCrumpled([6, 6, 7]), [6, 7]);
   assert.equal(isCrumpled(6, [6, 7]), true);
   assert.equal(isCrumpled(14, [6, 7]), false);
   assert.equal(wallColumns(390), 2);
   const pin = wallPinStyle(14);
-  assert.ok(pin.rotate >= -5 && pin.rotate <= 5);
+  assert.ok(pin.rotate >= -3.2 && pin.rotate <= 3.2);
   assert.ok(pin.kind === 'pin' || pin.kind === 'tape');
+  const phone = 358;
+  const gap = wallGutter(phone);
   const laid = layoutWall(
     [
       { id: 6, items: [{ name: 'A' }, { name: 'B' }] },
       { id: 7, items: [{ name: 'C' }] },
     ],
     new Set([6]),
-    390,
+    phone,
     2,
+    gap,
   );
   assert.equal(laid.cards.length, 2);
   assert.ok(laid.height > laid.cards[0].h);
+  const xs = Array.from(new Set(laid.cards.map((card) => Math.round(card.x)))).sort((a, b) => a - b);
+  assert.equal(xs.length, 2);
+  assert.equal(xs[0], gap);
+  for (const card of laid.cards) {
+    assert.ok(card.x >= gap - 0.01, `left gutter ${card.x}`);
+    assert.ok(card.x + card.w <= phone - gap + 0.01, `right overflow ${card.x + card.w}`);
+  }
+  const right = laid.cards.find((card) => Math.round(card.x) === xs[1]);
+  assert.equal(Math.round(phone - (right.x + right.w)), gap);
   const wall = fs.readFileSync(new URL('../components/shipped/wall/ReceiptWall.tsx', import.meta.url), 'utf8');
   assert.match(wall, /\/api\/shipped\/pile/);
   assert.match(wall, /localStorage/);

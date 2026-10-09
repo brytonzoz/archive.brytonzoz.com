@@ -111,9 +111,9 @@ push, and give the owner the staging link from the PR comment once the Staging w
  a robots.txt that allows crawling so the noindex is seen, never linked from nav, sitemap, llms.txt or JSON-LD). The build
  keeps it under `app/shipped/`; `worker/shipped-host.ts` serves it at the root of `SHIPPED_HOST` (wrangler vars, Workers
  Custom Domains in `wrangler.jsonc`, so no DNS work) and 301s brytonzoz.com/shipped/* there. Inside it, link with plain
- `<a>` to root paths (`/`, `/r/<id>/`), never `next/link` to `/shipped/...`. A receipt-printer machine
- prints Bryton's "SHIPPED IN <year>" receipt (`components/shipped/BrytonReceipt.tsx`, from `data/shipped/businesses.json`),
- then PRINT YOURS runs the same machine for any name, @handle, GitHub user or domain (`ShippedStage.tsx`: the one
+ `<a>` to root paths (`/`, `/r/<id>/`), never `next/link` to `/shipped/...`. Shipped is a two-week public event
+ (closes `SHIPPED_CLOSES_AT`), de-branded except a one-line credit. A receipt-printer machine opens on a "How it works"
+ slip (`HouseSlip.tsx`), then PRINT YOURS runs it for any name, @handle, GitHub user or domain (`ShippedStage.tsx`: the one
  printer and the self-serve panel; `Machine.tsx` does the line-by-line feed and drag/tap/key tear, `physics.ts` the
  seeded tears and springs, `sound.ts` the opt-in synthesized clicks; share images in `lib/receipt-svg.ts`). The Worker
  (`worker/shipped.ts`) gathers free sources (`worker/shipped-sources.ts`: GitHub, iTunes, HN, npm, Product Hunt with a
@@ -126,16 +126,22 @@ push, and give the owner the staging link from the PR comment once the Staging w
  the free sources find under 2 items, max 2 searches. Without a key, receipts print as demos. A credit/billing error from
  Anthropic flips the machine to "OUT OF PAPER" globally (no retries; cached receipts and sharing keep working); clear it
  with "Paper restocked" in `/admin` once credits are added. Logos are dithered into R2; `/shipped/r/<id>/` serves
- `og.png` and `receipt.png`. Guardrails: Turnstile when its keys exist (otherwise printing relies on the limits),
- per-IP limits, `SHIPPED_DAILY_CAP_USD` spend cap in D1, 7-day cache, takedowns in `/admin`.
+ `og.png` and `receipt.png`. Guardrails live in `worker/shipped-guard.ts` and `worker/shipped-fetch.ts` (SSRF-safe
+ fetches); **`docs/shipped-security.md` lists every threat, its mitigation and the kill switches** (`/admin` → Shipped,
+ or the `SHIPPED_OFF` var: site, generate, sponsors, sponsor-display, prints). Keep it current when guardrails change,
+ and keep `npm test` passing (both deploy workflows run it).
  Secrets: both deploy workflows run `scripts/sync-worker-secrets.mjs`, which copies the repository secrets (Bryton's names:
  `CLAUDE_KEY`, `SHIPPED_GITHUB_TOKEN` -> `GITHUB_TOKEN`, `PRODUCTHUNT_KEY` + `PRODUCTHUNT_SECRET` (OAuth client_credentials,
  token cached), `BRANDFETCH_API`, `TINYFISH`, `TURNSTILE_SITE_KEY` + `TURNSTILE_SECRET_KEY` from Bryton's managed widget)
  into the Worker in one `wrangler secret bulk`, skipping empty ones and logging names only. Turnstile is required (verified
  with siteverify) on printing, sponsor bids and print orders. Bryton never uses the Cloudflare dashboard: every secret goes
  through this.
- Year: `SHIPPED_YEAR` (Worker) / `NEXT_PUBLIC_SHIPPED_YEAR` (build), default the current year. "PAID FOR BY" sponsor
- lines (`lib/shipped-sponsors.ts`, same Stripe key as the store) rotate on shared receipts; impressions are in `/admin`.
+ Year: `SHIPPED_YEAR` (Worker) / `NEXT_PUBLIC_SHIPPED_YEAR` (build), default the current year. Money: 10 fixed-price
+ sponsor slots (1 hero + 3×3, `lib/shipped-sponsors.ts`; takeover = shown price, the displaced sponsor is refunded
+ pro rata; logos only after `/admin` approval; QR codes go through `/q/<key>`) and a $5 mailed print (US only,
+ Stripe Tax), both through `worker/shipped-pay.ts` with the store's Stripe key; the optional `STRIPE_SHIPPED_WEBHOOK_SECRET` adds
+ signed webhooks (without it, payments are confirmed from Stripe when the buyer returns).
+ Terms and privacy: `app/shipped/terms/`.
 - Metrics: `lib/analytics.ts` (anonymous, batched) -> `/api/e` in `worker/metrics.ts` -> D1 `brytonzoz-metrics`
   (`brytonzoz-metrics-staging` for staging; schema `worker/schema.sql`). The dashboard is `/admin`; its password is
   the `ADMIN_PASSWORD` repository secret, which both deploy workflows copy to the Worker. Never put it in code or chat.

@@ -185,3 +185,30 @@ test('sponsor text: scam, giveaway, crypto, payment-company, link and slur wordi
   const invisible = sponsors.validateBid({ ...base, name: 'Ac\u202eme\u200b' });
   assert.equal(invisible.ok && invisible.name, 'Acme', 'bidi and zero-width characters are stripped');
 });
+
+test('MAILED counts only paid print orders, never checkout sessions or receipt line-items', async () => {
+  const fs = await import('node:fs');
+  const source = fs.readFileSync(new URL('../worker/shipped.ts', import.meta.url), 'utf8');
+  assert.equal(source.includes("bump(db, 'shipped'"), false, 'printing a receipt must not bump MAILED');
+  assert.match(source, /Paid \$5 mailed thermal prints/);
+  assert.match(source, /once per visitor \/ receipt \/ day/);
+
+  const { memoryD1 } = await import('./d1.mjs');
+  const { MARKET_SCHEMA, bump, counters } = await import('../worker/shipped-market.ts');
+  const db = memoryD1();
+  db.raw.exec('CREATE TABLE shipped_receipts (id INTEGER PRIMARY KEY, shares INTEGER DEFAULT 0, views INTEGER DEFAULT 0)');
+  for (const sql of MARKET_SCHEMA) db.raw.exec(sql);
+  db.raw.exec(`CREATE TABLE print_orders (
+    id INTEGER PRIMARY KEY AUTOINCREMENT, receipt_id INTEGER NOT NULL, status TEXT NOT NULL, provider TEXT NOT NULL,
+    checkout_id TEXT, order_id TEXT, amount_cents INTEGER NOT NULL, tax_cents INTEGER, total_cents INTEGER, email TEXT,
+    created_at INTEGER NOT NULL, paid_at INTEGER, shipped_at INTEGER, note TEXT)`);
+  await bump(db, 'shipped', 6);
+  db.raw.exec(`INSERT INTO print_orders (receipt_id, status, provider, amount_cents, created_at, paid_at)
+    VALUES (1, 'checkout', 'stripe', 500, 1, NULL),
+           (2, 'failed', 'stripe', 500, 1, NULL),
+           (3, 'refunded', 'stripe', 500, 1, 2),
+           (4, 'to_print', 'stripe', 500, 1, 2),
+           (5, 'shipped', 'stripe', 500, 1, 2)`);
+  const tallies = await counters(db);
+  assert.equal(tallies.shipped, 2, 'checkout, failed and refunded rows do not count');
+});

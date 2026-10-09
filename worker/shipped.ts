@@ -3,7 +3,7 @@
 // the two-week event ends, lib/shipped-sponsors.ts) and $5 mailed prints. The event window is lib/shipped-event.ts.
 //
 //   GET  /api/shipped/state            event window, counters, generator, payments, the sponsor block
-//   GET  /api/shipped/proof            PRINTED / SHARED / SHIPPED / VIEWS and how they are counted (starts at 0)
+//   GET  /api/shipped/proof            PRINTED / SHARED / MAILED / VIEWS and how they are counted (starts at 0)
 //   POST /api/shipped/lookup           { q } -> { candidates, auto } (who did they mean?)
 //   POST /api/shipped/print            { subject, token, listed } -> { id, pile } (same subject within 7 days: cached)
 //   GET  /api/shipped/pile             the pile (lib/shipped-pile.ts); POST { id, token } tosses a receipt on
@@ -619,8 +619,6 @@ async function generate(
     await db.prepare('UPDATE shipped_receipts SET hidden = 0 WHERE id = ? AND hidden = 2').bind(inserted.id).run();
     if (!replaces) {
       await bump(db, 'printed');
-      const n = itemsShipped(receipt);
-      if (n > 0) await bump(db, 'shipped', n);
     }
     console.log(JSON.stringify({ shipped: 'print', id: inserted.id, kind: subject.kind, items: receipt.items.length, potential: receipt.potential, ran: gathered.ran, failed: gathered.failed, costMicros: usage.cost }));
     return json({ id: inserted.id, pile: await pileToken(env, inserted.id) });
@@ -631,7 +629,7 @@ async function generate(
   }
 }
 
-const SHARE_WAYS = new Set(['x', 'card', 'tall', 'copy']);
+const SHARE_WAYS = new Set(['x', 'card', 'tall', 'copy', 'share', 'rollo']);
 
 /**
  * Counted once per visitor, receipt and way of sharing per day: the counters are public and sponsor prices
@@ -1432,9 +1430,9 @@ async function state(env: ShippedEnv): Promise<Response> {
 
 const TICKER_HOW = {
   printed: 'New receipt rows. A reprint of the same subject the same day does not add another. Starts at 0.',
-  shared: 'Share taps, one per visitor / receipt / way / day. Starts at 0.',
-  shipped: 'Items listed as shipped on those receipts. A potential (empty) print adds 0. Starts at 0.',
-  views: 'Opens of a printed receipt page. Starts at 0.',
+  shared: 'Confirmed share actions, once per visitor / receipt / way / day. Opening checkout does not count. Starts at 0.',
+  shipped: 'Paid $5 mailed thermal prints (Stripe webhook / paid_at, status to_print or shipped). Checkout sessions do not count. Refunds drop off. Starts at 0.',
+  views: 'Opens of a printed receipt page, once per visitor / receipt / day. Reloads the same day do not add another. Starts at 0.',
 };
 
 /** GET /api/shipped/proof: the four ticker counters and how they are counted. Nothing invented. */
@@ -1541,12 +1539,11 @@ async function sharePage(request: Request, env: ShippedEnv & { ASSETS: Fetcher }
   }
 
   ctx.waitUntil(
-    db
-      .prepare('UPDATE shipped_receipts SET views = views + 1 WHERE id = ?')
-      .bind(id)
-      .run()
-      .then(() => bump(db, 'views'))
-      .catch(() => undefined),
+    (async () => {
+      if (!(await onceToday(db, request, `view:${id}`))) return;
+      await db.prepare('UPDATE shipped_receipts SET views = views + 1 WHERE id = ?').bind(id).run();
+      await bump(db, 'views');
+    })().catch(() => undefined),
   );
   const sponsors = await sponsorBlock(db, env);
   // JSON inside a <script> data block: "<" escaped so nothing in a receipt can close the tag.

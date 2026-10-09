@@ -15,7 +15,7 @@ export type TickerCounts = { printed: number; shared: number; shipped: number; v
 const LABELS: { key: keyof TickerCounts; label: string }[] = [
   { key: 'printed', label: 'PRINTED' },
   { key: 'shared', label: 'SHARED' },
-  { key: 'shipped', label: 'SHIPPED' },
+  { key: 'shipped', label: 'MAILED' },
   { key: 'views', label: 'VIEWS' },
 ];
 

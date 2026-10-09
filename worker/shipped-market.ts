@@ -43,10 +43,25 @@ export async function bump(db: D1Database, name: Counter, by = 1): Promise<numbe
   return row?.n ?? by;
 }
 
+/** Paid $5 mailed prints only: Stripe webhook / paid_at, still to-print or in the mail. Checkout sessions never count. */
+export const MAILED_SETTLED = `status IN ('to_print', 'shipped') AND paid_at IS NOT NULL`;
+
+export async function mailedPaid(db: D1Database): Promise<number> {
+  try {
+    const row = await db.prepare(`SELECT COUNT(*) AS n FROM print_orders WHERE ${MAILED_SETTLED}`).first<{ n: number }>();
+    return Number(row?.n) || 0;
+  } catch {
+    return 0;
+  }
+}
+
 export async function counters(db: D1Database): Promise<Record<Counter, number>> {
   const { results } = await db.prepare('SELECT name, n FROM shipped_counters').all<{ name: Counter; n: number }>();
   const out = emptyCounts();
   for (const row of results) if (row.name in out) out[row.name] = row.n;
+  // Always the live paid-order count. The shipped_counters.shipped row is leftover from when this
+  // number was "items listed as shipped" on receipts (checkout sessions and free prints inflated it).
+  out.shipped = await mailedPaid(db);
   return out;
 }
 

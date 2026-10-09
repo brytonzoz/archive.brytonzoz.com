@@ -216,7 +216,7 @@ export function masterReceiptSvg(data: MasterOg): string {
   for (const [label, value] of [
     ['1. TYPE A NAME OR @HANDLE', 'FREE'],
     [`2. IT PRINTS YOUR ${data.year}`, 'AUTO'],
-    ['3. POST IT, TOSS IT ON THE PILE', 'FREE'],
+    ['3. POST IT, PIN IT ON THE WALL', 'FREE'],
     ['MAILED THERMAL PRINT (US)', '$5'],
   ]) {
     body.push(leader(y, label, value, 12, 500));

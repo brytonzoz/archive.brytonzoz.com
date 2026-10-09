@@ -456,11 +456,11 @@ export function Machine({ job, display, tone, onPrinted, onTorn, tearSignal = 0,
           type="button"
           className="shipped-key"
           aria-pressed={desk.listed}
-          aria-label={desk.listed ? 'Listed under recently printed. Tap to unlist' : 'List it under recently printed'}
+          aria-label={desk.listed ? 'Listed on the wall. Tap to unlist' : 'Pin it on the wall under recently printed'}
           onPointerDown={press}
           onClick={() => desk.onListed(!desk.listed)}
         >
-          <span aria-hidden="true">{desk.listed ? 'PILE ON' : 'PILE'}</span>
+          <span aria-hidden="true">{desk.listed ? 'WALL ON' : 'WALL'}</span>
         </button>
       ) : null}
       <span className="shipped-keys-space" aria-hidden="true" />

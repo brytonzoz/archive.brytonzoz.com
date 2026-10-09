@@ -790,7 +790,10 @@
   min-height: 100svh;
 }
 
-html.shipped-focus .shipped-stack > p {
+html.shipped-focus .shipped-stack > p,
+html.shipped-focus .shipped-nav,
+html.shipped-focus .shipped-wall,
+html.shipped-focus .shipped-board {
   display: none;
 }
 
@@ -1946,5 +1949,291 @@ html.shipped-focus .shipped-stack > p {
 
   .shipped-board-toggle:hover {
     color: #fff;
+  }
+}
+
+/* ---- Nav + the wall ----------------------------------------------------------------------------------- */
+
+.shipped-nav {
+  order: -1;
+  display: flex;
+  justify-content: center;
+  gap: 8px;
+  width: 100%;
+  padding: 2px 0 0;
+}
+
+.shipped-nav a {
+  min-height: 36px;
+  padding: 8px 14px;
+  border-radius: 999px;
+  color: var(--cream);
+  font-size: 12px;
+  font-weight: 600;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+  text-decoration: none;
+  opacity: 0.62;
+}
+
+.shipped-nav a[aria-current='page'] {
+  opacity: 1;
+  background: rgba(243, 234, 216, 0.1);
+}
+
+.shipped-nav a:focus-visible {
+  outline: 2px solid var(--cream);
+  outline-offset: 3px;
+}
+
+.shipped-page:has(.shipped-wall.is-page) .shipped-stack {
+  width: min(52rem, 100%);
+}
+
+.shipped-wall {
+  width: 100%;
+  color: var(--cream);
+}
+
+.shipped-wall-head {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 12px;
+  margin: 8px 4px 12px;
+}
+
+.shipped-wall-head h2 {
+  margin: 0;
+  font-size: 13px;
+  font-weight: 600;
+  letter-spacing: 0.28em;
+  text-transform: uppercase;
+}
+
+.shipped-wall-head p {
+  margin: 0;
+  font-size: 11px;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  opacity: 0.55;
+}
+
+.shipped-wall-board {
+  position: relative;
+  overflow: hidden;
+  min-height: 280px;
+  border-radius: 4px;
+  background:
+    radial-gradient(circle at 18% 12%, rgba(255, 214, 160, 0.08), transparent 36%),
+    repeating-radial-gradient(circle at 12px 12px, rgba(40, 28, 18, 0.22) 0 1.2px, transparent 1.4px 18px),
+    linear-gradient(180deg, #6a513c 0%, #4f3b2b 55%, #3d2d21 100%);
+  box-shadow: inset 0 0 0 1px rgba(0, 0, 0, 0.35), inset 0 20px 40px rgba(0, 0, 0, 0.18);
+}
+
+.shipped-wall-empty {
+  position: absolute;
+  inset: 24px;
+  margin: 0;
+  display: grid;
+  place-items: center;
+  text-align: center;
+  color: #f3ead8;
+  font-size: 13px;
+  line-height: 1.45;
+  opacity: 0.78;
+}
+
+.shipped-wall-pin {
+  position: absolute;
+  top: 0;
+  left: 0;
+  display: block;
+  padding: 18px 10px 12px;
+  border: 0;
+  background: transparent;
+  color: inherit;
+  font: inherit;
+  text-align: left;
+  cursor: pointer;
+  transform-origin: 50% 8px;
+  will-change: transform;
+  contain: layout style;
+}
+
+.shipped-wall-pin:focus-visible {
+  outline: 2px solid var(--cream);
+  outline-offset: 3px;
+}
+
+.shipped-wall-slip {
+  height: 100%;
+  padding: 12px 10px 10px;
+  overflow: hidden;
+  background:
+    linear-gradient(180deg, rgba(255, 255, 255, 0.22), transparent 18%),
+    #efe4cf;
+  color: #1d1b19;
+  box-shadow: 0 10px 18px rgba(0, 0, 0, 0.28), 0 1px 0 rgba(255, 255, 255, 0.35) inset;
+  font-family: var(--font-receipt), ui-monospace, monospace;
+}
+
+.shipped-wall-slip-kicker,
+.shipped-wall-slip-meta {
+  margin: 0;
+  text-align: center;
+  font-size: 8px;
+  letter-spacing: 0.16em;
+  opacity: 0.55;
+}
+
+.shipped-wall-slip-who {
+  margin: 6px 0 4px;
+  text-align: center;
+  font-size: 13px;
+  font-weight: 600;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  line-height: 1.15;
+}
+
+.shipped-wall-slip-items {
+  margin: 8px 0 0;
+  padding: 0;
+  list-style: none;
+}
+
+.shipped-wall-slip-items li {
+  display: flex;
+  justify-content: space-between;
+  gap: 6px;
+  font-size: 9px;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+}
+
+.shipped-wall-slip-items li span:last-child {
+  opacity: 0.55;
+  flex: none;
+}
+
+.shipped-wall-tack {
+  position: absolute;
+  top: 4px;
+  width: 14px;
+  height: 14px;
+  margin-left: -7px;
+  border-radius: 50%;
+  background: radial-gradient(circle at 35% 30%, #ff8b7a, #c4271c 62%, #7a120c);
+  box-shadow: 0 2px 3px rgba(0, 0, 0, 0.45), inset 0 1px 0 rgba(255, 255, 255, 0.45);
+  z-index: 2;
+}
+
+.shipped-wall-tack::after {
+  content: '';
+  position: absolute;
+  left: 50%;
+  top: 12px;
+  width: 2px;
+  height: 8px;
+  margin-left: -1px;
+  background: linear-gradient(#d0d4d8, #7d838a);
+}
+
+.shipped-wall-tape {
+  position: absolute;
+  top: 4px;
+  left: 50%;
+  width: 42%;
+  height: 14px;
+  transform: translateX(-50%) rotate(-6deg);
+  background: linear-gradient(180deg, rgba(232, 197, 106, 0.55), rgba(201, 162, 74, 0.32));
+  box-shadow: 0 1px 0 rgba(255, 255, 255, 0.2) inset;
+  z-index: 2;
+}
+
+.shipped-wall-ball {
+  display: block;
+  width: 58%;
+  aspect-ratio: 1;
+  margin: 28% auto 0;
+  border-radius: 46% 54% 50% 50%;
+  background:
+    radial-gradient(circle at 32% 28%, #f7efe2, #d8cbb4 58%, #8c7a62);
+  box-shadow: 0 10px 16px rgba(0, 0, 0, 0.35), inset -6px -8px 12px rgba(60, 40, 20, 0.28);
+}
+
+.shipped-wall-focus {
+  position: fixed;
+  inset: 0;
+  z-index: 60;
+  display: grid;
+  place-items: end center;
+}
+
+.shipped-wall-focus-scrim {
+  position: absolute;
+  inset: 0;
+  border: 0;
+  background: rgba(8, 6, 4, 0.72);
+}
+
+.shipped-wall-focus-stage {
+  position: relative;
+  z-index: 1;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 14px;
+  width: min(26rem, 100%);
+  padding: 24px 16px calc(24px + env(safe-area-inset-bottom, 0px));
+  perspective: 1100px;
+}
+
+.shipped-wall-focus-paper {
+  width: min(18rem, 86vw);
+  transform-style: preserve-3d;
+  touch-action: none;
+  cursor: grab;
+  will-change: transform;
+}
+
+.shipped-wall-focus-paper:active {
+  cursor: grabbing;
+}
+
+.shipped-wall-focus-paper .shipped-wall-slip {
+  min-height: 22rem;
+}
+
+.shipped-wall-focus-canvas {
+  display: block;
+  margin: 0 auto;
+}
+
+.shipped-wall-focus-actions {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 8px;
+  width: 100%;
+}
+
+.shipped-wall-focus-actions .is-big {
+  grid-column: 1 / -1;
+}
+
+.shipped-wall-focus-note {
+  margin: 0;
+  font-size: 11px;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  opacity: 0.5;
+  text-align: center;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .shipped-wall-pin,
+  .shipped-wall-focus-paper {
+    transition: none;
   }
 }

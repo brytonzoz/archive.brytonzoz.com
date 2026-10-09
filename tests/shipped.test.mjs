@@ -199,6 +199,37 @@ test('share pages fill a placeholder instead of appending head scripts', () => {
   assert.equal(worker.includes("el.append(`<script>window.__SHIPPED_RECEIPT__"), false);
 });
 
+test('the wall crumples only in this browser and pages from the listed pile', async () => {
+  const { isCrumpled, layoutWall, wallColumns, wallPinStyle, writeCrumpled } = await import('../lib/shipped-wall.ts');
+  assert.deepEqual(writeCrumpled([6, 6, 7]), [6, 7]);
+  assert.equal(isCrumpled(6, [6, 7]), true);
+  assert.equal(isCrumpled(14, [6, 7]), false);
+  assert.equal(wallColumns(390), 2);
+  const pin = wallPinStyle(14);
+  assert.ok(pin.rotate >= -5 && pin.rotate <= 5);
+  assert.ok(pin.kind === 'pin' || pin.kind === 'tape');
+  const laid = layoutWall(
+    [
+      { id: 6, items: [{ name: 'A' }, { name: 'B' }] },
+      { id: 7, items: [{ name: 'C' }] },
+    ],
+    new Set([6]),
+    390,
+    2,
+  );
+  assert.equal(laid.cards.length, 2);
+  assert.ok(laid.height > laid.cards[0].h);
+  const wall = fs.readFileSync(new URL('../components/shipped/wall/ReceiptWall.tsx', import.meta.url), 'utf8');
+  assert.match(wall, /\/api\/shipped\/pile/);
+  assert.match(wall, /localStorage/);
+  assert.doesNotMatch(wall, /shipped-sources|shipped-ai/);
+  const home = fs.readFileSync(new URL('../app/shipped/page.tsx', import.meta.url), 'utf8');
+  assert.match(home, /ReceiptWall/);
+  assert.doesNotMatch(home, /RecentStrip|ReceiptPile/);
+  const host = fs.readFileSync(new URL('../worker/shipped-host.ts', import.meta.url), 'utf8');
+  assert.match(host, /wall/);
+});
+
 test('the printer mouth and receipt sponsor cells do not share a class (absolute slot must not stack ads on the header)', () => {
   const machine = fs.readFileSync(new URL('../components/shipped/Machine.tsx', import.meta.url), 'utf8');
   const year = fs.readFileSync(new URL('../components/shipped/YearReceipt.tsx', import.meta.url), 'utf8');

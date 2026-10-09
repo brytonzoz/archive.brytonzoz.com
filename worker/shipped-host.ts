@@ -1,6 +1,6 @@
 // Shipped's own host (SHIPPED_HOST: shipped.brytonzoz.com, shipped-staging.brytonzoz.com on staging). The
 // static build keeps the app under /shipped/, so on that host the root maps onto it: / is the printer,
-// /r/<id>/ a receipt (+ og.png, receipt.png, rollo.png, rollo.pdf), /terms/ (terms, refunds, privacy; /refunds/ too), /remove/,
+// /r/<id>/ a receipt (+ og.png, receipt.png, rollo.png, rollo.pdf), /wall/, /terms/ (terms, refunds, privacy; /refunds/ too), /remove/,
 // /sandbox-pay/, and /q/<key> (a printed QR code). Every response gets the security headers and pages a CSP
 // (worker/shipped-guard.ts). With the "site" kill switch on, every page is the out-of-paper notice. On every other host
 // /shipped/* answers with a 301 to the same path on SHIPPED_HOST, so old links keep working.
@@ -12,7 +12,7 @@ import { SHIPPED_URL } from '../lib/shipped-year';
 import shareImages from '../lib/share-images.json';
 
 const NOINDEX = 'noindex, nofollow, noarchive';
-const PAGES = /^\/(?:(lab|refunds|remove|sandbox-pay|terms)(?:\/.*)?)?$/;
+const PAGES = /^\/(?:(lab|refunds|remove|sandbox-pay|terms|wall)(?:\/.*)?)?$/;
 /** Static files the app itself loads from /shipped/ (Bryton's dithered logos). */
 const OWN_FILES = /^\/shipped\/logos\//;
 

@@ -4,6 +4,7 @@
 import React, { useEffect, useRef, useState } from 'react';
 import { track } from '../../lib/analytics';
 import { receiptDate } from '../../lib/shipped';
+import { WALL_PATH } from '../../lib/shipped-wall';
 import { money } from '../../lib/shipped-receipt';
 import { isFirstRun } from '../../lib/shipped-modules';
 import {
@@ -392,6 +393,9 @@ export function SharePill({
                 </button>
                 <a href={intent} target="_blank" rel="noopener noreferrer" className="shipped-button is-ghost" onPointerDown={press} onClick={() => beacon(receipt.id, 'x')}>
                   POST TO X
+                </a>
+                <a href={WALL_PATH} className="shipped-button is-ghost" onPointerDown={press}>
+                  THE WALL
                 </a>
                 <div className="shipped-share-row">
                   <button type="button" className={`shipped-button is-ghost${copied ? ' is-copied' : ''}`} onPointerDown={press} onClick={() => void copyLink()}>

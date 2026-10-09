@@ -15,6 +15,8 @@ import { prng, rubber, spring, springStep, type SpringConfig } from '../physics'
 import { buildFeedPlan, sampleFeed, type FeedPlan } from './timeline';
 import { aboveClip, barClip, belowClip, edgeY, serratedEdge, TOOTH_DEPTH, TOOTH_PITCH, type EdgePoint, type TornPart } from './tear';
 import { localPoint, stepFalling, stepHeld, type Body2D } from './body';
+import { pileLength } from '../pile/crumple';
+import { ballSprite } from '../pile/draw2d';
 import { Crumple, paperTexture } from './crumple';
 import { GRAIN_SIZE, grainTile, grainUrl } from './grain';
 
@@ -40,6 +42,7 @@ export type EngineHooks = {
   tossable(): boolean;
   speed(): number;
   target(): ScreenRect | null;
+  reveal(): void;
   toss(payload: TossPayload): boolean;
   phase(phase: PrintPhase, landed?: boolean): void;
   line(index: number): void;
@@ -947,6 +950,7 @@ export class PrintEngine {
     const receipt = this.receipt;
     if (!receipt || this.mode !== 'free') return;
     this.pendingToss = false;
+    this.hooks.reveal();
     this.endDrag();
     const raster = this.raster;
     const frameBox = this.el.frame.getBoundingClientRect();
@@ -1066,8 +1070,12 @@ export class PrintEngine {
         const cos = Math.cos(place.angle);
         const sin = Math.sin(place.angle);
         ball.start = { x: ball.origin.x + place.x + c.x * cos - c.y * sin, y: ball.origin.y + place.y + c.x * sin + c.y * cos };
-        // From here the ball is one small canvas that only moves: no drawing per frame.
-        const sprite = ball.crumple.sprite(dpr);
+        // From here the ball is the same faceted paper the pile draws, so it matches on landing.
+        const size = Math.max(48, Math.round(ball.crumple.radius * 2));
+        const pileBall = ballSprite({ id: ball.receipt.id, length: pileLength(ball.raster?.height ?? 800) }, size, dpr);
+        pileBall.style.width = `${size}px`;
+        pileBall.style.height = `${size}px`;
+        const sprite = { canvas: pileBall, size };
         Object.assign(sprite.canvas.style, {
           position: 'fixed',
           left: '0',

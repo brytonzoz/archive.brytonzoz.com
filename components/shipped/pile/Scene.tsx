@@ -164,7 +164,7 @@ function Engine(props: EngineProps) {
   return null;
 }
 
-const GL = { antialias: true, alpha: false, powerPreference: 'high-performance' as const, stencil: false };
+const GL = { antialias: true, alpha: true, premultipliedAlpha: true, powerPreference: 'high-performance' as const, stencil: false };
 const SHADOWS = { enabled: true, type: THREE.PCFShadowMap };
 const DPR: [number, number] = [1, 2];
 const CAMERA = { fov: 40, near: 0.1, far: 80, position: [0, 6, 5] as [number, number, number] };
@@ -322,6 +322,7 @@ export default function PileScene(props: SceneProps) {
 
   const onCreated = useMemo(
     () => (state: { gl: THREE.WebGLRenderer }) => {
+      state.gl.setClearColor(0x000000, 0);
       const canvas = state.gl.domElement;
       canvas.setAttribute('role', 'img');
       canvas.setAttribute('aria-label', latest.current.label);
@@ -337,7 +338,7 @@ export default function PileScene(props: SceneProps) {
 
   return (
     <div ref={wrap} className={`${styles.scene}${holding ? ` ${styles.holding}` : ''}`} data-pile-scene="">
-      <Canvas frameloop="demand" dpr={DPR} shadows={SHADOWS} flat gl={GL} camera={CAMERA} onCreated={onCreated}>
+      <Canvas frameloop="demand" dpr={DPR} shadows={SHADOWS} flat gl={GL} camera={CAMERA} onCreated={onCreated} style={{ background: 'transparent' }}>
         <Engine
           receipts={props.receipts}
           own={props.own}

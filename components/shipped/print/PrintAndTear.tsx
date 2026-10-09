@@ -189,6 +189,7 @@ export const PrintAndTear = forwardRef<PrintAndTearHandle, PrintAndTearProps>(fu
       tossable: () => latest.current.canToss,
       speed: () => latest.current.speed,
       target: () => latest.current.pile.target(),
+      reveal: () => latest.current.pile.reveal(),
       toss: (payload) => latest.current.pile.toss(payload),
       phase: (next, didLand) => {
         setPhase(next);

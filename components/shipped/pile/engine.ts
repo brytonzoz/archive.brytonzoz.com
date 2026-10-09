@@ -16,7 +16,7 @@ import type { ScreenRect, TossPayload } from '../thermal/toss';
 import type { ThermalReceipt } from '../thermal/types';
 import { ATLAS_SLOTS, InkAtlas } from './atlas';
 import { FLAT_CRUMPLE, PILE_GRID, SHEET_W, heldLength, pileLength, restCrumple, shapeHull, shapeSeed, type Hull, type Seed4 } from './crumple';
-import { PAGE_HEX, MASK_ALPHA, MASK_RED, createContactMaterial, createCounterMaterial, createPaper, createSheetGeometry, type PaperSet } from './material';
+import { MASK_ALPHA, MASK_RED, createContactMaterial, createCounterMaterial, createPaper, createSheetGeometry, type PaperSet } from './material';
 import { BurnQueue, docDots, tileFrom, type Tile } from './rasters';
 import { GRAVITY, PileWorld, type Rapier } from './world';
 
@@ -239,7 +239,8 @@ export class PileEngine {
     gl.shadowMap.enabled = true;
     gl.shadowMap.type = THREE.PCFShadowMap;
     gl.shadowMap.autoUpdate = true;
-    scene.background = new THREE.Color(PAGE_HEX);
+    scene.background = null;
+    gl.setClearColor(0x000000, 0);
 
     // Pile: one instanced mesh.
     this.geometry = createSheetGeometry(PILE_GRID.across, PILE_GRID.along);
@@ -1362,7 +1363,7 @@ export class PileEngine {
   rect(): ScreenRect | null {
     const el = this.o.gl.domElement;
     const box = el.getBoundingClientRect();
-    if (box.bottom < 0 || box.top > window.innerHeight || box.width < 1) return null;
+    if (box.width < 1 || box.height < 1) return null;
     return { x: box.left, y: box.top, width: box.width, height: box.height };
   }
 

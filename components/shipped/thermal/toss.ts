@@ -25,10 +25,12 @@ export type TossPayload = {
 };
 
 export type TossTarget = {
-  /** The box the ball should fly to (the pile's canvas), or null while it isn't on screen. */
+  /** The pile's box in client pixels. Off-screen piles still count (phones stack the pile under the printer). */
   rect(): ScreenRect | null;
   /** Take the ball. False if it can't (still loading, or no WebGL: it then lands in the 2D pile). */
   receive(payload: TossPayload): boolean;
+  /** Scroll the pile into view so a throw from above (mobile) is seen landing. */
+  reveal?(): void;
 };
 
 const targets = new Set<TossTarget>();
@@ -49,22 +51,29 @@ export function registerTossTarget(target: TossTarget): () => void {
   };
 }
 
-/** The target nearest the middle of the screen that is at least partly visible. */
+/** Prefer a pile that's on screen; if none is (the phone stacked it below), take the nearest one anyway. */
 export function tossTarget(): TossTarget | null {
   if (typeof window === 'undefined') return null;
-  let best: TossTarget | null = null;
-  let bestDistance = Infinity;
+  let visible: TossTarget | null = null;
+  let visibleDistance = Infinity;
+  let any: TossTarget | null = null;
+  let anyDistance = Infinity;
   const middle = window.innerHeight / 2;
   targets.forEach((target) => {
     const rect = target.rect();
     if (!rect || rect.width < 1 || rect.height < 1) return;
     const distance = Math.abs(rect.y + rect.height / 2 - middle);
-    if (distance < bestDistance) {
-      best = target;
-      bestDistance = distance;
+    if (distance < anyDistance) {
+      any = target;
+      anyDistance = distance;
+    }
+    const onScreen = rect.y < window.innerHeight && rect.y + rect.height > 0;
+    if (onScreen && distance < visibleDistance) {
+      visible = target;
+      visibleDistance = distance;
     }
   });
-  return best;
+  return visible ?? any;
 }
 
 /** Hand a ball to the pile. False when there's no pile to take it. */
@@ -88,6 +97,7 @@ export function useCrumpleToss() {
   return {
     available,
     target: () => tossTarget()?.rect() ?? null,
+    reveal: () => tossTarget()?.reveal?.(),
     toss: tossToPile,
   };
 }
@@ -102,6 +112,7 @@ export function useTossTarget(target: TossTarget | null) {
     return registerTossTarget({
       rect: () => ref.current?.rect() ?? null,
       receive: (payload) => ref.current?.receive(payload) ?? false,
+      reveal: () => ref.current?.reveal?.(),
     });
   }, [enabled]);
 }

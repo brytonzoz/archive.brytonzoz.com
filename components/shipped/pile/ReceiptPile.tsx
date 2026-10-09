@@ -252,8 +252,11 @@ export function ReceiptPile({
             const el = root.current;
             if (!el) return null;
             const box = el.getBoundingClientRect();
-            if (box.bottom < 0 || box.top > window.innerHeight) return null;
+            if (box.width < 1 || box.height < 1) return null;
             return { x: box.left, y: box.top, width: box.width, height: box.height };
+          },
+          reveal: () => {
+            root.current?.scrollIntoView({ behavior: config?.reduced ? 'auto' : 'smooth', block: 'nearest', inline: 'nearest' });
           },
           receive: (payload: TossPayload) => {
             if (stage === '3d' && sceneApi.current?.receive(payload)) {

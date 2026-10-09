@@ -5,9 +5,8 @@
 // Only for testing the handoff; the real pile (components/shipped/pile/) takes the same payload into 3D.
 import React, { useEffect, useRef, useState } from 'react';
 import { useTossTarget, type TossPayload } from '../../../../components/shipped/thermal/toss';
-import { Crumple, paperTexture } from '../../../../components/shipped/print/crumple';
-import { grainTile } from '../../../../components/shipped/print/grain';
-import { prng } from '../../../../components/shipped/physics';
+import { pileLength } from '../../../../components/shipped/pile/crumple';
+import { ballSprite as pileBall } from '../../../../components/shipped/pile/draw2d';
 import { land } from '../../../../components/shipped/thermal/sfx';
 import styles from './lab.module.css';
 
@@ -16,12 +15,9 @@ type Ball = { el: HTMLCanvasElement; r: number; x: number; y: number; vx: number
 const GRAVITY = 2600;
 
 function ballSprite(payload: TossPayload, radius: number): HTMLCanvasElement | null {
-  const raster = payload.raster;
   const dpr = Math.min(2, window.devicePixelRatio || 1);
-  if (!raster) return null;
-  const texture = paperTexture({ ink: raster.canvas, inkTop: 0, rows: raster.height, width: 220, grain: grainTile(), grainDots: 100, outline: null });
-  const crumple = new Crumple({ width: 160, height: 160 * (raster.height / raster.width), texture, center: { x: 80, y: 80 * (raster.height / raster.width) }, radius, random: prng(`${payload.receipt.id}:crumple`) });
-  const { canvas, size } = crumple.sprite(dpr);
+  const size = Math.max(28, Math.round(radius * 2));
+  const canvas = pileBall({ id: payload.receipt.id, length: pileLength(payload.raster?.height ?? 800) }, size, dpr);
   canvas.style.width = `${size}px`;
   canvas.style.height = `${size}px`;
   return canvas;

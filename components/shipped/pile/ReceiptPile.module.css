@@ -12,7 +12,7 @@
   overflow: hidden;
   isolation: isolate;
   container-type: size;
-  background-color: var(--counter);
+  background: transparent;
   color: var(--cream);
   -webkit-tap-highlight-color: transparent;
 }

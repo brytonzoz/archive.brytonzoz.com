@@ -21,10 +21,41 @@ export const BID_RULES = {
   checkoutMinutes: 30,
   /** No takeovers in the last hour before close. */
   lockMinutes: 60,
+  /** After a slot changes hands, nobody else can take it for this long. */
+  cooldownMinutes: 5,
+  /** A takeover inside this window before lock slides close (and the lock) forward. */
+  antiSnipeMinutes: 10,
 };
 
+export const lockAt = (closesAt: number) => closesAt - BID_RULES.lockMinutes * 60_000;
+
 /** Whether slots can still change hands at `now`. */
-export const takeoversOpen = (now: number, closesAt: number) => now < closesAt - BID_RULES.lockMinutes * 60_000;
+export const takeoversOpen = (now: number, closesAt: number) => now < lockAt(closesAt);
+
+/** True while this slot's current holder just went live (the next buyer has to wait). */
+export const slotCooling = (liveAt: number | null | undefined, now: number) =>
+  Boolean(liveAt && now - liveAt < BID_RULES.cooldownMinutes * 60_000);
+
+export const cooldownUntil = (liveAt: number | null | undefined) =>
+  liveAt && liveAt > 0 ? liveAt + BID_RULES.cooldownMinutes * 60_000 : null;
+
+/** A paid takeover this close to lock extends the event so the next person can still answer. */
+export const inAntiSnipeWindow = (now: number, closesAt: number) => {
+  const lock = lockAt(closesAt);
+  return now >= lock - BID_RULES.antiSnipeMinutes * 60_000 && now < lock;
+};
+
+export const extendClose = (closesAt: number) => closesAt + BID_RULES.antiSnipeMinutes * 60_000;
+
+/** Same Stripe email = the current holder trying to raise their own price. */
+export function sameHolder(a?: string | null, b?: string | null): boolean {
+  const one = (a ?? '').trim().toLowerCase();
+  const two = (b ?? '').trim().toLowerCase();
+  return Boolean(one && one === two);
+}
+
+/** First paid sponsor is #001, then #002… */
+export const sponsorTag = (serial: number) => `SPONSOR #${String(serial).padStart(3, '0')}`;
 
 export const SLOT_LIMITS = {
   hero: { name: 26, cta: 48 },

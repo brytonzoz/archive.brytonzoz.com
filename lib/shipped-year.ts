@@ -83,6 +83,10 @@ export type SponsorSlot = {
   lastOutbid: number | null;
   /** How many sponsors have held it. */
   holders: number;
+  /** Global serial of this paid holder (1 = SPONSOR #001). Null for a house ad. */
+  serial: number | null;
+  /** When the per-slot cooldown lifts (null if the spot can be taken now). */
+  cooldownUntil: number | null;
 };
 /** The 10-slot block (hero first). frozen: the event is over and these holders keep their slots forever. */
 export type SponsorBlock = { slots: SponsorSlot[]; frozen: boolean };

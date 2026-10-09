@@ -21,6 +21,7 @@ const ERRORS: Record<string, string> = {
   turnstile: 'Couldn’t check you’re human. Try again.',
   'slow-down': 'Too many tries. Try again in an hour.',
   'checkout-failed': 'Checkout didn’t open. Try again.',
+  cooldown: 'This slot just changed hands. Wait a moment and try again.',
   'cross-origin': 'Use shipped.brytonzoz.com.',
   'browser-only': 'Use a browser.',
 };

@@ -80,8 +80,11 @@ export default function TermsPage() {
             It’s a fixed price, not an auction or a raffle. Each slot shows one price, set by the site: {money(BID_RULES.minCents)} for a
             house slot, otherwise what the current holder paid plus {money(BID_RULES.incrementCents)}. Paying that price takes the slot
             right away. You keep it until someone pays the next price or the event ends. Whoever holds a slot when the printer shuts off
-            keeps it in the archive for good. Slots stop changing hands {BID_RULES.lockMinutes} minutes before close, so nobody can take
-            one in the last seconds. No slot goes above {money(BID_RULES.maxCents)}.
+            keeps it in the archive for good. The holder of a slot cannot raise their own price. After a slot changes hands it cannot be
+            taken again for {BID_RULES.cooldownMinutes} minutes. A takeover in the last {BID_RULES.antiSnipeMinutes} minutes before
+            slots lock adds {BID_RULES.antiSnipeMinutes} minutes to the close, so the next person can still answer. Slots stop changing
+            hands {BID_RULES.lockMinutes} minutes before close. House ads show as HOUSE AD · $0 until someone pays; the first paid
+            sponsor is SPONSOR #001. No slot goes above {money(BID_RULES.maxCents)}.
           </p>
           <div className="space-y-1">
             <Line label="HERO SLOT" value={`${SLOT_LIMITS.hero.name} + ${SLOT_LIMITS.hero.cta} CHARS`} />

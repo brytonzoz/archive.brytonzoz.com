@@ -34,6 +34,14 @@ export const MARKET_COLUMNS = [
   'ALTER TABLE shipped_bids ADD COLUMN seen_at_end INTEGER',
 ];
 
+/** Next global sponsor number (SPONSOR #001…). Gaps are fine if a promote races and loses. */
+export async function nextSponsorSerial(db: D1Database): Promise<number> {
+  const row = await db
+    .prepare(`INSERT INTO shipped_counters (name, n) VALUES ('sponsors', 1) ON CONFLICT(name) DO UPDATE SET n = n + 1 RETURNING n`)
+    .first<{ n: number }>();
+  return row?.n ?? 1;
+}
+
 export async function bump(db: D1Database, name: Counter, by = 1): Promise<number> {
   const row = await db
     .prepare('INSERT INTO shipped_counters (name, n) VALUES (?, ?) ON CONFLICT(name) DO UPDATE SET n = n + excluded.n RETURNING n')

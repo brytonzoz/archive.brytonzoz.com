@@ -6,7 +6,7 @@
 import React, { useEffect, useState } from 'react';
 import { countdown } from '../../lib/shipped-event';
 import { moneyShort } from '../../lib/shipped-receipt';
-import { BID_RULES, DEFAULT_LADDER, HERO_SLOT, HOUSE_SLOTS, floorFor, floorsAt, slotLabel, slotPrice } from '../../lib/shipped-sponsors';
+import { BID_RULES, DEFAULT_LADDER, HERO_SLOT, HOUSE_SLOTS, floorFor, floorsAt, slotLabel, slotPrice, sponsorTag } from '../../lib/shipped-sponsors';
 import type { SponsorSlot } from '../../lib/shipped-year';
 import { openSponsor } from './sponsor-pick';
 import { useShippedState } from './state';
@@ -30,6 +30,8 @@ function housePreview(slot: number): SponsorSlot {
     since: null,
     lastOutbid: null,
     holders: 0,
+    serial: null,
+    cooldownUntil: null,
   };
 }
 
@@ -50,16 +52,24 @@ function SlotFace({ slot, hero }: { slot: SponsorSlot; hero: boolean }) {
       )}
       <p className="shipped-board-cta">{slot.cta}</p>
       <p className="shipped-board-held">
-        {slot.house ? 'HOUSE AD · $0' : `HELD · ${moneyShort(slot.cents)}`}
+        {slot.house ? 'HOUSE AD · $0' : `${slot.serial ? `${sponsorTag(slot.serial)} · ` : ''}${moneyShort(slot.cents)}`}
       </p>
     </div>
   );
 }
 
-function TakeButton({ slot, open, frozen }: { slot: SponsorSlot; open: boolean; frozen: boolean }) {
+function TakeButton({ slot, open, frozen, now }: { slot: SponsorSlot; open: boolean; frozen: boolean; now: number | null }) {
   const maxed = slot.next > BID_RULES.maxCents;
-  const disabled = !open || frozen || maxed;
-  const label = frozen ? 'Board is final' : maxed ? 'This spot is maxed' : takeCopy(slot.next);
+  const cooling = Boolean(now && slot.cooldownUntil && now < slot.cooldownUntil);
+  const disabled = !open || frozen || maxed || cooling;
+  const wait = cooling && now && slot.cooldownUntil ? Math.max(1, Math.ceil((slot.cooldownUntil - now) / 1000)) : 0;
+  const label = frozen
+    ? 'Board is final'
+    : maxed
+      ? 'This spot is maxed'
+      : cooling
+        ? `Just taken · ${wait}s`
+        : takeCopy(slot.next);
   return (
     <button type="button" className="shipped-board-take" disabled={disabled} onClick={() => openSponsor(slot.slot)}>
       {label}
@@ -109,7 +119,7 @@ export function SponsorBoard() {
       <article className="shipped-board-hero" aria-label={slotLabel(hero.slot)}>
         <p className="shipped-board-slot">HERO</p>
         <SlotFace slot={hero} hero />
-        <TakeButton slot={hero} open={open} frozen={frozen} />
+        <TakeButton slot={hero} open={open} frozen={frozen} now={now} />
       </article>
 
       <ul className="shipped-board-grid">
@@ -117,7 +127,7 @@ export function SponsorBoard() {
           <li key={slot.slot} className="shipped-board-cell">
             <p className="shipped-board-slot">{slotLabel(slot.slot)}</p>
             <SlotFace slot={slot} hero={false} />
-            <TakeButton slot={slot} open={open} frozen={frozen} />
+            <TakeButton slot={slot} open={open} frozen={frozen} now={now} />
           </li>
         ))}
       </ul>

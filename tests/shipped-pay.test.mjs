@@ -65,6 +65,30 @@ test('takeovers lock an hour before close; prorated refunds never exceed what wa
   assert.equal(sponsors.proratedRefund(1000, live, live - 1e9, close), 1000, 'never more than paid');
 });
 
+test('bidding guardrails: same holder, per-slot cooldown, 10-minute anti-snipe, SPONSOR #001', () => {
+  assert.equal(sponsors.sameHolder('Ada@example.com', 'ada@example.com'), true);
+  assert.equal(sponsors.sameHolder('ada@example.com', 'other@example.com'), false);
+  assert.equal(sponsors.sameHolder('', ''), false);
+  assert.equal(sponsors.sameHolder(null, 'ada@example.com'), false);
+
+  const live = Date.UTC(2026, 9, 20, 12);
+  assert.equal(sponsors.slotCooling(live, live + 4 * 60_000), true);
+  assert.equal(sponsors.slotCooling(live, live + 5 * 60_000), false);
+  assert.equal(sponsors.slotCooling(null, live), false);
+  assert.equal(sponsors.cooldownUntil(live), live + sponsors.BID_RULES.cooldownMinutes * 60_000);
+
+  const close = Date.UTC(2026, 9, 26, 16);
+  const lock = close - 60 * 60_000;
+  assert.equal(sponsors.inAntiSnipeWindow(lock - 10 * 60_000, close), true);
+  assert.equal(sponsors.inAntiSnipeWindow(lock - 10 * 60_000 + 1, close), true);
+  assert.equal(sponsors.inAntiSnipeWindow(lock - 11 * 60_000, close), false);
+  assert.equal(sponsors.inAntiSnipeWindow(lock, close), false);
+  assert.equal(sponsors.extendClose(close), close + 10 * 60_000);
+
+  assert.equal(sponsors.sponsorTag(1), 'SPONSOR #001');
+  assert.equal(sponsors.sponsorTag(42), 'SPONSOR #042');
+});
+
 test('sponsor links: https, a real public domain of their own, no shorteners, redirects or lookalikes', () => {
   assert.deepEqual(sponsors.sponsorUrlProblem('acme.dev'), { url: 'https://acme.dev/' });
   assert.deepEqual(sponsors.sponsorUrlProblem('https://www.acme.dev/pricing#top'), { url: 'https://www.acme.dev/pricing' });

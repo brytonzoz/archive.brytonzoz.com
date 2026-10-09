@@ -272,9 +272,9 @@ export function ShippedStage({ opening, title }: { opening: Opening; title: Reac
     <div className="shipped-stage">
       <section className="shipped-kiosk" id="print" aria-labelledby="shipped-title">
         <p className="shipped-kiosk-eyebrow">BZ-80 · SELF-SERVE</p>
-        <h1 id="shipped-title" className="shipped-kiosk-title">
+        <h2 id="shipped-title" className="shipped-kiosk-title">
           {title}
-        </h1>
+        </h2>
         <p className="shipped-kiosk-lede">Everything you shipped in {generator?.year ?? 'this year'}, itemized on one receipt. Apps, launches, repos, releases, sites.</p>
 
         <Countdown />

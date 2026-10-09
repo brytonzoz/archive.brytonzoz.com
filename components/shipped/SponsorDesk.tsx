@@ -11,6 +11,7 @@ import { BID_RULES, HERO_SLOT, limitsFor, slotLabel, validateBid } from '../../l
 import type { SponsorSlot } from '../../lib/shipped-year';
 import { HumanCheck, type HumanCheckHandle } from './HumanCheck';
 import { Line, Rule, Ticket } from './paper';
+import { closeSponsor, openSponsor, useSponsorPick } from './sponsor-pick';
 import { refreshShippedState, useShippedState } from './state';
 
 const ERRORS: Record<string, string> = {
@@ -40,6 +41,7 @@ type FieldError = { field: string; message: string } | null;
 
 export function SponsorDesk() {
   const state = useShippedState();
+  const pick = useSponsorPick();
   const block = state?.sponsors;
   const payments = state?.payments;
   const [slot, setSlot] = useState(HERO_SLOT);
@@ -55,16 +57,36 @@ export function SponsorDesk() {
   const human = useRef<HumanCheckHandle>(null);
 
   useEffect(() => {
+    if (pick.open) setSlot(pick.slot);
+  }, [pick.open, pick.slot]);
+
+  useEffect(() => {
+    if (!pick.open) return;
+    const onKey = (event: KeyboardEvent) => {
+      if (event.key === 'Escape') closeSponsor();
+    };
+    const prev = document.body.style.overflow;
+    document.body.style.overflow = 'hidden';
+    window.addEventListener('keydown', onKey);
+    return () => {
+      document.body.style.overflow = prev;
+      window.removeEventListener('keydown', onKey);
+    };
+  }, [pick.open]);
+
+  useEffect(() => {
     const query = new URLSearchParams(window.location.search);
     const checkout = query.get('bid');
     if (!checkout || !/^[A-Za-z0-9_-]{6,200}$/.test(checkout)) return;
     setNotice(TAKEN.checkout);
+    openSponsor(HERO_SLOT);
     fetch(`/api/shipped/checkout?checkout=${encodeURIComponent(checkout)}`, { cache: 'no-store' })
       .then((response) => (response.ok ? (response.json() as Promise<Taken>) : null))
       .then((taken) => {
         if (!taken || taken.kind !== 'bid') return setNotice('Couldn’t find that checkout. If you paid, email the address on the terms page.');
         const extra = taken.status === 'live' && taken.logoPending ? ' Your logo shows once it’s approved; your name prints until then.' : '';
         setNotice(`${slotLabel(taken.slot)} · ${taken.name} · ${money(taken.cents)}. ${TAKEN[taken.status] ?? TAKEN.failed}${extra}`);
+        openSponsor(taken.slot);
         refreshShippedState();
       })
       .catch(() => setNotice('Couldn’t check your payment. Reload to try again.'));
@@ -136,11 +158,20 @@ export function SponsorDesk() {
       </p>
     ) : null;
 
+  if (!pick.open) return null;
+
   return (
-    <Ticket id="sponsor" label="Sponsor a slot">
+    <div className="shipped-sheet" role="dialog" aria-modal="true" aria-labelledby="sponsor-sheet-title">
+      <button type="button" className="shipped-sheet-backdrop" aria-label="Close sponsor desk" onClick={closeSponsor} />
+      <Ticket id="sponsor" label="Sponsor a slot" className="shipped-sheet-ticket">
       <header className="text-center">
-        <p className="text-[11px] font-semibold tracking-[0.32em] text-[#1c1917]/70">SPONSOR DESK</p>
-        <h2 className="mt-2 text-[20px] font-semibold leading-none tracking-[0.2em]">TAKE A SLOT</h2>
+        <div className="flex items-start justify-between gap-3">
+          <p className="text-[11px] font-semibold tracking-[0.32em] text-[#1c1917]/70">SPONSOR DESK</p>
+          <button type="button" className="text-[11px] font-semibold tracking-[0.16em] underline underline-offset-4" onClick={closeSponsor}>
+            CLOSE
+          </button>
+        </div>
+        <h2 id="sponsor-sheet-title" className="mt-2 text-[20px] font-semibold leading-none tracking-[0.2em]">TAKE A SLOT</h2>
         <p className="mt-2 text-[12px] leading-relaxed text-[#1c1917]/75">
           Ten slots at the foot of every receipt, share image and mailed print, each with its own QR code. One fixed price per slot:
           what the holder paid plus {money(BID_RULES.incrementCents)}. Pay it and the slot is yours until someone pays the next price.
@@ -276,5 +307,6 @@ export function SponsorDesk() {
         )}
       </form>
     </Ticket>
+    </div>
   );
 }

@@ -33,6 +33,20 @@ test('slot prices are fixed and set by the server: $1 for a house slot, holder +
   assert.equal(sponsors.SLOT_COUNT, 10);
 });
 
+test('floors rise with receipts printed; a house hero never sells below the current floor', () => {
+  const floors = sponsors.floorsAt(sponsors.DEFAULT_LADDER, 0);
+  assert.equal(floors.hero, 500);
+  assert.equal(floors.slot, 100);
+  assert.equal(sponsors.slotPrice(0, floors.hero), 500);
+  assert.equal(sponsors.slotPrice(0, floors.slot), 100);
+  const later = sponsors.floorsAt(sponsors.DEFAULT_LADDER, 250);
+  assert.equal(later.hero, 2_500);
+  assert.equal(later.slot, 300);
+  assert.equal(sponsors.slotPrice(400, later.slot), 500, 'holder plus $1 still wins if it is above the floor');
+  assert.equal(sponsors.parseLadder('nope'), null);
+  assert.ok(sponsors.parseLadder(sponsors.DEFAULT_LADDER));
+});
+
 test('takeovers lock an hour before close; prorated refunds never exceed what was paid', () => {
   const close = Date.UTC(2026, 9, 26, 16);
   assert.equal(sponsors.takeoversOpen(close - 61 * 60_000, close), true);

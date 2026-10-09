@@ -51,9 +51,68 @@ export const isSlot = (value: unknown): value is number => Number.isInteger(valu
 export const slotLabel = (slot: number) => (slot === HERO_SLOT ? 'HERO' : `SLOT ${slot}`);
 export const limitsFor = (slot: number) => (slot === HERO_SLOT ? SLOT_LIMITS.hero : SLOT_LIMITS.small);
 
-/** The slot's posted price when its holder paid `currentCents` (0 for a house ad). */
-export const minimumBid = (currentCents: number) => Math.max(BID_RULES.minCents, currentCents + BID_RULES.incrementCents);
-export const slotPrice = minimumBid;
+/**
+ * Floors that rise with traction: once `at` receipts have been printed (a real count of rows, never inflated),
+ * no slot sells below `slot` cents and the hero below `hero`. The hero climbs fastest. Floors only ever apply to
+ * the next sale: a holder keeps what they paid for, and a checkout already open keeps its price.
+ */
+export type LadderStep = { at: number; hero: number; slot: number };
+
+export const DEFAULT_LADDER: LadderStep[] = [
+  { at: 0, hero: 500, slot: 100 },
+  { at: 100, hero: 1_000, slot: 200 },
+  { at: 250, hero: 2_500, slot: 300 },
+  { at: 500, hero: 5_000, slot: 500 },
+  { at: 1_000, hero: 10_000, slot: 1_000 },
+  { at: 2_500, hero: 25_000, slot: 2_000 },
+  { at: 5_000, hero: 50_000, slot: 3_500 },
+  { at: 10_000, hero: 100_000, slot: 5_000 },
+  { at: 25_000, hero: 200_000, slot: 10_000 },
+  { at: 50_000, hero: 400_000, slot: 20_000 },
+];
+
+const LADDER_MAX_STEPS = 30;
+
+/** A ladder from JSON (env or /admin): starts at 0, `at` strictly rising, floors never falling, whole dollars, under the cap. */
+export function parseLadder(raw: unknown): LadderStep[] | null {
+  let value = raw;
+  if (typeof value === 'string') {
+    try {
+      value = JSON.parse(value);
+    } catch {
+      return null;
+    }
+  }
+  if (!Array.isArray(value) || value.length < 1 || value.length > LADDER_MAX_STEPS) return null;
+  const steps: LadderStep[] = [];
+  for (const entry of value) {
+    if (!entry || typeof entry !== 'object') return null;
+    const { at, hero, slot } = entry as Record<string, unknown>;
+    const cents = (n: unknown) => Number.isSafeInteger(n) && (n as number) >= BID_RULES.minCents && (n as number) <= BID_RULES.maxCents && (n as number) % 100 === 0;
+    if (!Number.isSafeInteger(at) || (at as number) < 0 || !cents(hero) || !cents(slot)) return null;
+    const previous = steps[steps.length - 1];
+    if (previous ? (at as number) <= previous.at || (hero as number) < previous.hero || (slot as number) < previous.slot : at !== 0) return null;
+    steps.push({ at: at as number, hero: hero as number, slot: slot as number });
+  }
+  return steps;
+}
+
+export type Floors = { step: number; at: number; hero: number; slot: number; next: LadderStep | null };
+
+/** The floors in force after `printed` receipts, and the next milestone (null at the top of the ladder). */
+export function floorsAt(ladder: LadderStep[], printed: number): Floors {
+  let step = 0;
+  for (let i = 0; i < ladder.length; i++) if (printed >= ladder[i].at) step = i;
+  const current = ladder[step];
+  return { step, at: current.at, hero: current.hero, slot: current.slot, next: ladder[step + 1] ?? null };
+}
+
+export const floorFor = (slot: number, floors: Pick<Floors, 'hero' | 'slot'>) => (slot === HERO_SLOT ? floors.hero : floors.slot);
+
+/** The slot's posted price: the holder's payment plus the increment (0 for a house ad), never below the floor. */
+export const slotPrice = (currentCents: number, floorCents: number = BID_RULES.minCents) =>
+  Math.max(BID_RULES.minCents, floorCents, currentCents > 0 ? currentCents + BID_RULES.incrementCents : 0);
+export const minimumBid = slotPrice;
 
 /** What an outbid sponsor gets back: their payment for the share of the run they lose, in whole cents. */
 export function proratedRefund(paidCents: number, liveAt: number, outbidAt: number, closesAt: number): number {

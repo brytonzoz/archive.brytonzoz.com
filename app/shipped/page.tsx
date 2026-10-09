@@ -3,6 +3,7 @@ import type { Metadata } from 'next';
 import { HouseSlip } from '../../components/shipped/HouseSlip';
 import { RecentStrip } from '../../components/shipped/RecentStrip';
 import { ShippedStage } from '../../components/shipped/ShippedStage';
+import { SponsorBoard } from '../../components/shipped/SponsorBoard';
 import { SponsorDesk } from '../../components/shipped/SponsorDesk';
 import { SHIPPED_OG_IMAGE } from '../../lib/shipped';
 import { EVENT_NAME } from '../../lib/shipped-event';
@@ -54,9 +55,10 @@ export const metadata: Metadata = {
 export default function ShippedPage() {
   return (
     <>
-      <ShippedStage opening={{ kind: 'house', content: <HouseSlip /> }} title={`Shipped in ${SITE_YEAR}`} />
-      <RecentStrip />
+      <SponsorBoard />
       <SponsorDesk />
+      <ShippedStage opening={{ kind: 'house', content: <HouseSlip /> }} title="Print yours" />
+      <RecentStrip />
       <p className="pb-8 text-center text-[11px] text-[#f3ead8]/45">
         A free public offering by{' '}
         <a href="https://brytonzoz.com/about/" target="_blank" rel="noopener noreferrer" className="underline underline-offset-4">

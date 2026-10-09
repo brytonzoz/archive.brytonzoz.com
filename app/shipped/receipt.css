@@ -16,7 +16,7 @@
     radial-gradient(ellipse 70% 46% at 62% -6%, rgba(255, 228, 186, 0.13), transparent 70%),
     radial-gradient(ellipse 120% 60% at 50% 120%, rgba(0, 0, 0, 0.55), transparent 70%),
     url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='160' height='160'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='.85' numOctaves='2' stitchTiles='stitch'/%3E%3CfeColorMatrix values='0 0 0 0 1 0 0 0 0 1 0 0 0 0 1 0 0 0 .05 0'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)'/%3E%3C/svg%3E");
-  padding: 1.75rem 1.1rem 2.5rem;
+  padding: 0.85rem 0.7rem 2.5rem;
   padding-bottom: calc(2.5rem + env(safe-area-inset-bottom, 0px) + var(--player-offset, 0px));
 }
 
@@ -24,7 +24,219 @@
   display: flex;
   flex-direction: column;
   align-items: center;
-  gap: 3rem;
+  gap: 1.75rem;
+}
+
+/* ---- Sponsor board (first thing on the page; outbid-style take buttons) ------------------------------ */
+
+.shipped-board {
+  width: min(28rem, 100%);
+  color: var(--cream);
+}
+
+.shipped-board-head {
+  text-align: center;
+  margin-bottom: 0.85rem;
+}
+
+.shipped-board-eyebrow {
+  font-size: 11px;
+  letter-spacing: 0.28em;
+  color: rgba(243, 234, 216, 0.5);
+}
+
+.shipped-board-title {
+  margin-top: 0.35rem;
+  font-size: clamp(1.55rem, 7vw, 2.15rem);
+  font-weight: 500;
+  line-height: 1.05;
+  letter-spacing: -0.03em;
+}
+
+.shipped-board-pitch {
+  margin-top: 0.45rem;
+  font-size: 13.5px;
+  line-height: 1.4;
+  color: rgba(243, 234, 216, 0.82);
+}
+
+.shipped-board-proof {
+  margin-top: 0.35rem;
+  font-size: 11px;
+  letter-spacing: 0.04em;
+  color: rgba(243, 234, 216, 0.48);
+}
+
+.shipped-board-hero,
+.shipped-board-cell {
+  background-color: var(--paper);
+  background-image:
+    linear-gradient(90deg, rgba(40, 30, 20, 0.07), transparent 9%, transparent 91%, rgba(40, 30, 20, 0.08)),
+    radial-gradient(rgba(29, 27, 25, 0.04) 0.6px, transparent 0.7px);
+  background-size: 100% 100%, 3px 3px;
+  color: var(--ink);
+  border-radius: 10px;
+  box-shadow: 0 1px 0 rgba(255, 255, 255, 0.08), 0 10px 22px rgba(0, 0, 0, 0.35);
+}
+
+.shipped-board-hero {
+  padding: 0.7rem 0.75rem 0.75rem;
+}
+
+.shipped-board-grid {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 0.4rem;
+  margin-top: 0.4rem;
+}
+
+.shipped-board-cell {
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+  padding: 0.4rem 0.4rem 0.45rem;
+}
+
+.shipped-board-slot {
+  font-size: 9px;
+  font-weight: 600;
+  letter-spacing: 0.16em;
+  color: rgba(29, 27, 25, 0.5);
+}
+
+.shipped-board-face {
+  display: flex;
+  flex-direction: column;
+  flex: 1 1 auto;
+  min-height: 4.4rem;
+  margin: 0.25rem 0 0.4rem;
+}
+
+.shipped-board-face.is-hero {
+  min-height: 4.8rem;
+  margin-bottom: 0.55rem;
+}
+
+.shipped-board-logo {
+  display: block;
+  max-width: 100%;
+  height: auto;
+  max-height: 1.7rem;
+  margin-bottom: 0.25rem;
+  image-rendering: pixelated;
+}
+
+.shipped-board-face.is-hero .shipped-board-logo {
+  max-height: 2.3rem;
+}
+
+.shipped-board-name {
+  font-size: 12px;
+  font-weight: 600;
+  line-height: 1.15;
+  letter-spacing: 0.02em;
+  word-break: break-word;
+}
+
+.shipped-board-face.is-hero .shipped-board-name {
+  font-size: 20px;
+  letter-spacing: -0.02em;
+}
+
+.shipped-board-cta {
+  margin-top: 0.15rem;
+  font-size: 10px;
+  line-height: 1.25;
+  color: rgba(29, 27, 25, 0.7);
+  display: -webkit-box;
+  -webkit-line-clamp: 2;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+}
+
+.shipped-board-face.is-hero .shipped-board-cta {
+  font-size: 12px;
+  -webkit-line-clamp: 2;
+}
+
+.shipped-board-held {
+  margin-top: auto;
+  padding-top: 0.3rem;
+  font-size: 10px;
+  font-weight: 600;
+  letter-spacing: 0.06em;
+}
+
+.shipped-board-face.is-hero .shipped-board-held {
+  font-size: 12px;
+}
+
+.shipped-board-take {
+  width: 100%;
+  min-height: 2.55rem;
+  border-radius: 9px;
+  background: var(--ink);
+  color: var(--paper);
+  padding: 0.4rem 0.35rem;
+  font: inherit;
+  font-size: 10.5px;
+  font-weight: 700;
+  line-height: 1.2;
+  letter-spacing: 0.02em;
+  text-wrap: balance;
+  transition: transform 120ms ease-out, opacity 150ms ease-out;
+}
+
+.shipped-board-hero .shipped-board-take {
+  min-height: 3.15rem;
+  font-size: 15px;
+  letter-spacing: 0.01em;
+}
+
+.shipped-board-take:active:not(:disabled) {
+  transform: scale(0.98);
+}
+
+.shipped-board-take:disabled {
+  opacity: 0.45;
+  cursor: not-allowed;
+}
+
+.shipped-board-take:focus-visible {
+  outline: 2px solid var(--ink);
+  outline-offset: 2px;
+}
+
+.shipped-sheet {
+  position: fixed;
+  inset: 0;
+  z-index: 60;
+  display: flex;
+  align-items: flex-end;
+  justify-content: center;
+  padding: 1rem 0.7rem calc(1rem + env(safe-area-inset-bottom, 0px));
+}
+
+.shipped-sheet-backdrop {
+  position: absolute;
+  inset: 0;
+  background: rgba(8, 8, 10, 0.62);
+  border: 0;
+  padding: 0;
+}
+
+.shipped-sheet-ticket {
+  position: relative;
+  z-index: 1;
+  width: min(26.5rem, 100%);
+  max-height: min(92vh, 44rem);
+  overflow: auto;
+}
+
+@media (min-width: 640px) {
+  .shipped-sheet {
+    align-items: center;
+  }
 }
 
 /* ---- Paper ------------------------------------------------------------------------------------------ */
@@ -432,16 +644,28 @@
 }
 
 @media (max-width: 959px) {
-  /* Phones: the printer is on the first screen; the counts and small print wait until after it. */
+  /* Phones: the board is the first screen; kiosk counts wait until after the printer. */
   .shipped-kiosk-count,
   .shipped-kiosk-fine {
     display: none;
+  }
+
+  .shipped-kiosk-title {
+    font-size: clamp(1.7rem, 7vw, 2.3rem);
   }
 }
 
 @media (min-width: 960px) {
   .shipped-page {
-    padding-top: 3.5rem;
+    padding-top: 2.25rem;
+  }
+
+  .shipped-stack {
+    gap: 3rem;
+  }
+
+  .shipped-board {
+    width: min(40rem, 100%);
   }
 
   .shipped-stage {

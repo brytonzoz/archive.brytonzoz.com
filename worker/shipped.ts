@@ -7,6 +7,7 @@
 //   POST /api/shipped/print            { subject, token, listed } -> { id, pile } (same subject within 7 days: cached)
 //   GET  /api/shipped/pile             the pile (lib/shipped-pile.ts); POST { id, token } tosses a receipt on
 //   POST /api/shipped/shared           { id, how } share counter (sendBeacon)
+//   POST /api/shipped/seen             { id } sponsor-block impression (once per visitor/receipt/day)
 //   POST /api/shipped/takedown         { id, reason, token, pile? } report / remove: hidden at once, reviewed in /admin
 //   GET  /api/shipped/challenge        a proof-of-work puzzle (only when Turnstile isn't configured)
 //   GET  /api/shipped/receipts/<id>    a printed receipt + the sponsor block
@@ -33,6 +34,20 @@ import { PRINT_KIND, SPONSOR_KIND, isProduction, sponsorProvider, type PayEnv, t
 import { brandIcon, clean, faviconUrl, gather, githubUser, hostOf, readSite, searchGithubUsers, tinyfishAccess, type SourceEnv } from './shipped-sources';
 import { TINYFISH_DAILY, type TinyfishKind, type TinyfishMeter } from './shipped-tinyfish';
 import { checkFetchUrl, finalUrl } from './shipped-fetch';
+import {
+  IMPRESSIONS_NOW,
+  MARKET_COLUMNS,
+  MARKET_SCHEMA,
+  bump,
+  counters,
+  logTakeover,
+  market,
+  slotHistory,
+  syncFloors,
+  ladderFor,
+  type Market,
+  type MarketEnv,
+} from './shipped-market';
 import {
   DAY,
   HOUR,
@@ -98,6 +113,7 @@ import {
   LOGO_LIMITS,
   SLOT_COUNT,
   checkSponsorUrl,
+  floorFor,
   hasBlockedWord,
   isSlot,
   proratedRefund,
@@ -107,7 +123,7 @@ import {
   validateBid,
 } from '../lib/shipped-sponsors';
 
-export interface ShippedEnv extends AiEnv, PayEnv, SourceEnv, GuardEnv {
+export interface ShippedEnv extends AiEnv, PayEnv, SourceEnv, GuardEnv, MarketEnv {
   /** Google Safe Browsing API key: sponsor links are checked against it when set. */
   SAFE_BROWSING_KEY?: string;
   DB?: D1Database;
@@ -200,6 +216,7 @@ const COLUMNS = [
   'ALTER TABLE shipped_receipts ADD COLUMN shares INTEGER NOT NULL DEFAULT 0',
   'ALTER TABLE shipped_receipts ADD COLUMN views INTEGER NOT NULL DEFAULT 0',
   'ALTER TABLE shipped_spend ADD COLUMN searches INTEGER NOT NULL DEFAULT 0',
+  ...MARKET_COLUMNS,
 ];
 
 async function migrate(db: D1Database) {
@@ -213,6 +230,7 @@ async function migrate(db: D1Database) {
         if (!String(error).includes('duplicate column')) throw error;
       });
   }
+  await db.batch(MARKET_SCHEMA.map((sql) => db.prepare(sql)));
 }
 
 let schemaReady: Promise<unknown> | null = null;
@@ -549,6 +567,8 @@ async function generate(
       listed,
     };
     const day = today();
+    // Only a new row adds to "printed"; a second print of the same subject the same day replaces the first.
+    const replaces = await db.prepare('SELECT 1 AS x FROM shipped_receipts WHERE login_key = ? AND day = ? AND mode = ?').bind(key, day, mode).first();
     const inserted = await db
       .prepare(
         `INSERT INTO shipped_receipts (login, login_key, day, mode, data, demo, model, input_tokens, output_tokens, searches, cost_micros, listed, created_at)
@@ -563,6 +583,10 @@ async function generate(
     if (!state.demo) ctx.waitUntil(recordSpend(db, true, usage.input, usage.output, usage.searches));
     if (!inserted) return json({ error: 'taken-down' }, 410);
     await db.prepare('UPDATE shipped_receipts SET hidden = 0 WHERE id = ? AND hidden = 2').bind(inserted.id).run();
+    if (!replaces) {
+      const printed = await bump(db, 'printed');
+      ctx.waitUntil(ladderFor(db, env).then(({ ladder }) => syncFloors(db, ladder, printed)).catch(() => undefined));
+    }
     console.log(JSON.stringify({ shipped: 'print', id: inserted.id, kind: subject.kind, items: receipt.items.length, potential: receipt.potential, ran: gathered.ran, failed: gathered.failed, costMicros: usage.cost }));
     return json({ id: inserted.id, pile: await pileToken(env, inserted.id) });
   } catch (error) {
@@ -572,14 +596,46 @@ async function generate(
   }
 }
 
+const SHARE_WAYS = new Set(['x', 'card', 'tall', 'copy']);
+
+/**
+ * Counted once per visitor, receipt and way of sharing per day: the counters are public and sponsor prices
+ * lean on them, so a reload loop can't run them up.
+ */
+async function onceToday(db: D1Database, request: Request, what: string): Promise<boolean> {
+  return acquire(db, `${what}:${await hashedKey(clientIp(request))}`, DAY);
+}
+
 async function shared(request: Request, env: ShippedEnv): Promise<Response> {
+  const why = refuseRequest(request, 1024);
+  if (why) return refused(why);
   const db = await database(env);
   const body = await readJson(request);
   const id = Number(body?.id);
   if (!db || !Number.isSafeInteger(id) || id < 1) return json({ ok: false }, 400);
   if (await overLimit(db, request, 'shared')) return json({ ok: false }, 429);
-  await db.prepare('UPDATE shipped_receipts SET shares = shares + 1 WHERE id = ? AND hidden = 0').bind(id).run();
-  return json({ ok: true });
+  const how = typeof body?.how === 'string' && SHARE_WAYS.has(body.how) ? body.how : 'other';
+  if (!(await onceToday(db, request, `share:${id}:${how}`))) return json({ ok: true, counted: false });
+  const row = await db.prepare('UPDATE shipped_receipts SET shares = shares + 1 WHERE id = ? AND hidden = 0 RETURNING id').bind(id).first();
+  if (row) await bump(db, 'shared');
+  return json({ ok: true, counted: Boolean(row) });
+}
+
+/** POST /api/shipped/seen { id }: the sponsor block of receipt `id` was on screen (once per visitor/receipt/day). */
+async function seen(request: Request, env: ShippedEnv): Promise<Response> {
+  const why = refuseRequest(request, 1024);
+  if (why) return refused(why);
+  const db = await database(env);
+  const body = await readJson(request);
+  const id = Number(body?.id);
+  if (!db || !Number.isSafeInteger(id) || id < 1) return json({ ok: false }, 400);
+  if (await overLimit(db, request, 'seen')) return json({ ok: false }, 429);
+  // While sponsor-display is off the block shows house ads only, so no holder is credited.
+  if ((await switchedOff(env, db)).has('sponsor-display')) return json({ ok: true, counted: false });
+  const real = await db.prepare('SELECT 1 AS x FROM shipped_receipts WHERE id = ? AND hidden = 0').bind(id).first();
+  if (!real || !(await onceToday(db, request, `seen:${id}`))) return json({ ok: true, counted: false });
+  await bump(db, 'impressions');
+  return json({ ok: true, counted: true });
 }
 
 /**
@@ -740,18 +796,37 @@ type BidRow = {
   paid_at: number | null;
   live_at: number | null;
   ended_at: number | null;
+  seen_at_live: number | null;
+  seen_at_end: number | null;
 };
 
 const bidLogoPath = (id: number) => `/api/shipped/logo/${id}.png`;
 const houseKey = (slot: number) => `h${slot}`;
 
-function houseSlot(slot: number): SponsorSlot {
+type SlotContext = { floor: number; impressions: number; lastOutbid: number | null; holders: number; seenAtEnd: number | null };
+
+function houseSlot(slot: number, ctx: SlotContext): SponsorSlot {
   const ad = HOUSE_SLOTS[slot];
-  return { slot, name: ad.name, cta: ad.cta, url: ad.url, qr: houseKey(slot), logo: null, house: true, cents: 0, next: slotPrice(0) };
+  return {
+    slot,
+    name: ad.name,
+    cta: ad.cta,
+    url: ad.url,
+    qr: houseKey(slot),
+    logo: null,
+    house: true,
+    cents: 0,
+    next: slotPrice(0, ctx.floor),
+    floor: ctx.floor,
+    impressions: Math.max(0, ctx.impressions - (ctx.seenAtEnd ?? 0)),
+    since: null,
+    lastOutbid: ctx.lastOutbid,
+    holders: ctx.holders,
+  };
 }
 
-function slotFrom(slot: number, bid: BidRow | undefined): SponsorSlot {
-  if (!bid) return houseSlot(slot);
+function slotFrom(slot: number, bid: BidRow | undefined, ctx: SlotContext): SponsorSlot {
+  if (!bid) return houseSlot(slot, ctx);
   return {
     slot,
     name: bid.name,
@@ -761,17 +836,38 @@ function slotFrom(slot: number, bid: BidRow | undefined): SponsorSlot {
     logo: bid.logo_key && bid.logo_ok ? bidLogoPath(bid.id) : null,
     house: false,
     cents: bid.amount_cents,
-    next: slotPrice(bid.amount_cents),
+    next: slotPrice(bid.amount_cents, ctx.floor),
+    floor: ctx.floor,
+    // Bids that went live before impressions were counted started at zero.
+    impressions: Math.max(0, ctx.impressions - (bid.seen_at_live ?? 0)),
+    since: bid.live_at,
+    lastOutbid: ctx.lastOutbid,
+    holders: ctx.holders,
   };
 }
 
-/** Who holds each slot right now (after close: forever). With sponsor-display switched off, the house ads. */
-async function sponsorBlock(db: D1Database | null, env: ShippedEnv, off?: Set<Switch>): Promise<SponsorBlock> {
+/** Who holds each slot right now (after close: forever), at what price. With sponsor-display switched off, the house ads. */
+async function sponsorBlock(db: D1Database | null, env: ShippedEnv, off?: Set<Switch>, known?: Market): Promise<SponsorBlock> {
   const frozen = isClosed(env);
   const hidden = (off ?? (await switchedOff(env, db))).has('sponsor-display');
-  const live = db && !hidden ? (await db.prepare(`SELECT * FROM shipped_bids WHERE status = 'live'`).all<BidRow>()).results : [];
+  const [live, history, now] = await Promise.all([
+    db && !hidden ? db.prepare(`SELECT * FROM shipped_bids WHERE status = 'live'`).all<BidRow>().then((r) => r.results) : Promise.resolve([] as BidRow[]),
+    db ? slotHistory(db) : Promise.resolve(new Map()),
+    known ?? market(db, env),
+  ]);
   const bySlot = new Map(live.map((bid) => [bid.slot, bid]));
-  return { slots: Array.from({ length: SLOT_COUNT }, (_, slot) => slotFrom(slot, bySlot.get(slot))), frozen };
+  const slots = Array.from({ length: SLOT_COUNT }, (_, slot) => {
+    const past = history.get(slot);
+    const ctx: SlotContext = {
+      floor: floorFor(slot, now.floors),
+      impressions: now.counts.impressions,
+      lastOutbid: past?.lastOutbid ?? null,
+      holders: past?.holders ?? 0,
+      seenAtEnd: past?.seenAtEnd ?? null,
+    };
+    return slotFrom(slot, bySlot.get(slot), ctx);
+  });
+  return { slots, frozen };
 }
 
 const checkoutExpiry = () => Math.floor(Date.now() / 1000) + BID_RULES.checkoutMinutes * 60 + 60;
@@ -847,9 +943,13 @@ async function createBid(request: Request, env: ShippedEnv): Promise<Response> {
   const check = validateBid({ slot, name: text('name'), cta: text('cta'), url: text('url') });
   if (!check.ok) return json({ error: 'invalid', field: check.field, message: check.error }, 400);
 
-  // The price is ours: the holder's payment plus $1. A client that sends anything else is told the real price.
-  const holder = await db.prepare(`SELECT amount_cents FROM shipped_bids WHERE slot = ? AND status = 'live'`).bind(slot).first<{ amount_cents: number }>();
-  const price = slotPrice(holder?.amount_cents ?? 0);
+  // The price is ours: the holder's payment plus $1, never below the floor for the receipts printed so far.
+  // A client that sends anything else is told the real price.
+  const [holder, now] = await Promise.all([
+    db.prepare(`SELECT amount_cents FROM shipped_bids WHERE slot = ? AND status = 'live'`).bind(slot).first<{ amount_cents: number }>(),
+    market(db, env),
+  ]);
+  const price = slotPrice(holder?.amount_cents ?? 0, floorFor(slot, now.floors));
   if (price > BID_RULES.maxCents) return json({ error: 'sold-out', message: 'This slot is at its ceiling price and can\u2019t be taken over.' }, 409);
   const cents = Number(form.get('cents'));
   if (cents !== price) return json({ error: 'price-changed', message: `The price is now ${money(price)}.`, price }, 409);
@@ -941,13 +1041,13 @@ async function settleBid(db: D1Database, env: ShippedEnv, bid: BidRow, paid: Ext
   const [promoted, pushed] = await db.batch([
     db
       .prepare(
-        `UPDATE shipped_bids SET status = 'live', live_at = ? WHERE id = ? AND status = 'checkout'
+        `UPDATE shipped_bids SET status = 'live', live_at = ?, seen_at_live = ${IMPRESSIONS_NOW} WHERE id = ? AND status = 'checkout'
          AND NOT EXISTS (SELECT 1 FROM shipped_bids WHERE slot = ? AND status = 'live' AND amount_cents >= ?)`,
       )
       .bind(now, bid.id, bid.slot, bid.amount_cents),
     db
       .prepare(
-        `UPDATE shipped_bids SET status = 'outbid', ended_at = ? WHERE slot = ? AND status = 'live' AND id != ?
+        `UPDATE shipped_bids SET status = 'outbid', ended_at = ?, seen_at_end = ${IMPRESSIONS_NOW} WHERE slot = ? AND status = 'live' AND id != ?
          AND (SELECT status FROM shipped_bids WHERE id = ?) = 'live' RETURNING *`,
       )
       .bind(now, bid.slot, bid.id, bid.id),
@@ -957,7 +1057,10 @@ async function settleBid(db: D1Database, env: ShippedEnv, bid: BidRow, paid: Ext
     if (current?.status === 'checkout') await refundAll('someone else paid this price first');
     return;
   }
-  for (const previous of (pushed.results ?? []) as BidRow[]) {
+  const pushedOut = (pushed.results ?? []) as BidRow[];
+  const { printed } = await counters(db);
+  await logTakeover(db, bid.slot, pushedOut[0]?.amount_cents ?? 0, bid.amount_cents, printed, bid.id, now).catch(() => undefined);
+  for (const previous of pushedOut) {
     const total = previous.total_cents ?? previous.amount_cents;
     const owed = proratedRefund(total, previous.live_at ?? previous.paid_at ?? now, now, window.closesAt);
     const refund =
@@ -1083,7 +1186,10 @@ async function applyEvent(db: D1Database, env: ShippedEnv, payEvent: SponsorEven
     ]);
   } else if (payEvent.type === 'refunded') {
     // A full refund (from /admin or Stripe's dashboard) takes a bid down; its slot goes back to the house ad.
-    await db.prepare(`UPDATE shipped_bids SET status = 'refunded', ended_at = COALESCE(ended_at, ?) WHERE order_id = ? AND status = 'live'`).bind(now, payEvent.orderId).run();
+    await db
+      .prepare(`UPDATE shipped_bids SET status = 'refunded', ended_at = COALESCE(ended_at, ?), seen_at_end = ${IMPRESSIONS_NOW} WHERE order_id = ? AND status = 'live'`)
+      .bind(now, payEvent.orderId)
+      .run();
     await db.prepare(`UPDATE print_orders SET status = 'refunded' WHERE order_id = ? AND status = 'to_print'`).bind(payEvent.orderId).run();
   } else if (payEvent.type === 'refund_failed') {
     await db.prepare(`UPDATE shipped_bids SET note = ? WHERE order_id = ?`).bind(payEvent.reason.slice(0, 200), payEvent.orderId).run();
@@ -1381,6 +1487,7 @@ export async function handleShipped(request: Request, env: ShippedEnv, ctx: Exec
   if (path === '/api/shipped/pile' && method === 'GET') return cached(request, ctx, 15, () => pile(url, env));
   if (path === '/api/shipped/pile' && method === 'POST') return tossOnPile(request, env);
   if (path === '/api/shipped/shared' && method === 'POST') return shared(request, env);
+  if (path === '/api/shipped/seen' && method === 'POST') return seen(request, env);
   if (path === '/api/shipped/takedown' && method === 'POST') return takedown(request, env, ctx);
   if (path === '/api/shipped/bid' && method === 'POST') return createBid(request, env);
   if (path === '/api/shipped/print-order' && method === 'POST') return createPrintOrder(request, env);
@@ -1550,7 +1657,7 @@ export async function adminShipped(request: Request, env: ShippedEnv): Promise<R
       const refund =
         bid.order_id && provider && provider.id === bid.provider ? await provider.refund(bid.order_id, undefined, `bid-${bid.id}-removed`) : { ok: !bid.order_id, error: `provider ${bid.provider} not available` };
       await db
-        .prepare(`UPDATE shipped_bids SET status = 'removed', ended_at = ?, refund_cents = ?, note = ? WHERE id = ?`)
+        .prepare(`UPDATE shipped_bids SET status = 'removed', ended_at = ?, refund_cents = ?, note = ?, seen_at_end = CASE WHEN status = 'live' THEN ${IMPRESSIONS_NOW} ELSE seen_at_end END WHERE id = ?`)
         .bind(now, refund.ok ? (bid.total_cents ?? bid.amount_cents) : 0, refund.ok ? 'removed in review' : `removed; refund failed: ${refund.error ?? ''}`.slice(0, 200), id)
         .run();
       if (bid.logo_key) await env.SHIPPED?.delete(bid.logo_key);

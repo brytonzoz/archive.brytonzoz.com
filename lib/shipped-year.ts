@@ -69,10 +69,20 @@ export type SponsorSlot = {
   /** Same-origin URL of an approved 1-bit logo, or null. */
   logo: string | null;
   house: boolean;
-  /** What the holder bid (0 for a house ad). */
+  /** What the holder paid (0 for a house ad). */
   cents: number;
-  /** The least the next bid can be. */
+  /** The posted price to take it: holder + $1, never below the floor. */
   next: number;
+  /** The floor in force for this slot (rises with receipts printed). */
+  floor: number;
+  /** Times the sponsor block was on screen while this holder had it (house ad: since the slot was last held). */
+  impressions: number;
+  /** When the holder went live (null for a house ad). */
+  since: number | null;
+  /** When a holder of this slot was last taken over, or null. */
+  lastOutbid: number | null;
+  /** How many sponsors have held it. */
+  holders: number;
 };
 /** The 10-slot block (hero first). frozen: the event is over and these holders keep their slots forever. */
 export type SponsorBlock = { slots: SponsorSlot[]; frozen: boolean };

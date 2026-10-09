@@ -137,6 +137,7 @@ export const LIMITS = {
   print: { ip: 8, subnet: 24, window: HOUR },
   toss: { ip: 30, subnet: 90, window: HOUR },
   shared: { ip: 60, subnet: 200, window: HOUR },
+  seen: { ip: 60, subnet: 240, window: HOUR },
   takedown: { ip: 5, subnet: 15, window: HOUR },
   bid: { ip: 6, subnet: 12, window: HOUR },
   order: { ip: 10, subnet: 25, window: HOUR },

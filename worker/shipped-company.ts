@@ -602,7 +602,7 @@ export async function harvestCompany(opts: {
   if (!slug || companyScope(affiliation) === 'none') {
     return { found: [], spend: emptyXaiSpend(), ran: [], cacheHit: false };
   }
-  const cacheKey = opts.deep ? `company:deep:v12:${year}:${slug}` : `company:v14:${year}:${slug}`;
+  const cacheKey = opts.deep ? `company:deep:v13:${year}:${slug}` : `company:v15:${year}:${slug}`;
   const harvested = await cached(
     cacheKey,
     7 * 1440 * MIN,
@@ -681,14 +681,28 @@ export async function harvestCompany(opts: {
       ].filter(Boolean);
       for (const query of queries.slice(0, 2)) {
         const hits = await tinyfishSearch(query, year, ctx.tinyfish.key, ctx.tinyfish.meter).catch(() => []);
-        const urls = hits
-          .map((hit) => publicUrl(hit.url))
-          .filter((url): url is string => Boolean(url) && (isPriorityCompanyUrl(url) || /changelog|releases?|whats-new|docs\//i.test(url)))
-          .slice(0, 8);
+        const urls = [
+          ...new Set(
+            hits
+              .map((hit) => publicUrl(hit.url))
+              .filter((url): url is string => Boolean(url) && (isPriorityCompanyUrl(url) || /changelog|releases?|whats-new|docs\//i.test(url)))
+              .flatMap((url) => {
+                const out = [url];
+                try {
+                  const parsed = new URL(url);
+                  if (/^(developers|docs|learn|platform)\./i.test(parsed.hostname) && !/changelog/i.test(parsed.pathname)) {
+                    out.push(`${parsed.origin}/docs/changelog`, `${parsed.origin}/changelog`);
+                  }
+                } catch {
+                  /* skip */
+                }
+                return out;
+              }),
+          ),
+        ].slice(0, 10);
         if (!urls.length) continue;
         ran.push(`company-tinyfish-search:${urls.length}`);
-        const pages = await fetchViaTinyfish(urls, ctx);
-        for (const page of pages) {
+        const absorbPage = (page: CompanyPage) => {
           const extracted = itemsFromCompanyPage({
             text: page.text,
             html: page.html,
@@ -704,6 +718,16 @@ export async function harvestCompany(opts: {
               via: via ?? item.via ?? null,
             })),
           );
+        };
+        // Prefer a direct HTML read: TinyFish markdown is short, and docs hosts like learn.* often allow Worker fetches.
+        const missing: string[] = [];
+        for (const url of urls) {
+          const htmlPage = await readCompanyPage(url);
+          if (htmlPage) absorbPage(htmlPage);
+          else missing.push(url);
+        }
+        if (missing.length) {
+          for (const page of await fetchViaTinyfish(missing, ctx)) absorbPage(page);
         }
       }
     }

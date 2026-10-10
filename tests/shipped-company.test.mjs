@@ -8,6 +8,7 @@ const affiliation = await import('../worker/shipped-affiliation.ts');
 const company = await import('../worker/shipped-company.ts');
 const decisions = await import('../worker/shipped-decisions.ts');
 const identity = await import('../worker/shipped-identity.ts');
+const flagship = await import('../worker/shipped-flagship.ts');
 
 test('name queries without a handle need a cheap person resolve', () => {
   const tibo = affiliation.parseAffiliationQuery('Tibo from OpenAI');
@@ -354,6 +355,26 @@ test('company harvests keep dated changelog cards and drop sitemap dumps', () =>
   assert.ok(compact.some((item) => /sol ultrafast/i.test(item.name)));
   assert.ok(compact.length <= 20);
   assert.ok(compact.findIndex((item) => /codex cli/i.test(item.name)) < 5);
+});
+
+test('OpenAI product release-notes ships survive a Codex dump', () => {
+  const dump = Array.from({ length: 180 }, (_, i) => ({
+    name: `Codex CLI 0.${i}.0`,
+    description: '',
+    date: '2026-07-21',
+    link: `https://learn.chatgpt.com/docs/changelog#v${i}`,
+    source: 'changelog',
+    status: 'LAUNCHED',
+    score: 7,
+    thisYear: true,
+    icon: null,
+  }));
+  const notes = flagship.openaiProductNoteShips(2026);
+  const compact = company.compactCompanyFound([...dump, ...notes], 30);
+  assert.ok(compact.some((item) => /chatgpt for word/i.test(item.name)), JSON.stringify(compact.map((i) => i.name)));
+  assert.ok(compact.some((item) => /team tasks/i.test(item.name)));
+  assert.ok(compact.some((item) => /privacy center/i.test(item.name)));
+  assert.ok(compact.some((item) => /audio uploads/i.test(item.name)));
 });
 
 test('compact force-keeps v0, Sora, Images, and Codex Cloud under a dump', () => {

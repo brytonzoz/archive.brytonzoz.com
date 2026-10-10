@@ -204,7 +204,81 @@ const FLAGSHIP_LAUNCH_DAY: Record<string, string> = {
   gpt6: '2026-05-01',
   sora: '2026-03-01',
   chatgptimages: '2026-02-01',
+  chatgptatlas: '2026-04-11',
+  chatgpthealth: '2026-06-02',
+  opendevice: '2026-09-05',
 };
+
+/** Dated 2026 ChatGPT / API cards on openai.com/products/release-notes (page 403s from most IPs). */
+export const OPENAI_PRODUCT_NOTES_2026 = [
+  {
+    name: 'ChatGPT for Word',
+    date: '2026-09-17',
+    hash: 'CL-20260917-CHAT-478',
+    description: 'ChatGPT add-in for Microsoft Word',
+  },
+  {
+    name: 'Privacy Center in ChatGPT',
+    date: '2026-09-21',
+    hash: 'CL-20260921-CHAT-484',
+    description: 'Privacy controls inside ChatGPT',
+  },
+  {
+    name: 'GPT-6 Sol and GPT-6 Luna',
+    date: '2026-09-22',
+    hash: 'CL-20260922-APIP-485',
+    description: 'GPT-6 Sol and Luna on the API',
+  },
+  {
+    name: 'Security History in ChatGPT',
+    date: '2026-09-25',
+    hash: 'CL-20260925-CHAT-490',
+    description: 'Sign-in and security log in ChatGPT',
+  },
+  {
+    name: 'Team Tasks in ChatGPT',
+    date: '2026-09-29',
+    hash: 'CL-20260929-CHAT-512',
+    description: 'Shared tasks for ChatGPT Team',
+  },
+  {
+    name: 'Decisions API with GPT-6 Luna',
+    date: '2026-10-06',
+    hash: 'CL-20261006-APIP-521',
+    description: 'Decisions API powered by GPT-6 Luna',
+  },
+  {
+    name: 'Audio uploads in ChatGPT',
+    date: '2026-10-06',
+    hash: 'CL-20261006-CHAT-523',
+    description: 'Upload audio files in ChatGPT',
+  },
+] as const;
+
+export function openaiProductNoteShips(year: number): {
+  name: string;
+  description: string;
+  date: string;
+  link: string;
+  icon: null;
+  source: 'changelog';
+  status: 'LAUNCHED';
+  score: number;
+  thisYear: true;
+}[] {
+  if (year !== 2026) return [];
+  return OPENAI_PRODUCT_NOTES_2026.map((row) => ({
+    name: row.name,
+    description: row.description,
+    date: row.date,
+    link: `https://openai.com/products/release-notes#${row.hash}`,
+    icon: null,
+    source: 'changelog' as const,
+    status: 'LAUNCHED' as const,
+    score: 8,
+    thisYear: true as const,
+  }));
+}
 
 /** First-party posts the sitemap often misses (older Cursor launches live on /blog, not the latest changelog page). */
 export function flagshipProbePaths(company: string | null | undefined): string[] {

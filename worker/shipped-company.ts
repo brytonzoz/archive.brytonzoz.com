@@ -3,7 +3,7 @@
 // releases, and App Store version rows. No per-company URL tables.
 import { extraResearchPaths, itemsFromProjectList } from './shipped-research';
 import { looksLikeNotAShip } from './shipped-decisions';
-import { flagshipLaunchName, flagshipProbePaths, knownFlagshipDate, logFlagshipGate } from './shipped-flagship';
+import { flagshipLaunchName, flagshipProbePaths, knownFlagshipDate, logFlagshipGate, openaiProductNoteShips } from './shipped-flagship';
 import { isPrereleaseShip, prettyBrand, versionParts } from './shipped-polish';
 import { companyOrgGuess, companyScope, companySlug, companyTokens, matchesLeadProduct, type Affiliation } from './shipped-affiliation';
 import { type XaiEnv, type XaiSpend, emptyXaiSpend } from './shipped-xai';
@@ -159,6 +159,7 @@ function isCompactMustKeep(item: Found): boolean {
   if (/\bv0\b/i.test(name) && /vercel\.com\/(blog|changelog)\//i.test(url)) return true;
   if (/\bvercel agent\b/i.test(name) || /\/changelog\/vercel-agent\b/i.test(url)) return true;
   if (/\bcodex cloud\b/i.test(name) || /\/codex\/cloud(?:\/|$)/i.test(url)) return true;
+  if (/openai\.com\/products\/release-notes/i.test(url) && /\bchatgpt\b/i.test(name)) return true;
   return false;
 }
 
@@ -442,6 +443,7 @@ async function pagesForCompany(
       thisYear: true,
     });
   }
+  if (/\bopenai\b/i.test(company || '')) found.push(...openaiProductNoteShips(year));
   const feeds: string[] = [];
   const extraHosts: string[] = [];
   const follow: string[] = [];
@@ -908,7 +910,7 @@ export async function harvestCompany(opts: {
   if (opts.storeOnly) {
     return { found: [], spend: emptyXaiSpend(), ran: ['company-store-miss'], cacheHit: false };
   }
-  const cacheKey = opts.deep ? `company:deep:v23:${year}:${slug}` : `company:v23:${year}:${slug}`;
+  const cacheKey = opts.deep ? `company:deep:v24:${year}:${slug}` : `company:v24:${year}:${slug}`;
   const load = async (): Promise<CompanyHarvest> => {
     const via = viaFor(affiliation);
     const ran: string[] = [];

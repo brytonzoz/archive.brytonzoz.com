@@ -11,7 +11,7 @@
 // After 5dd8ef4: multi-word pins date on hyphenated hosts (ship-or-die.com, not shipordie.com).
 // After c600749: product hosts listed on the maker's profile are still first-launch evidence.
 // After 4b865b5: npm packages are dated from the product homepage too.
-// After (next): revert npm dating (Zod is older than 2026); take earliest URL evidence.
+// After 05fa76d: revert npm dating (Zod is older than 2026); take earliest URL evidence.
 //
 //   ADMIN_PASSWORD=… node scripts/reprint-shipped.mjs [origin]
 const RECEIPT_PATH = (id) => `/r/${id}/`;

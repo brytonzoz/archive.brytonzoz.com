@@ -444,6 +444,14 @@ export function mergeSites(...lists: (string | null | undefined)[][]): string[] 
   return uniqueUrls(lists.flat().filter((u): u is string => Boolean(u)));
 }
 
+/** `jackfriks` → `https://jackfriks.com/` when the handle is a personal brand. */
+export function guessHandleDotCom(handle: string | null | undefined): string | null {
+  const id = (handle || '').replace(/^@/, '').toLowerCase();
+  if (!/^[a-z][a-z0-9]{3,22}$/.test(id)) return null;
+  if (SKIP_GH.has(id) || /^(admin|root|www|mail|blog|shop|store|news|api|test|demo)$/.test(id)) return null;
+  return `https://${id}.com/`;
+}
+
 export function extraSitePaths(siteUrl: string): string[] {
   const url = httpsUrl(siteUrl);
   if (!url) return [];

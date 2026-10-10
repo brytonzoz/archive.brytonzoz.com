@@ -156,6 +156,10 @@ export function itemsFromProjectList(opts: { text: string; url: string; year: nu
     add(match[1], null, clean(match[2], 80) || `Listed on ${hostOf(url) ?? 'their site'}`);
   }
 
+  for (const match of text.matchAll(/📌\s*([A-Za-z][A-Za-z0-9 .'-]{1,32})(?:\s*\(([^)]{3,80})\))?/g)) {
+    add(match[1], null, clean(match[2] || '', 80) || `Pinned on ${hostOf(url) ?? 'their site'}`);
+  }
+
   return found.slice(0, 80);
 }
 

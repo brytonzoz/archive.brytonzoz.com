@@ -21,6 +21,7 @@ import {
   collisionOverride,
   companyLogins,
   extraSitePaths,
+  guessHandleDotCom,
   githubLoginsFromText,
   handleTokens,
   handleVariants,
@@ -1904,6 +1905,11 @@ async function gatherFresh(
       })()
     : Promise.resolve(null);
 
+  const guessedSite = guessHandleDotCom(profile.github) || guessHandleDotCom(profile.x);
+  if (guessedSite) {
+    if (!profile.site) profile.site = guessedSite;
+    profile.sites = mergeSites(profile.sites, [guessedSite]);
+  }
   const homepage = profile.site;
   const extraHomes = [
     ...sitesOf(profile).filter((url) => hostOf(url) !== hostOf(homepage)),
@@ -1946,7 +1952,7 @@ async function gatherFresh(
       return true;
     })
     .filter((url, i, all) => all.findIndex((u) => hostOf(u) === hostOf(url)) === i)
-    .slice(0, 4);
+    .slice(0, 8);
   if (productHomes.length) {
     const more = await Promise.all(productHomes.map((url) => raceTimeout(readSite(url).catch(() => null), SOURCE_TIMEOUT_MS, null)));
     extraSites.push(...more);

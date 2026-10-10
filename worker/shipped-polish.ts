@@ -7,7 +7,7 @@ import { ITEM_STATUSES } from '../lib/shipped-year';
 export const TITLE_MAX = 38;
 
 const DOCS_NAV =
-  /^(overview|prompting|pool|security|browser|search|terminal|settings|plugins?|hooks?|cli|api|faq|guides?|reference|getting started|quickstart|quick start|installation|install|usage|examples?|changelog|release notes|acting as users|builds|context|rules|modes?|models?|indexing|privacy|enterprise|teams|billing|account|authentication|auth|docs|home|index|support)$/i;
+  /^(overview|prompting|pool|security|browser|search|terminal|settings|plugins?|hooks?|cli|api|faq|guides?|reference|getting started|quickstart|quick start|installation|install|usage|examples?|changelog|release notes|acting as users|builds|context|rules|modes?|models?|indexing|privacy|enterprise|teams|billing|account|authentication|auth|docs|home|index|support|repositories|ideas|pull requests)$/i;
 const BYLINE = /^(authors?\s*[:\-–—]|written by\b|posted by\b|byline\s*:)/i;
 const NAME_LIST =
   /^[A-Z][A-Za-z.'-]+(?:\s+[A-Z][A-Za-z.'-]+){1,3}(?:,| and )\s+[A-Z][A-Za-z.'-]+/;
@@ -17,7 +17,7 @@ const READ_THE = /^(read the|see the|check out the|learn more|if you\b|those\b|y
 const INSTRUCTIONAL = /^(if you|those |your agent can|you can|you don|use a |use the |use \w[\w.-]* for complex)\b/i;
 const RESEARCH_GERUND = /^(improving|bootstrapping|deprecating|continually|reward hacking|evaluating)\b/i;
 const ACQUISITION = /\b(is joining|joins)\b/i;
-const CUSTOMER_STORY = /\bships\s+[\d.,]+[×x]\s+faster\b/i;
+const CUSTOMER_STORY = /\bships\s+[\d.,]+[×x]\s+faster\b|·\s*\d+[kmb]\s*$/i;
 const TRAILING_PREP =
   /\b(of|in|to|for|and|or|the|a|an|with|on|as|by|from|into|longer|kind|new|our|your|through|their|its|vs|lower|higher|more|less|day|days|managed)$/i;
 const MID_WORD =
@@ -29,8 +29,9 @@ const CTA_NAV =
 const CTA_TRAIL = /[↗→⬅︎↵]\s*$|youtube channel|try cursor now|explore enterprise/i;
 const FRAGMENT_START = /^(ies|ing|ted|ated|nced|trol|elease|pdate|ontrol|espectively)\b/i;
 const PLATFORM_LEAF =
-  /(?:^|[-_/])(linux|darwin|win32|windows|freebsd|android|macos|ios)[-_]?(x64|arm64|armv7|ia32|musl|gnu|x86_64|aarch64)?$/i;
-const SCOPE_SUBPACKAGE = /^(types|loader|core|cli|native|bin|node|wasm|binding|runtime|parser|extensions?)s?$/i;
+  /(?:^|[-_/])(linux|darwin|win32|windows|freebsd|android|macos|ios)[-_]?(x64|arm64|armv7|ia32|x86_64|aarch64)?[-_]?(musl|gnu)?$/i;
+const SCOPE_SUBPACKAGE =
+  /^(types|loader|core|cli|native|bin|node|wasm|binding|runtime|parser|runner|extensions?)s?(?:[-_].+)?$/i;
 const MONTHS_SHORT = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
 const META_DESC = /sitemap lastmod|^(dated |linked from )/i;
 const HOST_ONLY = /^(https?:\/\/)?([a-z0-9-]+\.)+[a-z]{2,}$/i;
@@ -165,7 +166,7 @@ export function looksFragment(text: string): boolean {
 
 export function looksCutOff(text: string): boolean {
   const trimmed = text.trim();
-  if (/[,;]\s*$/.test(trimmed)) return true;
+  if (/[,;·|]\s*$/.test(trimmed)) return true;
   if (/\([^)]*$/.test(trimmed)) return true;
   if (TRAILING_PREP.test(trimmed) && trimmed.split(/\s+/).length >= 3) return true;
   if (/\b(turn on enable|enable full|at lower|on ai)$/i.test(trimmed)) return true;
@@ -199,7 +200,7 @@ export function isJunkTitle(title: string, opts: { who?: string | null; company?
   if (RESEARCH_GERUND.test(text) || CUSTOMER_STORY.test(text) || isAcquisitionNews(text)) return true;
   if (CTA_NAV.test(text) || CTA_TRAIL.test(text)) return true;
   if (/^respectively\.?$/i.test(text)) return true;
-  if (DOCS_NAV.test(text) || /^(recent highlights|cursor support)$/i.test(text)) return true;
+  if (DOCS_NAV.test(text) || /^(recent highlights|cursor support|under:)/i.test(text)) return true;
   if (isAboutPerson(text, opts.who)) return true;
   if (looksFragment(text) || looksMidWord(text) || looksCutOff(text)) return true;
   if ((text.replace(/[^a-zA-Z]/g, '').length < 3) && /\d/.test(text)) return true;
@@ -335,7 +336,7 @@ export function inYearStrict(item: Polishable, year: number): boolean {
   if (isFutureDate(item.date)) return false;
   const company = item.source === 'changelog' || item.source === 'company';
   if (company && isScrapeDate(item.date)) return false;
-  if (company && !inYearDate(item.date, year)) return false;
+  if (company && item.date && !inYearDate(item.date, year)) return false;
   return true;
 }
 
@@ -359,7 +360,11 @@ export function cleanDescription(value: unknown): string {
     .replace(/align=["']?center["']?/gi, ' ')
     .replace(/\s+/g, ' ')
     .trim();
-  if (!text || /<\/?[a-z]|align=["']|^(p|h[1-6]|div|span|img|ul|ol|li)\b/i.test(text)) return '';
+  if (
+    !text ||
+    /<\/?[a-z]|align=["']|^(p|h[1-6]|div|span|img|ul|ol|li|picture|source)\b|\b(srcset|prefers-color-scheme|media=["'])/i.test(text)
+  )
+    return '';
   if (text.length <= DESC_MAX) return text;
   const cut = wordClamp(text, DESC_MAX);
   if (!cut) return '';
@@ -451,12 +456,12 @@ export function npmFamilyKey(name: string): string | null {
   const slash = raw.indexOf('/');
   const scope = slash >= 0 ? raw.slice(0, slash) : null;
   const pkg = slash >= 0 ? raw.slice(slash + 1) : raw;
-  if (scope && (PLATFORM_LEAF.test(pkg) || SCOPE_SUBPACKAGE.test(pkg))) {
-    return scope.replace(/js$/i, '');
-  }
+  const brand = (scope || '').replace(/js$/i, '');
+  if (scope && loose(pkg) === loose(brand)) return brand;
+  if (scope && (PLATFORM_LEAF.test(pkg) || SCOPE_SUBPACKAGE.test(pkg))) return brand;
   if (PLATFORM_LEAF.test(pkg)) {
     const parent = pkg.replace(PLATFORM_LEAF, '').replace(/[-_]+$/g, '');
-    return parent.length >= 2 ? parent : scope;
+    return parent.length >= 2 ? parent : brand || null;
   }
   return null;
 }
@@ -571,11 +576,7 @@ export function polishCandidates<T extends Polishable>(items: T[], opts: PolishO
       drop(item, 'junk-title');
       continue;
     }
-    const date = inYearDate(item.date, year) ?? (item.source === 'changelog' || item.source === 'company' ? null : item.date);
-    if ((item.source === 'changelog' || item.source === 'company') && !date) {
-      drop(item, 'company-undated');
-      continue;
-    }
+    const date = inYearDate(item.date, year);
     out.push({
       ...item,
       name,

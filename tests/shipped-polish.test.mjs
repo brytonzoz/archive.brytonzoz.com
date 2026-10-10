@@ -158,6 +158,7 @@ test('source lines are via Brand · host with no sitemap metadata', () => {
   assert.equal(polish.cleanStatus('LAUNCHED~'), 'LAUNCHED');
   assert.equal(polish.cleanDescription('learn.chatgpt.com'), '');
   assert.equal(polish.cleanDescription('p align="center" h1 TypeScript loader'), '');
+  assert.equal(polish.cleanDescription('picture source media="(prefers-color-scheme: dark)" srcset=" 25px" alt="G'), '');
   const clipped = polish.cleanDescription('Standalone TypeScript loader for Node.js from the Nub project — TypeScript, JSX, tsconfig paths, and data-format imports through a native transform');
   assert.ok(clipped.length <= 91);
   assert.ok(/…$/.test(clipped) || clipped.length < 90);
@@ -169,13 +170,16 @@ test('platform npm packages roll into the parent name', () => {
     found({ name: '@tsc-rs/linux-x64', source: 'npm', link: 'https://www.npmjs.com/package/@tsc-rs/linux-x64' }),
     found({ name: '@tsc-rs/darwin-arm64', source: 'npm', link: 'https://www.npmjs.com/package/@tsc-rs/darwin-arm64' }),
     found({ name: '@nubjs/loader-win32-arm64', source: 'npm', link: 'https://www.npmjs.com/package/@nubjs/loader-win32-arm64' }),
+    found({ name: '@nubjs/loader-linux-x64-musl', source: 'npm', link: 'https://www.npmjs.com/package/@nubjs/loader-linux-x64-musl' }),
     found({ name: '@nubjs/types', source: 'npm', link: 'https://www.npmjs.com/package/@nubjs/types' }),
     found({ name: '@nubjs/nub', source: 'npm', link: 'https://www.npmjs.com/package/@nubjs/nub' }),
+    found({ name: 'fs2-cli-linux-x64-musl', source: 'npm', link: 'https://www.npmjs.com/package/fs2-cli-linux-x64-musl' }),
   ]);
   const names = rolled.map((item) => item.name.toLowerCase());
   assert.ok(names.some((n) => n === 'tsc-rs'));
+  assert.ok(names.some((n) => n === 'fs2-cli'));
   assert.equal(names.filter((n) => n === 'nub' || n === 'nubjs').length, 1);
-  assert.equal(names.some((n) => /linux|darwin|win32|types/.test(n)), false);
+  assert.equal(names.some((n) => /linux|darwin|win32|types|musl/.test(n)), false);
 });
 
 test('scrape-dated changelog cards are dropped', () => {
@@ -185,12 +189,19 @@ test('scrape-dated changelog cards are dropped', () => {
       found({ name: 'Visit our YouTube channel', date: '2026-06-01', link: 'https://cursor.com/youtube' }),
       found({ name: 'Cursor 2', date: today, link: 'https://cursor.com/changelog/today' }),
       found({ name: 'Agents Window', date: '2026-04-02', link: 'https://cursor.com/changelog/agents' }),
+      found({ name: 'Codex App', date: null, link: 'https://developers.openai.com/codex/app', source: 'changelog' }),
+      found({ name: 'Vicent Martí · 27M', date: '2026-08-14', link: 'https://cursor.com/blog/vicent' }),
+      found({ name: 'UNDER: COMPANY', date: '2026-07-06', link: 'https://cursor.com/blog/firetiger' }),
+      found({ name: 'CURSOR WEB ·', date: '2026-09-28', link: 'https://cursor.com/docs/release-notes' }),
+      found({ name: 'PULL REQUESTS', date: '2026-10-01', link: 'https://cursor.com/docs/release-notes' }),
     ],
     { year: 2026, who: 'Michael Truell' },
   );
   assert.equal(items.some((item) => /youtube|visit our/i.test(item.name)), false);
   assert.equal(items.some((item) => item.date === today), false);
   assert.ok(items.some((item) => /agents window/i.test(item.name)));
+  assert.ok(items.some((item) => /codex app/i.test(item.name) && item.date == null));
+  assert.equal(items.some((item) => /vicent|under:|cursor web\s*·|pull requests/i.test(item.name)), false);
 });
 
 test('notes must use the final post-filter count', () => {

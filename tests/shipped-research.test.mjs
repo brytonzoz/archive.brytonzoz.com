@@ -274,6 +274,15 @@ test('a /projects page dated 2026 becomes found items', () => {
   assert.ok(pins.some((item) => /post bridge/i.test(item.name)), JSON.stringify(pins.map((i) => i.name)));
   assert.ok(pins.some((item) => /lovelee/i.test(item.name)));
   assert.ok(pins.some((item) => /curiosity quench/i.test(item.name)));
+  const tight = research.itemsFromProjectList({
+    text: '📌 post bridge(social media scheduler)→📌 lovelee(couples app)→ curiosity quench(quit scrolling app)→ deep work depot(deep work timer)→',
+    url: 'https://jackfriks.com/',
+    year: 2026,
+  });
+  assert.ok(tight.some((item) => /post bridge/i.test(item.name)), JSON.stringify(tight.map((i) => i.name)));
+  assert.ok(tight.some((item) => /deep work depot/i.test(item.name)));
+  assert.equal(identity.guessHandleDotCom('jackfriks'), 'https://jackfriks.com/');
+  assert.equal(identity.guessHandleDotCom('www'), null);
 });
 
 test('indie blog month archives become dated ships and skip commentary', () => {

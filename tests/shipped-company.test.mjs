@@ -127,6 +127,10 @@ test('Cursor flagship probe paths cover Cursor 3 / Bugbot / Origin', async () =>
   assert.ok(paths.some((path) => /cursor-3/.test(path)));
   assert.ok(paths.some((path) => /bugbot/.test(path)));
   assert.ok(paths.some((path) => /origin/.test(path)));
+  const openai = flagship.flagshipProbePaths('OpenAI');
+  assert.ok(openai.some((path) => /\/index\/gpt-6/.test(path)));
+  assert.ok(openai.some((path) => /\/sora/.test(path)));
+  assert.ok(openai.some((path) => /\/device/.test(path)));
 });
 
 test('Vercel day headings plus bullets assume the harvest year', () => {

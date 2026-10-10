@@ -18,7 +18,7 @@ import { ownedByBuilder, undatedPassesGate, type OwnerContext } from './shipped-
 import type { ItemStatus } from '../lib/shipped-year';
 import { ITEM_STATUSES } from '../lib/shipped-year';
 
-export const TITLE_MAX = 38;
+export const TITLE_MAX = 60;
 
 const DOCS_NAV =
   /^(overview|prompting|pool|security|browser|search|terminal|settings|plugins?|hooks?|cli|api|faq|guides?|reference|getting started|quickstart|quick start|installation|install|usage|examples?|changelog|release notes|acting as users|builds|context|rules|modes?|models?|indexing|privacy|enterprise|teams|billing|account|authentication|auth|docs|home|index|support|repositories|ideas|pull requests|last updated|what'?s new|agents|legal|update)$/i;
@@ -34,7 +34,9 @@ const RESEARCH_GERUND =
 const ACQUISITION = /\b(is now a part of|acquired by|has been acquired)\b/i;
 const CUSTOMER_STORY = /\bships\s+[\d.,]+[×x]\s+faster\b|·\s*\d+[kmb]\s*$/i;
 const TRAILING_PREP =
-  /\b(of|in|to|for|and|or|the|a|an|with|on|as|by|from|into|longer|kind|new|our|your|through|their|its|vs|lower|higher|more|less|day|days|every|managed|security|controlled|trusted|general|advanced|remote|task|chat)$/i;
+  /\b(of|in|to|for|and|or|the|a|an|with|on|as|by|from|into|longer|kind|new|our|your|through|their|its|vs|lower|higher|more|less|day|days|every|managed|security|controlled|trusted|general|advanced|remote|task|chat|now|key|third|are|image|usage|delay|preview|zero)$/i;
+export const CUT_OFF_ENDINGS =
+  /^(now|and|with|for|of|the|on|key|third|are|image|usage|delay|preview|zero)$/i;
 const TITLE_START_BAD =
   /^(in|on|at|for|with|from|to|of|by|as|a|an|the|and|or|use|using|start|starting|lines|line|built|build|building|run|running|join|joining|announce|announces|announcing|added|add|fixed|fix|connect|review|share|more|ways|preview|control|give|let|take|work|choose|scan|create|organize|talk|try|visit|explore|download|get|see|read|learn|follow|watch|make|making|how|when|while|after|before|without|inside|beyond|under|over|my|our|your|quitting)\b/i;
 const TITLE_END_BAD = /\b(of|a|an|the|with|and|or|security|controlled|trusted|general|advanced|remote|task|chat)\s*$/i;
@@ -197,13 +199,22 @@ export function looksFragment(text: string): boolean {
   return looksMidWord(trimmed);
 }
 
+/** Last word is a chopped headline ending. Short product nouns like "FLUX 3 Image" stay. */
+export function endsWithCutOffWord(text: string): boolean {
+  const words = tidy(text).split(/\s+/).filter(Boolean);
+  const last = words[words.length - 1] || '';
+  if (/^(now|and|with|for|of|the|on|key|third|are|zero)$/i.test(last) && words.length >= 2) return true;
+  if (/^(image|usage|delay|preview)$/i.test(last) && words.length >= 4) return true;
+  return false;
+}
+
 export function looksCutOff(text: string): boolean {
   const trimmed = text.trim();
   if (/[,;·|]\s*$/.test(trimmed)) return true;
   if (/\([^)]*$/.test(trimmed)) return true;
   if (TRAILING_PREP.test(trimmed) && trimmed.split(/\s+/).length >= 3) return true;
   if (/\b(turn on enable|enable full|at lower|on ai)$/i.test(trimmed)) return true;
-  return false;
+  return endsWithCutOffWord(trimmed);
 }
 
 export function isAboutPerson(title: string, who: string | null | undefined): boolean {
@@ -419,6 +430,7 @@ export function isVagueOrCutTitle(name: string): boolean {
   if (!text) return true;
   if (/\b or \b/i.test(text) && !/\b(ship or die|marketing or die)\b/i.test(text)) return true;
   if (/^cloud work$/i.test(text) || /^new controls\b/i.test(text) || /^all\s+[a-z]+$/i.test(text)) return true;
+  if (/\brolling out to all users\b/i.test(text) || /^beta and rolling\b/i.test(text)) return true;
   if (/\bin the chatgpt desktop$/i.test(text)) return true;
   if (/^(pets|cloud|new)\s+[a-z]+$/i.test(text) && !/\b(cli|app|sdk|api|gpt|codex|cursor|chatgpt)\b/i.test(text)) return true;
   return false;
@@ -520,6 +532,10 @@ export function displayShipName(name: string, source?: string | null): string {
 const VERSION = String.raw`v?(?:\d{4}\.\d{1,2}\.\d{1,2}|\d{1,3}(?:\.\d+){1,3})`;
 
 export function versionParts(name: string): { product: string; version: string; extra?: number } | null {
+  const labeled = tidy(name).match(
+    /^(\d+\.\d+)\s+(?:jan(?:uary)?|feb(?:ruary)?|mar(?:ch)?|apr(?:il)?|may|jun(?:e)?|jul(?:y)?|aug(?:ust)?|sep(?:t(?:ember)?)?|oct(?:ober)?|nov(?:ember)?|dec(?:ember)?)\b/i,
+  );
+  if (labeled) return { product: 'Cursor', version: labeled[1] };
   const text = tidy(name)
     .replace(/\s+(reconnects?|released?|shipped|available)$/i, '')
     .trim();
@@ -571,9 +587,28 @@ export function nounPhraseFromSentence(raw: string): string {
 }
 
 /** Extract a clean product / feature name. Empty string means drop the item. */
+const LABELED_VERSION =
+  /^(\d+\.\d+)\s+(jan(?:uary)?|feb(?:ruary)?|mar(?:ch)?|apr(?:il)?|may|jun(?:e)?|jul(?:y)?|aug(?:ust)?|sep(?:t(?:ember)?)?|oct(?:ober)?|nov(?:ember)?|dec(?:ember)?)\b/i;
+
+/** `3.10 JUN 30, 2026` → the day on the card, so version rows can roll up. */
+export function dateFromLabeledTitle(raw: unknown, year: number): string | null {
+  const text = tidy(raw);
+  const match = text.match(
+    /(\d+\.\d+)\s+(jan(?:uary)?|feb(?:ruary)?|mar(?:ch)?|apr(?:il)?|may|jun(?:e)?|jul(?:y)?|aug(?:ust)?|sep(?:t(?:ember)?)?|oct(?:ober)?|nov(?:ember)?|dec(?:ember)?)\s+(\d{1,2})(?:st|nd|rd|th)?(?:,?\s+(20\d{2}))?/i,
+  );
+  if (!match) return null;
+  const y = match[4] ? Number(match[4]) : year;
+  if (y !== year) return null;
+  const mm = MONTHS_SHORT.findIndex((mon) => mon.toLowerCase() === match[2].slice(0, 3).toLowerCase());
+  if (mm < 0) return null;
+  return `${y}-${String(mm + 1).padStart(2, '0')}-${String(Number(match[3])).padStart(2, '0')}`;
+}
+
 export function cleanShipTitle(raw: unknown, max = TITLE_MAX): string {
   let text = normalizeVersionTokens(stripDateSuffix(tidy(raw)));
   if (!text) return '';
+  const labeled = text.match(LABELED_VERSION);
+  if (labeled) text = `Cursor ${labeled[1]}`;
   const join = text.match(/^([A-Za-z][\w.-]{1,32})\s+(?:is joining|joins)\s+([A-Za-z][\w.-]{1,32})/i);
   if (join) text = `${join[1]} joining ${join[2]}`;
   const report = text.match(/^a technical report on\s+(.+)$/i);
@@ -582,18 +617,23 @@ export function cleanShipTitle(raw: unknown, max = TITLE_MAX): string {
   if (meet?.[1]) text = meet[1];
   if (/^codex,\s*our code generation cli tool$/i.test(text)) text = 'Codex CLI';
   text = text.replace(/^the new\s+/i, '').replace(/^new\s+(v\d\b)/i, '$1');
-  const nowLead = text.match(/^((?:v\d|[A-Z][\w.+-]*)(?:\s+(?:v\d|[A-Z][\w.+-]*)){0,3})\s+now\b/);
-  if (nowLead?.[1] && nowLead[1].length >= 2) text = nowLead[1];
   text = text
     .replace(/^(introducing|launching|announcing|presenting|meet|say hello to|now available[:\s]+|how to|read the|launched)\s+/i, '')
     .replace(/\s+launched as\b.*$/i, '')
-    .replace(/\s+(is )?(now |generally )?available( today| in\b.*)?$/i, '')
+    .replace(/\s+(is )?(now |generally )?available(\s+(today|on\b.*|in\b.*))?$/i, '')
+    .replace(/\s+now in (public )?beta\b.*$/i, '')
+    .replace(/\s+is now\b.*$/i, '')
+    .replace(/\s+support for\b.*$/i, '')
+    .replace(/\s+now supports?\b.*$/i, '')
     .replace(/\s+(release|launch) notes\.?$/i, '')
     .replace(/\s+reconnects?$/i, '')
     .replace(/\s+,/g, ',')
     .replace(/[,\s.]+$/g, '')
     .replace(/\s+/g, ' ')
     .trim();
+  while (text && endsWithCutOffWord(text)) {
+    text = text.split(/\s+/).slice(0, -1).join(' ').trim();
+  }
   if (!text) return '';
   const sentence = /\b(released|lets?|can also|can now|in the api|use a |with site)\b/i.test(text);
   if (sentence) {
@@ -689,6 +729,7 @@ export function inYearStrict(item: Polishable, year: number): boolean {
   const company = item.source === 'changelog' || item.source === 'company';
   if (company && isScrapeDate(item.date) && !flagshipLaunchName(item)) return false;
   if (company && item.date && !inYearDate(item.date, year) && !isFlagshipYearKeep(item, year)) return false;
+  if (company && !item.date && !flagshipLaunchName(item) && !knownFlagshipDate(item, year)) return false;
   return true;
 }
 
@@ -996,11 +1037,11 @@ export function inheritDates<T extends Polishable>(items: T[]): T[] {
   });
 }
 
-/** Undated lines sort last and may not lead. When anything is dated, crumb undated stay ≤ 25% of the tape (U ≤ D/3). Company/changelog cards without a day stay — they are ships, not leftover links. */
+/** Undated lines sort last and may not lead. When anything is dated, crumb undated stay ≤ 25% of the tape (U ≤ D/3). Company/changelog cards without a day were already dropped. */
 export function capUndated<T extends Polishable>(items: T[], onDrop?: (drop: PolishDrop) => void): T[] {
   const dated = items.filter((item) => item.date);
   const companyUndated = items.filter(
-    (item) => !item.date && (item.source === 'changelog' || item.source === 'company'),
+    (item) => !item.date && (item.source === 'changelog' || item.source === 'company') && flagshipLaunchName(item),
   );
   const undated = items.filter((item) => !item.date && item.source !== 'changelog' && item.source !== 'company');
   if (!dated.length) return items;
@@ -1085,7 +1126,8 @@ export function polishCandidates<T extends Polishable>(items: T[], opts: PolishO
     }
     const date =
       knownFlagshipDate({ ...item, name }, year) ??
-      (isFlagshipYearKeep(item, year) && item.date ? String(item.date).slice(0, 10) : inYearDate(item.date, year));
+      (isFlagshipYearKeep(item, year) && item.date ? String(item.date).slice(0, 10) : inYearDate(item.date, year)) ??
+      dateFromLabeledTitle(item.name, year);
     if (isChangelogPhrase(name, date)) {
       drop(item, 'changelog-phrase');
       continue;
@@ -1133,9 +1175,7 @@ export function polishCandidates<T extends Polishable>(items: T[], opts: PolishO
   }
   const rolled = rollupCeoLeadCrumbs(capped, opts.affiliation);
   if (rolled.length < capped.length) drop({ name: `${capped.length - rolled.length} ceo-lead crumbs` }, 'ceo-rollup');
-  return rolled
-    .map((item) => ({ ...item, name: versionParts(item.name) ? item.name : wordClamp(item.name, TITLE_MAX) }))
-    .sort((a, b) => (a.date ?? '9999').localeCompare(b.date ?? '9999'));
+  return rolled.sort((a, b) => (a.date ?? '9999').localeCompare(b.date ?? '9999'));
 }
 
 function isOpenAiCompanyWide(name: string): boolean {

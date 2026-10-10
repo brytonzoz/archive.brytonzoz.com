@@ -1,85 +1,640 @@
 {
   "drop": [
-    { "name": "AUTHOR : CURSOR TEAM", "date": "2026-03-01", "source": "changelog", "link": "https://cursor.com/blog/authors" },
-    { "name": "AUTHOR : SASHA RUSH", "date": "2026-03-01", "source": "changelog", "link": "https://cursor.com/blog/sasha" },
-    { "name": "OVERVIEW", "date": "2026-03-01", "source": "changelog", "link": "https://cursor.com/docs/overview" },
-    { "name": "PROMPTING", "date": "2026-03-01", "source": "changelog", "link": "https://cursor.com/docs/prompting" },
-    { "name": "POOL", "date": "2026-03-01", "source": "changelog", "link": "https://cursor.com/docs/pool" },
-    { "name": "WEEK OF OCTOBER 6", "date": "2026-10-06", "source": "changelog", "link": "https://cursor.com/changelog/week" },
-    { "name": "VISIT OUR YOUTUBE CHANNEL ↗", "date": "2026-03-01", "source": "changelog", "link": "https://cursor.com/youtube" },
-    { "name": "TRY CURSOR NOW", "date": "2026-03-01", "source": "changelog", "link": "https://cursor.com/" },
-    { "name": "EXPLORE ENTERPRISE →", "date": "2026-03-01", "source": "changelog", "link": "https://cursor.com/enterprise" },
-    { "name": "DOWNLOAD ON THE APP STORE", "date": "2026-03-01", "source": "changelog", "link": "https://cursor.com/app" },
-    { "name": "emoji-todo", "date": "2026-04-24", "source": "github", "link": "https://github.com/rauchg/emoji-todo" },
-    { "name": "shoo-vite-demo", "date": "2026-03-01", "source": "github", "link": "https://github.com/t3dotgg/shoo-vite-demo" },
-    { "name": "t3dotgg", "date": "2026-03-01", "source": "github", "link": "https://github.com/t3dotgg/t3dotgg", "who": "Theo", "handle": "t3dotgg" },
-    { "name": "yes", "date": "2026-03-01", "source": "github", "link": "https://github.com/t3dotgg/yes" },
-    { "name": "MATTIA ASTORINO", "date": "2026-03-01", "source": "github", "link": "https://github.com/t3dotgg/mattia", "who": "Theo" },
-    { "name": "TRPC", "date": null, "source": "site", "link": "https://colinhacks.com/", "description": "end-to-end typesafe APIs", "who": "Colin McDonnell", "handle": "colinhacks", "owner": { "name": "Colin McDonnell", "github": "colinhacks", "site": "https://colinhacks.com/" } },
-    { "name": "TRANSFORM", "date": null, "source": "site", "link": "https://colinhacks.com/", "description": "val = parseFloat(val", "who": "Colin McDonnell", "handle": "colinhacks", "owner": { "name": "Colin McDonnell", "github": "colinhacks", "site": "https://colinhacks.com/" } },
-    { "name": "ALL CHECKS", "date": null, "source": "site", "link": "https://colinhacks.com/", "who": "Colin McDonnell", "handle": "colinhacks", "owner": { "name": "Colin McDonnell", "github": "colinhacks", "site": "https://colinhacks.com/" } },
-    { "name": "NUMBER", "date": null, "source": "npm", "link": "https://www.npmjs.com/package/number", "who": "Colin McDonnell", "handle": "colinhacks", "owner": { "name": "Colin McDonnell", "github": "colinhacks" } },
-    { "name": "AWAIT ASYNCCODEC.ENCODEASYNC", "date": null, "source": "site", "link": "https://colinhacks.com/" },
-    { "name": "COLIN MCDONNELL @COLINHACKS", "date": null, "source": "site", "link": "https://colinhacks.com/", "who": "Colin McDonnell", "handle": "colinhacks", "owner": { "name": "Colin McDonnell", "github": "colinhacks", "site": "https://colinhacks.com/" }, "description": "TypeScript and open source" },
-    { "name": "KEEPING COMMUNITY HUMAN WHILE SCALING", "date": "2026-06-01", "source": "changelog", "link": "https://vercel.com/blog/keeping-community-human" },
-    { "name": "LAST UPDATED", "date": "2026-06-01", "source": "changelog", "link": "https://vercel.com/docs" },
-    { "name": "DEPLOYING TO VERCEL", "date": "2026-06-01", "source": "changelog", "link": "https://vercel.com/docs/deploying" },
-    { "name": "FLAGS SDK REFERENCE", "date": "2026-06-01", "source": "changelog", "link": "https://vercel.com/docs/flags" },
-    { "name": "VERCEL QUEUES: JS SDK REFERENCE", "date": "2026-06-01", "source": "changelog", "link": "https://vercel.com/docs/queues" },
-    { "name": "EVERYTHING HACKABLE WILL GET HACKED", "date": "2026-06-01", "source": "changelog", "link": "https://vercel.com/blog/hackable" },
-    { "name": "OPEN-WEIGHT MODELS TAKE 56% OF TOKEN", "date": "2026-06-01", "source": "changelog", "link": "https://vercel.com/blog/open-weight" },
-    { "name": "WE MIGRATED THE DATABASE BEHIND EVERY", "date": "2026-06-01", "source": "changelog", "link": "https://vercel.com/blog/migrated" },
-    { "name": "REPRODUCING, DISCLOSING, AND FIXING", "date": "2026-06-01", "source": "changelog", "link": "https://vercel.com/blog/reproducing" },
-    { "name": "AI GATEWAY PRODUCTION INDEX SEPTEMBER", "date": "2026-01-01", "source": "changelog", "link": "https://vercel.com/blog/ai-gateway-index" },
-    { "name": "SHOHEI MAEDA SOFTWARE ENGINEER", "date": "2026-06-01", "source": "changelog", "link": "https://vercel.com/blog/shohei" },
-    { "name": "JEV FOR PYTHON ENGINEERS", "date": "2026-06-01", "source": "changelog", "link": "https://vercel.com/blog/jev" },
-    { "name": "WHAT'S NEW", "date": "2026-06-01", "source": "changelog", "link": "https://vercel.com/changelog" },
-    { "name": "WHAT&#x27;S NEW", "date": "2026-10-09", "source": "changelog", "link": "https://vercel.com/docs" },
-    { "name": "YURY SELIVANOV DIRECTOR OF ENGINEERING", "date": "2026-10-02", "source": "changelog", "link": "https://vercel.com/blog/jev-for-python-engineers" },
-    { "name": "2026 VERCEL AI ACCELERATOR RECAP", "date": "2026-04-28", "source": "changelog", "link": "https://vercel.com/blog/category/community" },
-    { "name": "SECURITY BOUNDARIES IN AGENTIC", "date": "2026-02-24", "source": "changelog", "link": "https://vercel.com/blog/category/security" },
-    { "name": "FRAMEWORKS ON VERCEL", "date": "2026-08-11", "source": "changelog", "link": "https://vercel.com/docs/frameworks" },
-    { "name": "AGENTS", "date": "2026-06-01", "source": "changelog", "link": "https://vercel.com/docs/agents" },
-    { "name": "LEGAL", "date": null, "source": "changelog", "link": "https://vercel.com/changelog#legal" },
-    { "name": "UPDATE", "date": "2026-09-05", "source": "changelog", "link": "https://learn.chatgpt.com/docs/changelog" },
-    { "name": "SIGN IN CONTACT CONTACT SALES DOWNLOAD", "date": "2026-06-01", "source": "changelog", "link": "https://cursor.com/changelog#signincontactcontactsalesdownload" },
-    { "name": "RIGIN PR REVIEW --REQUEST-CHANGES", "date": null, "source": "changelog", "link": "https://cursor.com/docs/release-notes#riginprreviewrequestchanges" },
-    { "name": "TRUELL20", "date": null, "source": "site", "link": "https://truell20.com/", "who": "Michael Truell", "handle": "mntruell", "owner": { "name": "Michael Truell", "github": "truell20", "site": "https://cursor.com" } },
-    { "name": "STATE OF AGENT SKILLS", "date": "2026-06-01", "source": "changelog", "link": "https://vercel.com/blog/state-of-agent-skills" },
-    { "name": "CHATGPT WORK OR CODEX CHAT AND WORK", "date": "2026-04-01", "source": "changelog", "link": "https://developers.openai.com/codex/or" },
-    { "name": "PETS CONTROLS IN THE CHATGPT DESKTOP", "date": "2026-04-02", "source": "changelog", "link": "https://openai.com/chatgpt/pets" },
-    { "name": "CLOUD WORK", "date": "2026-04-03", "source": "changelog", "link": "https://developers.openai.com/codex/cloud-work" },
-    { "name": "NEW CONTROLS FOR LONG-RUNNING WORK", "date": "2026-04-04", "source": "changelog", "link": "https://developers.openai.com/codex/controls" },
-    { "name": "IES A AND MAGIC", "date": "2026-04-01", "source": "changelog", "link": "https://developers.openai.com/codex/ies" },
-    { "name": "RESPECTIVELY.", "date": "2026-04-01", "source": "changelog", "link": "https://developers.openai.com/codex/resp" },
-    { "name": "ONTROL IS AVAILABLE TODAY IN THE CURSOR", "date": "2026-04-01", "source": "changelog", "link": "https://cursor.com/changelog/ontrol" },
-    { "name": "USE A WEBSITE’S TOOLS: WITH SITE", "date": "2026-04-01", "source": "changelog", "link": "https://developers.openai.com/codex/site" },
-    { "name": "CHATGPT FOR IOS UPDATES: REDESIGNED", "date": "2026-08-04", "source": "changelog", "link": "https://developers.openai.com/codex/ios-updates" },
-    { "name": "CODEX MCP SERVER REMOVED", "date": "2026-08-02", "source": "changelog", "link": "https://developers.openai.com/codex/mcp" },
-    { "name": "TEAMS PRICING JUNE 2026", "date": "2026-06-01", "source": "changelog", "link": "https://cursor.com/changelog/pricing" },
-    { "name": "IMPROVED TOKEN EFFICIENCY", "date": "2026-09-23", "source": "changelog", "link": "https://cursor.com/changelog/tokens" },
-    { "name": "AWAIT ASYNCCODEC.ENCODEASYNC", "date": "2026-04-01", "source": "npm", "link": "https://www.npmjs.com/package/asynccodec" },
-    { "name": "SHIP OR DIE", "date": "2026-01-15", "source": "site", "link": "https://ship-or-die.com", "description": "Conference by Marc Lou", "who": "Jack Friks", "handle": "jackfriks", "owner": { "name": "Jack Friks", "github": "jackfriks", "x": "jackfriks", "site": "https://jackfriks.com" } },
-    { "name": "MARKETING OR DIE", "date": "2026-01-16", "source": "site", "link": "https://marketing-or-die.com", "description": "By Marc Lou", "who": "Jack Friks", "handle": "jackfriks", "owner": { "name": "Jack Friks", "github": "jackfriks", "x": "jackfriks", "site": "https://jackfriks.com" } }
+    {
+      "name": "AUTHOR : CURSOR TEAM",
+      "date": "2026-03-01",
+      "source": "changelog",
+      "link": "https://cursor.com/blog/authors"
+    },
+    {
+      "name": "AUTHOR : SASHA RUSH",
+      "date": "2026-03-01",
+      "source": "changelog",
+      "link": "https://cursor.com/blog/sasha"
+    },
+    {
+      "name": "OVERVIEW",
+      "date": "2026-03-01",
+      "source": "changelog",
+      "link": "https://cursor.com/docs/overview"
+    },
+    {
+      "name": "PROMPTING",
+      "date": "2026-03-01",
+      "source": "changelog",
+      "link": "https://cursor.com/docs/prompting"
+    },
+    {
+      "name": "POOL",
+      "date": "2026-03-01",
+      "source": "changelog",
+      "link": "https://cursor.com/docs/pool"
+    },
+    {
+      "name": "WEEK OF OCTOBER 6",
+      "date": "2026-10-06",
+      "source": "changelog",
+      "link": "https://cursor.com/changelog/week"
+    },
+    {
+      "name": "VISIT OUR YOUTUBE CHANNEL \u2197",
+      "date": "2026-03-01",
+      "source": "changelog",
+      "link": "https://cursor.com/youtube"
+    },
+    {
+      "name": "TRY CURSOR NOW",
+      "date": "2026-03-01",
+      "source": "changelog",
+      "link": "https://cursor.com/"
+    },
+    {
+      "name": "EXPLORE ENTERPRISE \u2192",
+      "date": "2026-03-01",
+      "source": "changelog",
+      "link": "https://cursor.com/enterprise"
+    },
+    {
+      "name": "DOWNLOAD ON THE APP STORE",
+      "date": "2026-03-01",
+      "source": "changelog",
+      "link": "https://cursor.com/app"
+    },
+    {
+      "name": "emoji-todo",
+      "date": "2026-04-24",
+      "source": "github",
+      "link": "https://github.com/rauchg/emoji-todo"
+    },
+    {
+      "name": "shoo-vite-demo",
+      "date": "2026-03-01",
+      "source": "github",
+      "link": "https://github.com/t3dotgg/shoo-vite-demo"
+    },
+    {
+      "name": "t3dotgg",
+      "date": "2026-03-01",
+      "source": "github",
+      "link": "https://github.com/t3dotgg/t3dotgg",
+      "who": "Theo",
+      "handle": "t3dotgg"
+    },
+    {
+      "name": "yes",
+      "date": "2026-03-01",
+      "source": "github",
+      "link": "https://github.com/t3dotgg/yes"
+    },
+    {
+      "name": "MATTIA ASTORINO",
+      "date": "2026-03-01",
+      "source": "github",
+      "link": "https://github.com/t3dotgg/mattia",
+      "who": "Theo"
+    },
+    {
+      "name": "TRPC",
+      "date": null,
+      "source": "site",
+      "link": "https://colinhacks.com/",
+      "description": "end-to-end typesafe APIs",
+      "who": "Colin McDonnell",
+      "handle": "colinhacks",
+      "owner": {
+        "name": "Colin McDonnell",
+        "github": "colinhacks",
+        "site": "https://colinhacks.com/"
+      }
+    },
+    {
+      "name": "TRANSFORM",
+      "date": null,
+      "source": "site",
+      "link": "https://colinhacks.com/",
+      "description": "val = parseFloat(val",
+      "who": "Colin McDonnell",
+      "handle": "colinhacks",
+      "owner": {
+        "name": "Colin McDonnell",
+        "github": "colinhacks",
+        "site": "https://colinhacks.com/"
+      }
+    },
+    {
+      "name": "ALL CHECKS",
+      "date": null,
+      "source": "site",
+      "link": "https://colinhacks.com/",
+      "who": "Colin McDonnell",
+      "handle": "colinhacks",
+      "owner": {
+        "name": "Colin McDonnell",
+        "github": "colinhacks",
+        "site": "https://colinhacks.com/"
+      }
+    },
+    {
+      "name": "NUMBER",
+      "date": null,
+      "source": "npm",
+      "link": "https://www.npmjs.com/package/number",
+      "who": "Colin McDonnell",
+      "handle": "colinhacks",
+      "owner": {
+        "name": "Colin McDonnell",
+        "github": "colinhacks"
+      }
+    },
+    {
+      "name": "AWAIT ASYNCCODEC.ENCODEASYNC",
+      "date": null,
+      "source": "site",
+      "link": "https://colinhacks.com/"
+    },
+    {
+      "name": "COLIN MCDONNELL @COLINHACKS",
+      "date": null,
+      "source": "site",
+      "link": "https://colinhacks.com/",
+      "who": "Colin McDonnell",
+      "handle": "colinhacks",
+      "owner": {
+        "name": "Colin McDonnell",
+        "github": "colinhacks",
+        "site": "https://colinhacks.com/"
+      },
+      "description": "TypeScript and open source"
+    },
+    {
+      "name": "KEEPING COMMUNITY HUMAN WHILE SCALING",
+      "date": "2026-06-01",
+      "source": "changelog",
+      "link": "https://vercel.com/blog/keeping-community-human"
+    },
+    {
+      "name": "LAST UPDATED",
+      "date": "2026-06-01",
+      "source": "changelog",
+      "link": "https://vercel.com/docs"
+    },
+    {
+      "name": "DEPLOYING TO VERCEL",
+      "date": "2026-06-01",
+      "source": "changelog",
+      "link": "https://vercel.com/docs/deploying"
+    },
+    {
+      "name": "FLAGS SDK REFERENCE",
+      "date": "2026-06-01",
+      "source": "changelog",
+      "link": "https://vercel.com/docs/flags"
+    },
+    {
+      "name": "VERCEL QUEUES: JS SDK REFERENCE",
+      "date": "2026-06-01",
+      "source": "changelog",
+      "link": "https://vercel.com/docs/queues"
+    },
+    {
+      "name": "EVERYTHING HACKABLE WILL GET HACKED",
+      "date": "2026-06-01",
+      "source": "changelog",
+      "link": "https://vercel.com/blog/hackable"
+    },
+    {
+      "name": "OPEN-WEIGHT MODELS TAKE 56% OF TOKEN",
+      "date": "2026-06-01",
+      "source": "changelog",
+      "link": "https://vercel.com/blog/open-weight"
+    },
+    {
+      "name": "WE MIGRATED THE DATABASE BEHIND EVERY",
+      "date": "2026-06-01",
+      "source": "changelog",
+      "link": "https://vercel.com/blog/migrated"
+    },
+    {
+      "name": "REPRODUCING, DISCLOSING, AND FIXING",
+      "date": "2026-06-01",
+      "source": "changelog",
+      "link": "https://vercel.com/blog/reproducing"
+    },
+    {
+      "name": "AI GATEWAY PRODUCTION INDEX SEPTEMBER",
+      "date": "2026-01-01",
+      "source": "changelog",
+      "link": "https://vercel.com/blog/ai-gateway-index"
+    },
+    {
+      "name": "SHOHEI MAEDA SOFTWARE ENGINEER",
+      "date": "2026-06-01",
+      "source": "changelog",
+      "link": "https://vercel.com/blog/shohei"
+    },
+    {
+      "name": "JEV FOR PYTHON ENGINEERS",
+      "date": "2026-06-01",
+      "source": "changelog",
+      "link": "https://vercel.com/blog/jev"
+    },
+    {
+      "name": "WHAT'S NEW",
+      "date": "2026-06-01",
+      "source": "changelog",
+      "link": "https://vercel.com/changelog"
+    },
+    {
+      "name": "WHAT&#x27;S NEW",
+      "date": "2026-10-09",
+      "source": "changelog",
+      "link": "https://vercel.com/docs"
+    },
+    {
+      "name": "YURY SELIVANOV DIRECTOR OF ENGINEERING",
+      "date": "2026-10-02",
+      "source": "changelog",
+      "link": "https://vercel.com/blog/jev-for-python-engineers"
+    },
+    {
+      "name": "2026 VERCEL AI ACCELERATOR RECAP",
+      "date": "2026-04-28",
+      "source": "changelog",
+      "link": "https://vercel.com/blog/category/community"
+    },
+    {
+      "name": "SECURITY BOUNDARIES IN AGENTIC",
+      "date": "2026-02-24",
+      "source": "changelog",
+      "link": "https://vercel.com/blog/category/security"
+    },
+    {
+      "name": "FRAMEWORKS ON VERCEL",
+      "date": "2026-08-11",
+      "source": "changelog",
+      "link": "https://vercel.com/docs/frameworks"
+    },
+    {
+      "name": "AGENTS",
+      "date": "2026-06-01",
+      "source": "changelog",
+      "link": "https://vercel.com/docs/agents"
+    },
+    {
+      "name": "LEGAL",
+      "date": null,
+      "source": "changelog",
+      "link": "https://vercel.com/changelog#legal"
+    },
+    {
+      "name": "UPDATE",
+      "date": "2026-09-05",
+      "source": "changelog",
+      "link": "https://learn.chatgpt.com/docs/changelog"
+    },
+    {
+      "name": "SIGN IN CONTACT CONTACT SALES DOWNLOAD",
+      "date": "2026-06-01",
+      "source": "changelog",
+      "link": "https://cursor.com/changelog#signincontactcontactsalesdownload"
+    },
+    {
+      "name": "RIGIN PR REVIEW --REQUEST-CHANGES",
+      "date": null,
+      "source": "changelog",
+      "link": "https://cursor.com/docs/release-notes#riginprreviewrequestchanges"
+    },
+    {
+      "name": "TRUELL20",
+      "date": null,
+      "source": "site",
+      "link": "https://truell20.com/",
+      "who": "Michael Truell",
+      "handle": "mntruell",
+      "owner": {
+        "name": "Michael Truell",
+        "github": "truell20",
+        "site": "https://cursor.com"
+      }
+    },
+    {
+      "name": "STATE OF AGENT SKILLS",
+      "date": "2026-06-01",
+      "source": "changelog",
+      "link": "https://vercel.com/blog/state-of-agent-skills"
+    },
+    {
+      "name": "CHATGPT WORK OR CODEX CHAT AND WORK",
+      "date": "2026-04-01",
+      "source": "changelog",
+      "link": "https://developers.openai.com/codex/or"
+    },
+    {
+      "name": "PETS CONTROLS IN THE CHATGPT DESKTOP",
+      "date": "2026-04-02",
+      "source": "changelog",
+      "link": "https://openai.com/chatgpt/pets"
+    },
+    {
+      "name": "CLOUD WORK",
+      "date": "2026-04-03",
+      "source": "changelog",
+      "link": "https://developers.openai.com/codex/cloud-work"
+    },
+    {
+      "name": "NEW CONTROLS FOR LONG-RUNNING WORK",
+      "date": "2026-04-04",
+      "source": "changelog",
+      "link": "https://developers.openai.com/codex/controls"
+    },
+    {
+      "name": "IES A AND MAGIC",
+      "date": "2026-04-01",
+      "source": "changelog",
+      "link": "https://developers.openai.com/codex/ies"
+    },
+    {
+      "name": "RESPECTIVELY.",
+      "date": "2026-04-01",
+      "source": "changelog",
+      "link": "https://developers.openai.com/codex/resp"
+    },
+    {
+      "name": "ONTROL IS AVAILABLE TODAY IN THE CURSOR",
+      "date": "2026-04-01",
+      "source": "changelog",
+      "link": "https://cursor.com/changelog/ontrol"
+    },
+    {
+      "name": "USE A WEBSITE\u2019S TOOLS: WITH SITE",
+      "date": "2026-04-01",
+      "source": "changelog",
+      "link": "https://developers.openai.com/codex/site"
+    },
+    {
+      "name": "CHATGPT FOR IOS UPDATES: REDESIGNED",
+      "date": "2026-08-04",
+      "source": "changelog",
+      "link": "https://developers.openai.com/codex/ios-updates"
+    },
+    {
+      "name": "CODEX MCP SERVER REMOVED",
+      "date": "2026-08-02",
+      "source": "changelog",
+      "link": "https://developers.openai.com/codex/mcp"
+    },
+    {
+      "name": "TEAMS PRICING JUNE 2026",
+      "date": "2026-06-01",
+      "source": "changelog",
+      "link": "https://cursor.com/changelog/pricing"
+    },
+    {
+      "name": "IMPROVED TOKEN EFFICIENCY",
+      "date": "2026-09-23",
+      "source": "changelog",
+      "link": "https://cursor.com/changelog/tokens"
+    },
+    {
+      "name": "AWAIT ASYNCCODEC.ENCODEASYNC",
+      "date": "2026-04-01",
+      "source": "npm",
+      "link": "https://www.npmjs.com/package/asynccodec"
+    },
+    {
+      "name": "SHIP OR DIE",
+      "date": "2026-01-15",
+      "source": "site",
+      "link": "https://ship-or-die.com",
+      "description": "Conference by Marc Lou",
+      "who": "Jack Friks",
+      "handle": "jackfriks",
+      "owner": {
+        "name": "Jack Friks",
+        "github": "jackfriks",
+        "x": "jackfriks",
+        "site": "https://jackfriks.com"
+      }
+    },
+    {
+      "name": "MARKETING OR DIE",
+      "date": "2026-01-16",
+      "source": "site",
+      "link": "https://marketing-or-die.com",
+      "description": "By Marc Lou",
+      "who": "Jack Friks",
+      "handle": "jackfriks",
+      "owner": {
+        "name": "Jack Friks",
+        "github": "jackfriks",
+        "x": "jackfriks",
+        "site": "https://jackfriks.com"
+      }
+    },
+    {
+      "name": "NODE JS 18 LTS",
+      "date": null,
+      "source": "changelog",
+      "link": "https://vercel.com/changelog/node-js-18-lts"
+    },
+    {
+      "name": "VERCEL POSTGRES",
+      "date": null,
+      "source": "changelog",
+      "link": "https://vercel.com/changelog/vercel-postgres"
+    },
+    {
+      "name": "VERCEL BLOB",
+      "date": null,
+      "source": "changelog",
+      "link": "https://vercel.com/changelog/vercel-blob"
+    },
+    {
+      "name": "VERCEL FUNCTIONS",
+      "date": null,
+      "source": "changelog",
+      "link": "https://vercel.com/changelog/vercel-functions"
+    },
+    {
+      "name": "WAITUNTIL",
+      "date": null,
+      "source": "changelog",
+      "link": "https://vercel.com/changelog/waituntil"
+    },
+    {
+      "name": "PYTHON 3 12",
+      "date": null,
+      "source": "changelog",
+      "link": "https://vercel.com/changelog/python-3-12"
+    },
+    {
+      "name": "BETA AND ROLLING OUT TO ALL USERS",
+      "date": "2026-07-01",
+      "source": "changelog",
+      "link": "https://cursor.com/changelog/beta-rolling"
+    },
+    {
+      "name": "SHIP OR DIE",
+      "date": "2026-06-09",
+      "source": "site",
+      "link": "https://jackfriks.com",
+      "description": "Founder community for indie hackers",
+      "who": "Jack Friks",
+      "handle": "jackfriks",
+      "owner": {
+        "name": "Jack Friks",
+        "github": "jackfriks",
+        "x": "jackfriks",
+        "site": "https://jackfriks.com"
+      }
+    }
   ],
   "keep": [
-    { "name": "CURSOR 3", "date": "2026-04-02", "source": "changelog", "link": "https://cursor.com/blog/cursor-3", "who": "Michael Truell" },
-    { "name": "COMPOSER 2", "date": "2026-03-19", "source": "changelog", "link": "https://cursor.com/blog/composer-2", "who": "Michael Truell" },
-    { "name": "BUGBOT", "date": "2026-06-01", "source": "changelog", "link": "https://cursor.com/changelog/bugbot-updates-june-2026", "who": "Michael Truell" },
-    { "name": "ORIGIN", "date": "2026-09-14", "source": "changelog", "link": "https://cursor.com/blog/origin", "who": "Michael Truell" },
-    { "name": "CODEX APP", "date": "2026-02-14", "source": "changelog", "link": "https://openai.com/codex", "who": "Tibo" },
-    { "name": "CODEX APP UPDATES", "date": "2026-08-04", "source": "changelog", "link": "https://developers.openai.com/codex/app", "who": "Tibo" },
-    { "name": "GPT-5.3-CODEX", "date": "2026-03-12", "source": "changelog", "link": "https://developers.openai.com/codex/changelog#gpt-5-3-codex", "who": "Tibo" },
-    { "name": "ZOD", "date": "2026-10-10", "source": "github", "link": "https://github.com/colinhacks/zod", "description": "TypeScript-first schema validation", "who": "Colin McDonnell", "handle": "colinhacks", "owner": { "name": "Colin McDonnell", "github": "colinhacks" } },
-    { "name": "TSC-RS", "date": "2026-03-01", "source": "github", "link": "https://github.com/colinhacks/tsc-rs", "description": "TypeScript checker", "who": "Colin McDonnell", "handle": "colinhacks", "owner": { "name": "Colin McDonnell", "github": "colinhacks" } },
-    { "name": "SHIP OR DIE", "date": "2026-01-15", "source": "site", "link": "https://ship-or-die.com", "description": "Conference", "who": "Marc Lou", "handle": "marclou", "owner": { "name": "Marc Lou", "github": "marclou", "site": "https://ship-or-die.com" } },
-    { "name": "V0", "date": "2026-02-01", "source": "changelog", "link": "https://vercel.com/blog/v0", "who": "Guillermo Rauch" },
-    { "name": "V0 API", "date": "2026-03-01", "source": "changelog", "link": "https://vercel.com/blog/v0-api", "who": "Guillermo Rauch" },
-    { "name": "Vercel Agent now installs private packages from npm and", "date": "2026-09-30", "source": "changelog", "link": "https://vercel.com/changelog/vercel-agent-now-installs-private-packages-from-npm-and-custom-registries", "who": "Guillermo Rauch" },
-    { "name": "v0 Platform API now in beta", "date": "2026-04-01", "source": "changelog", "link": "https://vercel.com/changelog/v0-platform-api-now-in-beta", "who": "Guillermo Rauch" },
-    { "name": "GPT-6", "date": "2026-05-01", "source": "changelog", "link": "https://openai.com/index/gpt-6", "who": "Sam Altman" },
-    { "name": "CHATGPT IMAGES", "date": "2026-02-01", "source": "changelog", "link": "https://openai.com/index/images", "who": "Sam Altman" },
-    { "name": "SORA", "date": "2026-03-01", "source": "changelog", "link": "https://openai.com/sora", "who": "Sam Altman" },
-    { "name": "SHOO", "date": "2026-03-01", "source": "npm", "link": "https://www.npmjs.com/package/@shoojs/core", "who": "Theo", "handle": "t3dotgg" }
+    {
+      "name": "CURSOR 3",
+      "date": "2026-04-02",
+      "source": "changelog",
+      "link": "https://cursor.com/blog/cursor-3",
+      "who": "Michael Truell"
+    },
+    {
+      "name": "COMPOSER 2",
+      "date": "2026-03-19",
+      "source": "changelog",
+      "link": "https://cursor.com/blog/composer-2",
+      "who": "Michael Truell"
+    },
+    {
+      "name": "BUGBOT",
+      "date": "2026-06-01",
+      "source": "changelog",
+      "link": "https://cursor.com/changelog/bugbot-updates-june-2026",
+      "who": "Michael Truell"
+    },
+    {
+      "name": "ORIGIN",
+      "date": "2026-09-14",
+      "source": "changelog",
+      "link": "https://cursor.com/blog/origin",
+      "who": "Michael Truell"
+    },
+    {
+      "name": "CODEX APP",
+      "date": "2026-02-14",
+      "source": "changelog",
+      "link": "https://openai.com/codex",
+      "who": "Tibo"
+    },
+    {
+      "name": "CODEX APP UPDATES",
+      "date": "2026-08-04",
+      "source": "changelog",
+      "link": "https://developers.openai.com/codex/app",
+      "who": "Tibo"
+    },
+    {
+      "name": "GPT-5.3-CODEX",
+      "date": "2026-03-12",
+      "source": "changelog",
+      "link": "https://developers.openai.com/codex/changelog#gpt-5-3-codex",
+      "who": "Tibo"
+    },
+    {
+      "name": "ZOD",
+      "date": "2026-10-10",
+      "source": "github",
+      "link": "https://github.com/colinhacks/zod",
+      "description": "TypeScript-first schema validation",
+      "who": "Colin McDonnell",
+      "handle": "colinhacks",
+      "owner": {
+        "name": "Colin McDonnell",
+        "github": "colinhacks"
+      }
+    },
+    {
+      "name": "TSC-RS",
+      "date": "2026-03-01",
+      "source": "github",
+      "link": "https://github.com/colinhacks/tsc-rs",
+      "description": "TypeScript checker",
+      "who": "Colin McDonnell",
+      "handle": "colinhacks",
+      "owner": {
+        "name": "Colin McDonnell",
+        "github": "colinhacks"
+      }
+    },
+    {
+      "name": "SHIP OR DIE",
+      "date": "2026-01-15",
+      "source": "site",
+      "link": "https://ship-or-die.com",
+      "description": "Conference",
+      "who": "Marc Lou",
+      "handle": "marclou",
+      "owner": {
+        "name": "Marc Lou",
+        "github": "marclou",
+        "site": "https://ship-or-die.com"
+      }
+    },
+    {
+      "name": "V0",
+      "date": "2026-02-01",
+      "source": "changelog",
+      "link": "https://vercel.com/blog/v0",
+      "who": "Guillermo Rauch"
+    },
+    {
+      "name": "V0 API",
+      "date": "2026-03-01",
+      "source": "changelog",
+      "link": "https://vercel.com/blog/v0-api",
+      "who": "Guillermo Rauch"
+    },
+    {
+      "name": "Vercel Agent now installs private packages from npm and",
+      "date": "2026-09-30",
+      "source": "changelog",
+      "link": "https://vercel.com/changelog/vercel-agent-now-installs-private-packages-from-npm-and-custom-registries",
+      "who": "Guillermo Rauch"
+    },
+    {
+      "name": "v0 Platform API now in beta",
+      "date": "2026-04-01",
+      "source": "changelog",
+      "link": "https://vercel.com/changelog/v0-platform-api-now-in-beta",
+      "who": "Guillermo Rauch"
+    },
+    {
+      "name": "GPT-6",
+      "date": "2026-05-01",
+      "source": "changelog",
+      "link": "https://openai.com/index/gpt-6",
+      "who": "Sam Altman"
+    },
+    {
+      "name": "CHATGPT IMAGES",
+      "date": "2026-02-01",
+      "source": "changelog",
+      "link": "https://openai.com/index/images",
+      "who": "Sam Altman"
+    },
+    {
+      "name": "SORA",
+      "date": "2026-03-01",
+      "source": "changelog",
+      "link": "https://openai.com/sora",
+      "who": "Sam Altman"
+    },
+    {
+      "name": "SHOO",
+      "date": "2026-03-01",
+      "source": "npm",
+      "link": "https://www.npmjs.com/package/@shoojs/core",
+      "who": "Theo",
+      "handle": "t3dotgg"
+    }
   ]
 }

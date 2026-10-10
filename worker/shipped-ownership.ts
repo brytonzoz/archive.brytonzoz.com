@@ -16,8 +16,27 @@ const DEVELOPER_SOURCE = /^(github|npm|producthunt|appstore|x)$/;
 const COMPANY_SOURCE = /^(changelog|company)$/;
 const PORTFOLIO_HINT =
   /\b(pinned on|listed under|listed on|things i.?ve built|working on|my projects|portfolio)\b/i;
-const TOOLS_HINT = /\b(tools i use|affiliat|friends?|recommended|i use|made by|from the maker)\b/i;
+const TOOLS_HINT =
+  /\b(tools i use|affiliat|friends?|recommended|i use|made by|from the maker|founder community)\b/i;
 const PUBLIC_PAGE = /^public page on /i;
+const FOREIGN_PRODUCTS: { re: RegExp; owner: RegExp }[] = [
+  { re: /\bship or die\b/i, owner: /marc\s*lou|marclou|marc_lou/i },
+  { re: /\bmarketing or die\b/i, owner: /marc\s*lou|marclou|marc_lou/i },
+];
+
+function ownerHay(owner?: OwnerContext | null): string {
+  return `${owner?.name || ''} ${owner?.github || ''} ${owner?.x || ''} ${owner?.site || ''}`;
+}
+
+function isForeignProduct(
+  item: { name?: string; description?: string; link?: string | null },
+  owner?: OwnerContext | null,
+): boolean {
+  const hay = `${item.name || ''} ${item.description || ''} ${item.link || ''}`;
+  const who = ownerHay(owner);
+  if (/\bmarc\s*lou\b/i.test(item.description || '') && !/marc\s*lou|marclou|marc_lou/i.test(who)) return true;
+  return FOREIGN_PRODUCTS.some((row) => row.re.test(hay) && !row.owner.test(who));
+}
 
 function loose(text: string): string {
   return text.toLowerCase().normalize('NFKD').replace(/[^a-z0-9]/g, '');
@@ -83,6 +102,7 @@ export function ownershipEvidence(
   owner?: OwnerContext | null,
 ): OwnershipKind {
   const source = item.source ?? '';
+  if (isForeignProduct(item, owner)) return 'none';
   if (COMPANY_SOURCE.test(source)) return 'company';
   if (DEVELOPER_SOURCE.test(source)) return 'developer';
   if (githubOwned(item.link, owner)) return 'developer';

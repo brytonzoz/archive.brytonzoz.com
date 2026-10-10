@@ -4,6 +4,7 @@ import { test } from 'node:test';
 
 const affiliation = await import('../worker/shipped-affiliation.ts');
 const decisions = await import('../worker/shipped-decisions.ts');
+const ownership = await import('../worker/shipped-ownership.ts');
 const xai = await import('../worker/shipped-xai.ts');
 const year = await import('../lib/shipped-year.ts');
 const ai = await import('../worker/shipped-ai.ts');
@@ -170,6 +171,26 @@ test('tutorials, case studies, and research writeups are not ships', () => {
     date: '2026-09-09',
   });
   assert.equal(decisions.shouldKeep(decisions.heuristicMark(repoJack, 2026, indie, jack), repoJack, jack), true);
+  const shipOrDie = found({
+    name: 'SHIP OR DIE',
+    description: 'Founder community for indie hackers',
+    date: '2026-06-09',
+    link: 'https://jackfriks.com',
+    source: 'site',
+  });
+  assert.equal(ownership.ownedByBuilder(shipOrDie, jack), false);
+  assert.equal(decisions.shouldKeep(decisions.heuristicMark(shipOrDie, 2026, indie, jack), shipOrDie, jack), false);
+  const marcShip = found({
+    name: 'SHIP OR DIE',
+    description: 'Conference',
+    date: '2026-01-15',
+    link: 'https://ship-or-die.com',
+    source: 'site',
+  });
+  assert.equal(
+    ownership.ownedByBuilder(marcShip, { name: 'Marc Lou', github: 'marclou', site: 'https://ship-or-die.com' }),
+    true,
+  );
   const virgin = decisions.heuristicMark(
     found({ name: 'Virgin Atlantic ships faster with Codex', link: 'https://openai.com/index/virgin', via: 'via OpenAI · Codex' }),
     2026,

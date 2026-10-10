@@ -157,7 +157,7 @@ function isNoiseTitle(text: string): boolean {
 }
 
 /** Headline verbs → a short product name. Never cut mid-word. */
-export function shipName(value: unknown, max = 40): string {
+export function shipName(value: unknown, max = 60): string {
   let text = stripDateSuffix(tidy(value))
     .replace(/^(guides?|editorials?|listicles?|news|product|safety|research|company|inside\s+\w+)\s+/i, '')
     .replace(/\s+\d+\s*min(?:ute)?s?\s*$/i, '')

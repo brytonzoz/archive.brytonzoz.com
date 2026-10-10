@@ -91,6 +91,28 @@ test('E2E goldens: cached raw tapes keep flagships, hit floors, and drop junk', 
     if (anyMissing.length) failures.push(`${id}: missing any ${anyMissing.map((row) => row.key).join(', ')}`);
     if (leaked.length) failures.push(`${id}: junk leaked ${JSON.stringify(leaked)}`);
     if (!yearOk) failures.push(`${id}: no ${spec.requireYear} product`);
+    const chopped = names.filter((name) => polish.endsWithCutOffWord(name));
+    if (chopped.length) failures.push(`${id}: cut-off titles ${JSON.stringify(chopped)}`);
+    for (const needle of spec.forbidden || []) {
+      const want = loose(needle);
+      if (names.some((name) => loose(name) === want)) failures.push(`${id}: forbidden ${needle}`);
+    }
+    for (const row of spec.forbiddenRe || []) {
+      if (names.some((name) => new RegExp(row.re, 'i').test(name))) failures.push(`${id}: forbidden re ${row.key}`);
+    }
+    if (items.length) {
+      const sealed = ai.finish(items, '', 1, undefined, [], {
+        who: spec.who,
+        handle: spec.handle,
+        year: 2026,
+        affiliation: spec.profile.affiliation,
+        owner: spec.owner || null,
+        apiDown: false,
+      });
+      if (ai.isBareProductNote(sealed.note, sealed.items)) {
+        failures.push(`${id}: bare-name fallback ${JSON.stringify(sealed.note)}`);
+      }
+    }
   }
   assert.deepEqual(failures, [], JSON.stringify({ failures, report: Object.fromEntries(Object.entries(report).map(([k, v]) => [k, { count: v.count, names: v.names }])) }, null, 2));
 });

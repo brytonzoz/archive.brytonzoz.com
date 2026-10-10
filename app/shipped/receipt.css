@@ -641,7 +641,7 @@
 
 .shipped-lead {
   display: flex;
-  align-items: baseline;
+  align-items: last baseline;
   justify-content: space-between;
   gap: 0.4rem;
   min-width: 0;
@@ -667,10 +667,17 @@
 }
 
 .shipped-item-name {
+  flex: 1 1 12rem;
+  min-width: 0;
   font-size: 13.5px;
   text-wrap: balance;
   overflow-wrap: break-word;
   word-break: break-word;
+  display: -webkit-box;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 2;
+  line-clamp: 2;
+  overflow: hidden;
 }
 
 @media (max-width: 430px) {

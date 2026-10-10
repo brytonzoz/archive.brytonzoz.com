@@ -66,7 +66,7 @@
         "icon": null
       },
       {
-        "name": "ORIGIN · SEP 14, 2026",
+        "name": "ORIGIN \u00b7 SEP 14, 2026",
         "description": "",
         "date": "2026-09-14",
         "link": "https://cursor.com/blog/origin",
@@ -405,6 +405,50 @@
         "score": 3,
         "thisYear": true,
         "icon": null
+      },
+      {
+        "name": "3.10 JUN 30, 2026",
+        "description": "",
+        "date": "2026-06-30",
+        "link": "https://cursor.com/changelog/3-10",
+        "source": "changelog",
+        "status": "LAUNCHED",
+        "score": 7,
+        "thisYear": true,
+        "icon": null
+      },
+      {
+        "name": "3.11 JUL 10, 2026",
+        "description": "",
+        "date": "2026-07-10",
+        "link": "https://cursor.com/changelog/3-11",
+        "source": "changelog",
+        "status": "LAUNCHED",
+        "score": 7,
+        "thisYear": true,
+        "icon": null
+      },
+      {
+        "name": "BETA AND ROLLING OUT TO ALL USERS",
+        "description": "",
+        "date": "2026-07-01",
+        "link": "https://cursor.com/changelog/beta-rolling",
+        "source": "changelog",
+        "status": "LAUNCHED",
+        "score": 7,
+        "thisYear": true,
+        "icon": null
+      }
+    ],
+    "forbidden": [
+      "3.10 JUN 30, 2026",
+      "3.11 JUL 10, 2026",
+      "BETA AND ROLLING OUT TO ALL USERS"
+    ],
+    "forbiddenRe": [
+      {
+        "key": "version-label",
+        "re": "^\\d+\\.\\d+\\s+(jan|feb|mar|apr|may|jun|jul|aug|sep|oct|nov|dec)"
       }
     ]
   },
@@ -2552,14 +2596,224 @@
         "score": 2,
         "thisYear": true,
         "icon": null
+      },
+      {
+        "name": "Vercel Terraform Provider now available",
+        "description": "",
+        "date": "2026-08-12",
+        "link": "https://vercel.com/changelog/vercel-terraform-provider-now-available",
+        "source": "changelog",
+        "status": "LAUNCHED",
+        "score": 7,
+        "thisYear": true,
+        "icon": null
+      },
+      {
+        "name": "Deployment Pages now display key metrics",
+        "description": "",
+        "date": "2026-08-13",
+        "link": "https://vercel.com/changelog/deployment-pages-now-display-key-metrics",
+        "source": "changelog",
+        "status": "LAUNCHED",
+        "score": 7,
+        "thisYear": true,
+        "icon": null
+      },
+      {
+        "name": "Claimed Deployments now include third-party logs",
+        "description": "",
+        "date": "2026-08-14",
+        "link": "https://vercel.com/changelog/claimed-deployments-now-include-third-party-logs",
+        "source": "changelog",
+        "status": "LAUNCHED",
+        "score": 7,
+        "thisYear": true,
+        "icon": null
+      },
+      {
+        "name": "Vercel Firewall now stops DDoS attacks",
+        "description": "",
+        "date": "2026-08-15",
+        "link": "https://vercel.com/changelog/vercel-firewall-now-stops-ddos-attacks",
+        "source": "changelog",
+        "status": "LAUNCHED",
+        "score": 7,
+        "thisYear": true,
+        "icon": null
+      },
+      {
+        "name": "Deploy Hono backends with zero configuration",
+        "description": "",
+        "date": "2026-08-16",
+        "link": "https://vercel.com/changelog/deploy-hono-backends-with-zero-configuration",
+        "source": "changelog",
+        "status": "LAUNCHED",
+        "score": 7,
+        "thisYear": true,
+        "icon": null
+      },
+      {
+        "name": "Instrument and Trace Applications with OpenTelemetry",
+        "description": "",
+        "date": "2026-08-17",
+        "link": "https://vercel.com/changelog/instrument-and-trace-applications-with-opentelemetry",
+        "source": "changelog",
+        "status": "LAUNCHED",
+        "score": 7,
+        "thisYear": true,
+        "icon": null
+      },
+      {
+        "name": "Observability Dashboard for Image Optimization",
+        "description": "",
+        "date": "2026-08-18",
+        "link": "https://vercel.com/changelog/observability-dashboard-for-image-optimization",
+        "source": "changelog",
+        "status": "LAUNCHED",
+        "score": 7,
+        "thisYear": true,
+        "icon": null
+      },
+      {
+        "name": "Enhanced Observability on the Usage page",
+        "description": "",
+        "date": "2026-08-19",
+        "link": "https://vercel.com/changelog/enhanced-observability-on-the-usage-page",
+        "source": "changelog",
+        "status": "LAUNCHED",
+        "score": 7,
+        "thisYear": true,
+        "icon": null
+      },
+      {
+        "name": "Convert Comments on Preview Deployments",
+        "description": "",
+        "date": "2026-08-20",
+        "link": "https://vercel.com/changelog/convert-comments-on-preview-deployments",
+        "source": "changelog",
+        "status": "LAUNCHED",
+        "score": 7,
+        "thisYear": true,
+        "icon": null
+      },
+      {
+        "name": "Automatic Mitigation of Crawler Delays",
+        "description": "",
+        "date": "2026-08-21",
+        "link": "https://vercel.com/changelog/automatic-mitigation-of-crawler-delays",
+        "source": "changelog",
+        "status": "LAUNCHED",
+        "score": 7,
+        "thisYear": true,
+        "icon": null
+      },
+      {
+        "name": "NODE JS 18 LTS",
+        "description": "",
+        "date": null,
+        "link": "https://vercel.com/changelog/node-js-18-lts",
+        "source": "changelog",
+        "status": "LAUNCHED",
+        "score": 3,
+        "thisYear": true,
+        "icon": null
+      },
+      {
+        "name": "VERCEL POSTGRES",
+        "description": "",
+        "date": null,
+        "link": "https://vercel.com/changelog/vercel-postgres",
+        "source": "changelog",
+        "status": "LAUNCHED",
+        "score": 3,
+        "thisYear": true,
+        "icon": null
+      },
+      {
+        "name": "VERCEL BLOB",
+        "description": "",
+        "date": null,
+        "link": "https://vercel.com/changelog/vercel-blob",
+        "source": "changelog",
+        "status": "LAUNCHED",
+        "score": 3,
+        "thisYear": true,
+        "icon": null
+      },
+      {
+        "name": "VERCEL FUNCTIONS",
+        "description": "",
+        "date": null,
+        "link": "https://vercel.com/changelog/vercel-functions",
+        "source": "changelog",
+        "status": "LAUNCHED",
+        "score": 3,
+        "thisYear": true,
+        "icon": null
+      },
+      {
+        "name": "WAITUNTIL",
+        "description": "",
+        "date": null,
+        "link": "https://vercel.com/changelog/waituntil",
+        "source": "changelog",
+        "status": "LAUNCHED",
+        "score": 3,
+        "thisYear": true,
+        "icon": null
+      },
+      {
+        "name": "PYTHON 3 12",
+        "description": "",
+        "date": null,
+        "link": "https://vercel.com/changelog/python-3-12",
+        "source": "changelog",
+        "status": "LAUNCHED",
+        "score": 3,
+        "thisYear": true,
+        "icon": null
+      },
+      {
+        "name": "PYTHON 3 12 AND RUBY 3.3 ARE",
+        "description": "",
+        "date": null,
+        "link": "https://vercel.com/changelog/python-3-12-and-ruby-3-3",
+        "source": "changelog",
+        "status": "LAUNCHED",
+        "score": 3,
+        "thisYear": true,
+        "icon": null
       }
+    ],
+    "forbidden": [
+      "VERCEL TERRAFORM PROVIDER NOW",
+      "DEPLOYMENT PAGES NOW DISPLAY KEY",
+      "CLAIMED DEPLOYMENTS NOW INCLUDE THIRD",
+      "PYTHON 3 12 AND RUBY 3.3 ARE",
+      "VERCEL FIREWALL NOW STOPS DDOS",
+      "DEPLOY HONO BACKENDS WITH ZERO",
+      "INSTRUMENT AND TRACE APPLICATIONS",
+      "OBSERVABILITY DASHBOARD FOR IMAGE",
+      "ENHANCED OBSERVABILITY ON THE USAGE",
+      "CONVERT COMMENTS ON PREVIEW",
+      "AUTOMATIC MITIGATION OF CRAWLER DELAY",
+      "NODE JS 18 LTS",
+      "VERCEL POSTGRES",
+      "VERCEL BLOB",
+      "VERCEL FUNCTIONS",
+      "WAITUNTIL",
+      "PYTHON 3 12"
     ]
   },
   "sam": {
     "who": "Sam Altman",
     "handle": "sama",
     "min": 20,
-    "required": [],
+    "required": [
+      "GPT-6",
+      "Sora",
+      "ChatGPT Images"
+    ],
     "profile": {
       "name": "Sam Altman",
       "bio": "CEO of OpenAI",
@@ -3288,7 +3542,22 @@
         "score": 7,
         "thisYear": true,
         "icon": null
+      },
+      {
+        "name": "SHIP OR DIE",
+        "description": "Founder community for indie hackers",
+        "date": "2026-06-09",
+        "link": "https://jackfriks.com",
+        "source": "site",
+        "status": "LAUNCHED",
+        "score": 7,
+        "thisYear": true,
+        "icon": null
       }
+    ],
+    "forbidden": [
+      "SHIP OR DIE",
+      "MARKETING OR DIE"
     ]
   }
 }

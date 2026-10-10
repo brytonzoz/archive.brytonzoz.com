@@ -446,6 +446,7 @@ export type NoteContext = {
   year?: number;
   affiliation?: Affiliation | null;
   owner?: OwnerContext | null;
+  apiDown?: boolean;
 };
 
 function notableShip(items: DraftItem[]): DraftItem | null {
@@ -605,6 +606,40 @@ export function pickLeastBadNote(
   return ranked[0]?.note ?? '';
 }
 
+/** A cashier note that is only the product name — a failed fallback when the API is up. */
+export function isBareProductNote(note: string, items: DraftItem[] = []): boolean {
+  const text = note.replace(/\s+/g, ' ').trim();
+  if (!text || /[.!?]/.test(text)) return false;
+  const compact = loose(text);
+  if (!compact) return false;
+  if (!items.length) return !/\s/.test(text) && compact.length >= 3;
+  return items.some((item) => {
+    const name = loose(item.name);
+    const spoken = loose(item.spoken || spokenShipName(item.name));
+    return Boolean(name && (compact === name || compact === spoken));
+  });
+}
+
+/** When Claude is up but every candidate died: a sentence, never a bare product name. */
+export function sentenceFallbackNote(items: DraftItem[], ctx: NoteContext = {}): string {
+  const notable = notableShip(items);
+  if (!notable) return POTENTIAL_NOTES[0] ?? '';
+  const spoken = spokenOf(notable);
+  const who = (ctx.who || '').replace(/^@/, '').split(/\s+/).filter(Boolean)[0] || '';
+  const candidates = [
+    `${spoken} is the one that stuck.`,
+    who ? `${spoken} is the one I'd put next to ${who}.` : `${spoken} is the one I'd keep.`,
+    `${spoken} showed up, and it reads like the real ship.`,
+  ];
+  for (const note of candidates) {
+    if (hardRejectNote(note, items, [], ctx)) continue;
+    if (isBareProductNote(note, items)) continue;
+    if (!printable(note)) continue;
+    return clipSentence(note, 140);
+  }
+  return clipSentence(`${spoken} showed up.`, 140);
+}
+
 /** Last resort only: the notable ship name. No sentence costume. */
 export function groundedNote(items: DraftItem[], seed: number, profileName = '', _stats: string[] = [], ctx: NoteContext = {}): string {
   const real = items.filter((item) => item.source !== 'none' && !GENERIC_NOTE_NAME.test(item.name.trim()));
@@ -762,7 +797,7 @@ function asPrintedItem(item: DraftItem): DraftItem {
   };
 }
 
-function finish(items: DraftItem[], note: string, seed: number, modulesRaw?: unknown, statsRaw?: unknown, ctx: NoteContext = {}): Draft {
+export function finish(items: DraftItem[], note: string, seed: number, modulesRaw?: unknown, statsRaw?: unknown, ctx: NoteContext = {}): Draft {
   const layout = sanitizeLayout(modulesRaw, seed);
   const year = ctx.year || new Date().getUTCFullYear();
   const gated = gateReceiptItems(items, {
@@ -785,19 +820,17 @@ function finish(items: DraftItem[], note: string, seed: number, modulesRaw?: unk
     : formatStats(sorted);
   const text = note.replace(/\s+/g, ' ').trim();
   const hard = hardRejectNote(text, sorted, Array.isArray(statsRaw) ? (statsRaw as string[]) : stats, ctx);
-  // Bare-name fallback is for an empty/unprintable note, or a hard reject that slipped the picker.
-  const whoNote =
-    !text ||
-    !ok(text) ||
-    hard === 'url' ||
-    hard === 'unsafe' ||
-    hard === 'empty' ||
-    hard === 'other-person' ||
-    hard === 'unsourced-number' ||
-    hard === 'banned-phrase'
+  const apiDown = Boolean(ctx.apiDown);
+  let whoNote = text;
+  if (!text || !ok(text) || hard) {
+    whoNote = apiDown
       ? groundedNote(sorted, seed, ctx.who || ctx.company || '', stats, ctx)
-      : text;
+      : sentenceFallbackNote(sorted, ctx);
+  }
   const printed = printNote(whoNote, stats);
+  if (!apiDown && isBareProductNote(printed, sorted)) {
+    console.log(JSON.stringify({ shipped: 'note-fallback', who: ctx.who || null, note: printed, apiDown: false }));
+  }
   return { items: sorted, note: printed, stats, potential: false, layout };
 }
 
@@ -824,7 +857,7 @@ export function demoReceipt(gathered: Gathered, year: number, seed: number): Dra
     seed,
     undefined,
     formatStats(items, gathered.stats ?? []),
-    noteCtx,
+    { ...noteCtx, apiDown: true },
   );
 }
 
@@ -995,7 +1028,7 @@ function normalize(raw: unknown, gathered: Gathered, allowed: Allowed, year: num
     if (!entry || typeof entry !== 'object' || Array.isArray(entry)) continue;
     const item = entry as Record<string, unknown>;
     if (typeof item.name !== 'string' || item.name.length > 120) continue;
-    const name = upper(item.name, 40);
+    const name = upper(item.name, 60);
     const key = loose(name);
     if (!ok(name) || !key || seen.has(key)) continue;
     const date = yearDate(item.date, year);
@@ -1262,7 +1295,7 @@ export async function assembleReceipt(
       apiDown = true;
     }
     if (apiDown) note = '';
-    const draft = finish(harvested, note, seed, undefined, stats, noteCtx);
+    const draft = finish(harvested, note, seed, undefined, stats, { ...noteCtx, apiDown });
     const cost = spent();
     console.log(JSON.stringify({ shipped: 'ai', model, mode: 'note-only', items: harvested.length, inputTokens: usage.input, outputTokens: usage.output, costMicros: cost }));
     return { ...draft, model, inputTokens: usage.input, outputTokens: usage.output, searches: 0, costMicros: cost };

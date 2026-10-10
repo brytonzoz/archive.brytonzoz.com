@@ -49,7 +49,15 @@ test('title cleaner extracts a short product name or drops the line', () => {
   assert.match(polish.cleanShipTitle('GRAPHITE IS JOINING CURSOR'), /graphite joining cursor/i);
   assert.equal(polish.cleanShipTitle('RILLET SHIPS 3× FASTER WITH AI AGENTS'), '');
   assert.equal(polish.cleanShipTitle('TRUSTMRR REVENUECAT INTEGRATION (API'), '');
-  assert.ok(polish.cleanShipTitle('Remote control for local agents').length <= 38);
+  assert.ok(polish.cleanShipTitle('Remote control for local agents').length <= 60);
+  assert.match(polish.cleanShipTitle('Vercel Terraform Provider now available'), /vercel terraform provider/i);
+  assert.match(polish.cleanShipTitle('Deployment Pages now display key metrics'), /deployment pages now display key metrics/i);
+  assert.equal(polish.endsWithCutOffWord('Vercel Terraform Provider Now'), true);
+  assert.equal(polish.endsWithCutOffWord('Observability Dashboard for Image'), true);
+  assert.equal(polish.endsWithCutOffWord('FLUX 3 Image'), false);
+  assert.match(polish.cleanShipTitle('3.10 JUN 30, 2026'), /cursor 3\.10/i);
+  assert.equal(polish.dateFromLabeledTitle('3.11 JUL 10, 2026', 2026), '2026-07-10');
+  assert.equal(polish.isVagueOrCutTitle('BETA AND ROLLING OUT TO ALL USERS'), true);
   assert.equal(polish.cleanShipTitle('Introducing Codex long-running work'), 'Codex long-running work');
   assert.equal(polish.cleanShipTitle('VISIT OUR YOUTUBE CHANNEL ↗'), '');
   assert.equal(polish.cleanShipTitle('TRY CURSOR NOW'), '');

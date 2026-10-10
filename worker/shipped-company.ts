@@ -67,7 +67,8 @@ export function isPriorityCompanyUrl(url: string): boolean {
   try {
     const path = new URL(url).pathname.replace(/\/+$/, '') || '/';
     if (path === '/' || path === '/index') return true;
-    return /\/(changelog|blog|news|releases|updates|whats-new|feed|rss|atom|sitemap)(\/|$|\.)/i.test(path);
+    if (/\/index\/[a-z0-9-]+/i.test(path)) return true;
+    return /\/(changelog|blog|news|releases|updates|whats-new|feed|rss|atom|sitemap|sora|device)(\/|$|\.)/i.test(path);
   } catch {
     return false;
   }
@@ -78,7 +79,7 @@ export function priorityCompanyScore(url: string): number {
   try {
     const path = new URL(url).pathname.replace(/\/+$/, '') || '/';
     if (/\/changelog\b/i.test(path)) return 0;
-    if (/\/(releases?|updates?|whats-new)\b/i.test(path)) return 1;
+    if (/\/(releases?|updates?|whats-new|index\/|sora|device)\b/i.test(path)) return 1;
     if (path === '/' || path === '/index') return 2;
     if (/\/(feed|rss|atom|sitemap)/i.test(path)) return 3;
     if (/\/(blog|news)\b/i.test(path)) return 4;
@@ -155,7 +156,13 @@ export function compactCompanyFound(found: Found[], cap = COMPANY_CACHE_CAP): Fo
     if (item.source === 'changelog') n += 80;
     if (/\/(changelog|release-notes|whats-new|docs\/changelog)/i.test(url)) n += 50;
     if (item.date && /^\d{4}-\d{2}-\d{2}$/.test(item.date)) n += 30;
-    if (/\/(blog|news|research|index)\//i.test(url) && !/changelog/i.test(url)) n -= 20;
+    if (
+      /openai\.com\/(index|sora|device)\b/i.test(url) &&
+      (item.date || /\b(gpt-?\d|chatgpt|sora|atlas|health|device|images)\b/i.test(name))
+    ) {
+      n += 40;
+    }
+    if (/\/(blog|news|research)\//i.test(url) && !/changelog|\/index\//i.test(url)) n -= 20;
     if (looksLikeNotAShip(item) && !flagshipLaunchName(item)) n -= 80;
     if (/\b(bug fixes?|get started|configuration details|see setup)\b/i.test(name)) n -= 60;
     if (/\b(codex|chatgpt|claude|cursor|gpt-?\d)/i.test(name) && name.length <= 72) n += 25;

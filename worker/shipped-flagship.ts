@@ -79,7 +79,9 @@ export function stripDateSuffix(text: string): string {
 export function isCompanyShip(item: FlagshipItem): boolean {
   const source = item.source ?? '';
   if (source === 'changelog' || source === 'company') return true;
-  return /\/(changelog|blog|news|releases?|whats-new|release-notes)\//i.test(item.link ?? '');
+  const link = item.link ?? '';
+  if (/\/(changelog|blog|news|releases?|whats-new|release-notes|index)\//i.test(link)) return true;
+  return /openai\.com\/(sora|device|index)(\/|$)/i.test(link);
 }
 
 /** Grok/Claude/Gemini appearing on a company tape is a model-availability note. */
@@ -199,6 +201,18 @@ export function flagshipProbePaths(company: string | null | undefined): string[]
       '/changelog/origin',
       '/changelog/page/2',
       '/changelog/page/3',
+    ];
+  }
+  if (/\bopenai\b/.test(slug)) {
+    return [
+      '/index',
+      '/index/gpt-6',
+      '/index/chatgpt-atlas',
+      '/index/chatgpt-health',
+      '/index/chatgpt-images',
+      '/sora',
+      '/device',
+      '/products/release-notes',
     ];
   }
   return [];

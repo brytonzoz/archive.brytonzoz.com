@@ -354,6 +354,26 @@ test('cashier note and stats are specific to the items, never stock copy', () =>
   );
   assert.ok(softOnly.length > 8, softOnly);
   assert.doesNotMatch(softOnly, /^(PhotoAI|InteriorAI|SuperLevels)$/i);
+  assert.equal(ai.isBareProductNote('PhotoAI', [{ name: 'PHOTOAI', spoken: 'PhotoAI' }]), true);
+  assert.equal(ai.isBareProductNote('PhotoAI is the one that stuck.', [{ name: 'PHOTOAI', spoken: 'PhotoAI' }]), false);
+  const sealed = ai.finish(
+    [{ name: 'PHOTOAI', spoken: 'PhotoAI', description: 'headshots', date: '2026-01-20', status: 'LAUNCHED', link: 'https://photoai.com', icon: null, source: 'site' }],
+    '',
+    1,
+    undefined,
+    [],
+    { who: 'Pieter Levels', handle: 'levelsio', apiDown: false, year: 2026 },
+  );
+  assert.equal(ai.isBareProductNote(sealed.note, sealed.items), false, sealed.note);
+  const down = ai.finish(
+    [{ name: 'PHOTOAI', spoken: 'PhotoAI', description: 'headshots', date: '2026-01-20', status: 'LAUNCHED', link: 'https://photoai.com', icon: null, source: 'site' }],
+    '',
+    1,
+    undefined,
+    [],
+    { who: 'Pieter Levels', handle: 'levelsio', apiDown: true, year: 2026 },
+  );
+  assert.equal(ai.isBareProductNote(down.note, down.items), true, down.note);
   assert.doesNotMatch(note, /\blines\b|https?:\/\/|CODEX APP/i);
   assert.doesNotMatch(one, /\blines\b|https?:\/\/|www\./i);
   assert.doesNotMatch(ceo, /\blines\b|https?:\/\/|\b\d+\s+public\s+ships\b/i);

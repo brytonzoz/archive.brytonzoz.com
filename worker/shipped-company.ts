@@ -206,6 +206,9 @@ export function compactCompanyFound(found: Found[], cap = COMPANY_CACHE_CAP): Fo
     const letters = item.name.replace(/[^a-zA-Z]/g, '').length;
     if (key.length < 4 || letters < 3 || seen.has(key) || out.length >= cap) return;
     if (looksLikeNotAShip(item) && !flagshipLaunchName(item) && !isCompactMustKeep(item)) return;
+    if (/now available on ai gateway|\/ai-gateway/i.test(`${item.name} ${item.link || ''}`) && !/new models on ai gateway/i.test(item.name)) {
+      return;
+    }
     if (looksLikeNotAShip(item) && flagshipLaunchName(item)) logFlagshipGate(item, 'company-compact-not-a-ship', flagshipLaunchName(item));
     if (/\b(get started with|configuration details|see setup)\b/i.test(item.name)) return;
     seen.add(key);
@@ -226,7 +229,8 @@ export function compactCompanyFound(found: Found[], cap = COMPANY_CACHE_CAP): Fo
   const isNamedCodex = (item: Found) => {
     const name = item.name || '';
     const url = item.link || '';
-    if (!/\bcodex\b/i.test(name) && !/\/codex\b/i.test(url)) return false;
+    const onCodexLog = /learn\.chatgpt\.com\/docs\/changelog/i.test(url) || /developers\.openai\.com\/codex/i.test(url);
+    if (!onCodexLog && !/\bcodex\b/i.test(name) && !/\/codex\b/i.test(url)) return false;
     return !versionParts(name);
   };
   const must = ranked.filter(isCompactMustKeep).sort(byWeight);
@@ -887,7 +891,7 @@ export async function harvestCompany(opts: {
   if (opts.storeOnly) {
     return { found: [], spend: emptyXaiSpend(), ran: ['company-store-miss'], cacheHit: false };
   }
-  const cacheKey = opts.deep ? `company:deep:v26:${year}:${slug}` : `company:v26:${year}:${slug}`;
+  const cacheKey = opts.deep ? `company:deep:v27:${year}:${slug}` : `company:v27:${year}:${slug}`;
   const load = async (): Promise<CompanyHarvest> => {
     const via = viaFor(affiliation);
     const ran: string[] = [];

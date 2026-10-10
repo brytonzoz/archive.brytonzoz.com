@@ -292,6 +292,7 @@ export function isCustomerStoryTitle(title: string): boolean {
   if (/^[A-Za-z][\w'’]*(?:\s+AI)?(?:'s)?\s+(brings|trusts|reviewed|ships|widens|completes|improves)\b/i.test(text)) {
     return true;
   }
+  if (/\bbig bet\b/i.test(text)) return true;
   return false;
 }
 
@@ -315,7 +316,7 @@ export function isBlogEssayTitle(title: string): boolean {
   if (/\bships\s+\d+\s+times?\s+a\s+day\b/i.test(text) || /\bfastest-adopted\b/i.test(text)) return true;
   if (/\bships agent-written code\b|\bbug bounty program\b/i.test(text)) return true;
   if (/\b(helping (older adults|small businesses)|supporting the blind|big air tour|expand(?:s|ing) (access|their partnership)|academy with)\b/i.test(text)) return true;
-  if (/^(towards|disrupting|advancing|acceleration|daybreak|eternal|path to|publication)\b/i.test(text)) return true;
+  if (/^(towards|disrupting|advancing|acceleration|daybreak|eternal|path to|publication|overview)\b/i.test(text)) return true;
   if (/^openai delivers\b/i.test(text) || /\b(at scale|in production)\s+engineering\b/i.test(text)) return true;
   if (/\bhelps run\b.+\bexperiments\b/i.test(text) || /\bquantum computing experiments\b/i.test(text)) return true;
   if (/^(how|helping)\b/i.test(text) && !/\b(chatgpt|codex|gpt-?\d)\b/i.test(text.split(/\s+/).slice(0, 3).join(' '))) {

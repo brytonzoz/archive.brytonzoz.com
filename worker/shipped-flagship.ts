@@ -201,7 +201,8 @@ export function isFlagshipYearKeep(item: FlagshipItem, year: number): boolean {
   if (isJoinOrAcquire(item)) return String(item.date ?? '').startsWith(String(year));
   const raw = item.date ? String(item.date) : '';
   if (raw && !raw.startsWith(String(year))) return false;
-  return !raw || raw.startsWith(String(year));
+  if (raw && raw.startsWith(String(year))) return true;
+  return Boolean(knownFlagshipDate(item, year));
 }
 
 const FLAGSHIP_LAUNCH_DAY: Record<string, string> = {

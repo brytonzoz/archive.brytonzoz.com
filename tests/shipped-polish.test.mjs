@@ -246,7 +246,8 @@ test('scrape-dated changelog cards are dropped', () => {
       found({ name: 'Visit our YouTube channel', date: '2026-06-01', link: 'https://cursor.com/youtube' }),
       found({ name: 'Cursor 2', date: today, link: 'https://cursor.com/changelog/today' }),
       found({ name: 'Agents Window', date: '2026-04-02', link: 'https://cursor.com/changelog/agents' }),
-      found({ name: 'Codex App', date: null, link: 'https://developers.openai.com/codex/app', source: 'changelog', thisYear: true }),
+      found({ name: 'Codex App', date: '2026-02-02', link: 'https://developers.openai.com/codex/app', source: 'changelog', thisYear: true }),
+      found({ name: 'Sora', date: null, link: 'https://openai.com/index/sora', source: 'changelog', thisYear: true }),
       found({ name: 'Vicent Martí · 27M', date: '2026-08-14', link: 'https://cursor.com/blog/vicent' }),
       found({ name: 'UNDER: COMPANY', date: '2026-07-06', link: 'https://cursor.com/blog/firetiger' }),
       found({ name: 'CURSOR WEB ·', date: '2026-09-28', link: 'https://cursor.com/docs/release-notes' }),
@@ -257,7 +258,8 @@ test('scrape-dated changelog cards are dropped', () => {
   assert.equal(items.some((item) => /youtube|visit our/i.test(item.name)), false);
   assert.equal(items.some((item) => item.date === today), false);
   assert.ok(items.some((item) => /agents window/i.test(item.name)));
-  assert.ok(items.some((item) => /codex app/i.test(item.name) && item.date == null && item.thisYear));
+  assert.ok(items.some((item) => /codex app/i.test(item.name) && item.date === '2026-02-02'));
+  assert.equal(items.some((item) => /^sora$/i.test(item.name)), false);
   assert.equal(items.some((item) => /vicent|under:|cursor web\s*·|pull requests/i.test(item.name)), false);
 });
 
@@ -855,6 +857,8 @@ test('prereleases, starters, and Gateway model listings are not ships', () => {
   assert.equal(polish.isCustomerStoryTitle('Databricks brings GPT-5.5 to enterprise agent workflows'), true);
   assert.equal(polish.isCustomerStoryTitle('Airbnb widens access to GPT-6 Astra and OpenAI frontier'), true);
   assert.equal(polish.isCustomerStoryTitle('GPT-6.1 Sol'), false);
+  assert.equal(polish.isCustomerStoryTitle("Warp's big bet on building open source with GPT-5.5"), true);
+  assert.equal(polish.isBlogEssayTitle('Overview: GPT-6 Astra'), true);
   assert.equal(polish.isForeignProductOnCompanyTape('STRIPE', 'Vercel'), true);
   assert.equal(polish.isForeignProductOnCompanyTape('CURSOR', 'Vercel'), true);
   assert.equal(polish.isForeignProductOnCompanyTape('CURSOR', 'Cursor'), false);

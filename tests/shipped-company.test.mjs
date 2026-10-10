@@ -172,6 +172,26 @@ test('host guesses stay generic and product paths are derived from the role', ()
   assert.ok(changelog.FEED_PATHS.includes('/atom'));
 });
 
+test('time-plus-heading changelog cards become dated ships; month-only titles drop', () => {
+  assert.equal(changelog.shipName('December, 2025'), '');
+  const html = `
+    <ul>
+      <li id="codex-2026-10-08-gpt-61-sol-ultrafast" data-product="codex">
+        <time>2026-10-08</time>
+        <h3><span>GPT-6.1 Sol Ultrafast in Codex and ChatGPT Work</span></h3>
+      </li>
+      <li id="codex-2026-07-21-cli">
+        <time datetime="2026-07-21">21 Jul</time>
+        <h3>Codex CLI 0.145.0</h3>
+      </li>
+    </ul>`;
+  const items = changelog.itemsFromTimedHeadings(html, 'https://developers.openai.com/codex/changelog', 2026);
+  assert.ok(items.some((item) => /sol ultrafast/i.test(item.name) && item.date === '2026-10-08'), JSON.stringify(items));
+  assert.ok(items.some((item) => /0\.145\.0/.test(item.name) && item.date === '2026-07-21'), JSON.stringify(items));
+  const sameLine = changelog.itemsFromIsoDateHeadings('2026-07-21 Codex CLI 0.145.0\n', 'https://developers.openai.com/codex/changelog', 2026);
+  assert.ok(sameLine.some((item) => /0\.145\.0/.test(item.name)), JSON.stringify(sameLine));
+});
+
 test('blocked challenge pages are dropped; TinyFish markdown still extracts dated ships', () => {
   assert.equal(company.looksBlockedPage('<html>Just a moment...</html>', 'Just a moment...'), true);
   assert.equal(company.looksBlockedPage('Attention Required! | Cloudflare', 'Attention Required'), true);

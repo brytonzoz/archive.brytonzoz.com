@@ -582,8 +582,8 @@ export async function harvestCompany(opts: {
   if (!slug || companyScope(affiliation) === 'none') {
     return { found: [], spend: emptyXaiSpend(), ran: [], cacheHit: false };
   }
-  const cacheKey = opts.deep ? `company:deep:v9:${year}:${slug}` : `company:v11:${year}:${slug}`;
-  return cached(
+  const cacheKey = opts.deep ? `company:deep:v10:${year}:${slug}` : `company:v12:${year}:${slug}`;
+  const harvested = await cached(
     cacheKey,
     7 * 1440 * MIN,
     async () => {
@@ -622,14 +622,14 @@ export async function harvestCompany(opts: {
     };
 
     const firstSeeds = seeds.slice(0, 6);
-    for (const site of firstSeeds) {
-      await takePages(site, 'company-site');
-    }
-    // Blocked apex still has docs/changelog/developers subdomains — try those even when the homepage is empty.
+    // Docs/changelog subdomains first: many apex sites block Worker IPs while developers.example.com does not.
     if (firstSeeds[0]) {
       for (const prefixed of prefixHosts(firstSeeds[0])) {
         await takePages(prefixed, 'company-site');
       }
+    }
+    for (const site of firstSeeds) {
+      await takePages(site, 'company-site');
     }
     for (const extra of discoveredHosts) {
       await takePages(extra, 'company-site');
@@ -699,8 +699,9 @@ export async function harvestCompany(opts: {
     }
 
     if (ctx?.used) ran.push(`company-tinyfish-urls:${ctx.used}`);
-    return { found: scopeFilter(affiliation, found), spend, ran, cacheHit: false };
+    return { found, spend, ran, cacheHit: false };
     },
     (harvest) => harvest.found.length > 0,
   );
+  return { ...harvested, found: scopeFilter(affiliation, harvested.found) };
 }

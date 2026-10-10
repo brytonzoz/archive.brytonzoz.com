@@ -30,6 +30,9 @@ export const COMPANY_PATHS = [
   '/developers/changelog',
   '/products/release-notes',
   '/release-notes',
+  '/api/changelog',
+  '/api/docs/changelog',
+  '/docs/api/changelog',
   '/index',
   '/product',
 ];
@@ -132,6 +135,7 @@ function isNoiseTitle(text: string): boolean {
   if (/\b(ships faster with|running .{0,40} safely|harness engineering|beyond rate limits|leveraging|economics of|guidance)\b/i.test(text)) return true;
   if (/^(output:|screenshot|to get started|each dot |design \()/i.test(text)) return true;
   if (/^(launched|released|shipped|live|available)(\s+as(\s+a)?\s+\w+)?$/i.test(text)) return true;
+  if (new RegExp(`^(?:${MONTH_ALT}),?\\s+20\\d\\d$`, 'i').test(text)) return true;
   return false;
 }
 
@@ -324,7 +328,7 @@ export function itemsFromDatedCards(text: string, url: string, year: number): Ch
 export function itemsFromIsoDateHeadings(text: string, url: string, year: number): ChangelogFound[] {
   const found: ChangelogFound[] = [];
   const seen = new Set<string>();
-  const re = new RegExp(`(?:^|\\n)\\s*(${year}-\\d{2}-\\d{2})\\s*(?:\\n+\\s*#{0,3}\\s*)([A-Za-z0-9][^\\n]{2,80})`, 'g');
+  const re = new RegExp(`(?:^|\\n)\\s*(${year}-\\d{2}-\\d{2})\\s*(?:\\n+\\s*#{0,3}\\s*|\\s+#{0,3}\\s*)([A-Za-z0-9][^\\n]{2,80})`, 'g');
   for (const match of text.matchAll(re)) {
     const name = cleanTitle(match[2]);
     const key = loose(name);
@@ -532,6 +536,45 @@ export function mergeChangelog(lists: ChangelogFound[][]): ChangelogFound[] {
 }
 
 /** Every generic extractor on one page: HTML text + optional raw HTML + feeds already inlined. */
+/** `<time>2026-10-08</time>` next to an `<h3>` — docs changelogs (Codex, API, many Mintlify/Starlight sites). */
+export function itemsFromTimedHeadings(html: string, url: string, year: number): ChangelogFound[] {
+  const found: ChangelogFound[] = [];
+  const seen = new Set<string>();
+  const add = (dateRaw: string, titleHtml: string) => {
+    const date = parseFlexibleDate(tidy(dateRaw.replace(/<[^>]+>/g, ' ')), year);
+    const span = titleHtml.match(/<span\b[^>]*>([\s\S]*?)<\/span>/i)?.[1];
+    const name = cleanTitle(
+      tidy((span || titleHtml).replace(/<[^>]+>/g, ' ').replace(/\bcopy link to\b[\s\S]*/i, '')),
+    );
+    const key = loose(name);
+    if (!date || !name || key.length < 3 || seen.has(key)) return;
+    seen.add(key);
+    const item = row(name, date, url, year);
+    if (item) found.push(item);
+  };
+  const timeThenHeading = new RegExp(
+    `<time\\b([^>]*)>([\\s\\S]*?)</time>[\\s\\S]{0,500}?<h[1-4]\\b[^>]*>([\\s\\S]*?)</h[1-4]>`,
+    'gi',
+  );
+  const headingThenTime = new RegExp(
+    `<h[1-4]\\b[^>]*>([\\s\\S]*?)</h[1-4]>[\\s\\S]{0,500}?<time\\b([^>]*)>([\\s\\S]*?)</time>`,
+    'gi',
+  );
+  for (const match of html.matchAll(timeThenHeading)) {
+    add(match[1].match(/datetime=["']([^"']+)["']/i)?.[1] || match[2], match[3]);
+  }
+  for (const match of html.matchAll(headingThenTime)) {
+    add(match[2].match(/datetime=["']([^"']+)["']/i)?.[1] || match[3], match[1]);
+  }
+  const datedLi = new RegExp(`<li\\b[^>]*id=["']([^"']*${year}-\\d{2}-\\d{2}[^"']*)["'][^>]*>([\\s\\S]*?)</li>`, 'gi');
+  for (const match of html.matchAll(datedLi)) {
+    const date = parseFlexibleDate(match[1], year);
+    const heading = match[2].match(/<h[1-4]\b[^>]*>([\s\S]*?)<\/h[1-4]>/i)?.[1] ?? '';
+    if (date) add(date, heading || match[1].split(`${year}-`).pop() || '');
+  }
+  return found;
+}
+
 export function itemsFromCompanyPage(opts: {
   text: string;
   html?: string;
@@ -546,6 +589,7 @@ export function itemsFromCompanyPage(opts: {
     itemsFromDatedCards(opts.text, opts.url, opts.year),
     itemsFromVersionReleases(opts.text, opts.url, opts.year),
     monthItems,
+    opts.html ? itemsFromTimedHeadings(opts.html, opts.url, opts.year) : [],
     opts.html ? itemsFromJsonLd(opts.html, opts.year) : [],
     itemsFromNewsLinks(opts.links ?? [], opts.year, opts.url),
   ]);

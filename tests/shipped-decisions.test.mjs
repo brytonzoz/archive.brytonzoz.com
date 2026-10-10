@@ -78,6 +78,9 @@ test('heuristic keep/drop matches the Decisions product threshold', () => {
   assert.ok(keep.isRealShip * keep.inYear >= decisions.KEEP_PRODUCT);
   const tease = decisions.heuristicMark(found({ name: 'Coming soon', description: 'we are hiring', date: null, thisYear: false, link: null }), 2026, person);
   assert.equal(decisions.shouldKeep(tease), false);
+  const personShip = decisions.heuristicMark(found({ name: 'Mattia Astorino', source: 'github', link: 'https://github.com/t3dotgg/mattia' }), 2026, person);
+  assert.equal(decisions.looksLikeNotAShip(found({ name: 'Mattia Astorino' })), true);
+  assert.equal(decisions.shouldKeep(personShip, found({ name: 'Mattia Astorino', source: 'github', link: 'https://github.com/t3dotgg/mattia' })), false);
   const old = decisions.heuristicMark(found({ date: '2025-11-01', thisYear: false }), 2026, person);
   assert.equal(decisions.shouldKeep(old), false);
 });

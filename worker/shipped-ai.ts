@@ -191,7 +191,7 @@ export function formatStats(items: { source?: string }[], sourced: SourcedStat[]
 }
 
 const TEMPLATE_NOTE =
-  /is first on the tape|led the year|closed the year|set the tone|through-line|Receipt paper running low|Someone likes the publish button|\d+\s+launches?\s+·|night shift|publish button|\bthe tape\b|\bthe register\b|stock the shelves|counted receipts|got the paperwork|rings the publish|cashier has seen worse|mostly i just|wish and a prayer|nobody asked|same maker, more skus|runs on a wish|plus 0 more|github stars (llm|blog) for /i;
+  /is first on the tape|led the year|closed the year|set the tone|through-line|Receipt paper running low|Someone likes the publish button|\d+\s+launches?\s+·|night shift|publish button|\bthe tape\b|\bthe register\b|stock the shelves|counted receipts|got the paperwork|rings the publish|cashier has seen worse|mostly i just|wish and a prayer|nobody asked|same maker, more skus|runs on a wish|plus 0 more|github stars (llm|blog) for |supposed to be quiet|still be quoting|earned the grin|kept the year interesting|plus \d+ more, and /i;
 
 /** A number in the note must be the item count, or a sourced stars/downloads figure that is labeled. */
 export function noteMisusesStats(note: string, count: number, stats: string[] = []): boolean {
@@ -243,24 +243,34 @@ function clipSentence(text: string, max: number): string {
   return out;
 }
 
-export type NoteContext = { role?: string | null; company?: string | null };
+export type NoteContext = { role?: string | null; company?: string | null; who?: string | null };
 
-/** Warm-roast, one sentence, grounded in the loudest real fact. Never mean. */
+function distinctiveNames(items: DraftItem[]): string[] {
+  const dated = items.slice().sort((a, b) => (a.date ?? '9999').localeCompare(b.date ?? '9999'));
+  const short = dated.filter((item) => item.name.split(/\s+/).length <= 5 && item.name.length <= 28);
+  const pool = short.length ? short : dated;
+  const out: string[] = [];
+  for (const item of [pool[0], pool[Math.min(1, pool.length - 1)], pool[pool.length - 1]]) {
+    if (item?.name && !out.includes(item.name)) out.push(item.name);
+  }
+  return out;
+}
+
+/** Warm-roast, one sentence, grounded in this person's actual ships. Never a stock line. */
 export function groundedNote(items: DraftItem[], seed: number, profileName = '', stats: string[] = [], ctx: NoteContext = {}): string {
   const real = items.filter((item) => item.source !== 'none' && !GENERIC_NOTE_NAME.test(item.name.trim()));
   if (!real.length) return POTENTIAL_NOTES[seed % POTENTIAL_NOTES.length];
-  const first = real[0]?.name ?? 'THIS';
-  const short = real.filter((item) => item.name.split(/\s+/).length <= 6 && item.name.length <= 36);
-  const pool = short.length ? short : real;
-  const loud = pool[(seed + first.length) % pool.length] ?? real[0];
-  const who = profileName.split(/\s+/)[0] ?? '';
+  const who = (ctx.who || profileName).split(/\s+/).filter(Boolean)[0] ?? '';
   const company = prettyBrand(ctx.company, null) || (ctx.company || '').trim();
+  const named = distinctiveNames(real);
+  const headline = named[0] ?? real[0]!.name;
+  const closer = named[named.length - 1] ?? headline;
   if ((ctx.role === 'ceo' || ctx.role === 'founder') && real.length >= 4) {
     const label = company || who || 'They';
     const variants = [
-      `${label} put ${real.length} public ships on the year, company-wide, not one product's highlight.`,
-      `${real.length} company ships under ${label}, across the products they actually run.`,
-      `${label}'s year is the whole catalog: ${real.length} public lines, not a single-product recap.`,
+      `${label} put ${real.length} public ships on the year, from ${headline} through ${closer}.`,
+      `${who ? `${who} ran ` : ''}${label} across ${real.length} public lines, with ${headline} still first on the list.`,
+      `${label}'s ${real.length} public ships this year run from ${headline} to ${closer}.`,
     ];
     return clipSentence(variants[seed % variants.length], 140);
   }
@@ -284,26 +294,25 @@ export function groundedNote(items: DraftItem[], seed: number, profileName = '',
     .find((row): row is { phrase: string; item: DraftItem } => Boolean(row));
   if (paired) {
     const variants = [
-      `${paired.item.name} put ${paired.phrase} on the board. The rest is just keeping it company.`,
-      `${paired.phrase} on ${paired.item.name}. Not bad for a year that was supposed to be quiet.`,
-      `${paired.item.name} showed up with ${paired.phrase} and somehow made it look easy.`,
+      `${who ? `${who}'s ` : ''}${paired.item.name} is the one carrying ${paired.phrase} this year.`,
+      `${paired.item.name} still holds ${paired.phrase}${who ? `, which is very ${who}` : ''}.`,
+      `${who || paired.item.name} put ${paired.phrase} on ${paired.item.name} and let the other lines ride along.`,
     ];
     return clipSentence(variants[seed % variants.length], 140);
   }
   if (real.length === 1) {
-    const only = real[0]?.name ?? first;
+    const only = real[0]?.name ?? headline;
     const variants = [
-      `${only} is the whole tape this year. One public ship, no encore.`,
-      `Just ${only} this year, printed as a single line.`,
-      `${only} stands alone on the receipt. Nothing else made the cut.`,
+      `${who ? `${who} printed ` : ''}${only} as the only public ship this year.`,
+      `Just ${only} this year${who ? ` for ${who}` : ''}, printed as a single line.`,
+      `${only} stands alone on ${who ? `${who}'s ` : 'the '}receipt. Nothing else made the cut.`,
     ];
     return clipSentence(variants[seed % variants.length], 140);
   }
-  const extra = Math.max(0, real.length - 1);
   const variants = [
-    `${first} plus ${extra} more, and ${loud.name} is the one people will still be quoting.`,
-    `${real.length} public things${who ? ` under ${who}` : ''}, and ${first} is the one that earned the grin.`,
-    `${first} and ${loud.name} kept the year interesting. ${real.length} lines, all of them real.`,
+    `${who ? `${who}'s ` : ''}year is ${headline}${closer !== headline ? ` through ${closer}` : ''}: ${real.length} public lines, all theirs.`,
+    `${headline} opens ${who ? `${who}'s ` : 'the '}receipt${closer !== headline ? `; ${closer} closes it` : ''}. ${real.length} lines, all theirs.`,
+    `${who || 'They'} shipped ${headline}${named[1] ? ` and ${named[1]}` : ''} this year — ${real.length} lines, none borrowed.`,
   ];
   return clipSentence(variants[(seed + real.length) % variants.length], 140);
 }
@@ -417,7 +426,7 @@ function finish(items: DraftItem[], note: string, seed: number, modulesRaw?: unk
     !noteCountMismatch(note, sorted.length) &&
     !noteMisusesStats(note, sorted.length, Array.isArray(statsRaw) ? statsRaw : stats)
       ? note
-      : groundedNote(sorted, seed, ctx.company || '', stats, ctx);
+      : groundedNote(sorted, seed, ctx.who || ctx.company || '', stats, ctx);
   const printed = printNote(whoNote, stats);
   return { items: sorted, note: printed, stats, potential: false, layout };
 }
@@ -435,11 +444,12 @@ export function demoReceipt(gathered: Gathered, year: number, seed: number): Dra
     groundedNote(items, seed, gathered.profile.name, formatStats(items, gathered.stats ?? []), {
       role: affiliation?.role,
       company: affiliation?.company,
+      who: gathered.profile.name,
     }),
     seed,
     undefined,
     formatStats(items, gathered.stats ?? []),
-    { role: affiliation?.role, company: affiliation?.company },
+    { role: affiliation?.role, company: affiliation?.company, who: gathered.profile.name },
   );
 }
 
@@ -472,7 +482,7 @@ function noteOnlySystem(year: number, affiliation?: Affiliation | null, count = 
     'Bad: "13k GitHub stars llm for LLM-MRCHATTERBOX"',
     'Bad: "1.4k GitHub stars blog for NEW INSTANT ROLLBACK FLOW"',
     `The tape has exactly ${count} printed line${count === 1 ? '' : 's'} — if you mention a ship/line/launch/item/project/repo count, it must be ${count}. A star or download figure is fine only when it is copied from <found>.stats and labeled as stars or downloads. Never write "plus 0 more". For a 1-item tape, write a one-ship note.`,
-    'Banned: wish and a prayer, Nobody asked, Same maker more SKUs, night shift, publish button, the tape, the register, receipt paper, stock the shelves, invented numbers, insults, exclamation marks, emoji, pairing a star count with the wrong product.',
+    'Banned: wish and a prayer, Nobody asked, Same maker more SKUs, night shift, publish button, the tape, the register, receipt paper, stock the shelves, invented numbers, insults, exclamation marks, emoji, pairing a star count with the wrong product, "supposed to be quiet", "the one people will still be quoting", "plus N more". Name the person. Make the sentence about their year, not a reusable slogan.',
     'Finish with only a JSON object, no markdown: {"note":""}',
   ]
     .filter(Boolean)
@@ -622,6 +632,7 @@ function normalize(raw: unknown, gathered: Gathered, allowed: Allowed, year: num
   return finish(items, note, seed, data.modules, data.stats, {
     role: gathered.profile.affiliation?.role,
     company: gathered.profile.affiliation?.company,
+    who: gathered.profile.name,
   });
 }
 
@@ -752,6 +763,7 @@ export async function assembleReceipt(subject: Subject, gathered: Gathered, year
     let note = groundedNote(harvested, seed, gathered.profile.name, stats, {
       role: affiliation?.role,
       company: affiliation?.company,
+      who: gathered.profile.name,
     });
     try {
       const request = {
@@ -782,7 +794,11 @@ export async function assembleReceipt(subject: Subject, gathered: Gathered, year
     } catch (error) {
       if (error instanceof PrintError && error.code === 'out-of-credit') throw error;
     }
-    const draft = finish(harvested, note, seed, undefined, stats, { role: affiliation?.role, company: affiliation?.company });
+    const draft = finish(harvested, note, seed, undefined, stats, {
+      role: affiliation?.role,
+      company: affiliation?.company,
+      who: gathered.profile.name,
+    });
     const cost = spent();
     console.log(JSON.stringify({ shipped: 'ai', model, mode: 'note-only', items: harvested.length, inputTokens: usage.input, outputTokens: usage.output, costMicros: cost }));
     return { ...draft, model, inputTokens: usage.input, outputTokens: usage.output, searches: 0, costMicros: cost };

@@ -1,7 +1,7 @@
 // Hard pre-filters + title cleanup for the SHIPPED tape. Runs BEFORE Decisions
 // so bylines, docs nav, roundups, and cut-off headings never get scored as ships.
 import type { Affiliation } from './shipped-affiliation';
-import { isJunkProductName } from './shipped-repos';
+import { isJunkProductName, looksLikeCodeIdentifier, looksLikePersonName } from './shipped-repos';
 import {
   cursorModelTitle,
   flagshipLaunchName,
@@ -9,6 +9,7 @@ import {
   isFlagshipYearKeep,
   isJoinOrAcquire,
   isPriorYearJoin,
+  knownFlagshipDate,
   logFlagshipGate,
   stripDateSuffix,
 } from './shipped-flagship';
@@ -227,6 +228,8 @@ export function isJunkTitle(title: string, opts: { who?: string | null; company?
   if (/^respectively\.?$/i.test(text)) return true;
   if (DOCS_NAV.test(text) || /^(recent highlights|cursor support|under:|blog\s*\/\s*research|blog|research)$/i.test(text)) return true;
   if (isAboutPerson(text, opts.who)) return true;
+  if (looksLikePersonName(text, opts.who) || looksLikeCodeIdentifier(text)) return true;
+  if (isPricingOrMetricNote(text)) return true;
   if (/^(the )?(guy|person|one) who made\b/i.test(text)) return true;
   const whoLast = (opts.who || '').split(/\s+/).filter((word) => word.length > 2);
   if (/^[A-Z]\s+[A-Z]{2,}$/.test(text) && whoLast.some((word) => loose(text).includes(loose(word)))) return true;
@@ -248,7 +251,14 @@ function normalizeVersionTokens(text: string): string {
     .replace(/\b([A-Za-z][A-Za-z0-9.+-]{1,20})\s+(\d)\s+(\d)\b/g, '$1 $2.$3');
 }
 
-const VERSION = String.raw`v?\d{1,3}(?:\.\d+){1,3}`;
+export function isPricingOrMetricNote(name: string): boolean {
+  const text = tidy(name);
+  if (/\b(pric(e|ing|es)|plans?|billing|skus?)\b/i.test(text) && !/\b(app|cli|sdk|api|model)\b/i.test(text)) return true;
+  if (/^(improved|better|faster|cheaper|reduced|lower|higher)\s+[A-Za-z]+(?:\s+[A-Za-z]+)?$/i.test(text)) return true;
+  return false;
+}
+
+const VERSION = String.raw`v?(?:\d{4}\.\d{1,2}\.\d{1,2}|\d{1,3}(?:\.\d+){1,3})`;
 
 export function versionParts(name: string): { product: string; version: string; extra?: number } | null {
   const text = tidy(name)
@@ -311,11 +321,12 @@ export function cleanShipTitle(raw: unknown, max = TITLE_MAX): string {
   if (report?.[1]) text = report[1];
   const meet = text.match(/^meet the new\s+(.+)$/i);
   if (meet?.[1]) text = meet[1];
+  if (/^codex,\s*our code generation cli tool$/i.test(text)) text = 'Codex CLI';
   text = text
     .replace(/^(introducing|launching|announcing|presenting|meet|say hello to|now available[:\s]+|how to|read the|launched)\s+/i, '')
     .replace(/\s+launched as\b.*$/i, '')
     .replace(/\s+(is )?(now |generally )?available( today| in\b.*)?$/i, '')
-    .replace(/\s+release notes\.?$/i, '')
+    .replace(/\s+(release|launch) notes\.?$/i, '')
     .replace(/\s+reconnects?$/i, '')
     .replace(/\s+,/g, ',')
     .replace(/[,\s.]+$/g, '')
@@ -576,47 +587,63 @@ export function rollupPlatformPackages<T extends Polishable>(items: T[]): T[] {
   return kept;
 }
 
+const MONTH_LINE = /^(.+?)\s*·\s*(\d+)\s+updates?\s+in\s+(Jan|Feb|Mar|Apr|May|Jun|Jul|Aug|Sep|Oct|Nov|Dec)\s*$/i;
+
+function versionFamily(item: Polishable): { product: string; count: number } | null {
+  if (isCursorModelNote(item) || /^(grok|claude|gemini)[-.\s]?\d/i.test(item.name)) return null;
+  const rolled = tidy(item.name).match(MONTH_LINE);
+  if (rolled) return { product: rolled[1].trim(), count: Number(rolled[2]) || 1 };
+  const parts = versionParts(item.name);
+  if (!parts) return null;
+  if (flagshipLaunchName({ ...item, name: parts.product }) || flagshipLaunchName(item)) return null;
+  if (/^(grok|claude|gemini)$/i.test(parts.product)) return null;
+  return { product: parts.product, count: versionCount(item) };
+}
+
 export function rollupVersions<T extends Polishable>(items: T[]): T[] {
-  const groups = new Map<string, T[]>();
+  const groups = new Map<string, { item: T; product: string; count: number }[]>();
   const kept: T[] = [];
   for (const item of items) {
-    const parts = versionParts(item.name);
+    const family = versionFamily(item);
     const month = item.date?.match(/^(\d{4})-(\d{2})/)?.[0];
-    if (!parts || !month) {
+    if (!family || !month) {
       kept.push(item);
       continue;
     }
-    const key = `${loose(parts.product)}|${month}`;
+    const key = `${loose(family.product)}|${month}`;
     const list = groups.get(key) ?? [];
-    list.push(item);
+    list.push({ item, product: family.product, count: family.count });
     groups.set(key, list);
   }
   for (const [key, list] of groups) {
-    const count = list.reduce((sum, item) => sum + versionCount(item), 0);
-    const comma = list.some((item) => (versionParts(item.name)?.extra ?? 1) > 1);
-    if (list.length < 3 && !(comma && count >= 2)) {
-      kept.push(
-        ...list.map((item) => {
-          const parts = versionParts(item.name);
-          if (parts && (parts.extra ?? 1) > 1) {
-            return { ...item, name: `${parts.product} ${parts.version}`, description: '' };
-          }
-          return item;
-        }),
-      );
-      continue;
-    }
-    const product = versionParts(list[0].name)?.product || list[0].name;
+    const count = list.reduce((sum, row) => sum + row.count, 0);
+    const product = list[0]?.product || list[0]!.item.name;
     const month = key.split('|')[1] ?? '';
     const mon = MONTHS_SHORT[Number(month.slice(5, 7)) - 1] || month;
-    const latest = list.slice().sort((a, b) => (b.date ?? '').localeCompare(a.date ?? ''))[0]!;
+    const latest = list.slice().sort((a, b) => (b.item.date ?? '').localeCompare(a.item.date ?? ''))[0]!.item;
     kept.push({
       ...latest,
-      name: `${product} · ${count} updates in ${mon}`,
+      name: `${product} · ${count} update${count === 1 ? '' : 's'} in ${mon}`,
       description: '',
     });
   }
   return kept;
+}
+
+/** Same normalized name → one line (NUB + NUB, not NUB + NUBJS). */
+export function dedupeNormalized<T extends Polishable>(items: T[]): T[] {
+  const best = new Map<string, T>();
+  const none: T[] = [];
+  for (const item of items) {
+    const key = loose(item.name);
+    if (!key) {
+      none.push(item);
+      continue;
+    }
+    const prev = best.get(key);
+    if (!prev || titleScore(item) > titleScore(prev)) best.set(key, item);
+  }
+  return [...best.values(), ...none];
 }
 
 export function rollupCursorModels<T extends Polishable>(items: T[]): T[] {
@@ -713,7 +740,7 @@ export function polishCandidates<T extends Polishable>(items: T[], opts: PolishO
       }
     }
     let name = cleanShipTitle(item.name);
-    if (flagship && (!name || name.split(/\s+/).length <= 1 || /^the new\b/i.test(name))) {
+    if (flagship && !isCursorModelNote(item) && (!name || name.split(/\s+/).length <= 1 || /^the new\b/i.test(name))) {
       if (!name) logFlagshipGate(item, isJunkTitle(item.name, { who }) ? 'junk-title' : 'title-empty', flagship);
       name = flagship;
     }
@@ -741,7 +768,9 @@ export function polishCandidates<T extends Polishable>(items: T[], opts: PolishO
         continue;
       }
     }
-    const date = isFlagshipYearKeep(item, year) && item.date ? String(item.date).slice(0, 10) : inYearDate(item.date, year);
+    const date =
+      knownFlagshipDate({ ...item, name }, year) ??
+      (isFlagshipYearKeep(item, year) && item.date ? String(item.date).slice(0, 10) : inYearDate(item.date, year));
     out.push({
       ...item,
       name,
@@ -769,7 +798,9 @@ export function polishCandidates<T extends Polishable>(items: T[], opts: PolishO
   const models = rollupCursorModels(packaged);
   if (models.length < packaged.length) drop({ name: `${packaged.length - models.length} model notes` }, 'model-rollup');
   const inherited = inheritDates(models);
-  const capped = capUndated(inherited, drop);
+  const unique = dedupeNormalized(inherited);
+  if (unique.length < inherited.length) drop({ name: `${inherited.length - unique.length} duplicate names` }, 'name-dedupe');
+  const capped = capUndated(unique, drop);
   if (drops.length) {
     console.log(JSON.stringify({ shipped: 'polish-drops', who, handle: opts.handle || null, kept: capped.length, drops: drops.slice(0, 80) }));
   }

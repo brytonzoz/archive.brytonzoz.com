@@ -173,7 +173,10 @@ test('cashier note and stats are specific to the items, never stock copy', () =>
   assert.equal(ai.noteMisusesStats('44k GitHub stars on ZOD', 23, ['553 GitHub stars SuperLevels · github.com/x']), true);
   assert.equal(ai.noteMisusesStats('Zod sits at 326k npm weekly downloads.', 21, ['326k npm weekly downloads Zod · npmjs.com/package/zod']), false);
   assert.equal(ai.cashierNoteLooksCanned(note), false);
+  assert.doesNotMatch(note, /supposed to be quiet|still be quoting|plus \d+ more, and /i);
   assert.equal(ai.cashierNoteLooksCanned('Hallmark passed 30k stars while the night shift counted receipts.'), true);
+  assert.equal(ai.cashierNoteLooksCanned('553 GitHub stars on SUPERLEVELS. Not bad for a year that was supposed to be quiet.'), true);
+  assert.equal(ai.cashierNoteLooksCanned('GPT-5.2-CODEX plus 60 more, and CODEX APP UPDATES is the one people will still be quoting.'), true);
   assert.equal(ai.cashierNoteLooksCanned('runs on a wish and a prayer'), true);
   assert.equal(ai.cashierNoteLooksCanned('Nobody asked for ChatGPT for Research.'), true);
   assert.equal(ai.cashierNoteLooksCanned('200/mo public revenue. Same maker, more SKUs.'), true);

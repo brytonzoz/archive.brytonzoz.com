@@ -39,7 +39,7 @@ import {
   type XProfile,
 } from './shipped-identity';
 import { hostNamesOwner, ownerFromProfile, ownerTokens } from './shipped-ownership';
-import { isJunkRepoName, isShipRepo } from './shipped-repos';
+import { isJunkProductName, isJunkRepoName, isShipRepo, looksLikeCodeIdentifier, looksLikePersonName, looksLikeProductReadme } from './shipped-repos';
 import {
   compactNumber,
   describeWithStat,
@@ -812,7 +812,15 @@ const npm: SourceProvider = {
     );
     const objects = pages.flatMap((page) => (page.status === 'fulfilled' ? page.value.objects ?? [] : []));
     const recent = objects
-      .filter((entry) => inYear(day(entry.package.date), year))
+      .filter((entry) => {
+        if (!inYear(day(entry.package.date), year)) return false;
+        const name = String(entry.package.name ?? '');
+        const desc = String(entry.package.description ?? '');
+        if (isJunkProductName(name, users[0], profile.name)) return false;
+        if (looksLikeCodeIdentifier(name) || looksLikePersonName(name, profile.name)) return false;
+        if (desc.trim().length < 12 || !looksLikeProductReadme(desc)) return false;
+        return true;
+      })
       .sort((a, b) => (b.score?.final ?? 0) - (a.score?.final ?? 0))
       .slice(0, 80);
     const downloads = await Promise.all(
@@ -820,9 +828,13 @@ const npm: SourceProvider = {
         getJson<{ downloads?: number }>(`https://api.npmjs.org/downloads/point/last-week/${encodeURIComponent(String(pkg.name))}`).catch(() => null),
       ),
     );
-    return recent.map(({ package: pkg, score }, i): Found => {
-      const link = publicUrl((pkg.links as Record<string, unknown> | undefined)?.npm);
+    return recent
+      .map(({ package: pkg, score }, i): Found | null => {
+      const links = (pkg.links as Record<string, unknown> | undefined) ?? {};
+      const link = publicUrl(links.npm);
+      const homepage = publicUrl(links.homepage);
       const weekly = Number(downloads[i]?.downloads) || 0;
+      if (!weekly && !homepage) return null;
       return {
         name: clean(pkg.name, 60),
         description: clean(pkg.description, 140),
@@ -840,7 +852,8 @@ const npm: SourceProvider = {
               )
             : [],
       };
-    });
+    })
+      .filter((item): item is Found => Boolean(item));
   },
 };
 

@@ -18,7 +18,7 @@ export type PinDateVerdict = {
   reason: string | null;
 };
 
-const PROFILE_HOST = /^(gitlab\.com|npmjs\.com|x\.com|twitter\.com|linkedin\.com)$/i;
+const PROFILE_HOST = /^(gitlab\.com|npmjs\.com|www\.npmjs\.com|registry\.npmjs\.org|x\.com|twitter\.com|linkedin\.com)$/i;
 const STORE_HOST = /^(github\.com|apps\.apple\.com|producthunt\.com)$/i;
 
 function hostOf(url: string | null | undefined): string | null {
@@ -262,6 +262,21 @@ function isOwnedPin(
   return ownedByBuilder(item, owner);
 }
 
+/** Product-domain URLs only — never npm/GitHub. Used so archive.org/RDAP can beat an npm publish day. */
+export function productLaunchUrlsForNpm(
+  item: { name: string; link?: string | null },
+  opts: { owner?: OwnerContext | null; links?: { text: string; url: string }[]; pageText?: string },
+): string[] {
+  const words = item.name.trim().split(/[^A-Za-z0-9]+/).filter(Boolean);
+  const want = loose(item.name);
+  if (words.length < 2 && want.length < 8) return [];
+  return productUrlsForPin(item, opts).filter((url) => {
+    const host = hostOf(url);
+    if (!host || STORE_HOST.test(host) || PROFILE_HOST.test(host)) return false;
+    return want.length >= 4 && loose(host).includes(want);
+  });
+}
+
 /** After a pin is proven pre-`year`, drop leftover npm/web lines with the same loose name (POST BRIDGE, not POSTBRIDGE-CLI). */
 export function dropSameNameLeftovers<T extends { name: string; source?: string }>(
   items: T[],
@@ -345,6 +360,35 @@ export async function dateOwnedPins<T extends { name: string; date: string | nul
     }
   }
   kept.push(...leftover);
+  const npmRows = kept.filter((item) => item.source === 'npm');
+  const npmBatch = npmRows.slice(0, 12);
+  const npmVerdicts = await Promise.all(
+    npmBatch.map(async (item) => {
+      const urls = productLaunchUrlsForNpm(item, {
+        owner: opts.owner,
+        links: opts.links,
+        pageText: opts.pageText,
+      });
+      if (!urls.length) return { item, drop: false };
+      const evidence: LaunchEvidence[] = [];
+      for (const url of urls.slice(0, 2)) {
+        const host = hostOf(url);
+        if (!host) continue;
+        evidence.push(...(await evidenceForHost(host)));
+        if (evidence.some((row) => Number(row.date.slice(0, 4)) < year && (row.source === 'archive.org' || row.source === 'rdap'))) break;
+      }
+      const verdict = verdictFromEvidence(year, evidence);
+      const drop = Boolean(verdict.drop && (verdict.source === 'archive.org' || verdict.source === 'rdap'));
+      console.log(JSON.stringify({ shipped: 'npm-first-launch', name: item.name, urls, verdict, drop }));
+      return { item, drop };
+    }),
+  );
+  for (const { item, drop } of npmVerdicts) {
+    if (!drop) continue;
+    const at = kept.indexOf(item);
+    if (at >= 0) kept.splice(at, 1);
+    drops.push({ name: item.name, reason: 'pre-2026', source: 'npm' });
+  }
   const leftoverDrop = dropSameNameLeftovers(
     kept,
     drops.filter((row) => row.reason === 'pre-2026').map((row) => row.name),

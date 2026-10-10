@@ -4,6 +4,7 @@
 import type { Attribution, Affiliation } from './shipped-affiliation';
 import { defaultAttribution, leadProductTokens } from './shipped-affiliation';
 import { flagshipLaunchName } from './shipped-flagship';
+import { looksLikePersonName } from './shipped-repos';
 import { ownedByBuilder, ownershipEvidence, type OwnerContext } from './shipped-ownership';
 import type { Found } from './shipped-sources';
 import { clean } from './shipped-sources';
@@ -108,6 +109,12 @@ const CANDIDATE_QUESTIONS = [
     name: 'is_real_ship',
     instructions:
       'A ship is a product, feature, model, app, version, or release MADE AVAILABLE to users. A GitHub repo, npm package, Product Hunt launch, or App Store app this person published in 2026 IS a ship. Tutorials, how-tos, case studies, customer stories ("X uses PRODUCT"), research papers, system cards, hiring posts, opinion, engineering deep dives, event recaps, teasers, roadmaps, and retweets are NOT ships — answer no, even if they mention the product.',
+  },
+  {
+    type: 'predicate',
+    name: 'is_product',
+    instructions:
+      "Is the candidate's name a product, tool, feature, model, or package — not a person's name? A person's full name (for example Mattia Astorino) is never a product. Answer no for people, profile pages, and contributor names.",
   },
   {
     type: 'predicate',
@@ -216,6 +223,7 @@ export function looksLikeNotAShip(item: { name?: string; description?: string; l
   if (/^(output:|screenshot|to get started|each dot |design \()/i.test(name)) return true;
   if (/^(launched|released|shipped|live|available)(\s+as(\s+a)?\s+\w+)?$/i.test(name)) return true;
   if (/^v?\d+(?:\.\d+){1,4}[a-z0-9.-]*$/i.test(name) || /^20\d\d(?:-\d{2}){0,2}$/.test(name)) return true;
+  if (looksLikePersonName(name)) return true;
   if (/\/(customers|topic|resources|support)(\/|$)/i.test(item.link ?? '')) return true;
   if (/\/(research|blog)\//i.test(item.link ?? '') && /\b(how |why |tutorial|case |stor(?:y|ies)|accelerat|engineers?|rakuten|ramp )\b/i.test(name)) return true;
   return false;
@@ -269,12 +277,18 @@ export function shouldKeep(mark: DecisionMark, item?: Found, owner?: OwnerContex
 
 function markFromAnswers(answers: Answer[], fallback: DecisionMark, item?: Found, owner?: OwnerContext | null): DecisionMark {
   const real = pick(answers, 'is_real_ship');
+  const product = pick(answers, 'is_product');
   const year = pick(answers, 'in_2026');
   const owned = pick(answers, 'owned_by_person');
   const attr = pick(answers, 'attribution');
   const sig = pick(answers, 'significance');
   const kindAns = pick(answers, 'kind');
   let isRealShip = real?.type === 'predicate' ? real.probability : fallback.isRealShip;
+  if (item && looksLikePersonName(item.name)) {
+    isRealShip = 0.05;
+  } else if (product?.type === 'predicate' && product.probability < 0.45) {
+    isRealShip = Math.min(isRealShip, 0.2);
+  }
   const inYear = year?.type === 'predicate' ? year.probability : fallback.inYear;
   let attribution = attr?.type === 'choice' && ATTRIBUTION_CHOICES.some((c) => c.value === attr.choice) ? (attr.choice as Attribution) : fallback.attribution;
   if (owned?.type === 'predicate' && owned.probability < 0.55) attribution = 'unrelated';

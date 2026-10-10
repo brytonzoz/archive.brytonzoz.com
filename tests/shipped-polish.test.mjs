@@ -451,6 +451,81 @@ test('undated sitemap flagships survive harvest (the gate that dropped Cursor 3)
   assert.ok(tape.some((name) => /BUGBOT/i.test(name)), JSON.stringify(tape));
 });
 
+test('versioned releases always roll into the monthly line; flagships keep real dates', () => {
+  const rolled = polish.rollupVersions([
+    found({ name: 'CURSOR SDK BRIDGE V1.0.26', date: '2026-07-30' }),
+    found({ name: 'CURSOR SDK BRIDGE V1.0.31', date: '2026-09-03' }),
+    found({ name: 'CURSOR SDK BRIDGE V1.0.32', date: '2026-09-22' }),
+    found({ name: 'CURSOR SDK BRIDGE · 4 UPDATES IN AUG', date: '2026-08-27' }),
+    found({ name: 'CURSOR V2026.09.15', date: '2026-09-16' }),
+    found({ name: 'CURSOR 1.9.0', date: '2026-09-17' }),
+    found({ name: 'CURSOR 1.12.0', date: '2026-10-01' }),
+    found({ name: 'CURSOR 3', date: '2026-09-15', link: 'https://cursor.com/blog/cursor-3' }),
+  ]);
+  const names = rolled.map((item) => item.name);
+  assert.equal(names.some((name) => /v1\.0\.|v2026|1\.9\.0|1\.12\.0/i.test(name)), false, JSON.stringify(names));
+  assert.ok(names.some((name) => /cursor sdk bridge · 1 update in jul/i.test(name)), JSON.stringify(names));
+  assert.ok(names.some((name) => /cursor sdk bridge · 4 updates in aug/i.test(name)), JSON.stringify(names));
+  assert.ok(names.some((name) => /cursor sdk bridge · 2 updates in sep/i.test(name)), JSON.stringify(names));
+  assert.ok(names.some((name) => /cursor · \d+ updates? in sep/i.test(name)), JSON.stringify(names));
+  assert.ok(names.some((name) => /^cursor 3$/i.test(name)), JSON.stringify(names));
+});
+
+test('pricing, token-efficiency, person names, and code identifiers never print', () => {
+  assert.equal(polish.isPricingOrMetricNote('TEAMS PRICING JUNE 2026'), true);
+  assert.equal(polish.isPricingOrMetricNote('IMPROVED TOKEN EFFICIENCY'), true);
+  assert.equal(polish.isJunkTitle('TEAMS PRICING JUNE 2026'), true);
+  assert.equal(polish.isJunkTitle('IMPROVED TOKEN EFFICIENCY'), true);
+  assert.equal(polish.isJunkTitle('MATTIA ASTORINO'), true);
+  assert.equal(polish.isJunkTitle('Agents Window'), false);
+  assert.equal(repos.looksLikePersonName('Mattia Astorino'), true);
+  assert.equal(repos.looksLikePersonName('MATTIA ASTORINO'), true);
+  assert.equal(repos.looksLikePersonName('Agents Window'), false);
+  assert.equal(repos.looksLikePersonName('Ship or Die'), false);
+  assert.equal(repos.looksLikeCodeIdentifier('GREETING .QUERY'), true);
+  assert.equal(repos.looksLikeCodeIdentifier('CREATEHTTPSERVER'), true);
+  assert.equal(repos.looksLikeCodeIdentifier('LISTEN'), true);
+  assert.equal(repos.looksLikeCodeIdentifier('BUN-TYPES'), true);
+  assert.equal(repos.looksLikeCodeIdentifier('NUB'), false);
+  assert.equal(repos.isJunkProductName('MATTIA ASTORINO'), true);
+  assert.equal(repos.isJunkProductName('CREATEHTTPSERVER'), true);
+  const items = polish.polishCandidates(
+    [
+      found({ name: 'Teams pricing June 2026', date: '2026-06-01', link: 'https://cursor.com/changelog/pricing' }),
+      found({ name: 'Improved token efficiency', date: '2026-09-23', link: 'https://cursor.com/changelog/tokens' }),
+      found({ name: 'Mattia Astorino', date: '2026-03-01', source: 'github', link: 'https://github.com/t3dotgg/mattia' }),
+      found({ name: 'greeting.query', date: '2026-04-01', source: 'npm', link: 'https://www.npmjs.com/package/greeting.query' }),
+      found({ name: 'Nub', date: '2026-02-01', source: 'github', link: 'https://github.com/colinhacks/nub' }),
+      found({ name: 'NUB', date: '2026-02-08', source: 'npm', link: 'https://www.npmjs.com/package/nub' }),
+      found({ name: 'Meet the new Cursor', date: '2026-09-15', link: 'https://cursor.com/blog/cursor-3' }),
+    ],
+    { year: 2026, who: 'Theo' },
+  );
+  const names = items.map((item) => item.name);
+  assert.equal(names.some((name) => /pricing|token efficiency|mattia|greeting/i.test(name)), false, JSON.stringify(names));
+  assert.equal(names.filter((name) => /^nub$/i.test(name)).length, 1, JSON.stringify(names));
+  const cursor3 = items.find((item) => /cursor 3/i.test(item.name));
+  assert.equal(cursor3?.date, '2026-04-02');
+});
+
+test('Codex titles lose the marketing clause and launch-notes suffix', () => {
+  assert.match(polish.cleanShipTitle('CODEX, OUR CODE GENERATION CLI TOOL'), /codex cli/i);
+  assert.match(polish.cleanShipTitle('CODEX FOR CHROME LAUNCH NOTES'), /^codex for chrome$/i);
+});
+
+test('archive.org/RDAP product hosts beat an npm publish day for the product itself', () => {
+  const npmUrls = dates.productLaunchUrlsForNpm(
+    { name: 'POST BRIDGE', link: 'https://www.npmjs.com/package/post-bridge' },
+    { pageText: 'https://post-bridge.com https://zod.dev' },
+  );
+  assert.ok(npmUrls.some((url) => /post-bridge\.com/.test(url)), JSON.stringify(npmUrls));
+  assert.equal(npmUrls.some((url) => /npmjs|zod\.dev/.test(url)), false, JSON.stringify(npmUrls));
+  const zodUrls = dates.productLaunchUrlsForNpm({ name: 'ZOD', link: 'https://www.npmjs.com/package/zod' }, { pageText: 'https://zod.dev' });
+  assert.equal(zodUrls.length, 0);
+  const cliUrls = dates.productLaunchUrlsForNpm({ name: 'POSTBRIDGE-CLI', link: 'https://www.npmjs.com/package/postbridge-cli' }, { pageText: 'https://post-bridge.com' });
+  assert.equal(cliUrls.some((url) => /post-bridge\.com/.test(url)), false);
+});
+
 test('sitemap slugs become flagship names and june-2026 slugs get a day', () => {
   const xml = `<?xml version="1.0"?><urlset>
     <url><loc>https://cursor.com/blog/cursor-3</loc></url>

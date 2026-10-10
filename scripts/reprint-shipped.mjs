@@ -12,6 +12,7 @@
 // After c600749: product hosts listed on the maker's profile are still first-launch evidence.
 // After 4b865b5: npm packages are dated from the product homepage too.
 // After 05fa76d: revert npm dating (Zod is older than 2026); take earliest URL evidence.
+// After content-fix: version monthly rollup, person-name gate, archive/RDAP beats npm for the product itself.
 //
 //   ADMIN_PASSWORD=… node scripts/reprint-shipped.mjs [origin]
 const RECEIPT_PATH = (id) => `/r/${id}/`;

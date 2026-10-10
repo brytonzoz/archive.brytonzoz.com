@@ -115,6 +115,7 @@ export function flagshipLaunchName(item: FlagshipItem): string | null {
 
   if (/\bbugbot\b/i.test(hay) || /\/(blog|changelog)\/bugbot/i.test(path)) return 'Bugbot';
   if (/\bagents window\b/i.test(name) || /\/agents-window\b/i.test(path)) return 'Agents Window';
+  if (/^origin$/i.test(name) || /\/(blog|changelog)\/origin$/i.test(path)) return 'Origin';
 
   const report = name.match(/^a technical report on\s+(.+)$/i);
   if (report?.[1] && /\d/.test(report[1])) return titleCaseProduct(report[1]);
@@ -123,7 +124,9 @@ export function flagshipLaunchName(item: FlagshipItem): string | null {
   if (meet?.[1] && slug.match(/-(\d+)$/)) return `${titleCaseProduct(meet[1])} ${slug.match(/-(\d+)$/)?.[1]}`;
 
   const intro = name.match(/^(?:introducing|launching)\s+([A-Za-z][\w.+-]*(?:\s+\d+(?:\.\d+)?)?)/i);
-  if (intro?.[1] && /\d/.test(intro[1]) && isCompanyShip(item)) return titleCaseProduct(intro[1]);
+  if (intro?.[1] && /\d/.test(intro[1]) && isCompanyShip(item) && !isCursorModelNote({ ...item, name: intro[1] })) {
+    return titleCaseProduct(intro[1]);
+  }
 
   const joining = name.match(/^([A-Za-z][\w.-]{1,32})\s+(?:is joining|joins)\s+([A-Za-z][\w.-]{1,32})/i);
   if (joining && isCompanyShip(item)) return `${titleCaseProduct(joining[1])} joining ${titleCaseProduct(joining[2])}`;
@@ -156,6 +159,22 @@ export function isFlagshipYearKeep(item: FlagshipItem, year: number): boolean {
   const raw = item.date ? String(item.date) : '';
   if (raw && !raw.startsWith(String(year))) return false;
   return !raw || raw.startsWith(String(year));
+}
+
+const FLAGSHIP_LAUNCH_DAY: Record<string, string> = {
+  cursor3: '2026-04-02',
+  composer2: '2026-08-14',
+  bugbot: '2026-06-01',
+  origin: '2026-09-14',
+};
+
+/** Public launch day when we know it; otherwise the changelog slug's month. */
+export function knownFlagshipDate(item: FlagshipItem, year: number): string | null {
+  const flagship = flagshipLaunchName(item);
+  if (!flagship || isPriorYearJoin(item, year)) return null;
+  const known = FLAGSHIP_LAUNCH_DAY[flagship.toLowerCase().replace(/[^a-z0-9]/g, '')];
+  if (known && known.startsWith(String(year))) return known;
+  return dateFromShipSlug(item.link, year);
 }
 
 /** `bugbot-updates-june-2026` / `.../2026-04-02-cursor-3` → a day when the slug carries one. */

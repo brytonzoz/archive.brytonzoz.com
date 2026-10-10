@@ -3,7 +3,7 @@
 // releases, and App Store version rows. No per-company URL tables.
 import { extraResearchPaths, itemsFromProjectList } from './shipped-research';
 import { looksLikeNotAShip } from './shipped-decisions';
-import { flagshipLaunchName, logFlagshipGate } from './shipped-flagship';
+import { flagshipLaunchName, knownFlagshipDate, logFlagshipGate } from './shipped-flagship';
 import { prettyBrand } from './shipped-polish';
 import { companyOrgGuess, companyScope, companySlug, companyTokens, leadProductTokens, type Affiliation } from './shipped-affiliation';
 import { type XaiEnv, type XaiSpend, emptyXaiSpend } from './shipped-xai';
@@ -442,6 +442,14 @@ async function harvestSitemaps(origin: string, year: number, ctx?: FetchCtx): Pr
 
 /** Sitemap rows have no lastmod-as-date. Fetch the flagship posts so Cursor 3 / Composer 2 keep a day. */
 async function hydrateFlagshipDates(found: Found[], year: number, ctx?: FetchCtx): Promise<Found[]> {
+  found = found.map((item) => {
+    const flagship = flagshipLaunchName(item);
+    if (!flagship) return item;
+    const known = knownFlagshipDate(item, year);
+    if (!known || item.date === known) return item;
+    logFlagshipGate(item, item.date ? 'date-override' : 'known-date', flagship);
+    return { ...item, date: known, thisYear: true, dateConfidence: 'exact' as const };
+  });
   const need = found.filter((item) => !item.date && flagshipLaunchName(item) && item.link);
   const seen = new Set<string>();
   const unique = need.filter((item) => {

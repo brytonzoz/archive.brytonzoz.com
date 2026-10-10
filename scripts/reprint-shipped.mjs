@@ -1,6 +1,7 @@
 // Reprint wall receipts via POST /api/admin/shipped { action: 'reprint-receipt', affiliation? }.
 // Names and counts only. Never prints the admin password or receipt bodies.
 // Push-default FORCE_IDS: 16, 17, 18, 19, 20 (Tibo, Cursor, jackfriks, Zod, Theo).
+// After 7bdfa60: undated changelog rows stay, handle.com pins, musl rollup.
 //
 //   ADMIN_PASSWORD=… node scripts/reprint-shipped.mjs [origin]
 const RECEIPT_PATH = (id) => `/r/${id}/`;

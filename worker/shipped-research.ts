@@ -443,6 +443,118 @@ export function extraResearchPaths(siteUrl: string): string[] {
   ];
 }
 
+const PORTFOLIO_DATE = /^(createdAt|created_at|launchedAt|launched_at|shippedAt|shipped_at|publishedAt|published_at|date)$/i;
+const PORTFOLIO_NAME = /^(name|title|label)$/i;
+const PORTFOLIO_URL = /^(url|href|link|website|site)$/i;
+const PORTFOLIO_LIST = /^(startups|products|projects|ships|apps)$/i;
+
+function pickField(row: Record<string, unknown>, match: RegExp): unknown {
+  for (const [key, value] of Object.entries(row)) {
+    if (match.test(key)) return value;
+  }
+  return undefined;
+}
+
+function portfolioDate(value: unknown, year: number): string | null {
+  if (typeof value !== 'string' && typeof value !== 'number') return null;
+  const text = String(value);
+  const match = text.match(/^(\d{4})-(\d{2})(?:-(\d{2}))?/);
+  if (!match || Number(match[1]) !== year) return null;
+  return match[3] ? `${match[1]}-${match[2]}-${match[3]}` : `${match[1]}-${match[2]}`;
+}
+
+function isPortfolioRow(value: unknown): value is Record<string, unknown> {
+  if (!value || typeof value !== 'object' || Array.isArray(value)) return false;
+  const row = value as Record<string, unknown>;
+  const name = pickField(row, PORTFOLIO_NAME);
+  const href = pickField(row, PORTFOLIO_URL);
+  const date = pickField(row, PORTFOLIO_DATE);
+  return typeof name === 'string' && name.trim().length >= 2 && Boolean(href) && date != null;
+}
+
+function collectPortfolioRows(node: unknown, out: Record<string, unknown>[], depth = 0): void {
+  if (!node || typeof node !== 'object' || depth > 8 || out.length >= 80) return;
+  if (Array.isArray(node)) {
+    const rows = node.filter(isPortfolioRow);
+    if (rows.length >= 2) {
+      for (const row of rows) {
+        if (out.length >= 80) break;
+        out.push(row);
+      }
+      return;
+    }
+    for (const item of node) collectPortfolioRows(item, out, depth + 1);
+    return;
+  }
+  const record = node as Record<string, unknown>;
+  for (const [key, value] of Object.entries(record)) {
+    if (PORTFOLIO_LIST.test(key) && Array.isArray(value)) collectPortfolioRows(value, out, depth + 1);
+    else if (value && typeof value === 'object') collectPortfolioRows(value, out, depth + 1);
+  }
+}
+
+export function embeddedPageBlobs(html: string): unknown[] {
+  const blobs: unknown[] = [];
+  const add = (raw: string) => {
+    const text = raw.trim();
+    if (text.length < 20 || text.length > 800_000) return;
+    try {
+      blobs.push(JSON.parse(text));
+    } catch {
+      /* ignore */
+    }
+  };
+  if (html.trim().startsWith('{') || html.trim().startsWith('[')) add(html);
+  for (const match of html.matchAll(/<script\b[^>]*>([\s\S]*?)<\/script>/gi)) {
+    const tag = match[0].slice(0, match[0].indexOf('>') + 1);
+    const body = match[1] || '';
+    if (/id=["']__NEXT_DATA__["']/i.test(tag) || /type=["']application\/json["']/i.test(tag)) add(body);
+  }
+  return blobs;
+}
+
+/**
+ * Indie Page / similar personal portfolios keep the product list in __NEXT_DATA__.
+ * HTML text extraction strips <script>, so dated 2026 startups never reached the tape.
+ */
+export function itemsFromEmbeddedPortfolio(opts: { html: string; url: string; year: number }): Found[] {
+  const found: Found[] = [];
+  const seen = new Set<string>();
+  const add = (name: string, date: string, href: string | null, hint: string) => {
+    const trimmed = clean(name, 40);
+    if (!trimmed || trimmed.length < 2) return;
+    const key = loose(trimmed);
+    if (key.length < 2 || seen.has(key)) return;
+    if (/^(home|about|blog|contact|projects?|changelog|indie page)$/i.test(trimmed)) return;
+    seen.add(key);
+    found.push({
+      name: trimmed,
+      description: clean(hint, 140),
+      date,
+      dateConfidence: 'exact',
+      link: href || publicUrl(opts.url),
+      icon: null,
+      source: 'site',
+      status: 'LAUNCHED',
+      score: 8,
+      thisYear: true,
+    });
+  };
+
+  const rows: Record<string, unknown>[] = [];
+  for (const blob of embeddedPageBlobs(opts.html)) collectPortfolioRows(blob, rows);
+  for (const row of rows) {
+    if (row.isShown === false) continue;
+    const date = portfolioDate(pickField(row, PORTFOLIO_DATE), opts.year);
+    if (!date) continue;
+    const name = String(pickField(row, PORTFOLIO_NAME) || '');
+    const href = publicUrl(String(pickField(row, PORTFOLIO_URL) || ''));
+    const bio = typeof row.bio === 'string' ? clean(row.bio, 120) : '';
+    add(name, date, href, bio || `Listed ${date} on ${hostOf(opts.url) ?? 'their site'}`);
+  }
+  return found.slice(0, 40);
+}
+
 export function trustmrrUrls(profile: Profile): string[] {
   return [...new Set([profile.x, profile.github].filter((h): h is string => Boolean(h)))].map(
     (handle) => `https://trustmrr.com/founder/${encodeURIComponent(handle.toLowerCase())}`,

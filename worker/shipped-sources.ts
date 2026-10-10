@@ -45,6 +45,7 @@ import {
   formatReceiptStats,
   githubContributions,
   itemsFromDatedJournal,
+  itemsFromEmbeddedPortfolio,
   itemsFromPersonalFeed,
   itemsFromProjectList,
   mergeStats,
@@ -108,7 +109,15 @@ export type Found = {
 
 export type WebResult = { title: string; url: string; snippet: string; date: string | null };
 
-export type SiteInfo = { url: string; title: string; description: string; icon: string | null; text: string; links: { text: string; url: string }[] };
+export type SiteInfo = {
+  url: string;
+  title: string;
+  description: string;
+  icon: string | null;
+  text: string;
+  links: { text: string; url: string }[];
+  embedded?: string;
+};
 
 /** What the subject is, filled in as sources learn it (GitHub, X bio, personal sites). */
 export type Profile = {
@@ -1121,8 +1130,9 @@ export async function readSite(siteUrl: string): Promise<SiteInfo | null> {
     const href = abs(attr(match[1], 'href'));
     const text = clean(decode(match[2].replace(/<[^>]+>/g, ' ')), 60);
     if (href && text && !links.some((l) => l.url === href)) links.push({ text, url: href });
-    if (links.length >= 40) break;
+    if (links.length >= 80) break;
   }
+  const embedded = (html.match(/<script\b[^>]*id=["']__NEXT_DATA__["'][^>]*>[\s\S]*?<\/script>/i) ?? [])[0] || '';
   const rawText = linedText(html, 48_000);
   const dated = (rawText.match(/(?:^|\n).{0,20}20\d\d[-/.]\d{1,2}.{0,80}/g) ?? []).join('\n');
   const text = `${dated}\n${rawText}`.trim().slice(0, 48_000);
@@ -1134,6 +1144,7 @@ export async function readSite(siteUrl: string): Promise<SiteInfo | null> {
     icon: abs(attr(touch ?? png ?? '', 'href')) ?? faviconUrl(base),
     text,
     links,
+    embedded: embedded || undefined,
   };
 }
 
@@ -1663,7 +1674,7 @@ export async function gather(
     gatherFresh(subject, resolved.profile, env, year, meter, tinyfish, resolved.notes, mode, opts?.onPartial);
   if (opts?.rebuild && !opts.onPartial) return load();
   if (opts?.rebuild) return load();
-  const key = mode === 'full' ? `gather:full:v25:${year}:${resolved.cacheKey}` : `gather:v34:${year}:${resolved.cacheKey}`;
+  const key = mode === 'full' ? `gather:full:v26:${year}:${resolved.cacheKey}` : `gather:v35:${year}:${resolved.cacheKey}`;
   return cached(
     key,
     1440 * MIN,
@@ -1873,7 +1884,7 @@ async function gatherFresh(
     ...trustmrrUrls(profile),
   ]
     .filter((url, i, all) => all.findIndex((u) => u.replace(/\/+$/, '') === url.replace(/\/+$/, '')) === i)
-    .slice(0, 14);
+    .slice(0, 18);
   const [results, site, extraSites, searched, storeHarvest, githubOverview] = await Promise.all([
     Promise.allSettled(SOURCES.filter((source) => source.enabled(ctx)).map(async (source) => ({ id: source.id, found: await raceTimeout(source.run(ctx), SOURCE_TIMEOUT_MS, []) }))),
     homepage ? raceTimeout(readSite(homepage).catch(() => null), SOURCE_TIMEOUT_MS, null) : Promise.resolve(null),
@@ -1945,6 +1956,7 @@ async function gatherFresh(
     found.push(...itemsFromProjectList({ text, url: page.url, year }));
     found.push(...itemsFromDatedJournal({ text, url: page.url, year }));
     found.push(...itemsFromPersonalFeed({ text, url: page.url, year }));
+    found.push(...itemsFromEmbeddedPortfolio({ html: page.embedded || text, url: page.url, year }));
   }
   if (storeHarvest.found.length) {
     found.push(...storeHarvest.found);
@@ -2007,6 +2019,7 @@ async function gatherFresh(
     found.push(...itemsFromProjectList({ text: `${page.title}\n${page.text}`, url: page.url, year }));
     found.push(...itemsFromDatedJournal({ text: `${page.title}\n${page.text}`, url: page.url, year }));
     found.push(...itemsFromPersonalFeed({ text: `${page.title}\n${page.text}`, url: page.url, year }));
+    found.push(...itemsFromEmbeddedPortfolio({ html: page.text, url: page.url, year }));
     pageStats.push(...extractPublicStats(`${page.title}\n${page.text}`, page.url));
   }
 

@@ -296,6 +296,33 @@ August 2026
   assert.ok(research.extraResearchPaths('https://levels.io').some((url) => /\/rss$/.test(url)));
 });
 
+test('Indie Page __NEXT_DATA__ keeps 2026 startups and drops older ones', () => {
+  const html = `<html><script id="__NEXT_DATA__" type="application/json">${JSON.stringify({
+    props: {
+      pageProps: {
+        user: {
+          name: 'Marc Lou',
+          startups: [
+            { name: 'ShipFast', url: 'https://shipfa.st', createdAt: '2023-08-28T00:00:00.000Z', bio: 'Ship your startup' },
+            { name: 'Ship or Die', url: 'https://www.ship-or-die.com/', createdAt: '2026-05-25T00:00:00.000Z', bio: 'Ship in 30 days' },
+            { name: 'Stalkr', url: 'https://stalkr.ai', createdAt: '2026-06-05T12:00:00.000Z', isShown: true },
+            { name: 'Hidden App', url: 'https://hidden.example', createdAt: '2026-03-01T00:00:00.000Z', isShown: false },
+            { name: 'DataRadar', url: 'https://dataradar.datafa.st/', createdAt: '2026-03-02T00:00:00.000Z' },
+          ],
+        },
+      },
+    },
+  })}</script></html>`;
+  const items = research.itemsFromEmbeddedPortfolio({ html, url: 'https://marclou.com/', year: 2026 });
+  const names = items.map((item) => item.name).join(' | ');
+  assert.ok(items.some((item) => /ship or die/i.test(item.name) && item.date === '2026-05-25'), names);
+  assert.ok(items.some((item) => /stalkr/i.test(item.name) && item.date === '2026-06-05'), names);
+  assert.ok(items.some((item) => /dataradar/i.test(item.name)), names);
+  assert.equal(items.some((item) => /shipfast/i.test(item.name)), false);
+  assert.equal(items.some((item) => /hidden app/i.test(item.name)), false);
+  assert.ok(items.every((item) => item.date && item.date.startsWith('2026-')));
+});
+
 test('personal RSS keeps dated ships and drops commentary', () => {
   const xml = `<?xml version="1.0"?>
   <rss><channel>

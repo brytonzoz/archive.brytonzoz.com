@@ -258,7 +258,7 @@ function isOwnedPin(
   item: { name?: string; date?: string | null; link?: string | null; source?: string; description?: string },
   owner?: OwnerContext | null,
 ): boolean {
-  if (item.source !== 'site' && item.source !== 'web') return false;
+  if (item.source !== 'site' && item.source !== 'web' && item.source !== 'npm') return false;
   return ownedByBuilder(item, owner);
 }
 

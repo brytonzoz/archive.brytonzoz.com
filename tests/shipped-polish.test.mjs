@@ -409,6 +409,7 @@ test('owned pin dates keep 2026 first launches and drop pre-2026 evidence', () =
     { owner: { name: 'Jack Friks', site: 'https://jackfriks.com', sites: ['https://jackfriks.com', 'https://post-bridge.com'] } },
   );
   assert.ok(ownedBridge.some((url) => /post-bridge\.com/.test(url)), JSON.stringify(ownedBridge));
+  assert.equal(dates.dropSameNameLeftovers([{ name: 'POST BRIDGE', source: 'npm' }], ['POST BRIDGE']).items.length, 0);
   const leftover = dates.dropSameNameLeftovers(
     [
       { name: 'POST BRIDGE', source: 'npm', date: '2026-09-09' },

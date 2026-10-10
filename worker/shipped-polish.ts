@@ -227,6 +227,9 @@ export function isJunkTitle(title: string, opts: { who?: string | null; company?
   if (/^respectively\.?$/i.test(text)) return true;
   if (DOCS_NAV.test(text) || /^(recent highlights|cursor support|under:|blog\s*\/\s*research|blog|research)$/i.test(text)) return true;
   if (isAboutPerson(text, opts.who)) return true;
+  if (/^(the )?(guy|person|one) who made\b/i.test(text)) return true;
+  const whoLast = (opts.who || '').split(/\s+/).filter((word) => word.length > 2);
+  if (/^[A-Z]\s+[A-Z]{2,}$/.test(text) && whoLast.some((word) => loose(text).includes(loose(word)))) return true;
   if (looksFragment(text) || looksMidWord(text) || looksCutOff(text)) return true;
   if ((text.replace(/[^a-zA-Z]/g, '').length < 3) && /\d/.test(text)) return true;
   return false;

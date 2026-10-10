@@ -152,7 +152,9 @@ export function productUrlsForPin(
   const want = loose(item.name);
   const add = (url: string | null | undefined) => {
     const host = hostOf(url);
-    if (!url || !host || own.has(host) || PROFILE_HOST.test(host)) return;
+    if (!url || !host || PROFILE_HOST.test(host)) return;
+    // Portfolio hosts are not first-launch evidence, unless the host *is* the product (post-bridge.com).
+    if (own.has(host) && !(want.length >= 4 && loose(host).includes(want))) return;
     if (!out.includes(url)) out.push(url);
   };
   const itemHost = hostOf(item.link);

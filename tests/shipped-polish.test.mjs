@@ -27,6 +27,8 @@ test('bylines, docs nav, week-of roundups, and articles about the person are jun
   assert.equal(polish.isJunkTitle('POOL'), true);
   assert.equal(polish.isJunkTitle('WEEK OF OCTOBER 6'), true);
   assert.equal(polish.isJunkTitle('MICHAEL TRUELL', { who: 'Michael Truell' }), true);
+  assert.equal(polish.isJunkTitle('S JACK', { who: 'Jack Friks' }), true);
+  assert.equal(polish.isJunkTitle('THE GUY WHO MADE POST BRIDGE'), true);
   assert.equal(polish.isJunkTitle('MELKEY MOKSYAKOV, ESTEBAN SUÁREZ'), true);
   assert.equal(polish.isJunkTitle('Cursor 2.0'), false);
 });
@@ -402,6 +404,11 @@ test('owned pin dates keep 2026 first launches and drop pre-2026 evidence', () =
   const shipUrls = dates.productUrlsForPin({ name: 'SHIP OR DIE' }, {});
   assert.ok(shipUrls.some((url) => /ship-or-die\.com/.test(url)), JSON.stringify(shipUrls));
   assert.equal(shipUrls.some((url) => /shipordie\.com/.test(url)), false);
+  const ownedBridge = dates.productUrlsForPin(
+    { name: 'POST BRIDGE', link: 'https://www.jackfriks.com/#postbridge' },
+    { owner: { name: 'Jack Friks', site: 'https://jackfriks.com', sites: ['https://jackfriks.com', 'https://post-bridge.com'] } },
+  );
+  assert.ok(ownedBridge.some((url) => /post-bridge\.com/.test(url)), JSON.stringify(ownedBridge));
   const leftover = dates.dropSameNameLeftovers(
     [
       { name: 'POST BRIDGE', source: 'npm', date: '2026-09-09' },

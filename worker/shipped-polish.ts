@@ -1,13 +1,14 @@
 // Hard pre-filters + title cleanup for the SHIPPED tape. Runs BEFORE Decisions
 // so bylines, docs nav, roundups, and cut-off headings never get scored as ships.
 import type { Affiliation } from './shipped-affiliation';
-import { isJunkRepoName } from './shipped-repos';
+import { isJunkProductName } from './shipped-repos';
 import {
   cursorModelTitle,
   flagshipLaunchName,
   isCursorModelNote,
   isFlagshipYearKeep,
   isJoinOrAcquire,
+  isPriorYearJoin,
   logFlagshipGate,
   stripDateSuffix,
 } from './shipped-flagship';
@@ -224,7 +225,7 @@ export function isJunkTitle(title: string, opts: { who?: string | null; company?
   if (CODE_TITLE.test(text) || /^(object|query|router)$/i.test(text)) return true;
   if (/\bgithub stars\b|\bweekly downloads\b/i.test(text) && !/\b(zod|nub|tsc|cli|app)\b/i.test(text)) return true;
   if (/^respectively\.?$/i.test(text)) return true;
-  if (DOCS_NAV.test(text) || /^(recent highlights|cursor support|under:)/i.test(text)) return true;
+  if (DOCS_NAV.test(text) || /^(recent highlights|cursor support|under:|blog\s*\/\s*research|blog|research)$/i.test(text)) return true;
   if (isAboutPerson(text, opts.who)) return true;
   if (looksFragment(text) || looksMidWord(text) || looksCutOff(text)) return true;
   if ((text.replace(/[^a-zA-Z]/g, '').length < 3) && /\d/.test(text)) return true;
@@ -401,6 +402,7 @@ export function inYearDate(value: unknown, year: number): string | null {
 
 export function inYearStrict(item: Polishable, year: number): boolean {
   if (otherYearProduct(item.name, year) && !flagshipLaunchName(item)) return false;
+  if (isPriorYearJoin(item, year)) return false;
   if (isJoinOrAcquire(item) && !String(item.date ?? '').startsWith(String(year))) return false;
   const raw = item.date ? String(item.date) : '';
   if (/^\d{4}/.test(raw) && !raw.startsWith(String(year))) {
@@ -725,7 +727,7 @@ export function polishCandidates<T extends Polishable>(items: T[], opts: PolishO
         continue;
       }
     }
-    if ((item.source === 'github' || /^https?:\/\/github\.com\//i.test(item.link ?? '')) && isJunkRepoName(name, opts.handle || opts.owner?.github, who)) {
+    if (isJunkProductName(name, opts.handle || opts.owner?.github, who)) {
       drop(item, 'github-junk');
       continue;
     }

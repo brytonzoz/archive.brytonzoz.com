@@ -9,6 +9,12 @@ const JUNK_REPO_TAIL =
 export function isJunkRepoName(name: string, login?: string | null, who?: string | null): boolean {
   const n = name.replace(/\.git$/, '');
   if (!REPO_NAME.test(n) && !/^[A-Za-z0-9 ._:-]{1,80}$/.test(n)) return true;
+  return isJunkProductName(n, login, who);
+}
+
+/** Repro/demo/profile names are not ships on any source (`yes`, `t3dotgg`, `shoo-vite-demo`). */
+export function isJunkProductName(name: string, login?: string | null, who?: string | null): boolean {
+  const n = name.replace(/\.git$/, '');
   const compact = n.replace(/[\s._-]+/g, '').toLowerCase();
   if (login && compact === login.replace(/[\s._-]+/g, '').toLowerCase()) return true;
   if (who && compact === who.replace(/[\s._-]+/g, '').toLowerCase()) return true;

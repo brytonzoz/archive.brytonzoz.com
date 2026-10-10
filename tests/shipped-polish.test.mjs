@@ -309,6 +309,7 @@ test('flagship company launches survive the title gate with a logged keep', () =
       found({ name: 'Introducing Composer 2', date: '2026-03-19', link: 'https://cursor.com/blog/composer-2' }),
       found({ name: 'A technical report on Composer 2', date: '2026-03-27', link: 'https://cursor.com/blog/composer-2-technical-report' }),
       found({ name: 'Graphite is joining Cursor', date: '2025-12-19', link: 'https://cursor.com/blog/graphite' }),
+      found({ name: 'Graphite joining Cursor', date: '2026-05-22', link: 'https://cursor.com/blog/graphite' }),
       found({ name: 'Bugbot is now over 3x faster, 22% cheaper, and finds 10% more bugs', date: '2026-06-10', link: 'https://cursor.com/changelog/bugbot-updates-june-2026' }),
       found({ name: 'ORIGIN · SEP 14, 2026', date: '2026-09-14', link: 'https://cursor.com/changelog/origin' }),
       found({ name: 'CURSOR WEB · CLOUD AGENTS · SEP 14', date: '2026-09-14', link: 'https://cursor.com/changelog/cursor-web' }),
@@ -354,6 +355,9 @@ test('repro bench demo and profile repos are not ships; @shoojs rolls into SHOO'
   assert.equal(repos.isJunkRepoName('t3dotgg', 't3dotgg'), true);
   assert.equal(repos.isJunkRepoName('T3 - THEO', 't3dotgg', 'Theo'), true);
   assert.equal(repos.isJunkRepoName('yes'), true);
+  assert.equal(repos.isJunkProductName('YES'), true);
+  assert.equal(repos.isJunkProductName('t3dotgg', 't3dotgg'), true);
+  assert.equal(repos.isJunkProductName('@zod/mini', 'colinhacks'), false);
   assert.equal(repos.isShipRepo({ name: 'zod', description: 'TypeScript-first schema validation', stars: 30000, homepage: 'https://zod.dev' }, 'colinhacks'), true);
   assert.equal(repos.isShipRepo({ name: 'bun-workspaces', description: 'wip', stars: 2, homepage: null }, 'colinhacks'), false);
   assert.equal(repos.isShipRepo({ name: 'turbopack-nested-namespace', description: '', stars: 1, homepage: null }, 'colinhacks'), false);

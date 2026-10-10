@@ -10,7 +10,7 @@ import { clean, hostOf, inYearCount, publicUrl, type Found, type Gathered } from
 import { shipName } from './shipped-changelog';
 import { shareKeywords } from './shipped-decisions';
 import { ownerFromProfile } from './shipped-ownership';
-import { flagshipLaunchName, isFlagshipYearKeep, isJoinOrAcquire, logFlagshipGate } from './shipped-flagship';
+import { flagshipLaunchName, isFlagshipYearKeep, isJoinOrAcquire, isPriorYearJoin, logFlagshipGate } from './shipped-flagship';
 import { cleanDescription, cleanShipTitle, cleanStatus, noteCountMismatch, polishCandidates, prettyBrand } from './shipped-polish';
 import type { Affiliation } from './shipped-affiliation';
 import { RECEIPT_BUDGET_MICROS, formatReceiptStats, searchBudget, type SourcedStat } from './shipped-research';
@@ -333,7 +333,7 @@ function toDraftItem(item: Found, year: number): DraftItem | null {
     if (flagship) logFlagshipGate(item, 'draft-year', null);
     return null;
   }
-  if (isJoinOrAcquire(item) && !String(item.date ?? '').startsWith(String(year))) {
+  if (isPriorYearJoin(item, year) || (isJoinOrAcquire(item) && !String(item.date ?? '').startsWith(String(year)))) {
     if (flagship) logFlagshipGate(item, 'draft-year', null);
     return null;
   }

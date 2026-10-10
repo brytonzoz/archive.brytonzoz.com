@@ -1,6 +1,6 @@
 // Generic first-party ship extractors: changelog cards, RSS/Atom, sitemaps, JSON-LD.
 // No per-company URL tables — callers discover pages, this file turns dated markup into Found rows.
-import { dateFromShipSlug, flagshipLaunchName, isFlagshipYearKeep, isJoinOrAcquire, stripDateSuffix } from './shipped-flagship';
+import { dateFromShipSlug, flagshipLaunchName, isFlagshipYearKeep, isJoinOrAcquire, isPriorYearJoin, stripDateSuffix } from './shipped-flagship';
 
 export type ChangelogFound = {
   name: string;
@@ -306,6 +306,7 @@ function row(name: string, date: string | null, url: string, year: number, _hint
   if (!title) return null;
   const slugDate = dateFromShipSlug(url, year);
   const draft = { name: title, link: url, source: 'changelog', date };
+  if (isPriorYearJoin({ ...draft, date: date || slugDate }, year)) return null;
   if (isJoinOrAcquire(draft) && !String(date || slugDate || '').startsWith(String(year))) return null;
   const keepYear = isFlagshipYearKeep(draft, year);
   const resolved = date && date.startsWith(String(year)) ? date : slugDate;

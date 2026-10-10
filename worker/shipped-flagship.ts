@@ -136,6 +136,14 @@ export function isJoinOrAcquire(item: FlagshipItem): boolean {
   return /joining|joins|acquired/i.test(`${item.name ?? ''} ${flagship ?? ''}`);
 }
 
+/** Graphite joined Cursor in Dec 2025. A later page date must not put it on a 2026 tape. */
+export function isPriorYearJoin(item: FlagshipItem, year: number): boolean {
+  if (!isJoinOrAcquire(item) && !/\/(blog|changelog)\/graphite\b/i.test(item.link ?? '')) return false;
+  if (/graphite/i.test(`${item.name ?? ''} ${item.link ?? ''}`)) return true;
+  const raw = String(item.date ?? '');
+  return Boolean(raw) && !raw.startsWith(String(year));
+}
+
 /**
  * Flagships may keep an undated 2026 sitemap row (Cursor 3). They must never
  * override the year rule: a 2025 join (Graphite) is not a 2026 ship.
@@ -143,6 +151,7 @@ export function isJoinOrAcquire(item: FlagshipItem): boolean {
 export function isFlagshipYearKeep(item: FlagshipItem, year: number): boolean {
   const flagship = flagshipLaunchName(item);
   if (!flagship || !isCompanyShip(item)) return false;
+  if (isPriorYearJoin(item, year)) return false;
   if (isJoinOrAcquire(item)) return String(item.date ?? '').startsWith(String(year));
   const raw = item.date ? String(item.date) : '';
   if (raw && !raw.startsWith(String(year))) return false;

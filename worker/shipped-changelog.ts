@@ -101,6 +101,12 @@ function tidy(value: unknown): string {
   if (typeof value !== 'string') return '';
   return value
     .normalize('NFKC')
+    .replace(/&amp;/gi, '&')
+    .replace(/&quot;/gi, '"')
+    .replace(/&#39;|&apos;/gi, "'")
+    .replace(/&lt;/gi, '<')
+    .replace(/&gt;/gi, '>')
+    .replace(/&nbsp;/gi, ' ')
     .replace(/[\u0000-\u001f\u007f-\u009f\u200b-\u200f\u2028-\u202e\u2066-\u2069]/g, ' ')
     .replace(/[<>`{}]/g, '')
     .replace(/\s+/g, ' ')
@@ -141,6 +147,9 @@ function isNoiseTitle(text: string): boolean {
   if (/\b(practical guide|approach to|progress in|text provenance|advertising for)\b/i.test(text)) return true;
   if (/^(building|sharing|our approach)\b/i.test(text) && !/\b(launch|released?|version|cli|api|app|model)\b/i.test(text)) return true;
   if (text.length <= 3 && !/\d/.test(text)) return true;
+  if (/^(fixes|updates|changes|improvements|bugfixes|misc)$/i.test(text)) return true;
+  if (/,\s+(and|or|the|to|for)$/i.test(text)) return true;
+  if (/\b(and|or|the|to|for)$/i.test(text) && text.split(/\s+/).length <= 8) return true;
   return false;
 }
 

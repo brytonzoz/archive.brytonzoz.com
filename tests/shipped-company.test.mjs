@@ -153,6 +153,9 @@ test('ship names strip launch words, skip bylines, and never cut mid-word', () =
   assert.equal(changelog.shipName('2026'), '');
   assert.equal(changelog.shipName('6-02-05'), '');
   assert.equal(changelog.shipName('codex-2026-02-05-cli'), '');
+  assert.equal(changelog.shipName('FIXES'), '');
+  assert.equal(changelog.shipName('CODEX APP , AND CUSTOMIZE THE'), '');
+  assert.equal(changelog.shipName('Record &amp; Replay expands to the EU'), 'Record & Replay expands to the EU');
   assert.equal(changelog.shipName('Launched as a desktop'), '');
   assert.equal(changelog.shipName('Rakuten uses Codex to ship faster'), '');
   assert.equal(changelog.shipName('Ramp engineers accelerate code review'), '');
@@ -301,6 +304,10 @@ test('off-worker cache is preferred and scoped on read', async () => {
   const all = await company.harvestCompany({ affiliation: ceo, year: 2026, env: {}, store });
   assert.equal(all.found.length, 2);
   assert.ok(all.found.every((item) => item.via === 'via OpenAI'));
+  const reprint = await company.harvestCompany({ affiliation: lead, year: 2026, env: {}, store, rebuild: true });
+  assert.equal(reprint.cacheHit, true);
+  assert.ok(reprint.ran.includes('company-offworker'));
+  assert.ok(reprint.found.some((item) => /codex cli/i.test(item.name)));
 });
 
 test('seed list includes OpenAI Codex plus the companies Bryton will look up', () => {

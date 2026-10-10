@@ -645,7 +645,9 @@ export async function harvestCompany(opts: {
     return { found: [], spend: emptyXaiSpend(), ran: [], cacheHit: false };
   }
   const via = viaFor(affiliation);
-  if (!opts.rebuild && opts.store) {
+  // Always prefer the off-worker list. `rebuild` only skips the isolate cache so
+  // Actions can harvest live; Worker reprints still need the D1/R2 tape.
+  if (opts.store) {
     const off = await opts.store.get(year, slug);
     if (off) {
       const scoped = scopeFilter(affiliation, stripVia(off.found));

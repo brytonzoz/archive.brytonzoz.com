@@ -232,7 +232,12 @@ test('proof of work: solved tokens pass once; forged, stale, easy or reused ones
   const [, body, nonce] = solved.match(/^pow:(.+):(\d+)$/);
   const easier = body.replace(/^(\d{13})\.\d+\./, '$1.1.');
   assert.equal(await guard.verifyPow(env, db, `pow:${easier}:${nonce}`, now), false, 'difficulty is signed');
-  assert.equal(await guard.verifyPow(env, db, `pow:${body}:${Number(nonce) + 1}`, now), false, 'wrong nonce');
+  // 8-bit difficulty matches a neighboring nonce about 1/256 times; keep walking until one fails.
+  let wrongNonceRejected = false;
+  for (let i = 1; i <= 64 && !wrongNonceRejected; i++) {
+    wrongNonceRejected = !(await guard.verifyPow(env, db, `pow:${body}:${Number(nonce) + i}`, now));
+  }
+  assert.equal(wrongNonceRejected, true, 'wrong nonce');
   assert.equal(await guard.verifyHuman(env, db, 'x'.repeat(5000), requestFrom('192.0.2.1')), false, 'oversized token');
   assert.equal(await guard.verifyHuman(env, db, { token: 1 }, requestFrom('192.0.2.1')), false, 'not a string');
   assert.equal(guard.leadingZeroBits(new Uint8Array([0, 0, 0x0f])), 20);

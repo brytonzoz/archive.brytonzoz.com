@@ -161,6 +161,17 @@ const POTENTIAL_NOTES = [
   'Empty drawer. Go ship something.',
 ];
 
+const EMPTY_TAPE_NOTE =
+  /nothing public in 20\d{2} turned up|item on back order|empty drawer\.\s*go ship something/i;
+
+/** Empty-tape copy is only legal when the printed count is 0. */
+export function isEmptyTapeNote(note: string): boolean {
+  const text = note.replace(/\s+/g, ' ').trim();
+  if (!text) return false;
+  if (POTENTIAL_NOTES.some((line) => foldNote(line) === foldNote(text))) return true;
+  return EMPTY_TAPE_NOTE.test(text);
+}
+
 const SOURCE_LABEL: Record<string, string> = {
   github: 'GitHub',
   appstore: 'App Store',
@@ -479,6 +490,7 @@ function noteAlreadyUsed(note: string, used: string[]): boolean {
 
 export type NoteRejectReason =
   | 'empty'
+  | 'empty-tape'
   | 'banned-phrase'
   | 'url'
   | 'unsourced-number'
@@ -486,7 +498,10 @@ export type NoteRejectReason =
   | 'unknown-ship'
   | 'unsafe'
   | 'other-person'
-  | 'missing-data';
+  | 'missing-data'
+  | 'too-short'
+  | 'verbatim-desc'
+  | 'title-restate';
 
 const NOTE_HAS_URL = /https?:\/\/|\bwww\.|\b(npmjs|github|producthunt|twitter)\.com\b/i;
 
@@ -499,6 +514,7 @@ export function hardRejectNote(
 ): NoteRejectReason | null {
   const text = note.replace(/\s+/g, ' ').trim();
   if (!text) return 'empty';
+  if (items.length && isEmptyTapeNote(text)) return 'empty-tape';
   if (!ok(text)) return 'unsafe';
   if (NOTE_HAS_URL.test(text)) return 'url';
   if (BANNED_NOTE_SHAPE.test(text)) return 'banned-phrase';
@@ -737,10 +753,43 @@ function kindFromShipName(name: string): string {
   return 'product';
 }
 
+function shortShipLabel(item: DraftItem): string {
+  const spoken = spokenOf(item);
+  const words = spoken.split(/\s+/).filter(Boolean);
+  if (words.length <= 3) return spoken;
+  return words.slice(0, 2).join(' ');
+}
+
+/** Last resort when the writer dies: top ship + a scrap of description, never the empty-tape line. */
+export function safeNoteFromTopShip(items: DraftItem[], ctx: NoteContext = {}): string {
+  const notable = notableShip(items) || items[0];
+  if (!notable) return POTENTIAL_NOTES[0] ?? '';
+  const label = shortShipLabel(notable);
+  const does = shipWhatItDoes(notable);
+  const titleWords = new Set(wordsIn(`${notable.name} ${spokenOf(notable)}`));
+  const extra = wordsIn(does)
+    .filter((word) => !titleWords.has(word))
+    .slice(0, 2)
+    .join(' ');
+  const candidates = [
+    extra ? `This year's public tape starts with ${label}, built around ${extra}.` : '',
+    `This year's public tape starts with ${label} as the lead ship.`,
+    `${label} is the named product on this year's public tape.`,
+  ].filter(Boolean);
+  for (const note of candidates) {
+    if (isEmptyTapeNote(note)) continue;
+    if (hardRejectNote(note, items, [], ctx)) continue;
+    if (isBareProductNote(note, items)) continue;
+    if (!printable(note)) continue;
+    return clipSentence(note, 140);
+  }
+  return clipSentence(`This year's public tape starts with ${label} as the lead ship.`, 140);
+}
+
 /** When Claude is up but every candidate died: a sentence, never a bare product name. */
 export function sentenceFallbackNote(items: DraftItem[], ctx: NoteContext = {}): string {
   const notable = notableShip(items);
-  if (!notable) return POTENTIAL_NOTES[0] ?? '';
+  if (!notable) return items.length ? safeNoteFromTopShip(items, ctx) : (POTENTIAL_NOTES[0] ?? '');
   const spoken = spokenOf(notable);
   const does = shipWhatItDoes(notable);
   const kind = kindFromShipName(`${notable.name} ${spoken}`);
@@ -758,16 +807,17 @@ export function sentenceFallbackNote(items: DraftItem[], ctx: NoteContext = {}):
     items.length === 1 ? `This tape has one public ship, and ${spoken} is it.` : '',
   ].filter(Boolean);
   for (const note of candidates) {
+    if (isEmptyTapeNote(note)) continue;
     if (hardRejectNote(note, items, [], ctx)) continue;
     if (isBareProductNote(note, items)) continue;
     if (!printable(note)) continue;
     return clipSentence(note, 140);
   }
   const last = `${spoken} is the named product on this year's public tape.`;
-  if (!hardRejectNote(last, items, [], ctx) && printable(last) && !isBareProductNote(last, items)) {
+  if (!isEmptyTapeNote(last) && !hardRejectNote(last, items, [], ctx) && printable(last) && !isBareProductNote(last, items)) {
     return clipSentence(last, 140);
   }
-  return POTENTIAL_NOTES[0] ?? '';
+  return safeNoteFromTopShip(items, ctx);
 }
 
 /** Last resort only: the notable ship name. No sentence costume. */
@@ -992,10 +1042,13 @@ export function finish(items: DraftItem[], note: string, seed: number, modulesRa
   const hard = hardRejectNote(text, sorted, Array.isArray(statsRaw) ? (statsRaw as string[]) : stats, ctx);
   const apiDown = Boolean(ctx.apiDown);
   let whoNote = text;
-  if (!text || !ok(text) || hard) {
+  if (!text || !ok(text) || hard || isEmptyTapeNote(text)) {
     whoNote = apiDown
       ? groundedNote(sorted, seed, ctx.who || ctx.company || '', stats, ctx)
       : sentenceFallbackNote(sorted, ctx);
+  }
+  if (isEmptyTapeNote(whoNote)) {
+    whoNote = safeNoteFromTopShip(sorted, ctx);
   }
   const printed = printNote(whoNote, stats);
   if (!apiDown && isBareProductNote(printed, sorted)) {

@@ -460,8 +460,46 @@ test('cashier note and stats are specific to the items, never stock copy', () =>
     ],
     { who: 'Guillermo Rauch' },
   );
-  assert.doesNotMatch(awsFallback, /leads \d+ ships|Aws Databases Are Now Live sits|·|the rest of the tape/i);
+  assert.doesNotMatch(awsFallback, /leads \d+ ships|Aws Databases Are Now Live sits|·|the rest of the tape|nothing public in 20\d{2} turned up/i);
   assert.match(awsFallback, /keep an eye on|are both on this|public tape/i);
+  assert.equal(ai.isEmptyTapeNote(awsFallback), false, awsFallback);
+  const longAws = ai.finish(
+    [
+      {
+        name: 'AWS DATABASES ARE NOW LIVE ON THE VERCEL MARKETPLACE AND V0',
+        spoken: 'Aws databases are now live on the Vercel Marketplace and V0',
+        description: 'See all of the latest features and updates to the Vercel platform.',
+        date: '2026-10-01',
+        status: 'LAUNCHED',
+        link: 'https://vercel.com/changelog/aws',
+        icon: null,
+        source: 'changelog',
+      },
+      {
+        name: 'VERCEL PLUGIN FOR VSCODE',
+        spoken: 'Vercel Plugin for VS Code',
+        description: 'editor plugin',
+        date: '2026-09-01',
+        status: 'LAUNCHED',
+        link: 'https://vercel.com/changelog/plugin',
+        icon: null,
+        source: 'changelog',
+      },
+    ],
+    'Nothing public in 2026 turned up. Come back when something ships.',
+    7,
+    undefined,
+    [],
+    { who: 'Guillermo Rauch', handle: 'rauchg', apiDown: false, year: 2026 },
+  );
+  assert.equal(longAws.potential, false);
+  assert.ok(longAws.items.length > 0, JSON.stringify(longAws.items.map((item) => item.name)));
+  assert.equal(ai.isEmptyTapeNote(longAws.note), false, longAws.note);
+  assert.equal(ai.isBareProductNote(longAws.note, longAws.items), false, longAws.note);
+  assert.match(longAws.note, /Aws databases|Vercel Plugin|public tape/i);
+  const emptyOnly = ai.finish([], 'keep going', 3, undefined, [], { who: 'Nobody', apiDown: false, year: 2026 });
+  assert.equal(emptyOnly.potential, true);
+  assert.equal(ai.isEmptyTapeNote(emptyOnly.note), true, emptyOnly.note);
   assert.equal(
     ai.hardRejectNote(
       'Keep an eye on Codex CLI; the rest of the tape is still filling in.',

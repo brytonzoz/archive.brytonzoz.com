@@ -425,7 +425,7 @@ export function isJunkTitle(
   if (RESEARCH_GERUND.test(text) || CUSTOMER_STORY.test(text) || CHOPPED_GATEWAY.test(text) || isAcquisitionNews(text)) return true;
   if (CTA_NAV.test(text) || CTA_TRAIL.test(text)) return true;
   if (/^(download on the|get it on|get the app|affiliates|analytics|available on|filed under|quitting)\b/i.test(text)) return true;
-  if (CODE_TITLE.test(text) || /^(object|query|router|number|string|boolean|date|type|value|array|null|undefined|any)$/i.test(text)) return true;
+  if (CODE_TITLE.test(text) || isCodeOrBugfixTitle(text) || /^(object|query|router|number|string|boolean|date|type|value|array|null|undefined|any)$/i.test(text)) return true;
   if (isVagueOrCutTitle(text)) return true;
   if (/\bgithub stars\b|\bweekly downloads\b/i.test(text) && !/\b(zod|nub|tsc|cli|app)\b/i.test(text)) return true;
   if (/^respectively\.?$/i.test(text)) return true;
@@ -581,8 +581,19 @@ export function isVagueOrCutTitle(name: string): boolean {
   if (/\bmodel snapshot\b/i.test(text)) return true;
   if (/^(work with|use)\b.+\bfrom anywhere\b/i.test(text)) return true;
   if (/\bcan now help\b/i.test(text)) return true;
+  if (/^released several\b|\bseveral new models and tools\b/i.test(text)) return true;
+  if (/\bconnections to api\.openai\.com\b|\bcan now use ipv6\b|\bipv6\b/i.test(text)) return true;
+  if (/^server-side compaction\b|\bcompaction in the responses api\b/i.test(text)) return true;
   if (/^(pets|cloud|new)\s+[a-z]+$/i.test(text) && !/\b(cli|app|sdk|api|gpt|codex|cursor|chatgpt)\b/i.test(text)) return true;
   return false;
+}
+
+/** Assignment snippets, quoted code, and bugfix / known-issue sentences never print. */
+export function isCodeOrBugfixTitle(name: string): boolean {
+  const text = tidy(name);
+  if (!text) return false;
+  if (/=/.test(text) || /["“”]/.test(text)) return true;
+  return /\b(flaky|bug ?fix(?:es)?|known issues?|will continue to scale)\b/i.test(text);
 }
 
 /** Undated adjective phrases ("Richer JavaScript representation") are changelog copy, not products. */
@@ -779,8 +790,15 @@ export function cleanShipTitle(raw: unknown, max = TITLE_MAX): string {
   }
   text = text.replace(/^the new\s+/i, '').replace(/^new\s+(v\d\b)/i, '$1');
   text = text.replace(/-+$/, '').trim();
+  const speedTag = text.match(/^(.*?):\s*(.+?)\s+at up to\s+\d+x\b.*$/i);
+  if (speedTag) {
+    const left = speedTag[1].replace(/^(introducing|launching|announcing|presenting|previewing)\s+/i, '').trim();
+    const mid = speedTag[2].trim();
+    text = left && !isJunkTitle(left) && !isVagueOrCutTitle(left) ? left : mid || left;
+  }
   text = text
-    .replace(/^(introducing|launching|announcing|presenting|meet|say hello to|now available[:\s]+|how to|read the|launched)\s+/i, '')
+    .replace(/^(introducing|launching|announcing|presenting|meet|say hello to|now available[:\s]+|how to|read the|launched|previewing)\s+/i, '')
+    .replace(/:?\s*at up to\s+\d+x\b.*$/i, '')
     .replace(/\s+launched as\b.*$/i, '')
     .replace(/\s+(is )?(now |generally )?available(\s+(today|on\b.*|in\b.*))?$/i, '')
     .replace(/\s+now in (public )?beta\b.*$/i, '')
@@ -793,6 +811,7 @@ export function cleanShipTitle(raw: unknown, max = TITLE_MAX): string {
     .replace(/[,\s.]+$/g, '')
     .replace(/\s+/g, ' ')
     .trim();
+  if (isVagueOrCutTitle(text) || isCodeOrBugfixTitle(text)) return '';
   while (text && endsWithCutOffWord(text)) {
     text = text.split(/\s+/).slice(0, -1).join(' ').trim();
   }
@@ -1119,18 +1138,54 @@ export function rollupVersions<T extends Polishable>(items: T[]): T[] {
   return kept;
 }
 
+const SEMANTIC_STOP = new Set(['in', 'the', 'a', 'an', 'and', 'of', 'for', 'on', 'with', 'to', 'from', 'at']);
+const GPT_FLUFF = /^(intelligent|ui|everyone|preferred|model|microsoft|365|copilot|previewing|ultrafast|mode)$/i;
+
+/** Word-order-insensitive ship key: "Health in ChatGPT" == "ChatGPT Health". */
+export function semanticShipKey(name: string): string {
+  const tokens = tidy(name)
+    .toLowerCase()
+    .replace(/\bgpt[-\s]?(\d+(?:\.\d+)?)/gi, (_, ver: string) => `gpt${ver.replace(/\./g, '')}`)
+    .replace(/[^a-z0-9]+/g, ' ')
+    .split(/\s+/)
+    .filter((token) => token && !SEMANTIC_STOP.has(token));
+  const gpt = tokens.find((token) => /^gpt\d/.test(token));
+  if (gpt && tokens.filter((token) => token !== gpt).every((token) => GPT_FLUFF.test(token))) return gpt;
+  return tokens.slice().sort().join('');
+}
+
+/** If the title names GPT-N but the URL slug is GPT-M, prefer the slug. */
+export function reconcileTitleWithHref(name: string, link?: string | null): string {
+  if (!name || !link) return name;
+  const titleGpt = name.match(/\bgpt[-\s]?(\d+(?:\.\d+)?)/i);
+  const slugGpt = String(link).match(/\/gpt-(\d+(?:-\d+)*)(?:\/|$|[?#])/i);
+  if (!titleGpt || !slugGpt) return name;
+  const titleVer = titleGpt[1];
+  const slugVer = slugGpt[1].replace(/-/g, '.');
+  if (titleVer === slugVer) return name;
+  return name.replace(titleGpt[0], `GPT-${slugVer}`);
+}
+
+function preferShorterShip<T extends Polishable>(a: T, b: T): T {
+  const wordsA = a.name.split(/\s+/).filter(Boolean).length;
+  const wordsB = b.name.split(/\s+/).filter(Boolean).length;
+  if (wordsA !== wordsB) return wordsA < wordsB ? a : b;
+  return titleScore(a) >= titleScore(b) ? a : b;
+}
+
 /** Same normalized name → one line (NUB + NUB, not NUB + NUBJS). */
 export function dedupeNormalized<T extends Polishable>(items: T[]): T[] {
   const best = new Map<string, T>();
   const none: T[] = [];
   for (const item of items) {
-    const key = loose(item.name);
+    const key = semanticShipKey(item.name) || loose(item.name);
     if (!key) {
       none.push(item);
       continue;
     }
     const prev = best.get(key);
-    if (!prev || titleScore(item) > titleScore(prev)) best.set(key, item);
+    if (!prev) best.set(key, item);
+    else best.set(key, preferShorterShip(prev, item));
   }
   return [...best.values(), ...none];
 }
@@ -1317,6 +1372,7 @@ export function polishCandidates<T extends Polishable>(items: T[], opts: PolishO
       date: item.date,
     };
     let name = cleanShipTitle(item.name);
+    if (name) name = reconcileTitleWithHref(name, item.link);
     if (!name && (item.source === 'changelog' || isChangelogEntryHref(item.link))) {
       const fallback = wordClamp(stripDateSuffix(tidy(item.name).replace(/\bcopy link to\b[\s\S]*/i, '')), TITLE_MAX);
       const keepCard =
@@ -1331,6 +1387,7 @@ export function polishCandidates<T extends Polishable>(items: T[], opts: PolishO
         !isNotAShipTitle(fallback);
       if (keepCard) name = fallback;
     }
+    if (name) name = reconcileTitleWithHref(name, item.link);
     if (flagship && !isCursorModelNote(item) && (!name || name.split(/\s+/).length <= 1 || /^the new\b/i.test(name))) {
       if (!name) logFlagshipGate(item, isJunkTitle(item.name, junkOpts) ? 'junk-title' : 'title-empty', flagship);
       name = flagship;

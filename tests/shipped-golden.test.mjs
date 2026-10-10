@@ -64,6 +64,7 @@ test('E2E goldens: cached raw tapes keep flagships, hit floors, and drop junk', 
     junkHit: junkKeys(),
     endsWithCutOffWord: polish.endsWithCutOffWord,
     isBareProductNote: ai.isBareProductNote,
+    isEmptyTapeNote: ai.isEmptyTapeNote,
   };
   const report = {};
   const failures = [];

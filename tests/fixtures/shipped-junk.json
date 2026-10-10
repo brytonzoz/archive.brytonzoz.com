@@ -816,6 +816,48 @@
       "date": "2026-09-16",
       "source": "changelog",
       "link": "https://vercel.com/changelog/mem0-joins-the-vercel-marketplace"
+    },
+    {
+      "name": "RELEASED SEVERAL NEW MODELS AND TOOLS AND A NEW API",
+      "date": "2026-04-14",
+      "source": "changelog",
+      "link": "https://openai.com/index/released-several",
+      "who": "Sam Altman"
+    },
+    {
+      "name": "CONNECTIONS TO API.OPENAI.COM CAN NOW USE IPV6",
+      "date": "2026-06-11",
+      "source": "changelog",
+      "link": "https://platform.openai.com/docs/changelog/ipv6",
+      "who": "Sam Altman"
+    },
+    {
+      "name": "SERVER-SIDE COMPACTION IN THE RESPONSES API",
+      "date": "2026-05-20",
+      "source": "changelog",
+      "link": "https://platform.openai.com/docs/changelog/compaction",
+      "who": "Sam Altman"
+    },
+    {
+      "name": "WEB_SEARCH = \"DISABLED\" TO REMOVE",
+      "date": "2026-08-12",
+      "source": "changelog",
+      "link": "https://learn.chatgpt.com/docs/changelog#web-search-disabled",
+      "who": "Tibo"
+    },
+    {
+      "name": "CONTROLS WILL CONTINUE TO SCALE WITH YOUR WORKSPACE",
+      "date": "2026-07-22",
+      "source": "changelog",
+      "link": "https://learn.chatgpt.com/docs/changelog#controls-scale",
+      "who": "Tibo"
+    },
+    {
+      "name": "FLAKY AVAILABILITY OF THE PLUGIN ON FIRST LAUNCH",
+      "date": "2026-09-03",
+      "source": "changelog",
+      "link": "https://learn.chatgpt.com/docs/changelog#flaky-plugin",
+      "who": "Tibo"
     }
   ],
   "keep": [

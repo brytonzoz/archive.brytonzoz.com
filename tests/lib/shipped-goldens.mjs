@@ -55,6 +55,7 @@ export function evaluateGolden(spec, items, note, opts = {}) {
   const junkHit = opts.junkHit || junkKeys();
   const endsWithCutOffWord = opts.endsWithCutOffWord;
   const isBareProductNote = opts.isBareProductNote;
+  const isEmptyTapeNote = opts.isEmptyTapeNote;
   const failures = [];
   const leaked = names.filter((name) => junkHit.has(loose(name)));
   const missing = [];
@@ -76,8 +77,15 @@ export function evaluateGolden(spec, items, note, opts = {}) {
   for (const row of spec.forbiddenRe || []) {
     if (names.some((name) => new RegExp(row.re, 'i').test(name))) failures.push(`forbidden re ${row.key}`);
   }
-  if (items.length && typeof isBareProductNote === 'function' && isBareProductNote(note || '', items)) {
-    failures.push(`bare-name fallback ${JSON.stringify(note)}`);
+  if (items.length) {
+    const emptyTape =
+      typeof isEmptyTapeNote === 'function'
+        ? isEmptyTapeNote(note || '')
+        : /nothing public in 20\d{2} turned up|item on back order|empty drawer\.\s*go ship/i.test(note || '');
+    if (emptyTape) failures.push(`empty-tape note on non-empty receipt ${JSON.stringify(note)}`);
+    if (typeof isBareProductNote === 'function' && isBareProductNote(note || '', items)) {
+      failures.push(`bare-name fallback ${JSON.stringify(note)}`);
+    }
   }
   if (note && THIN_NOTE.test(note)) failures.push(`thin note ${JSON.stringify(note)}`);
   return { ok: failures.length === 0, failures, count: items.length, names, note: note || '' };

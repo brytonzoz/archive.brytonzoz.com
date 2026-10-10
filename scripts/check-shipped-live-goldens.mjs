@@ -15,6 +15,7 @@ const helpers = {
   junkHit: junkKeys(),
   endsWithCutOffWord: polish.endsWithCutOffWord,
   isBareProductNote: ai.isBareProductNote,
+  isEmptyTapeNote: ai.isEmptyTapeNote,
 };
 
 async function readReceipt(id) {

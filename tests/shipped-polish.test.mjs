@@ -868,6 +868,27 @@ test('prereleases, starters, and Gateway model listings are not ships', () => {
   assert.equal(polish.isVagueOrCutTitle('FEATURES'), true);
   assert.equal(polish.isVagueOrCutTitle('WORK WITH CODEX FROM ANYWHERE'), true);
   assert.equal(polish.isVagueOrCutTitle('CODEX CAN NOW HELP'), true);
+  assert.equal(polish.isVagueOrCutTitle('RELEASED SEVERAL NEW MODELS AND TOOLS AND A NEW API'), true);
+  assert.equal(polish.isVagueOrCutTitle('CONNECTIONS TO API.OPENAI.COM CAN NOW USE IPV6'), true);
+  assert.equal(polish.isVagueOrCutTitle('SERVER-SIDE COMPACTION IN THE RESPONSES API'), true);
+  assert.equal(polish.isCodeOrBugfixTitle('WEB_SEARCH = "DISABLED" TO REMOVE'), true);
+  assert.equal(polish.isCodeOrBugfixTitle('CONTROLS WILL CONTINUE TO SCALE WITH YOUR WORKSPACE'), true);
+  assert.equal(polish.isCodeOrBugfixTitle('FLAKY AVAILABILITY OF THE PLUGIN ON FIRST LAUNCH'), true);
+  assert.equal(polish.isJunkTitle('WEB_SEARCH = "DISABLED" TO REMOVE'), true);
+  assert.match(polish.cleanShipTitle('PREVIEWING ULTRAFAST MODE: GPT-5.6 SOL AT UP TO 14X'), /gpt-5\.6 sol/i);
+  assert.equal(polish.reconcileTitleWithHref('GPT-6 AND INTELLIGENT UI FOR EVERYONE', 'https://openai.com/index/gpt-5-6/'), 'GPT-5.6 AND INTELLIGENT UI FOR EVERYONE');
+  assert.equal(polish.semanticShipKey('HEALTH IN CHATGPT'), polish.semanticShipKey('CHATGPT HEALTH'));
+  const health = polish.dedupeNormalized([
+    found({ name: 'CHATGPT HEALTH', date: '2026-06-01', link: 'https://openai.com/index/chatgpt-health' }),
+    found({ name: 'HEALTH IN CHATGPT', date: '2026-06-11', link: 'https://openai.com/index/health-in-chatgpt' }),
+  ]);
+  assert.equal(health.length, 1, JSON.stringify(health.map((item) => item.name)));
+  const gptRows = polish.dedupeNormalized([
+    found({ name: 'GPT-5.6', date: '2026-09-01', link: 'https://openai.com/index/gpt-5-6/' }),
+    found({ name: 'GPT-5.6 AND INTELLIGENT UI FOR EVERYONE', date: '2026-09-01', link: 'https://openai.com/index/gpt-5-6/' }),
+  ]);
+  assert.equal(gptRows.length, 1, JSON.stringify(gptRows.map((item) => item.name)));
+  assert.match(gptRows[0].name, /^gpt-5\.6$/i);
   assert.equal(polish.isDocsOrReferenceTitle('MORE CODEX FEATURES IN THE EEA, UK, AND SWITZERLAND'), true);
   assert.equal(polish.cleanShipTitle('Codex, our code generation CLI'), 'Codex CLI');
   assert.equal(polish.isNotAShipTitle('GPT-5.4 AND GPT-5.4 MINI RETIRE'), true);

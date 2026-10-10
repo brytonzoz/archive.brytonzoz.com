@@ -227,6 +227,7 @@ jobs:
         env:
           ADMIN_PASSWORD: ${{ secrets.ADMIN_PASSWORD }}
           SHIPPED_ORIGIN: https://shipped-staging.brytonzoz.com
+          SHIPPED_REPRINT_FORCE_IDS: 16,11,13
         run: |
           if [ -z "$ADMIN_PASSWORD" ]; then
             echo "::error::ADMIN_PASSWORD is required to reprint staging wall receipts."

@@ -11,7 +11,9 @@ import {
   publicUrl,
   type Found,
   type SourceEnv,
+  type TinyfishAccess,
 } from './shipped-sources';
+import { tinyfishFetch, type TinyfishPage } from './shipped-tinyfish';
 import { safeFetch } from './shipped-fetch';
 import {
   COMPANY_PATHS,
@@ -31,8 +33,38 @@ const MIN = 60;
 const UA =
   'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/128.0.0.0 Safari/537.36';
 const PREFIX_HOSTS = ['developers', 'platform', 'docs', 'help', 'blog', 'news', 'changelog'];
+/** TinyFish Fetch is metered (600/day). Cap first-party fallback URLs per company harvest. */
+const TINYFISH_COMPANY_CAP = 16;
 
 export type CompanyEnv = SourceEnv & XaiEnv;
+
+type FetchCtx = {
+  tinyfish: TinyfishAccess;
+  left: { n: number };
+  used: number;
+};
+
+export function looksBlockedPage(text: string, title = ''): boolean {
+  const hay = `${title}\n${text}`.slice(0, 6000).toLowerCase();
+  if (
+    /just a moment|attention required|enable javascript to continue|cf-browser-verification|challenge-platform|checking your browser|verify you are (a )?human|unusual traffic from your computer|access denied|request unsuccessful|sorry, you have been blocked|blocked because of|bot detection/.test(
+      hay,
+    )
+  ) {
+    return true;
+  }
+  return text.length < 1200 && /cloudflare|please enable javascript|captcha/.test(hay);
+}
+
+export function isPriorityCompanyUrl(url: string): boolean {
+  try {
+    const path = new URL(url).pathname.replace(/\/+$/, '') || '/';
+    if (path === '/' || path === '/index') return true;
+    return /\/(changelog|blog|news|releases|updates|whats-new|feed|rss|atom|sitemap)(\/|$|\.)/i.test(path);
+  } catch {
+    return false;
+  }
+}
 
 export type CompanyHarvest = { found: Found[]; spend: XaiSpend; ran: string[]; cacheHit: boolean };
 
@@ -122,7 +154,67 @@ async function fetchText(url: string, maxBytes: number, types?: string[]): Promi
     userAgent: UA,
   }).catch(() => null);
   if (!page) return null;
-  return { url: page.url || safe, text: new TextDecoder().decode(page.bytes) };
+  const text = new TextDecoder().decode(page.bytes);
+  if (looksBlockedPage(text)) return null;
+  return { url: page.url || safe, text };
+}
+
+function linksFromMarkdown(text: string, base: string): { text: string; url: string }[] {
+  const out: { text: string; url: string }[] = [];
+  for (const match of text.matchAll(/\[([^\]]{1,80})\]\((https?:\/\/[^)\s]+)\)/g)) {
+    const href = publicUrl(match[2]);
+    const label = clean(match[1], 80);
+    if (href && label && !out.some((row) => row.url === href)) out.push({ text: label, url: href });
+    if (out.length >= 400) break;
+  }
+  if (out.length) return out;
+  for (const match of text.matchAll(/https?:\/\/[^\s)"']+/g)) {
+    try {
+      const href = publicUrl(new URL(match[0], base).toString());
+      const label = clean(match[0].split('/').filter(Boolean).pop() ?? '', 80);
+      if (href && label && !out.some((row) => row.url === href)) out.push({ text: label, url: href });
+    } catch {
+      /* skip */
+    }
+    if (out.length >= 200) break;
+  }
+  return out;
+}
+
+export function companyPageFromTinyfish(page: TinyfishPage): CompanyPage | null {
+  const url = publicUrl(page.url);
+  if (!url || !page.text || looksBlockedPage(page.text, page.title)) return null;
+  const fromApi = page.links
+    .map((href) => {
+      try {
+        const abs = publicUrl(new URL(href, url).toString());
+        const label = clean(href.split('/').filter(Boolean).pop() ?? href, 80);
+        return abs && label ? { text: label, url: abs } : null;
+      } catch {
+        return null;
+      }
+    })
+    .filter((row): row is { text: string; url: string } => Boolean(row));
+  const links = fromApi.length ? fromApi : linksFromMarkdown(page.text, url);
+  const text = page.text.slice(0, 140_000);
+  return {
+    url,
+    title: clean(page.title, 100),
+    text,
+    html: text,
+    links,
+    feeds: extractAlternateFeeds(page.text, url),
+  };
+}
+
+async function fetchViaTinyfish(urls: string[], ctx: FetchCtx | undefined): Promise<CompanyPage[]> {
+  if (!ctx?.tinyfish || ctx.left.n <= 0) return [];
+  const want = [...new Set(urls.map((url) => publicUrl(url)).filter((url): url is string => Boolean(url)))].slice(0, Math.min(10, ctx.left.n));
+  if (!want.length) return [];
+  ctx.left.n -= want.length;
+  ctx.used += want.length;
+  const pages = await tinyfishFetch(want, ctx.tinyfish.key, ctx.tinyfish.meter).catch(() => []);
+  return pages.map(companyPageFromTinyfish).filter((page): page is CompanyPage => Boolean(page));
 }
 
 export async function readCompanyPage(siteUrl: string): Promise<CompanyPage | null> {
@@ -174,9 +266,14 @@ function sameRegistrable(a: string | null, b: string | null): boolean {
   return left.length >= 3 && left === right;
 }
 
-async function pagesForCompany(site: string, year: number, product: string | null): Promise<{ found: Found[]; feeds: string[]; extraHosts: string[] }> {
+async function pagesForCompany(
+  site: string,
+  year: number,
+  product: string | null,
+  ctx?: FetchCtx,
+): Promise<{ found: Found[]; feeds: string[]; extraHosts: string[]; tinyfish: boolean }> {
   const base = publicUrl(site);
-  if (!base) return { found: [], feeds: [], extraHosts: [] };
+  if (!base) return { found: [], feeds: [], extraHosts: [], tinyfish: false };
   const root = base.replace(/\/+$/, '');
   const roots = [
     `${root}/`,
@@ -191,6 +288,7 @@ async function pagesForCompany(site: string, year: number, product: string | nul
   const feeds: string[] = [];
   const extraHosts: string[] = [];
   const follow: string[] = [];
+  let usedTinyfish = false;
   const apex = hostOf(base);
   const absorb = (page: CompanyPage | null) => {
     if (!page) return;
@@ -216,11 +314,22 @@ async function pagesForCompany(site: string, year: number, product: string | nul
     }
   };
   for (const page of pages) absorb(page);
+  if (!found.length && !feeds.length && ctx?.tinyfish) {
+    const priority = unique.filter(isPriorityCompanyUrl).slice(0, 8);
+    const fallback = await fetchViaTinyfish(priority.length ? priority : unique.slice(0, 6), ctx);
+    if (fallback.length) usedTinyfish = true;
+    for (const page of fallback) absorb(page);
+  }
   if (follow.length) {
     const more = await mapLimit(follow.slice(0, 10), 6, (url) => readCompanyPage(url));
     for (const page of more) absorb(page);
+    if (!found.length && ctx?.tinyfish) {
+      const extra = await fetchViaTinyfish(follow.filter(isPriorityCompanyUrl).slice(0, 4), ctx);
+      if (extra.length) usedTinyfish = true;
+      for (const page of extra) absorb(page);
+    }
   }
-  return { found, feeds, extraHosts };
+  return { found, feeds, extraHosts, tinyfish: usedTinyfish };
 }
 
 function isIndexShipPath(url: string): boolean {
@@ -233,22 +342,30 @@ function isIndexShipPath(url: string): boolean {
   }
 }
 
-async function harvestFeeds(urls: string[], year: number): Promise<Found[]> {
+async function harvestFeeds(urls: string[], year: number, ctx?: FetchCtx): Promise<Found[]> {
   const unique = [...new Set(urls)].slice(0, 10);
   const pages = await mapLimit(unique, 4, (url) => fetchText(url, 4_000_000));
   const found: Found[] = [];
+  const absorb = (text: string) => found.push(...itemsFromFeedXml(text, year).map(asFound));
   for (const page of pages) {
-    if (!page) continue;
-    found.push(...itemsFromFeedXml(page.text, year).map(asFound));
+    if (page) absorb(page.text);
+  }
+  if (!found.length && ctx?.tinyfish) {
+    const fallback = await fetchViaTinyfish(unique.filter(isPriorityCompanyUrl).slice(0, 4), ctx);
+    for (const page of fallback) absorb(page.text);
   }
   return found;
 }
 
-async function harvestSitemaps(origin: string, year: number): Promise<Found[]> {
+async function harvestSitemaps(origin: string, year: number, ctx?: FetchCtx): Promise<Found[]> {
   const root = origin.replace(/\/+$/, '');
   const seeds = [`${root}/sitemap.xml`, `${root}/sitemap_index.xml`, `${root}/sitemap-0.xml`];
   const first = await mapLimit(seeds, 3, (url) => fetchText(url, 2_000_000));
-  const xmls = first.filter((page): page is { url: string; text: string } => Boolean(page));
+  let xmls = first.filter((page): page is { url: string; text: string } => Boolean(page));
+  if (!xmls.length && ctx?.tinyfish) {
+    const fallback = await fetchViaTinyfish(seeds, ctx);
+    xmls = fallback.map((page) => ({ url: page.url, text: page.text }));
+  }
   const children = xmls.flatMap((page) => sitemapChildLocs(page.text));
   const more = children.length ? await mapLimit(children, 3, (url) => fetchText(url, 2_000_000)) : [];
   return mergeChangelog([...xmls, ...more.filter(Boolean)].map((page) => itemsFromSitemap(page!.text, year))).map(asFound);
@@ -457,18 +574,26 @@ export async function harvestCompany(opts: {
   deep?: boolean;
   /** Free gap-fill: company X only after first-party sources, and only if those were thin. */
   gapFillX?: boolean;
+  /** When first-party hosts block Worker IPs, TinyFish Fetch reads changelog/blog/news pages. */
+  tinyfish?: TinyfishAccess;
 }): Promise<CompanyHarvest> {
   const { affiliation, year, env } = opts;
   const slug = companySlug(affiliation.company);
   if (!slug || companyScope(affiliation) === 'none') {
     return { found: [], spend: emptyXaiSpend(), ran: [], cacheHit: false };
   }
-  const cacheKey = opts.deep ? `company:deep:v8:${year}:${slug}` : `company:v10:${year}:${slug}`;
-  return cached(cacheKey, 7 * 1440 * MIN, async () => {
+  const cacheKey = opts.deep ? `company:deep:v9:${year}:${slug}` : `company:v11:${year}:${slug}`;
+  return cached(
+    cacheKey,
+    7 * 1440 * MIN,
+    async () => {
     const via = viaFor(affiliation);
     const ran: string[] = [];
     const found: Found[] = [];
     const spend = emptyXaiSpend();
+    const ctx: FetchCtx | undefined = opts.tinyfish
+      ? { tinyfish: opts.tinyfish, left: { n: TINYFISH_COMPANY_CAP }, used: 0 }
+      : undefined;
     const seeds = [
       affiliation.companySite,
       ...hostGuesses(affiliation.company ?? ''),
@@ -478,48 +603,47 @@ export async function harvestCompany(opts: {
     const liveOrigins: string[] = [];
     const feeds: string[] = [];
 
-    for (const site of seeds.slice(0, 6)) {
+    const discoveredHosts: string[] = [];
+    const takePages = async (site: string, tag: string) => {
       const host = hostOf(site);
-      if (!host || seenHost.has(host)) continue;
-      const pageItems = await pagesForCompany(site, year, affiliation.product);
-      if (!pageItems.found.length && !pageItems.feeds.length && !pageItems.extraHosts.length) continue;
+      if (!host || seenHost.has(host)) return false;
+      const pageItems = await pagesForCompany(site, year, affiliation.product, ctx);
+      if (!pageItems.found.length && !pageItems.feeds.length && !pageItems.extraHosts.length) return false;
       seenHost.add(host);
       liveOrigins.push(site);
       found.push(...withVia(pageItems.found, via));
       for (const feed of pageItems.feeds) if (!feeds.includes(feed)) feeds.push(feed);
-      ran.push(`company-site:${host}`);
       for (const extra of pageItems.extraHosts) {
-        const extraHost = hostOf(extra);
-        if (!extraHost || seenHost.has(extraHost)) continue;
-        seenHost.add(extraHost);
-        const more = await pagesForCompany(extra, year, affiliation.product);
-        if (more.found.length) {
-          found.push(...withVia(more.found, via));
-          ran.push(`company-site:${extraHost}`);
-        }
-        for (const feed of more.feeds) if (!feeds.includes(feed)) feeds.push(feed);
+        if (!discoveredHosts.includes(extra)) discoveredHosts.push(extra);
       }
-      for (const prefixed of prefixHosts(site)) {
-        const extraHost = hostOf(prefixed);
-        if (!extraHost || seenHost.has(extraHost)) continue;
-        const more = await pagesForCompany(prefixed, year, affiliation.product);
-        if (!more.found.length && !more.feeds.length) continue;
-        seenHost.add(extraHost);
-        found.push(...withVia(more.found, via));
-        for (const feed of more.feeds) if (!feeds.includes(feed)) feeds.push(feed);
-        ran.push(`company-site:${extraHost}`);
+      ran.push(`${tag}:${host}`);
+      if (pageItems.tinyfish) ran.push(`company-tinyfish:${host}`);
+      return true;
+    };
+
+    const firstSeeds = seeds.slice(0, 6);
+    for (const site of firstSeeds) {
+      await takePages(site, 'company-site');
+    }
+    // Blocked apex still has docs/changelog/developers subdomains — try those even when the homepage is empty.
+    if (firstSeeds[0]) {
+      for (const prefixed of prefixHosts(firstSeeds[0])) {
+        await takePages(prefixed, 'company-site');
       }
+    }
+    for (const extra of discoveredHosts) {
+      await takePages(extra, 'company-site');
     }
 
     for (const origin of liveOrigins.slice(0, 4)) {
       for (const path of FEED_PATHS) feeds.push(`${origin.replace(/\/+$/, '')}${path}`);
-      const sitemapItems = await harvestSitemaps(origin, year).catch(() => []);
+      const sitemapItems = await harvestSitemaps(origin, year, ctx).catch(() => []);
       if (sitemapItems.length) {
         found.push(...withVia(sitemapItems, via));
         ran.push(`company-sitemap:${hostOf(origin)}`);
       }
     }
-    const feedItems = await harvestFeeds(feeds, year).catch(() => []);
+    const feedItems = await harvestFeeds(feeds, year, ctx).catch(() => []);
     if (feedItems.length) {
       found.push(...withVia(feedItems, via));
       ran.push('company-feeds');
@@ -574,6 +698,9 @@ export async function harvestCompany(opts: {
       ran.push('company-x:skipped-first-party');
     }
 
+    if (ctx?.used) ran.push(`company-tinyfish-urls:${ctx.used}`);
     return { found: scopeFilter(affiliation, found), spend, ran, cacheHit: false };
-  });
+    },
+    (harvest) => harvest.found.length > 0,
+  );
 }

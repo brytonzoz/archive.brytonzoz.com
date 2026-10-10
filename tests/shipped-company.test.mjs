@@ -171,3 +171,23 @@ test('host guesses stay generic and product paths are derived from the role', ()
   assert.ok(changelog.COMPANY_PATHS.includes('/changelog'));
   assert.ok(changelog.FEED_PATHS.includes('/atom'));
 });
+
+test('blocked challenge pages are dropped; TinyFish markdown still extracts dated ships', () => {
+  assert.equal(company.looksBlockedPage('<html>Just a moment...</html>', 'Just a moment...'), true);
+  assert.equal(company.looksBlockedPage('Attention Required! | Cloudflare', 'Attention Required'), true);
+  assert.equal(company.looksBlockedPage('# Codex CLI 0.145.0\n2026-07-21\nReleased to users.', 'Codex changelog'), false);
+  assert.equal(company.isPriorityCompanyUrl('https://openai.com/changelog'), true);
+  assert.equal(company.isPriorityCompanyUrl('https://developers.openai.com/codex/changelog'), true);
+  assert.equal(company.isPriorityCompanyUrl('https://openai.com/careers'), false);
+  const page = company.companyPageFromTinyfish({
+    url: 'https://developers.openai.com/codex/changelog',
+    title: 'Codex changelog',
+    description: '',
+    published: null,
+    text: '## July 2026\n\n2026-07-23\n\n### ChatGPT Voice and multi-folder projects 26.715\n\n2026-07-21\n\n### Codex CLI 0.145.0\n\n[Codex app for macOS](https://developers.openai.com/codex/changelog/macos)',
+    links: [],
+  });
+  assert.ok(page);
+  const items = changelog.itemsFromCompanyPage({ text: page.text, html: page.html, url: page.url, year: 2026, links: page.links });
+  assert.ok(items.some((item) => /0\.145\.0/.test(item.name) && item.date === '2026-07-21'), JSON.stringify(items));
+});

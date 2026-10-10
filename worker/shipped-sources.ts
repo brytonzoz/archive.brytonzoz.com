@@ -1605,7 +1605,7 @@ export async function gather(
   const tinyfish = tinyfishAccess(env, meter);
   const resolved = await resolveIdentity(subject, env, tinyfish);
   const mode: GatherMode = opts?.mode === 'full' ? 'full' : 'free';
-  const key = mode === 'full' ? `gather:full:v12:${year}:${resolved.cacheKey}` : `gather:v21:${year}:${resolved.cacheKey}`;
+  const key = mode === 'full' ? `gather:full:v13:${year}:${resolved.cacheKey}` : `gather:v22:${year}:${resolved.cacheKey}`;
   return cached(
     key,
     1440 * MIN,
@@ -1915,6 +1915,7 @@ async function gatherFresh(
       env,
       deep: mode === 'full',
       gapFillX: mode === 'full' || found.length < 6,
+      tinyfish,
     });
     if (company.found.length) found.push(...company.found);
     ran.push(...company.ran);

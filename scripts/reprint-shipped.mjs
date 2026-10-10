@@ -7,6 +7,12 @@ const RECEIPT_PATH = (id) => `/r/${id}/`;
 const origin = (process.argv[2] || process.env.SHIPPED_ORIGIN || 'https://shipped-staging.brytonzoz.com').replace(/\/+$/, '');
 const password = process.env.ADMIN_PASSWORD || '';
 const FORCE = process.env.SHIPPED_REPRINT_FORCE === '1';
+const FORCE_IDS = new Set(
+  (process.env.SHIPPED_REPRINT_FORCE_IDS || '')
+    .split(',')
+    .map((id) => Number(id.trim()))
+    .filter((id) => Number.isFinite(id) && id > 0),
+);
 const realCount = (receipt) => {
   const items = Array.isArray(receipt?.items) ? receipt.items : [];
   return items.filter((item) => item && item.name && item.name !== 'YOUR POTENTIAL' && item.source !== 'none').length;
@@ -56,7 +62,7 @@ for (const target of TARGETS) {
   const before = await readReceipt(target.id);
   const who = before?.subject?.display || before?.login || target.who;
   const prior = realCount(before);
-  if (!FORCE && prior >= 15 && !before?.potential) {
+  if (!FORCE && !FORCE_IDS.has(target.id) && prior >= 15 && !before?.potential) {
     console.log(`#${target.id} ${who} already has ${prior} items; skip`);
     rows.push({ id: target.id, who, items: prior, url: `${origin}${RECEIPT_PATH(target.id)}`, skipped: true });
     continue;

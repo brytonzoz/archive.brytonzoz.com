@@ -15,6 +15,7 @@
 // After 05fa76d: revert npm dating (Zod is older than 2026); take earliest URL evidence.
 // After de3d3e3: version monthly rollup, person-name gate, archive/RDAP beats npm for the product itself.
 // After 80487e7: GitLab prefix-only merge; reject copied cashier examples.
+// After c85e99e: seeded note styles, undated ownership gate, leftover Codex fragments.
 //
 //   ADMIN_PASSWORD=… node scripts/reprint-shipped.mjs [origin]
 const RECEIPT_PATH = (id) => `/r/${id}/`;

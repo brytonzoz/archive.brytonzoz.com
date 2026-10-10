@@ -701,7 +701,7 @@ export function isBareProductNote(note: string, items: DraftItem[] = []): boolea
 
 function shipWhatItDoes(item: DraftItem): string {
   const desc = (item.description || '').replace(/\s+/g, ' ').trim();
-  if (!desc || /^(dated |linked from )/i.test(desc) || /^[a-z0-9.-]+\.[a-z]{2,}$/i.test(desc)) return '';
+  if (!desc || /^(dated |linked from |listed on )/i.test(desc) || /^[a-z0-9.-]+\.[a-z]{2,}$/i.test(desc)) return '';
   const first = desc.split(/[.!?]/)[0]?.trim() || '';
   if (first.length < 8) return '';
   return first.length > 72 ? `${first.slice(0, 72).replace(/\s+\S*$/, '')}` : first;

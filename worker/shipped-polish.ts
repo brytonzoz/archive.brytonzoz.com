@@ -279,6 +279,7 @@ export function isDocsOrReferenceTitle(title: string): boolean {
   if (/\b(workspace )?model availability\b/i.test(text)) return true;
   if (/\bcsv export\b/i.test(text) || /^public plugin catalog\b/i.test(text)) return true;
   if (/^usage resets\b/i.test(text)) return true;
+  if (/^more .+ features in the\b/i.test(text)) return true;
   return false;
 }
 
@@ -547,7 +548,7 @@ export function isNotAShipTitle(name: string): boolean {
   if (!text) return true;
   if (/^@[\w.-]+$/.test(text)) return true;
   if (CHOPPED_GATEWAY.test(text) || CUSTOMER_STORY.test(text)) return true;
-  if (/\b(removed|retired|retires|deprecated|sunsetting|sunset|deleted|discontinued|shut down|shutting down)\b/i.test(text)) return true;
+  if (/\b(removed|retired|retires|retire|deprecated|sunsetting|sunset|deleted|discontinued|shut down|shutting down)\b/i.test(text)) return true;
   if (/^key changes\b|\bwhen migrating\b/i.test(text)) return true;
   if (/\b(docs?|documentation|readme|governance docs)\b/i.test(text) && /\b(update|updated|updates)\b/i.test(text)) return true;
   if (/\bmodels? for model availability\b/i.test(text) || /\bmodel availability update\b/i.test(text)) return true;
@@ -566,7 +567,9 @@ export function isVagueOrCutTitle(name: string): boolean {
   if (/^cloud work$/i.test(text) || /^new controls\b/i.test(text) || /^all\s+[a-z]+$/i.test(text)) return true;
   if (/\brolling out to all users\b/i.test(text) || /^beta and rolling\b/i.test(text)) return true;
   if (/\bin the chatgpt desktop$/i.test(text)) return true;
-  if (/^(codex joining|chatgpt)$/i.test(text)) return true;
+  if (/^(codex joining|chatgpt|features|commands|customize|side|release|admin|members)$/i.test(text)) return true;
+  if (/^(work with|use)\b.+\bfrom anywhere\b/i.test(text)) return true;
+  if (/\bcan now help\b/i.test(text)) return true;
   if (/^(pets|cloud|new)\s+[a-z]+$/i.test(text) && !/\b(cli|app|sdk|api|gpt|codex|cursor|chatgpt)\b/i.test(text)) return true;
   return false;
 }
@@ -753,7 +756,7 @@ export function cleanShipTitle(raw: unknown, max = TITLE_MAX): string {
   if (report?.[1]) text = report[1];
   const meet = text.match(/^meet the new\s+(.+)$/i);
   if (meet?.[1]) text = meet[1];
-  if (/^codex,\s*our code generation cli tool$/i.test(text)) text = 'Codex CLI';
+  if (/^codex,\s*our code generation cli(?: tool)?$/i.test(text)) text = 'Codex CLI';
   if (/^install the chatgpt desktop app on linux$/i.test(text) || /^chatgpt desktop app on linux$/i.test(text)) {
     text = 'ChatGPT Desktop for Linux';
   }

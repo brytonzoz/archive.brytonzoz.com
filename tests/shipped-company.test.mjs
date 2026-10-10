@@ -467,6 +467,23 @@ test('OpenAI compact keeps named Codex features when version dumps fill the rest
   assert.ok(compact.some((item) => /sandbox/i.test(item.name)), JSON.stringify(compact.map((i) => i.name)));
 });
 
+test('company seed URLs keep changelog pages ahead of a long site list', () => {
+  const seeds = [
+    'https://openai.com/',
+    'https://openai.com/news/rss.xml',
+    'https://openai.com/index',
+    'https://openai.com/products/release-notes',
+    'https://developers.openai.com/',
+    'https://developers.openai.com/codex/changelog',
+    'https://learn.chatgpt.com/',
+    'https://learn.chatgpt.com/docs/changelog',
+  ];
+  const picked = company.companySeedUrls(seeds, 6);
+  assert.ok(picked.some((url) => /learn\.chatgpt\.com\/docs\/changelog/i.test(url)), JSON.stringify(picked));
+  assert.ok(picked.some((url) => /developers\.openai\.com\/codex\/changelog/i.test(url)), JSON.stringify(picked));
+  assert.ok(picked.some((url) => /news\/rss\.xml/i.test(url)), JSON.stringify(picked));
+});
+
 test('OpenAI compact keeps quality changelog cards over Codex fragments', () => {
   const junk = [
     'CODEX JOINING',

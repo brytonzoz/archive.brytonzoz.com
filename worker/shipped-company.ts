@@ -66,6 +66,19 @@ export function looksBlockedPage(text: string, title = ''): boolean {
   return text.length < 1200 && /cloudflare|please enable javascript|captcha/.test(hay);
 }
 
+/** Changelog / feed / index URLs must be fetched even after the host was already crawled. */
+export function isExactCompanySeed(url: string): boolean {
+  return /\/(changelog|atom|rss|feed|index|release-notes)(\/|$|\.xml)/i.test(url);
+}
+
+/** Exact changelog/RSS seeds first so a long site list cannot drop Codex / news feeds. */
+export function companySeedUrls(seeds: string[], cap = 16): string[] {
+  const unique = [...new Set(seeds.filter(Boolean))];
+  const exact = unique.filter(isExactCompanySeed);
+  const rest = unique.filter((site) => !exact.includes(site));
+  return [...exact, ...rest].slice(0, cap);
+}
+
 export function isPriorityCompanyUrl(url: string): boolean {
   try {
     const path = new URL(url).pathname.replace(/\/+$/, '') || '/';
@@ -904,7 +917,7 @@ export async function harvestCompany(opts: {
   if (opts.storeOnly) {
     return { found: [], spend: emptyXaiSpend(), ran: ['company-store-miss'], cacheHit: false };
   }
-  const cacheKey = opts.deep ? `company:deep:v28:${year}:${slug}` : `company:v28:${year}:${slug}`;
+  const cacheKey = opts.deep ? `company:deep:v29:${year}:${slug}` : `company:v29:${year}:${slug}`;
   const load = async (): Promise<CompanyHarvest> => {
     const via = viaFor(affiliation);
     const ran: string[] = [];
@@ -930,7 +943,7 @@ export async function harvestCompany(opts: {
     const takePages = async (site: string, tag: string) => {
       const host = hostOf(site);
       if (!host) return false;
-      const exact = /\/(changelog|atom|rss|feed|index)(\/|$)/i.test(site);
+      const exact = isExactCompanySeed(site);
       if (seenHost.has(host) && !exact) return false;
       const pageItems = await pagesForCompany(site, year, affiliation.product, ctx, affiliation.company);
       if (!pageItems.found.length && !pageItems.feeds.length && !pageItems.extraHosts.length) return false;
@@ -946,7 +959,7 @@ export async function harvestCompany(opts: {
       return true;
     };
 
-    const firstSeeds = seeds.slice(0, 6);
+    const firstSeeds = companySeedUrls(seeds);
     const prefixed = firstSeeds[0] ? prefixHosts(firstSeeds[0]) : [];
     await Promise.all(firstSeeds.map((site) => takePages(site, 'company-site')));
     await Promise.all([...prefixed, ...discoveredHosts].map((extra) => takePages(extra, 'company-site')));

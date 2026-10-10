@@ -855,6 +855,12 @@ test('prereleases, starters, and Gateway model listings are not ships', () => {
   assert.equal(polish.isDocsOrReferenceTitle('MODEL SELECTION'), true);
   assert.equal(polish.isVagueOrCutTitle('CHATGPT'), true);
   assert.equal(polish.isVagueOrCutTitle('CODEX JOINING'), true);
+  assert.equal(polish.isVagueOrCutTitle('FEATURES'), true);
+  assert.equal(polish.isVagueOrCutTitle('WORK WITH CODEX FROM ANYWHERE'), true);
+  assert.equal(polish.isVagueOrCutTitle('CODEX CAN NOW HELP'), true);
+  assert.equal(polish.isDocsOrReferenceTitle('MORE CODEX FEATURES IN THE EEA, UK, AND SWITZERLAND'), true);
+  assert.equal(polish.cleanShipTitle('Codex, our code generation CLI'), 'Codex CLI');
+  assert.equal(polish.isNotAShipTitle('GPT-5.4 AND GPT-5.4 MINI RETIRE'), true);
   assert.equal(polish.isBlogEssayTitle('GPT-5.6 Sol helps run quantum computing experiments applied'), true);
   assert.equal(polish.isCustomerStoryTitle('Databricks brings GPT-5.5 to enterprise agent workflows'), true);
   assert.equal(polish.isCustomerStoryTitle('Airbnb widens access to GPT-6 Astra and OpenAI frontier'), true);

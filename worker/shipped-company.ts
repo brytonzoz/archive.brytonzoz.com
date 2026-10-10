@@ -13,7 +13,7 @@ import {
   type SourceEnv,
   type TinyfishAccess,
 } from './shipped-sources';
-import { tinyfishFetch, type TinyfishPage } from './shipped-tinyfish';
+import { tinyfishFetch, tinyfishSearch, type TinyfishPage } from './shipped-tinyfish';
 import { safeFetch } from './shipped-fetch';
 import {
   COMPANY_PATHS,
@@ -34,7 +34,7 @@ const UA =
   'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/128.0.0.0 Safari/537.36';
 const PREFIX_HOSTS = ['developers', 'platform', 'docs', 'help', 'blog', 'news', 'changelog'];
 /** TinyFish Fetch is metered (600/day). Cap first-party fallback URLs per company harvest. */
-const TINYFISH_COMPANY_CAP = 16;
+const TINYFISH_COMPANY_CAP = 24;
 
 export type CompanyEnv = SourceEnv & XaiEnv;
 
@@ -602,7 +602,7 @@ export async function harvestCompany(opts: {
   if (!slug || companyScope(affiliation) === 'none') {
     return { found: [], spend: emptyXaiSpend(), ran: [], cacheHit: false };
   }
-  const cacheKey = opts.deep ? `company:deep:v11:${year}:${slug}` : `company:v13:${year}:${slug}`;
+  const cacheKey = opts.deep ? `company:deep:v12:${year}:${slug}` : `company:v14:${year}:${slug}`;
   const harvested = await cached(
     cacheKey,
     7 * 1440 * MIN,
@@ -667,6 +667,45 @@ export async function harvestCompany(opts: {
     if (feedItems.length) {
       found.push(...withVia(feedItems, via));
       ran.push('company-feeds');
+    }
+
+    if (ctx?.tinyfish && found.length < 12) {
+      const apex = hostOf(liveOrigins[0] || firstSeeds[0] || '');
+      const queries = [
+        apex ? `site:${apex} (changelog OR "release notes") ${year}` : '',
+        affiliation.product
+          ? `"${affiliation.product}" changelog OR "what's new" ${year}`
+          : affiliation.company
+            ? `"${affiliation.company}" changelog OR "release notes" ${year}`
+            : '',
+      ].filter(Boolean);
+      for (const query of queries.slice(0, 2)) {
+        const hits = await tinyfishSearch(query, year, ctx.tinyfish.key, ctx.tinyfish.meter).catch(() => []);
+        const urls = hits
+          .map((hit) => publicUrl(hit.url))
+          .filter((url): url is string => Boolean(url) && (isPriorityCompanyUrl(url) || /changelog|releases?|whats-new|docs\//i.test(url)))
+          .slice(0, 8);
+        if (!urls.length) continue;
+        ran.push(`company-tinyfish-search:${urls.length}`);
+        const pages = await fetchViaTinyfish(urls, ctx);
+        for (const page of pages) {
+          const extracted = itemsFromCompanyPage({
+            text: page.text,
+            html: page.html,
+            url: page.url,
+            year,
+            links: page.links,
+          });
+          found.push(...withVia(extracted.map(asFound), via));
+          found.push(
+            ...itemsFromProjectList({ text: `${page.title}\n${page.text}`, url: page.url, year }).map((item) => ({
+              ...item,
+              source: item.source === 'site' ? 'changelog' : item.source,
+              via: via ?? item.via ?? null,
+            })),
+          );
+        }
+      }
     }
 
     const org = affiliation.companyGithub || companyOrgGuess(affiliation.company) || slug;

@@ -209,7 +209,8 @@ export function Machine({ job, display, tone, onPrinted, onTorn, tearSignal = 0,
     const clip = (hidden: number) => {
       const value = hidden <= 0 ? '' : `inset(0 0 ${hidden}px 0)`;
       el.style.clipPath = value;
-      el.style.setProperty('-webkit-clip-path', value);
+      const webkitClipPath = '-webkit-clip-path';
+      el.style.setProperty(webkitClipPath, value);
     };
     const height = Math.max(1, el.offsetHeight);
     clip(height);
@@ -279,7 +280,8 @@ export function Machine({ job, display, tone, onPrinted, onTorn, tearSignal = 0,
     const clip = (left: number) => {
       const value = left <= 0 ? '' : `inset(0 0 ${left}px 0)`;
       el.style.clipPath = value;
-      el.style.setProperty('-webkit-clip-path', value);
+      const webkitClipPath = '-webkit-clip-path';
+      el.style.setProperty(webkitClipPath, value);
     };
     let left = hidden;
     clip(left);

@@ -2,6 +2,7 @@
 // / releases / updates, <link rel=alternate> feeds, sitemap.xml (2026 lastmod), GitHub org
 // releases, and App Store version rows. No per-company URL tables.
 import { extraResearchPaths, itemsFromProjectList } from './shipped-research';
+import { looksLikeNotAShip } from './shipped-decisions';
 import { companyOrgGuess, companyScope, companySlug, companyTokens, leadProductTokens, type Affiliation } from './shipped-affiliation';
 import { type XaiEnv, type XaiSpend, emptyXaiSpend } from './shipped-xai';
 import { stripVia, type CompanyStore } from './shipped-company-store';
@@ -145,10 +146,14 @@ export function compactCompanyFound(found: Found[], cap = COMPANY_CACHE_CAP): Fo
   const weight = (item: Found) => {
     let n = (item.score || 0) * 8;
     const url = (item.link || '').toLowerCase();
+    const name = item.name || '';
     if (item.source === 'changelog') n += 80;
     if (/\/(changelog|release-notes|whats-new|docs\/changelog)/i.test(url)) n += 50;
     if (item.date && /^\d{4}-\d{2}-\d{2}$/.test(item.date)) n += 30;
     if (/\/(blog|news|research|index)\//i.test(url) && !/changelog/i.test(url)) n -= 20;
+    if (looksLikeNotAShip(item)) n -= 80;
+    if (/\b(bug fixes?|get started|configuration details|see setup)\b/i.test(name)) n -= 60;
+    if (/\b(codex|chatgpt|claude|cursor|gpt-?\d)/i.test(name) && name.length <= 72) n += 25;
     return n;
   };
   ranked.sort((a, b) => weight(b) - weight(a));
@@ -158,6 +163,8 @@ export function compactCompanyFound(found: Found[], cap = COMPANY_CACHE_CAP): Fo
     const key = item.name.toLowerCase().replace(/[^a-z0-9]+/g, '');
     const letters = item.name.replace(/[^a-zA-Z]/g, '').length;
     if (key.length < 4 || letters < 3 || seen.has(key)) continue;
+    if (looksLikeNotAShip(item)) continue;
+    if (/\b(get started with|configuration details|see setup)\b/i.test(item.name)) continue;
     seen.add(key);
     out.push(item);
     if (out.length >= cap) break;

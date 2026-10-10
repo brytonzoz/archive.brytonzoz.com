@@ -40,6 +40,7 @@ test('typed queries become person → role → company', () => {
   assert.equal(tibo.name, 'Tibo');
   assert.equal(tibo.company, 'OpenAI');
   assert.equal(tibo.typedCompany, true);
+  assert.equal(affiliation.defaultAttribution(tibo.role, tibo.typedCompany), 'company-founded-by-person');
   const lead = affiliation.parseAffiliationQuery('Codex lead at OpenAI');
   assert.equal(lead.role, 'lead');
   assert.equal(lead.product, 'Codex');
@@ -200,6 +201,21 @@ test('same_ship pairs share keywords; weaker duplicate is dropped', async () => 
     ),
     false,
   );
+  assert.equal(
+    decisions.shareKeywords(
+      found({ name: 'Codex', date: '2026-10-09', link: 'https://learn.chatgpt.com/docs/changelog' }),
+      found({ name: 'Codex app 26.608', date: '2026-06-09', link: 'https://learn.chatgpt.com/docs/changelog' }),
+    ),
+    false,
+  );
+  const typed = affiliation.parseAffiliationQuery('Tibo from OpenAI');
+  const typedMark = decisions.heuristicMark(
+    found({ name: 'Codex app 26.608', date: '2026-06-09', source: 'changelog', via: 'via OpenAI', link: 'https://learn.chatgpt.com/docs/changelog' }),
+    2026,
+    typed,
+  );
+  assert.equal(typedMark.attribution, 'company-founded-by-person');
+  assert.ok(decisions.shouldKeep(typedMark), JSON.stringify(typedMark));
   assert.equal(decisions.looksLikeNotAShip({ name: 'Ramp engineers accelerate code review', link: 'https://openai.com/index/ramp' }), true);
   assert.equal(decisions.looksLikeNotAShip({ name: 'Frontier firms are pulling ahead' }), true);
   const same = await decisions.dedupeSameShips({

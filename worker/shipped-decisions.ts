@@ -131,8 +131,8 @@ function evidenceOf(item: Found, who: string, affiliation: Affiliation, year: nu
     `Role: ${affiliation.role}${affiliation.product ? ` (leads ${affiliation.product})` : ''}`,
     affiliation.role === 'lead' && affiliation.product
       ? `This person leads ${affiliation.product} only. Other ${affiliation.company ?? 'company'} products are unrelated unless harvest source is github, x, npm, producthunt, appstore, or site (they personally posted it).`
-      : affiliation.role === 'unknown' && affiliation.company
-        ? `Note: they were typed as being from ${affiliation.company}. Keep ships they lead, founded, or personally shipped — not every company announcement.`
+      : affiliation.typedCompany && affiliation.company
+        ? `They were looked up as being from ${affiliation.company}. Keep that company's dated changelog ships.`
         : '',
     `Year: ${year}`,
     `Candidate: ${item.name}`,
@@ -204,7 +204,7 @@ function scopedAttribution(item: Found, affiliation: Affiliation): Attribution {
   if (isLead && item.via) {
     return matchesProduct ? 'company-led-by-person' : 'unrelated';
   }
-  if (item.via) return defaultAttribution(affiliation.role);
+  if (item.via) return defaultAttribution(affiliation.role, affiliation.typedCompany);
   return 'personal';
 }
 
@@ -245,6 +245,15 @@ function markFromAnswers(answers: Answer[], fallback: DecisionMark, item?: Found
   if (item && kind === 'NOT_A_SHIP' && isPersonalShipSource(item) && !looksLikeNotAShip(item)) {
     kind = 'release_version';
     if (isRealShip < 0.75) isRealShip = 0.8;
+  }
+  // Dated first-party changelog cards are already ships. Do not let the model
+  // flatten a Codex tape into "NOT_A_SHIP" version-bump noise.
+  if (item && kind === 'NOT_A_SHIP' && isDatedChangelogShip(item) && !looksLikeNotAShip(item)) {
+    kind = 'release_version';
+    if (isRealShip < 0.8) isRealShip = 0.85;
+  }
+  if (item && attribution === 'unrelated' && isDatedChangelogShip(item) && fallback.attribution !== 'unrelated' && !looksLikeNotAShip(item)) {
+    return { ...fallback, isRealShip: Math.max(isRealShip, fallback.isRealShip, 0.85), inYear: Math.max(inYear, fallback.inYear), kind: kind === 'NOT_A_SHIP' ? 'release_version' : kind, confidence: 0.7 };
   }
   const confidence = (attr?.type === 'choice' ? attr.confidence ?? 0.6 : 0.6) * isRealShip * inYear;
   return { isRealShip, inYear, attribution, significance, kind, confidence };
@@ -355,10 +364,17 @@ function coreTokens(name: string): Set<string> {
   );
 }
 
+function isDatedChangelogShip(item: Found): boolean {
+  if (item.source !== 'changelog' && item.source !== 'company') return false;
+  return Boolean(item.date && /^\d{4}-\d{2}-\d{2}$/.test(item.date) && item.thisYear !== false);
+}
+
 function containedName(a: string, b: string): boolean {
   if (a.length < 4 || b.length < 4) return false;
   if (a === b) return true;
   const [shorter, longer] = a.length <= b.length ? [a, b] : [b, a];
+  // A bare product word ("Codex") is not the same ship as a versioned card ("Codex app 26.608").
+  if (shorter.length <= 8 && !/\d/.test(shorter) && /\d/.test(longer)) return false;
   const at = longer.indexOf(shorter);
   if (at < 0) return false;
   const after = longer.slice(at + shorter.length);

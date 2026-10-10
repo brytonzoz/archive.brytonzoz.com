@@ -293,8 +293,10 @@ export function viaLabel(affiliation: Affiliation, attribution: Attribution): st
   return `via ${affiliation.company}${product}`;
 }
 
-export function defaultAttribution(role: RoleKind): Attribution {
+export function defaultAttribution(role: RoleKind, typedCompany = false): Attribution {
   if (role === 'founder' || role === 'ceo') return 'company-founded-by-person';
   if (role === 'lead') return 'company-led-by-person';
+  // "Tibo from OpenAI" is a company tape until a bio upgrades them to a product lead.
+  if (typedCompany) return 'company-founded-by-person';
   return 'personal';
 }

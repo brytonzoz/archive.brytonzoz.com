@@ -1932,7 +1932,7 @@ async function gatherFresh(
   }
 
   deduped = dedupeFound(found).map((item) => ({ ...item, description: describeWithStat(item) }));
-  const via = viaLabel(affiliation, defaultAttribution(affiliation.role));
+  const via = viaLabel(affiliation, defaultAttribution(affiliation.role, affiliation.typedCompany));
   try {
     const { verifyCandidates, dedupeSameShips, sortBySignificance } = await import('./shipped-decisions');
     const verified = await verifyCandidates({ env, items: deduped, year, who, affiliation, via });

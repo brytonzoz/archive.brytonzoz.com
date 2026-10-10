@@ -216,7 +216,12 @@ const TEMPLATE_NOTE =
   /is first on the tape|led the year|closed the year|set the tone|through-line|Receipt paper running low|Someone likes the publish button|\d+\s+launches?\s+·|night shift|publish button|\bthe tape\b|\bthe register\b|stock the shelves|counted receipts|got the paperwork|rings the publish|cashier has seen worse|mostly i just|wish and a prayer|nobody asked|same maker, more skus|runs on a wish|plus 0 more|github stars (llm|blog) for |supposed to be quiet|still be quoting|earned the grin|kept the year interesting|plus \d+ more, and |\byear is\b.+\bthrough\b|\b\d+\s+public\s+(ships?|lines?)\b|\bpublic lines\b|agents now stay clocked in overnight|other packages are just opening acts|treats Composer 2 like the real headline|kept \w[\w.]* busy:|(^|[.!?]\s+)\S[\w.]* first,\s+\S.+ later|spent the (rest of the )?year on |kept stacking|people will remember|\bthe sleeper\b|the loud one|slipped .+ beside|compiler toys|watches the bots|did not make a fuss|the bit is the product|the rest is scenery|ambition, compact|wallpaper a fridge|pays the rent|obvious next errand|treats \.com|enterprise PDFs|suspiciously so|side quests with sharper names|changelog like a group chat|normal behavior|tax office will have questions|filed the rest as changelog|filed each one as a changelog|took over the desktop|took the whole terminal|schema everyone copies|year was a patch list|receipt looks like a weekend|just how you hold it|blog posts around it are louder|opened the year|kept the drawer open|weather kite|smaller Quilt|parking meter|just the grip|plating the editor|announcement posts are doing too much|city will send a letter/i;
 
 /** A number in the note must be the item count, or a sourced stars/downloads figure that is labeled. */
-export function noteMisusesStats(note: string, count: number, stats: string[] = []): boolean {
+export function noteMisusesStats(
+  note: string,
+  count: number,
+  stats: string[] = [],
+  items: { name?: string; spoken?: string }[] = [],
+): boolean {
   const text = note.replace(/\s+/g, ' ').trim();
   if (!text) return false;
   if (/\bplus 0 more\b/i.test(text)) return true;
@@ -227,8 +232,12 @@ export function noteMisusesStats(note: string, count: number, stats: string[] = 
     const sourced = stats.some((line) => line.toLowerCase().includes(phrase.toLowerCase().replace(/\s+/g, ' ')));
     return !sourced;
   }
+  const sourced = new Set<number>();
+  for (const item of items) {
+    for (const hit of `${item.name || ''} ${item.spoken || ''}`.matchAll(/\d{1,7}/g)) sourced.add(Number(hit[0]));
+  }
   const numbers = [...text.matchAll(/\b(\d{1,7})\b/g)].map((m) => Number(m[1]));
-  return numbers.some((n) => n !== count && (n < 2000 || n > 2100) && n > 1);
+  return numbers.some((n) => n !== count && !sourced.has(n) && (n < 2000 || n > 2100) && n > 1);
 }
 
 const BANNED_NOTE_SHAPE =
@@ -528,7 +537,7 @@ export function hardRejectNote(
   if (!ok(text)) return 'unsafe';
   if (NOTE_HAS_URL.test(text)) return 'url';
   if (PUBLIC_TAPE_NOTE.test(text)) return 'banned-phrase';
-  if (noteMisusesStats(text, items.length, stats) || noteCountMismatch(text, items.length)) return 'unsourced-number';
+  if (noteMisusesStats(text, items.length, stats, items) || noteCountMismatch(text, items.length)) return 'unsourced-number';
   if (noteAlreadyUsed(text, ctx.usedNotes ?? [])) return 'duplicate';
   if (noteCitesUnknownShip(text, items, ctx)) return 'unknown-ship';
   if (noteCitesOtherPerson(text, items, ctx)) return 'other-person';
@@ -1461,8 +1470,21 @@ export async function assembleReceipt(
   };
 
   const affiliation = gathered.profile.affiliation;
-  if (harvested.length && !want) {
-    const stats = formatStats(harvested, gathered.stats ?? []);
+  if (harvested.length) {
+    const sealed = finish(harvested, '', seed, undefined, formatStats(harvested, gathered.stats ?? []), {
+      role: affiliation?.role,
+      company: affiliation?.company,
+      who: gathered.profile.name,
+      handle: gathered.profile.x,
+      bio: gathered.profile.bio,
+      usedNotes,
+      year,
+      affiliation,
+      owner: ownerFromProfile(gathered.profile, affiliation),
+      apiDown: true,
+    });
+    const tape = sealed.items;
+    const stats = Array.isArray(sealed.stats) ? sealed.stats : formatStats(tape, gathered.stats ?? []);
     const noteCtx: NoteContext = {
       role: affiliation?.role,
       company: affiliation?.company,
@@ -1481,7 +1503,7 @@ export async function assembleReceipt(
       const request = {
         model,
         max_tokens: 400,
-        system: noteOnlySystem(year, affiliation, harvested.length),
+        system: noteOnlySystem(year, affiliation, tape.length),
         messages: [{ role: 'user', content: userContent }],
         thinking: { type: 'disabled' },
       };
@@ -1503,12 +1525,12 @@ export async function assembleReceipt(
       return null;
     };
     try {
-      const prompt = noteOnlyPrompt(subject, harvested, stats, year, affiliation, noteCtx);
+      const prompt = noteOnlyPrompt(subject, tape, stats, year, affiliation, noteCtx);
       const first = await ask(prompt);
       if (!first) {
         apiDown = true;
       } else {
-        const ranked = rankCashierNotes(first, harvested, stats, noteCtx);
+        const ranked = rankCashierNotes(first, tape, stats, noteCtx);
         noteCandidates = noteCandidateLog(ranked);
         logNoteReject(noteCtx, ranked, false);
         note = ranked.find((row) => !row.hard)?.note ?? '';
@@ -1523,17 +1545,17 @@ export async function assembleReceipt(
             if (!second) {
               apiDown = true;
             } else {
-              const ranked2 = rankCashierNotes(second, harvested, stats, noteCtx);
+              const ranked2 = rankCashierNotes(second, tape, stats, noteCtx);
               noteCandidates = [...noteCandidates, ...noteCandidateLog(ranked2)];
               logNoteReject(noteCtx, ranked2, true);
               note = ranked2.find((row) => !row.hard)?.note ?? '';
               if (!note) {
-                note = pickLeastBadNote([...first, ...second], harvested, stats, noteCtx);
+                note = pickLeastBadNote([...first, ...second], tape, stats, noteCtx);
                 logNoteReject(noteCtx, ranked2, 'exhausted');
               }
             }
           } else {
-            note = pickLeastBadNote(first, harvested, stats, noteCtx);
+            note = pickLeastBadNote(first, tape, stats, noteCtx);
             logNoteReject(noteCtx, ranked, 'exhausted');
           }
         }
@@ -1543,9 +1565,9 @@ export async function assembleReceipt(
       apiDown = true;
     }
     if (apiDown) note = '';
-    const draft = finish(harvested, note, seed, undefined, stats, { ...noteCtx, apiDown });
+    const draft = finish(tape, note, seed, undefined, stats, { ...noteCtx, apiDown });
     const cost = spent();
-    console.log(JSON.stringify({ shipped: 'ai', model, mode: 'note-only', items: harvested.length, inputTokens: usage.input, outputTokens: usage.output, costMicros: cost }));
+    console.log(JSON.stringify({ shipped: 'ai', model, mode: 'note-only', items: tape.length, inputTokens: usage.input, outputTokens: usage.output, costMicros: cost }));
     return { ...draft, model, inputTokens: usage.input, outputTokens: usage.output, searches: 0, costMicros: cost, noteCandidates };
   }
 

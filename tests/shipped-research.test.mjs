@@ -325,6 +325,23 @@ test('cashier note and stats are specific to the items, never stock copy', () =>
     ),
     'unsourced-number',
   );
+  assert.equal(
+    ai.hardRejectNote(
+      'From Codex app to Sora to GPT-6, the year read like a city being rebuilt one storefront at a time.',
+      [
+        { name: 'CODEX APP', spoken: 'Codex app', source: 'changelog' },
+        { name: 'SORA', spoken: 'Sora', source: 'changelog' },
+        { name: 'GPT-6', spoken: 'GPT-6', source: 'changelog' },
+      ],
+      [],
+      { who: 'Sam Altman', handle: 'sama' },
+    ),
+    null,
+  );
+  assert.equal(
+    ai.noteMisusesStats('GPT-6 landed like a flagship should.', 25, [], [{ name: 'GPT-6', spoken: 'GPT-6' }]),
+    false,
+  );
   const thin = ai.scoreCashierNote(
     'Levels is the one on this tape worth a second look. The rest are short and the bio does most of the talking.',
     [{ name: 'PHOTOAI', spoken: 'PhotoAI', source: 'site' }],

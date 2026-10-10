@@ -33,7 +33,7 @@
 // Every guardrail (rate limits, locks, the budget, kill switches, the human check, headers) lives in
 // worker/shipped-guard.ts; the threat list is docs/shipped-security.md.
 // Tables are created (and new columns added) on first use; see SCHEMA below.
-import { DEFAULT_MODEL, PrintError, assembleReceipt, costMicros, demoReceipt, maxSearches, promptFor, worstCaseMicros, type AiEnv, type DraftItem } from './shipped-ai';
+import { DEFAULT_MODEL, PrintError, assembleReceipt, costMicros, demoReceipt, finish, maxSearches, promptFor, worstCaseMicros, type AiEnv, type DraftItem } from './shipped-ai';
 import { ICON_HASH, bytesDataUri, iconDataUri, iconKey, reencodeLogo, storeIcon } from './shipped-icons';
 import { houseMark } from './shipped-marks';
 import { yearCardPng, yearRolloPdf, yearRolloPng, yearTallPng, type LogoResolver } from './shipped-og';
@@ -2269,7 +2269,22 @@ async function reprintReceipt(
     const realOld = (current.items || []).filter((item) => item?.name && item.name !== 'YOUR POTENTIAL' && item.source !== 'none');
     if (!realNew.length && realOld.length) {
       console.log(JSON.stringify({ shipped: 'reprint-keep', id: row.id, kept: realOld.length, why: 'empty-harvest' }));
-      draft = { ...draft, items: current.items, note: current.note, potential: current.potential };
+      const keptItems = current.items as DraftItem[];
+      const keptNote = current.note || '';
+      const banned = !keptNote || /public tape|lead ship/i.test(keptNote);
+      draft = {
+        ...draft,
+        items: current.items,
+        note: banned
+          ? finish(keptItems, '', seedOf(row.login_key), undefined, current.stats, {
+              who: subject.display,
+              handle: current.subject?.x || undefined,
+              year,
+              apiDown: false,
+            }).note
+          : keptNote,
+        potential: current.potential,
+      };
     }
     const receipt: YearReceipt = {
       ...current,

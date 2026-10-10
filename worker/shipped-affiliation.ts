@@ -223,12 +223,19 @@ export function needsCompanyResolve(opts: {
   handle?: string | null;
   company?: string | null;
   role?: RoleKind;
+  product?: string | null;
   bio?: string;
 }): boolean {
   if (opts.company) return false;
   if (!opts.handle) return false;
-  if (opts.role === 'ceo' || opts.role === 'founder') return true;
-  return Boolean(opts.bio && !isJunkProfileText(opts.bio) && /\b(ceo|founder|co-?founder)\b/i.test(opts.bio));
+  if (opts.role === 'ceo' || opts.role === 'founder' || opts.role === 'lead') return true;
+  if (opts.product) return true;
+  return Boolean(opts.bio && !isJunkProfileText(opts.bio) && /\b(ceo|founder|co-?founder|lead|head|director)\b/i.test(opts.bio));
+}
+
+/** Handle is known but we still have no company or product — one identity lookup for leads. */
+export function needsHandleEnrichment(opts: { handle?: string | null; company?: string | null; product?: string | null }): boolean {
+  return Boolean(opts.handle && !opts.company && !opts.product);
 }
 
 /** Handle exists but X returned a cookie wall / empty bio and no site — one identity lookup. */

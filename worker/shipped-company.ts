@@ -463,7 +463,7 @@ export async function harvestCompany(opts: {
   if (!slug || companyScope(affiliation) === 'none') {
     return { found: [], spend: emptyXaiSpend(), ran: [], cacheHit: false };
   }
-  const cacheKey = opts.deep ? `company:deep:v6:${year}:${slug}` : `company:v8:${year}:${slug}`;
+  const cacheKey = opts.deep ? `company:deep:v7:${year}:${slug}` : `company:v9:${year}:${slug}`;
   return cached(cacheKey, 7 * 1440 * MIN, async () => {
     const via = viaFor(affiliation);
     const ran: string[] = [];

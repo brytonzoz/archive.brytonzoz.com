@@ -7,6 +7,10 @@ const RECEIPT_PATH = (id) => `/r/${id}/`;
 const origin = (process.argv[2] || process.env.SHIPPED_ORIGIN || 'https://shipped-staging.brytonzoz.com').replace(/\/+$/, '');
 const password = process.env.ADMIN_PASSWORD || '';
 const FORCE = process.env.SHIPPED_REPRINT_FORCE === '1';
+const realCount = (receipt) => {
+  const items = Array.isArray(receipt?.items) ? receipt.items : [];
+  return items.filter((item) => item && item.name && item.name !== 'YOUR POTENTIAL' && item.source !== 'none').length;
+};
 
 const TARGETS = [
   { id: 16, who: 'Tibo from OpenAI' },
@@ -51,8 +55,8 @@ const rows = [];
 for (const target of TARGETS) {
   const before = await readReceipt(target.id);
   const who = before?.subject?.display || before?.login || target.who;
-  const prior = Array.isArray(before?.items) ? before.items.filter((item) => item.source !== 'none').length : 0;
-  if (!FORCE && prior >= 15) {
+  const prior = realCount(before);
+  if (!FORCE && prior >= 15 && !before?.potential) {
     console.log(`#${target.id} ${who} already has ${prior} items; skip`);
     rows.push({ id: target.id, who, items: prior, url: `${origin}${RECEIPT_PATH(target.id)}`, skipped: true });
     continue;
@@ -68,9 +72,13 @@ for (const target of TARGETS) {
     console.error(`#${target.id} ${who} reprint failed: ${last.status} ${last.error || ''}`);
     process.exit(1);
   }
-  await new Promise((ok) => setTimeout(ok, 2000));
-  const after = (await readReceipt(target.id)) || before;
-  const items = Array.isArray(after?.items) ? after.items.filter((item) => item.source !== 'none').length : prior;
+  await new Promise((ok) => setTimeout(ok, 3000));
+  let after = await readReceipt(target.id);
+  if (!after || realCount(after) === prior) {
+    await new Promise((ok) => setTimeout(ok, 8000));
+    after = (await readReceipt(target.id)) || before;
+  }
+  const items = realCount(after) || (after?.potential ? 0 : prior);
   const url = `${origin}${RECEIPT_PATH(target.id)}`;
   console.log(`#${target.id} ${who} → ${items} items ${url}`);
   rows.push({ id: target.id, who, items, url, skipped: false });

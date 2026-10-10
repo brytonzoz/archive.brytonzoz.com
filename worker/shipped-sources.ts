@@ -264,7 +264,7 @@ export const tinyfishAccess = (env: SourceEnv, meter: TinyfishMeter | null): Tin
 const memo = new Map<string, { until: number; value: unknown }>();
 
 /** This isolate's memory, then the data center's cache. Failures aren't cached; a definite "no" (null) is. */
-export async function cached<T>(key: string, ttl: number, load: () => Promise<T>): Promise<T> {
+export async function cached<T>(key: string, ttl: number, load: () => Promise<T>, keep?: (value: T) => boolean): Promise<T> {
   const hit = memo.get(key);
   if (hit && hit.until > Date.now()) return hit.value as T;
   const url = `https://shipped-cache.brytonzoz.com/v1/${encodeURIComponent(key)}`;
@@ -276,9 +276,13 @@ export async function cached<T>(key: string, ttl: number, load: () => Promise<T>
     return value;
   }
   const value = await load();
-  memo.set(key, { until: Date.now() + ttl * 1000, value });
+  const persist = !keep || keep(value);
+  const seconds = persist ? ttl : 5 * MIN;
+  memo.set(key, { until: Date.now() + seconds * 1000, value });
   if (memo.size > 400) memo.delete(memo.keys().next().value as string);
-  await store?.put(url, new Response(JSON.stringify(value ?? null), { headers: { 'content-type': 'application/json', 'cache-control': `max-age=${ttl}` } })).catch(() => {});
+  if (persist) {
+    await store?.put(url, new Response(JSON.stringify(value ?? null), { headers: { 'content-type': 'application/json', 'cache-control': `max-age=${ttl}` } })).catch(() => {});
+  }
   return value;
 }
 
@@ -1277,7 +1281,7 @@ async function githubRepoOwners(product: string, env: SourceEnv): Promise<string
 
 /** Expand a typed subject to GitHub, X, sites, PH/npm usernames. Cached 24h. */
 export async function resolveIdentity(subject: Subject, env: SourceEnv, tinyfish: TinyfishAccess = null): Promise<ResolvedIdentity> {
-  return cached(`id:v6:${subject.kind}:${subject.id.toLowerCase()}:${loose(subject.display)}`, 1440 * MIN, () => resolveIdentityFresh(subject, env, tinyfish));
+  return cached(`id:v7:${subject.kind}:${subject.id.toLowerCase()}:${loose(subject.display)}:${subject.x || ''}`, 1440 * MIN, () => resolveIdentityFresh(subject, env, tinyfish));
 }
 
 async function resolveProductMaker(
@@ -1342,6 +1346,7 @@ async function resolveIdentityFresh(subject: Subject, env: SourceEnv, tinyfish: 
   const profile = emptyProfile();
   if (subject.kind === 'github') profile.github = subject.id;
   if (subject.kind === 'x') profile.x = subject.id;
+  if (subject.x && isXHandle(subject.x)) profile.x ||= subject.x;
   if (subject.kind === 'domain' && isDomain(subject.id)) profile.site = `https://${subject.id}/`;
   const nameParts = parsePersonName(subject.display);
   if (subject.kind === 'name' && !nameParts.product) profile.name = subject.display;
@@ -1600,8 +1605,13 @@ export async function gather(
   const tinyfish = tinyfishAccess(env, meter);
   const resolved = await resolveIdentity(subject, env, tinyfish);
   const mode: GatherMode = opts?.mode === 'full' ? 'full' : 'free';
-  const key = mode === 'full' ? `gather:full:v10:${year}:${resolved.cacheKey}` : `gather:v19:${year}:${resolved.cacheKey}`;
-  return cached(key, 1440 * MIN, () => gatherFresh(subject, resolved.profile, env, year, meter, tinyfish, resolved.notes, mode));
+  const key = mode === 'full' ? `gather:full:v11:${year}:${resolved.cacheKey}` : `gather:v20:${year}:${resolved.cacheKey}`;
+  return cached(
+    key,
+    1440 * MIN,
+    () => gatherFresh(subject, resolved.profile, env, year, meter, tinyfish, resolved.notes, mode),
+    (gathered) => gathered.found.length > 0,
+  );
 }
 
 async function gatherFresh(
@@ -1777,6 +1787,7 @@ async function gatherFresh(
     needsPersonResolve,
     needsCompanyResolve,
     needsIdentityRetry,
+    needsHandleEnrichment,
     cleanGithubCompany,
     shouldInferCompany,
     primaryProduct,
@@ -1868,7 +1879,13 @@ async function gatherFresh(
     handle: profile.x,
     company: affiliation.company,
     role: affiliation.role,
+    product: affiliation.product,
     bio: profile.bio,
+  });
+  const wantEnrich = needsHandleEnrichment({
+    handle: profile.x,
+    company: affiliation.company,
+    product: affiliation.product,
   });
   const wantRetry = needsIdentityRetry({
     handle: profile.x,
@@ -1876,7 +1893,7 @@ async function gatherFresh(
     bio: profile.bio,
     site: profile.site,
   });
-  if (xaiConfigured(env) && (wantPerson || wantCompany || wantRetry)) {
+  if (xaiConfigured(env) && (wantPerson || wantCompany || wantRetry || wantEnrich)) {
     try {
       await applyResolved(affiliation.name || who);
       // Legal name landed without a handle (CEO of Higgsfield → Alex Mashrabov).

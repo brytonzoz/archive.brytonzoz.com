@@ -22,6 +22,9 @@ test('name queries without a handle need a cheap person resolve', () => {
 test('handle-only CEOs resolve a company; unknown builders stay free', () => {
   assert.equal(affiliation.needsCompanyResolve({ handle: 'sama', company: null, role: 'unknown', bio: 'CEO, OpenAI' }), true);
   assert.equal(affiliation.needsCompanyResolve({ handle: 'rauchg', company: null, role: 'ceo' }), true);
+  assert.equal(affiliation.needsCompanyResolve({ handle: 'thsottiaux', company: null, role: 'lead', bio: 'Codex lead' }), true);
+  assert.equal(affiliation.needsHandleEnrichment({ handle: 'thsottiaux', company: null, product: null }), true);
+  assert.equal(affiliation.needsHandleEnrichment({ handle: 'levelsio', company: 'PhotoAI', product: null }), false);
   assert.equal(affiliation.needsCompanyResolve({ handle: 'steventey', company: null, role: 'unknown', bio: 'building stuff' }), false);
   assert.equal(affiliation.needsCompanyResolve({ handle: 'sama', company: 'OpenAI', role: 'unknown' }), false);
   assert.equal(

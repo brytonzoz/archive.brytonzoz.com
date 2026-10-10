@@ -21,7 +21,7 @@ import { ITEM_STATUSES } from '../lib/shipped-year';
 export const TITLE_MAX = 38;
 
 const DOCS_NAV =
-  /^(overview|prompting|pool|security|browser|search|terminal|settings|plugins?|hooks?|cli|api|faq|guides?|reference|getting started|quickstart|quick start|installation|install|usage|examples?|changelog|release notes|acting as users|builds|context|rules|modes?|models?|indexing|privacy|enterprise|teams|billing|account|authentication|auth|docs|home|index|support|repositories|ideas|pull requests|last updated|what'?s new|agents)$/i;
+  /^(overview|prompting|pool|security|browser|search|terminal|settings|plugins?|hooks?|cli|api|faq|guides?|reference|getting started|quickstart|quick start|installation|install|usage|examples?|changelog|release notes|acting as users|builds|context|rules|modes?|models?|indexing|privacy|enterprise|teams|billing|account|authentication|auth|docs|home|index|support|repositories|ideas|pull requests|last updated|what'?s new|agents|legal|update)$/i;
 const BYLINE = /^(authors?\s*[:\-–—]|written by\b|posted by\b|byline\s*:)/i;
 const NAME_LIST =
   /^[A-Z][A-Za-z.'-]+(?:\s+[A-Z][A-Za-z.'-]+){1,3}(?:,| and )\s+[A-Z][A-Za-z.'-]+/;
@@ -45,11 +45,11 @@ const SENTENCE_VERB =
 const BARE_MODEL = /^gpt-[3-5]$/i;
 const CODE_TITLE = /^[a-z][\w-]*\.[a-z][\w-]*\.[a-z]/i;
 const MID_WORD =
-  /^(ontrol|elease|pdate|ettings|vailable|olling|espectively|ead|nounced|ntroducing|aunched|hipped)\b/i;
+  /^(ontrol|elease|pdate|ettings|vailable|olling|espectively|ead|nounced|ntroducing|aunched|hipped|rigin)\b/i;
 const OLD_PRODUCT =
   /\b(gpt-?4o(?:-mini)?|gpt-?3(?:\.5)?(?:-turbo)?|text-embedding-?[123]|embedding v[123]|ada-?002|davinci|curie|babbage|turbo-0?125|whisper-1|o1|o3(?:-mini)?)\b/i;
 const CTA_NAV =
-  /^(visit our|try .{0,24} now|explore (enterprise|pricing|docs|plans)|watch (on )?youtube|subscribe|follow us|join (us|now)|get started|sign up|learn more|see more|read more|contact (us|sales)|book a (demo|call)|youtube channel)\b/i;
+  /^(visit our|try .{0,24} now|explore (enterprise|pricing|docs|plans)|watch (on )?youtube|subscribe|follow us|join (us|now)|get started|sign up|sign in\b|learn more|see more|read more|contact (us|sales|contact)|book a (demo|call)|youtube channel)\b/i;
 const CTA_TRAIL = /[↗→⬅︎↵]\s*$|youtube channel|try cursor now|explore enterprise/i;
 const FRAGMENT_START = /^(ies|ing|ted|ated|nced|trol|elease|pdate|ontrol|espectively)\b/i;
 const PLATFORM_LEAF =
@@ -224,13 +224,18 @@ export function isAboutPerson(title: string, who: string | null | undefined): bo
 const JOB_TITLE =
   /\b(software engineer|staff engineer|engineering manager|developer advocate|director of engineering|engineer at|python engineers?|head of engineering|vp of engineering)\b/i;
 
-function isSelfNameTitle(title: string, opts: { who?: string | null; handle?: string | null } = {}): boolean {
+function isSelfNameTitle(
+  title: string,
+  opts: { who?: string | null; handle?: string | null; github?: string | null } = {},
+): boolean {
   const text = tidy(title);
-  if (isAboutPerson(text, opts.who) || isAboutPerson(text, opts.handle)) return true;
+  if (isAboutPerson(text, opts.who) || isAboutPerson(text, opts.handle) || isAboutPerson(text, opts.github)) return true;
   const stripped = text.replace(/@[\w.-]+/g, ' ').replace(/\s+/g, ' ').trim();
   if (looksLikePersonName(stripped, opts.who) || looksLikePersonName(text, opts.who)) return true;
   const handle = (opts.handle || '').replace(/^@/, '');
   if (handle.length >= 4 && new RegExp(`@${handle}\\b`, 'i').test(text)) return true;
+  const github = (opts.github || '').replace(/^@/, '');
+  if (github.length >= 4 && (loose(text) === loose(github) || new RegExp(`@${github}\\b`, 'i').test(text))) return true;
   if (JOB_TITLE.test(text) && looksLikePersonName(stripped.replace(JOB_TITLE, '').trim(), opts.who)) return true;
   if (JOB_TITLE.test(text) && stripped.split(/\s+/).length <= 6) return true;
   return false;
@@ -920,13 +925,51 @@ export function rollupCursorModels<T extends Polishable>(items: T[]): T[] {
   return kept;
 }
 
+const COUNT_ONES: Record<string, number> = {
+  zero: 0,
+  one: 1,
+  two: 2,
+  three: 3,
+  four: 4,
+  five: 5,
+  six: 6,
+  seven: 7,
+  eight: 8,
+  nine: 9,
+  ten: 10,
+  eleven: 11,
+  twelve: 12,
+  thirteen: 13,
+  fourteen: 14,
+  fifteen: 15,
+  sixteen: 16,
+  seventeen: 17,
+  eighteen: 18,
+  nineteen: 19,
+};
+const COUNT_TENS: Record<string, number> = { twenty: 20, thirty: 30, forty: 40, fifty: 50 };
+
+function spokenCount(word: string): number | null {
+  const text = word.toLowerCase().replace(/[\s_]+/g, '-');
+  if (COUNT_ONES[text] != null) return COUNT_ONES[text];
+  if (COUNT_TENS[text] != null) return COUNT_TENS[text];
+  const parts = text.split('-');
+  if (parts.length === 2 && COUNT_TENS[parts[0]] != null && COUNT_ONES[parts[1]] != null) {
+    return COUNT_TENS[parts[0]]! + COUNT_ONES[parts[1]]!;
+  }
+  return null;
+}
+
 export function noteCountMismatch(note: string, count: number): boolean {
   const mention =
-    /\b(\d{1,4})\s+(public\s+)?(ships?|lines?|launches?|things?|updates?|items?|projects?|repos?|repositories)\b/i.exec(
+    /\b(\d{1,4}|twenty(?:[-\s](?:one|two|three|four|five|six|seven|eight|nine))?|thirty(?:[-\s](?:one|two|three|four|five|six|seven|eight|nine))?|forty(?:[-\s](?:one|two|three|four|five|six|seven|eight|nine))?|ten|eleven|twelve|thirteen|fourteen|fifteen|sixteen|seventeen|eighteen|nineteen|zero|one|two|three|four|five|six|seven|eight|nine)\s+(printed\s+)?(public\s+)?(ships?|lines?|launches?|things?|updates?|items?|projects?|repos?|repositories|entries)\b/i.exec(
       note,
     );
   if (!mention) return false;
-  return Number(mention[1]) !== count;
+  const raw = mention[1].replace(/\s+/g, '-');
+  const n = /^\d+$/.test(raw) ? Number(raw) : spokenCount(raw);
+  if (n == null || Number.isNaN(n)) return false;
+  return n !== count;
 }
 
 const DATE_DONOR = /^(github|npm|x|producthunt|appstore)$/;
@@ -996,7 +1039,13 @@ export function polishCandidates<T extends Polishable>(items: T[], opts: PolishO
         continue;
       }
     }
-    const junkOpts = { who, handle: opts.handle, company: opts.affiliation?.company, date: item.date };
+    const junkOpts = {
+      who,
+      handle: opts.handle,
+      github: opts.owner?.github,
+      company: opts.affiliation?.company,
+      date: item.date,
+    };
     let name = cleanShipTitle(item.name);
     if (flagship && !isCursorModelNote(item) && (!name || name.split(/\s+/).length <= 1 || /^the new\b/i.test(name))) {
       if (!name) logFlagshipGate(item, isJunkTitle(item.name, junkOpts) ? 'junk-title' : 'title-empty', flagship);

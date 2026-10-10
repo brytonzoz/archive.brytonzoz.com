@@ -22,6 +22,7 @@
 // After 8f16288: one print-time gate; company cache stays raw; junk fixture in CI.
 // After de7f69d: docs/category hrefs and HTML-entity nav titles drop at print time.
 // After 1c92c1e: E2E goldens on cached tapes; changelog cards keep /changelog/ hrefs.
+// After note/self-name pass: word-number counts, bio/thin-tape notes, LEGAL/TRUELL20.
 // Optional SHIPPED_PRINT_SUBJECTS=handle,handle prints two fresh names via admin print-subject.
 //
 //   ADMIN_PASSWORD=… node scripts/reprint-shipped.mjs [origin]

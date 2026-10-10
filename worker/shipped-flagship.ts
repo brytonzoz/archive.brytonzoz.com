@@ -116,6 +116,10 @@ export function flagshipLaunchName(item: FlagshipItem): string | null {
   if (/\bbugbot\b/i.test(hay) || /\/(blog|changelog)\/bugbot/i.test(path)) return 'Bugbot';
   if (/\bagents window\b/i.test(name) || /\/agents-window\b/i.test(path)) return 'Agents Window';
   if (/^origin$/i.test(name) || /\/(blog|changelog)\/origin$/i.test(path)) return 'Origin';
+  if (/\bvercel agent\b/i.test(name) || /\/changelog\/vercel-agent\b/i.test(path)) return 'Vercel Agent';
+  if (/^(?:introducing\s+)?(?:the\s+)?(?:new\s+)?v0(?:\s+(?:api|platform|themes?))?$/i.test(name) || /\/(blog|changelog)\/(?:introducing-the-new-)?v0\b/i.test(path)) {
+    return /theme/i.test(name) ? 'v0 Themes' : /api|platform/i.test(name) || /v0-platform|v0-api/i.test(path) ? 'v0 Platform API' : 'v0';
+  }
   // Exact titles only — "Codex app 26.608" must still version-roll.
   if (/^(?:introducing\s+)?codex app(?: updates)?$/i.test(name)) return 'Codex app';
   if (/^(?:introducing\s+)?gpt-?5\.3-codex$/i.test(name)) return 'GPT-5.3-Codex';

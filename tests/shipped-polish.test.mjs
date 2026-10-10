@@ -250,6 +250,9 @@ test('scrape-dated changelog cards are dropped', () => {
 });
 
 test('notes must use the final post-filter count', () => {
+  assert.equal(polish.noteCountMismatch('Six printed items, one of them a drone simulator.', 5), true);
+  assert.equal(polish.noteCountMismatch('Twenty-three entries, most of them Codex.', 19), true);
+  assert.equal(polish.noteCountMismatch('Five printed items, one of them a drone simulator.', 5), false);
   assert.equal(polish.noteCountMismatch("Tibo's OpenAI crew put 37 public ships on the year.", 162), true);
   assert.equal(polish.noteCountMismatch("Tibo's OpenAI crew put 162 public ships on the year.", 162), false);
   assert.equal(polish.noteCountMismatch('OpenAI shipped 40 public updates to keep it moving.', 54), true);

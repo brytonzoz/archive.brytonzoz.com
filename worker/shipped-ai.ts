@@ -213,7 +213,7 @@ export function noteMisusesStats(note: string, count: number, stats: string[] = 
 }
 
 const BANNED_NOTE_SHAPE =
-  /kept \w[\w.]* busy:|(^|[.!?]\s+)\S[\w.]* first,\s+\S.+ later|spent the (rest of the )?year on |kept stacking|people will remember|\bthe sleeper\b|the loud one|slipped .+ beside|\bthe pair is\b|\bdoes one job\b|\bdoes another\b|\bopens on\b|\bopened the year\b|\byear opens\b|\bno encore\b/i;
+  /kept \w[\w.]* busy:|(^|[.!?]\s+)\S[\w.]* first,\s+\S.+ later|spent the (rest of the )?year on |kept stacking|people will remember|\bthe sleeper\b|the loud one|slipped .+ beside|\bthe pair is\b|\bdoes one job\b|\bdoes another\b|\bopens on\b|\bopened the year\b|\byear opens\b|\bno encore\b|\bthe bio\b.{0,48}\b(talking|menu|heavy lifting)\b|\bvibes bio\b|\breceipt is just the receipt\b|\bworth a second look\b.{0,80}\bthe rest\b|\bthin (receipt|tape)\b|\bentries,\s+most of them\b/i;
 
 const MISSING_DATA_NOTE =
   /\b(no description|without a description|with no description|lacks a description|has no description|went out with no|missing (a )?(description|date|copy)|undated|no date|without (a )?date|has no date)\b/i;
@@ -537,8 +537,12 @@ export function scoreCashierNote(
   if (/\bboth printed\b|\bprinted in\s+(jan(?:uary)?|feb(?:ruary)?|mar(?:ch)?|apr(?:il)?|may|jun(?:e)?|jul(?:y)?|aug(?:ust)?|sep(?:t(?:ember)?)?|oct(?:ober)?|nov(?:ember)?|dec(?:ember)?)\b/i.test(text)) {
     score -= 18;
   }
-  if (/\bbio does most of the talking\b|\bthin (receipt|tape)\b|\bworth a second look\b[\s\S]{0,80}\bthe rest\b|\bthe rest are short\b/i.test(text)) {
-    score -= 20;
+  if (
+    /\bthe bio\b|\bbio does\b|\bbio is\b|\bvibes bio\b|\bheavy lifting\b|\bthin (receipt|tape)\b|\breceipt is just the receipt\b|\bworth a second look\b|\bthe rest are short\b|\bmost of them\b.{0,40}\b(codex|chatgpt)\b|\bentries,\s+most of them\b/i.test(
+      text,
+    )
+  ) {
+    score -= 24;
   }
   return score;
 }
@@ -686,7 +690,7 @@ function printGateOpts(gathered: Gathered, year: number) {
   return {
     year,
     who: gathered.profile.name || gathered.profile.affiliation?.name,
-    handle: gathered.profile.x,
+    handle: gathered.profile.x || gathered.profile.github,
     affiliation: gathered.profile.affiliation,
     owner: ownerFromProfile(gathered.profile, gathered.profile.affiliation),
   };
@@ -781,10 +785,18 @@ function finish(items: DraftItem[], note: string, seed: number, modulesRaw?: unk
     : formatStats(sorted);
   const text = note.replace(/\s+/g, ' ').trim();
   const hard = hardRejectNote(text, sorted, Array.isArray(statsRaw) ? (statsRaw as string[]) : stats, ctx);
-  // Bare-name fallback is only for an empty/unprintable note (API down). Soft marks stay.
-  const whoNote = !text || !ok(text) || hard === 'url' || hard === 'unsafe' || hard === 'empty'
-    ? groundedNote(sorted, seed, ctx.who || ctx.company || '', stats, ctx)
-    : text;
+  // Bare-name fallback is for an empty/unprintable note, or a hard reject that slipped the picker.
+  const whoNote =
+    !text ||
+    !ok(text) ||
+    hard === 'url' ||
+    hard === 'unsafe' ||
+    hard === 'empty' ||
+    hard === 'other-person' ||
+    hard === 'unsourced-number' ||
+    hard === 'banned-phrase'
+      ? groundedNote(sorted, seed, ctx.who || ctx.company || '', stats, ctx)
+      : text;
   const printed = printNote(whoNote, stats);
   return { items: sorted, note: printed, stats, potential: false, layout };
 }

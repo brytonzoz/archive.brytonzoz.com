@@ -301,6 +301,24 @@ test('cashier note and stats are specific to the items, never stock copy', () =>
     ),
     false,
   );
+  assert.equal(
+    ai.hardRejectNote(
+      'Six printed items, one of them a drone simulator. The bio is a menu of incomes, and the receipt is just the receipt.',
+      [{ name: 'PHOTOAI', spoken: 'PhotoAI', source: 'site' }],
+      [],
+      { who: 'Pieter Levels', handle: 'levelsio' },
+    ),
+    'banned-phrase',
+  );
+  assert.equal(
+    ai.hardRejectNote(
+      'Twenty-three entries, most of them Codex.',
+      [{ name: 'CODEX APP', spoken: 'Codex app', source: 'changelog' }],
+      [],
+      { who: 'Sam Altman', handle: 'sama' },
+    ),
+    'banned-phrase',
+  );
   const thin = ai.scoreCashierNote(
     'Levels is the one on this tape worth a second look. The rest are short and the bio does most of the talking.',
     [{ name: 'PHOTOAI', spoken: 'PhotoAI', source: 'site' }],

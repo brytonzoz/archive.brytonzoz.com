@@ -76,6 +76,30 @@ test('print-time gate collapses OpenAI CEO Codex crumbs to company-wide ships', 
   assert.equal(names.filter((name) => /codex/i.test(name)).length, 1, JSON.stringify(names));
 });
 
+test('Vercel Agent truncated at and survives; GitHub handle drops TRUELL20', () => {
+  const agent = polish.gateReceiptItems(
+    [
+      asItem({
+        name: 'Vercel Agent now installs private packages from npm and',
+        date: '2026-09-30',
+        link: 'https://vercel.com/changelog/vercel-agent-now-installs-private-packages-from-npm-and-custom-registries',
+      }),
+    ],
+    { year: 2026, who: 'Guillermo Rauch', handle: 'rauchg' },
+  );
+  assert.ok(agent.some((item) => /vercel agent/i.test(item.name)), JSON.stringify(agent));
+  const self = polish.gateReceiptItems(
+    [asItem({ name: 'TRUELL20', date: null, source: 'site', link: 'https://truell20.com/' })],
+    {
+      year: 2026,
+      who: 'Michael Truell',
+      handle: 'mntruell',
+      owner: { name: 'Michael Truell', github: 'truell20', site: 'https://cursor.com' },
+    },
+  );
+  assert.equal(self.length, 0, JSON.stringify(self));
+});
+
 test('docs-href keeps changelog cards and drops docs nav / blog categories', () => {
   assert.equal(polish.isDocsOrCategoryHref('https://vercel.com/docs/frameworks'), true);
   assert.equal(polish.isDocsOrCategoryHref('https://vercel.com/blog/category/security'), true);

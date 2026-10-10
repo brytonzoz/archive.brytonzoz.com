@@ -302,6 +302,31 @@ test('seed list includes OpenAI Codex plus the companies Bryton will look up', (
   }
 });
 
+test('off-worker payload strips via and rejects an empty list', async () => {
+  const storeMod = await import('../worker/shipped-company-store.ts');
+  const payload = storeMod.offworkerPayload({
+    slug: 'openai',
+    year: 2026,
+    found: [
+      {
+        name: 'Codex CLI',
+        description: '',
+        date: '2026-07-21',
+        link: 'https://developers.openai.com/codex/changelog',
+        source: 'changelog',
+        status: 'LAUNCHED',
+        score: 7,
+        thisYear: true,
+        via: 'via OpenAI',
+      },
+    ],
+    ran: ['gha'],
+  });
+  assert.ok(payload);
+  assert.equal(payload.found[0].via, undefined);
+  assert.equal(storeMod.offworkerPayload({ slug: 'openai', year: 2026, found: [] }), null);
+});
+
 test('off-worker cache payload expires after 7 days', async () => {
   const storeMod = await import('../worker/shipped-company-store.ts');
   const fresh = storeMod.parseOffworkerCache({

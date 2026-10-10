@@ -42,7 +42,6 @@ jobs:
 
       - name: Harvest and write D1 + R2
         env:
-          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
           SHIPPED_GITHUB_TOKEN: ${{ secrets.SHIPPED_GITHUB_TOKEN }}
           TINYFISH: ${{ secrets.TINYFISH }}
           TINYFISH_API_KEY: ${{ secrets.TINYFISH_API_KEY }}
@@ -57,8 +56,8 @@ jobs:
           SHIPPED_YEAR: '2026'
           SHIPPED_CACHE_ONLY: ${{ github.event.client_payload.slug }}
         run: |
-          if [ -z "$CLOUDFLARE_API_TOKEN" ]; then
-            echo "::error::CLOUDFLARE_API_TOKEN is required to write the company cache."
+          if [ -z "$ADMIN_PASSWORD" ]; then
+            echo "::error::ADMIN_PASSWORD is required to write the company cache through the Worker."
             exit 1
           fi
           node --experimental-transform-types --no-warnings scripts/cache-shipped-companies.mjs

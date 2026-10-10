@@ -130,3 +130,35 @@ export function stripVia(items: Found[]): Found[] {
 export function slugForCompany(company: string | null | undefined): string | null {
   return companySlug(company);
 }
+
+export function offworkerPayload(input: { slug: string; year: number; found: Found[]; ran?: string[]; fetchedAt?: number }): OffworkerCache | null {
+  return parseOffworkerCache({
+    fetchedAt: input.fetchedAt ?? Date.now(),
+    slug: input.slug,
+    year: input.year,
+    found: stripVia(input.found),
+    ran: input.ran ?? [],
+  });
+}
+
+export async function putOffworkerCache(db: D1Database, bucket: R2Bucket | undefined, payload: OffworkerCache): Promise<void> {
+  const key = companyCacheObjectKey(payload.year, payload.slug);
+  const row: OffworkerCache = {
+    fetchedAt: payload.fetchedAt,
+    slug: payload.slug,
+    year: payload.year,
+    found: stripVia(payload.found),
+    ran: payload.ran,
+  };
+  await db
+    .prepare(
+      `INSERT INTO shipped_company_cache (slug, year, n, found, r2_key, fetched_at)
+       VALUES (?, ?, ?, ?, ?, ?)
+       ON CONFLICT(slug, year) DO UPDATE SET
+         n = excluded.n, found = excluded.found, r2_key = excluded.r2_key, fetched_at = excluded.fetched_at`,
+    )
+    .bind(row.slug, row.year, row.found.length, JSON.stringify(row), key, row.fetchedAt)
+    .run();
+  await bucket?.put(key, JSON.stringify(row), { httpMetadata: { contentType: 'application/json' } });
+  await db.prepare('DELETE FROM shipped_company_queue WHERE slug = ?').bind(row.slug).run().catch(() => undefined);
+}

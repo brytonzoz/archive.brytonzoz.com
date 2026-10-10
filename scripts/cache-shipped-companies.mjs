@@ -1,24 +1,16 @@
 // Harvest first-party company changelogs from GitHub Actions (openai.com 403s from the Worker)
-// and write the unscoped ship lists to D1 + R2. OpenAI is written first so staging can reprint
-// Tibo / thsottiaux / Sam before the rest of the seed list runs.
+// and POST the unscoped lists to the Worker, which writes D1 + R2. OpenAI is written first so
+// staging can reprint Tibo / thsottiaux / Sam before the rest of the seed list runs.
 //
-//   CLOUDFLARE_API_TOKEN=… node --experimental-transform-types scripts/cache-shipped-companies.mjs
+//   ADMIN_PASSWORD=… node --experimental-transform-types scripts/cache-shipped-companies.mjs
 import '../tests/resolve-ts.mjs';
-import { execFileSync, spawnSync } from 'node:child_process';
-import { readFileSync, writeFileSync, unlinkSync } from 'node:fs';
-import { tmpdir } from 'node:os';
-import { join } from 'node:path';
+import { spawnSync } from 'node:child_process';
+import { readFileSync } from 'node:fs';
 
-const ACCOUNT = '480a4eebfef4c5ba2d0e225fde891ae8';
-const D1_IDS = {
-  staging: '9f5fb652-b770-45c6-90a4-74c27ff947eb',
-  production: 'be9007bc-0a13-4a48-8b21-5dd731620cb8',
+const ORIGINS = {
+  staging: 'https://shipped-staging.brytonzoz.com',
+  production: 'https://shipped.brytonzoz.com',
 };
-const R2_BUCKETS = {
-  staging: 'brytonzoz-shipped-staging',
-  production: 'brytonzoz-shipped',
-};
-const STAGING_ORIGIN = 'https://shipped-staging.brytonzoz.com';
 const REPRINT_IDS = '16,11,13';
 
 const pick = (...names) => names.map((n) => process.env[n]).find((v) => typeof v === 'string' && v.trim()) || '';
@@ -30,15 +22,15 @@ const ref = process.env.GITHUB_REF_NAME || '';
 const targetFlag = (process.env.SHIPPED_CACHE_TARGET || (ref === 'main' ? 'both' : 'staging')).toLowerCase();
 const targets = targetFlag === 'both' ? ['staging', 'production'] : targetFlag === 'production' ? ['production'] : ['staging'];
 
-const token = pick('CLOUDFLARE_API_TOKEN');
-if (!token) {
-  console.error('CLOUDFLARE_API_TOKEN is required to write the company cache.');
+const password = pick('ADMIN_PASSWORD');
+if (!password) {
+  console.error('ADMIN_PASSWORD is required to write the company cache through the Worker.');
   process.exit(1);
 }
 
 const seeds = JSON.parse(readFileSync(new URL('../data/shipped-companies.json', import.meta.url), 'utf8'));
 const { harvestCompany } = await import('../worker/shipped-company.ts');
-const { companyCacheObjectKey, stripVia, parseOffworkerCache } = await import('../worker/shipped-company-store.ts');
+const { offworkerPayload } = await import('../worker/shipped-company-store.ts');
 const { emptyAffiliation } = await import('../worker/shipped-affiliation.ts');
 const { memoryXaiMeter } = await import('../worker/shipped-xai.ts');
 
@@ -64,38 +56,47 @@ const env = {
 };
 
 const tinyfish = env.TINYFISH_API_KEY ? { key: env.TINYFISH_API_KEY, meter: tinyfishMeter } : null;
+const adminHeaders = { authorization: `Bearer ${password}`, 'content-type': 'application/json' };
 
-async function d1(target, sql, params = []) {
-  const res = await fetch(`https://api.cloudflare.com/client/v4/accounts/${ACCOUNT}/d1/database/${D1_IDS[target]}/query`, {
-    method: 'POST',
-    headers: { authorization: `Bearer ${token}`, 'content-type': 'application/json' },
-    body: JSON.stringify({ sql, params }),
-  });
+async function adminGet(origin) {
+  const res = await fetch(`${origin}/api/admin/shipped/company-cache`, { headers: adminHeaders, cache: 'no-store' });
   const body = await res.json().catch(() => ({}));
-  if (!res.ok || body.success === false) {
-    throw new Error(body.errors?.[0]?.message || `d1 ${target} ${res.status}`);
+  if (!res.ok) throw new Error(body.error || `admin GET ${res.status}`);
+  return body;
+}
+
+async function adminPut(origin, payload, timeoutMs = 15 * 60 * 1000) {
+  const start = Date.now();
+  let last = 'not-tried';
+  while (Date.now() - start < timeoutMs) {
+    try {
+      const res = await fetch(`${origin}/api/admin/shipped/company-cache`, {
+        method: 'POST',
+        headers: adminHeaders,
+        body: JSON.stringify(payload),
+      });
+      const text = await res.text();
+      let body = {};
+      try {
+        body = JSON.parse(text);
+      } catch {
+        body = { error: text.slice(0, 160) };
+      }
+      if (res.ok && body.ok) return body;
+      last = `${res.status} ${body.error || text.slice(0, 80)}`;
+    } catch (error) {
+      last = error.message;
+    }
+    console.log(`waiting for Worker ingest (${last})`);
+    await new Promise((ok) => setTimeout(ok, 20_000));
   }
-  return body.result?.[0]?.results ?? [];
+  throw new Error(`Worker ingest timed out: ${last}`);
 }
 
-async function ensureTables(target) {
-  await d1(
-    target,
-    `CREATE TABLE IF NOT EXISTS shipped_company_cache (
-      slug TEXT NOT NULL, year INTEGER NOT NULL, n INTEGER NOT NULL, found TEXT NOT NULL,
-      r2_key TEXT, fetched_at INTEGER NOT NULL, PRIMARY KEY (slug, year))`,
-  );
-  await d1(
-    target,
-    `CREATE TABLE IF NOT EXISTS shipped_company_queue (
-      slug TEXT PRIMARY KEY, company TEXT NOT NULL, product TEXT, site TEXT, queued_at INTEGER NOT NULL)`,
-  );
-}
-
-async function queuedCompanies(target) {
+async function queuedCompanies(origin) {
   try {
-    const rows = await d1(target, 'SELECT slug, company, product, site FROM shipped_company_queue');
-    return rows.map((row) => ({
+    const body = await adminGet(origin);
+    return (body.queue || []).map((row) => ({
       company: row.company,
       products: row.product ? [row.product] : [],
       sites: row.site ? [row.site] : [],
@@ -103,51 +104,6 @@ async function queuedCompanies(target) {
   } catch {
     return [];
   }
-}
-
-function putR2(bucket, key, payload) {
-  const file = join(tmpdir(), `shipped-company-${Date.now()}-${Math.random().toString(16).slice(2)}.json`);
-  writeFileSync(file, JSON.stringify(payload));
-  try {
-    execFileSync('npx', ['wrangler', 'r2', 'object', 'put', `${bucket}/${key}`, '--file', file, '--remote', '--content-type', 'application/json'], {
-      stdio: ['ignore', 'inherit', 'inherit'],
-      env: process.env,
-    });
-  } finally {
-    try {
-      unlinkSync(file);
-    } catch {
-      /* ignore */
-    }
-  }
-}
-
-async function writeCache(target, payload) {
-  const key = companyCacheObjectKey(payload.year, payload.slug);
-  let foundJson = JSON.stringify(payload);
-  try {
-    await d1(
-      target,
-      `INSERT INTO shipped_company_cache (slug, year, n, found, r2_key, fetched_at)
-       VALUES (?, ?, ?, ?, ?, ?)
-       ON CONFLICT(slug, year) DO UPDATE SET
-         n = excluded.n, found = excluded.found, r2_key = excluded.r2_key, fetched_at = excluded.fetched_at`,
-      [payload.slug, payload.year, payload.found.length, foundJson, key, payload.fetchedAt],
-    );
-  } catch (error) {
-    console.warn(`${target} D1 write of ${payload.slug} failed (${error.message}); writing R2 and a stub row.`);
-    foundJson = JSON.stringify({ ...payload, found: [] });
-    await d1(
-      target,
-      `INSERT INTO shipped_company_cache (slug, year, n, found, r2_key, fetched_at)
-       VALUES (?, ?, ?, ?, ?, ?)
-       ON CONFLICT(slug, year) DO UPDATE SET
-         n = excluded.n, found = excluded.found, r2_key = excluded.r2_key, fetched_at = excluded.fetched_at`,
-      [payload.slug, payload.year, payload.found.length, foundJson, key, payload.fetchedAt],
-    ).catch((err) => console.warn(`${target} stub D1 write failed: ${err.message}`));
-  }
-  putR2(R2_BUCKETS[target], key, payload);
-  await d1(target, 'DELETE FROM shipped_company_queue WHERE slug = ?', [payload.slug]).catch(() => undefined);
 }
 
 function affiliationFor(seed) {
@@ -190,14 +146,7 @@ async function harvestOne(seed) {
     tinyfish,
     gapFillX: false,
   });
-  const found = stripVia(harvested.found).filter((item) => item && item.name);
-  const payload = parseOffworkerCache({
-    fetchedAt: Date.now(),
-    slug,
-    year,
-    found,
-    ran: harvested.ran,
-  });
+  const payload = offworkerPayload({ slug, year, found: harvested.found, ran: harvested.ran });
   if (!payload) {
     console.warn(`  ${seed.company}: 0 usable ships (${harvested.ran.join(', ') || 'no sources'})`);
     return null;
@@ -206,7 +155,7 @@ async function harvestOne(seed) {
   return payload;
 }
 
-async function waitForWorkerCache(origin, timeoutMs = 12 * 60 * 1000) {
+async function waitForWorkerCache(origin, timeoutMs = 8 * 60 * 1000) {
   const start = Date.now();
   while (Date.now() - start < timeoutMs) {
     try {
@@ -218,16 +167,12 @@ async function waitForWorkerCache(origin, timeoutMs = 12 * 60 * 1000) {
     } catch (error) {
       console.log(`waiting for Worker (${error.message})`);
     }
-    await new Promise((ok) => setTimeout(ok, 20_000));
+    await new Promise((ok) => setTimeout(ok, 15_000));
   }
   return false;
 }
 
 function reprintLeaders(origin) {
-  if (!process.env.ADMIN_PASSWORD) {
-    console.warn('ADMIN_PASSWORD missing; skip reprint.');
-    return false;
-  }
   const script = new URL('./reprint-shipped.mjs', import.meta.url).pathname;
   const result = spawnSync(process.execPath, ['--no-warnings', script], {
     env: {
@@ -240,10 +185,8 @@ function reprintLeaders(origin) {
   return result.status === 0;
 }
 
-for (const target of targets) await ensureTables(target);
-
 const queued = [];
-for (const target of targets) queued.push(...(await queuedCompanies(target)));
+for (const target of targets) queued.push(...(await queuedCompanies(ORIGINS[target])));
 const companies = mergeSeeds([...(seeds.companies || []), ...queued]);
 if (!companies.length) {
   console.log('No companies to harvest.');
@@ -255,14 +198,14 @@ for (const seed of companies) {
   const payload = await harvestOne(seed);
   if (!payload) continue;
   for (const target of targets) {
-    await writeCache(target, payload);
-    console.log(`wrote ${payload.slug} → ${target} (${payload.found.length})`);
+    const written = await adminPut(ORIGINS[target], payload);
+    console.log(`wrote ${payload.slug} → ${target} (${written.n})`);
   }
   if (payload.slug === 'openai' && targets.includes('staging')) {
     openaiWritten = true;
-    const ready = await waitForWorkerCache(STAGING_ORIGIN);
+    const ready = await waitForWorkerCache(ORIGINS.staging);
     console.log(ready ? 'staging Worker sees company-cache' : 'staging Worker did not list company-cache yet; reprinting anyway');
-    reprintLeaders(STAGING_ORIGIN);
+    reprintLeaders(ORIGINS.staging);
   }
 }
 

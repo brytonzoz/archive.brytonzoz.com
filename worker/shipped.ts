@@ -50,7 +50,7 @@ import {
   type SaleKind,
 } from '../lib/shipped-upgrade';
 import { brandIcon, candidatesFromIdentity, clean, faviconUrl, gather, hostOf, readSite, resolveIdentity, tinyfishAccess, type SourceEnv } from './shipped-sources';
-import { makeCompanyStore } from './shipped-company-store';
+import { makeCompanyStore, parseOffworkerCache, putOffworkerCache } from './shipped-company-store';
 import { TINYFISH_DAILY, type TinyfishKind, type TinyfishMeter } from './shipped-tinyfish';
 import { checkFetchUrl, finalUrl } from './shipped-fetch';
 import {
@@ -2108,6 +2108,29 @@ export async function adminShipped(request: Request, env: ShippedEnv): Promise<R
     const object = bid?.logo_key && env.SHIPPED ? await env.SHIPPED.get(bid.logo_key) : null;
     if (!object) return new Response('Not found', { status: 404 });
     return png(object.body, 'no-store');
+  }
+  if (url.pathname === '/api/admin/shipped/company-cache') {
+    if (request.method === 'GET') {
+      const [queue, cachedRows] = await Promise.all([
+        db.prepare('SELECT slug, company, product, site FROM shipped_company_queue').all<{ slug: string; company: string; product: string | null; site: string | null }>(),
+        db.prepare('SELECT slug, year, n, fetched_at FROM shipped_company_cache').all<{ slug: string; year: number; n: number; fetched_at: number }>(),
+      ]);
+      return json({ ok: true, queue: queue.results, cached: cachedRows.results });
+    }
+    if (request.method !== 'POST') return json({ error: 'method' }, 405);
+    const body = await readJsonCapped(request, 400_000);
+    if (!body) return json({ error: 'bad-request' }, 400);
+    const parsed = parseOffworkerCache({
+      fetchedAt: typeof body.fetchedAt === 'number' ? body.fetchedAt : Date.now(),
+      slug: body.slug,
+      year: body.year,
+      found: body.found,
+      ran: body.ran,
+    });
+    if (!parsed) return json({ error: 'bad-cache' }, 400);
+    await putOffworkerCache(db, env.SHIPPED, parsed);
+    await dropListedCache(env);
+    return json({ ok: true, slug: parsed.slug, n: parsed.found.length });
   }
   if (url.pathname !== '/api/admin/shipped') return json({ error: 'not-found' }, 404);
 

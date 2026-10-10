@@ -264,8 +264,10 @@ test('notes must use the final post-filter count', () => {
     source: 'changelog',
   }));
   const note = ai.groundedNote(items, 0, 'Tibo', [], { role: 'ceo', company: 'OpenAI' });
-  assert.match(note, /12/);
-  assert.doesNotMatch(note, /\b37\b/);
+  assert.match(note, /OpenAI|Tibo|Ship/i);
+  assert.doesNotMatch(note, /\b37\b|\b12 public\b|\blines\b/i);
+  assert.equal(ai.noteFailsVoice(note), false);
+  assert.equal(polish.noteCountMismatch(note, 12), false);
 });
 
 test('changelog rows no longer print sitemap lastmod and docs nav slugs stay out of sitemaps', () => {
@@ -323,6 +325,7 @@ test('flagship company launches survive the title gate with a logged keep', () =
   const names = items.map((item) => item.name);
   assert.ok(names.some((name) => /cursor 3/i.test(name)), JSON.stringify(names));
   assert.ok(names.some((name) => /composer 2/i.test(name)), JSON.stringify(names));
+  assert.equal(items.find((item) => /composer 2/i.test(item.name))?.date, '2026-03-19');
   assert.equal(names.filter((name) => /graphite/i.test(name)).length, 0, JSON.stringify(names));
   assert.ok(names.some((name) => /^bugbot$/i.test(name)), JSON.stringify(names));
   assert.ok(names.some((name) => /^origin$/i.test(name)), JSON.stringify(names));
@@ -369,6 +372,9 @@ test('repro bench demo and profile repos are not ships; @shoojs rolls into SHOO'
   ]);
   assert.equal(rolled.length, 1);
   assert.equal(rolled[0].name, 'SHOO');
+  assert.equal(repos.isKnownPackageFamily('@shoojs/core'), true);
+  assert.equal(repos.isKnownPackageFamily('shoo'), true);
+  assert.equal(repos.isShipRepo({ name: '@shoojs/core', description: '', stars: 0, homepage: null }, 't3dotgg'), true);
 });
 
 test('owned pin dates keep 2026 first launches and drop pre-2026 evidence', () => {
@@ -464,7 +470,8 @@ test('versioned releases always roll into the monthly line; flagships keep real 
   ]);
   const names = rolled.map((item) => item.name);
   assert.equal(names.some((name) => /v1\.0\.|v2026|1\.9\.0|1\.12\.0/i.test(name)), false, JSON.stringify(names));
-  assert.ok(names.some((name) => /cursor sdk bridge · 1 update in jul/i.test(name)), JSON.stringify(names));
+  assert.ok(names.some((name) => /^cursor sdk bridge$/i.test(name)), JSON.stringify(names));
+  assert.equal(names.some((name) => /1 update in jul/i.test(name)), false, JSON.stringify(names));
   assert.ok(names.some((name) => /cursor sdk bridge · 4 updates in aug/i.test(name)), JSON.stringify(names));
   assert.ok(names.some((name) => /cursor sdk bridge · 2 updates in sep/i.test(name)), JSON.stringify(names));
   assert.ok(names.some((name) => /cursor · \d+ updates? in sep/i.test(name)), JSON.stringify(names));
@@ -511,6 +518,78 @@ test('pricing, token-efficiency, person names, and code identifiers never print'
 test('Codex titles lose the marketing clause and launch-notes suffix', () => {
   assert.match(polish.cleanShipTitle('CODEX, OUR CODE GENERATION CLI TOOL'), /codex cli/i);
   assert.match(polish.cleanShipTitle('CODEX FOR CHROME LAUNCH NOTES'), /^codex for chrome$/i);
+});
+
+test('removals, docs, handles, and generic updates are not ships', () => {
+  assert.equal(polish.isNotAShipTitle('@CHATGPT'), true);
+  assert.equal(polish.isNotAShipTitle('CURSOR INTO THE CHATGPT DESKTOP APP'), true);
+  assert.equal(polish.isNotAShipTitle('CODEX MCP SERVER REMOVED'), true);
+  assert.equal(polish.isNotAShipTitle('CODEX ANALYTICS GOVERNANCE DOCS UPDATE'), true);
+  assert.equal(polish.isNotAShipTitle('CODEX MODELS FOR MODEL AVAILABILITY'), true);
+  assert.equal(polish.isNotAShipTitle('CODEX APP UPDATES'), true);
+  assert.equal(polish.isNotAShipTitle('GPT-5.5 AND CODEX APP UPDATES'), true);
+  assert.equal(polish.isNotAShipTitle('CHATGPT FOR IOS UPDATES: REDESIGNED'), true);
+  assert.equal(polish.isNotAShipTitle('Codex app · 26 updates in Feb'), false);
+  assert.equal(polish.isJunkTitle('CODEX APP UPDATES'), true);
+  assert.equal(polish.cleanShipTitle('CODEX MCP SERVER REMOVED'), '');
+  const items = polish.polishCandidates(
+    [
+      found({ name: '@CHATGPT', date: '2026-08-01', link: 'https://openai.com/chatgpt' }),
+      found({ name: 'CODEX MCP SERVER REMOVED', date: '2026-08-02', link: 'https://developers.openai.com/codex/mcp' }),
+      found({ name: 'CODEX ANALYTICS GOVERNANCE DOCS UPDATE', date: '2026-08-03', link: 'https://developers.openai.com/codex/docs' }),
+      found({ name: 'CODEX APP UPDATES', date: '2026-08-04', link: 'https://developers.openai.com/codex/app' }),
+      found({ name: 'GPT-5.5 AND CODEX APP UPDATES', date: '2026-08-05', link: 'https://developers.openai.com/codex/gpt' }),
+      found({ name: 'CHATGPT FOR IOS UPDATES: REDESIGNED', date: '2026-08-06', link: 'https://openai.com/chatgpt/ios' }),
+      found({ name: 'CURSOR INTO THE CHATGPT DESKTOP APP', date: '2026-08-07', link: 'https://openai.com/chatgpt/desktop' }),
+      found({ name: 'CODEX MODELS FOR MODEL AVAILABILITY', date: '2026-08-08', link: 'https://developers.openai.com/codex/models' }),
+      found({ name: 'GitLab support', date: '2026-08-19', link: 'https://developers.openai.com/codex/changelog#gitlab-19' }),
+      found({ name: 'GitLab support in Codex', date: '2026-08-20', link: 'https://developers.openai.com/codex/changelog#gitlab-20' }),
+      found({ name: 'Codex CLI', date: '2026-02-14', link: 'https://openai.com/codex' }),
+    ],
+    { year: 2026, who: 'Tibo' },
+  );
+  const names = items.map((item) => item.name);
+  assert.equal(names.some((name) => /@chatgpt|removed|docs update|app updates|redesigned|into the|model availability/i.test(name)), false, JSON.stringify(names));
+  assert.ok(names.some((name) => /codex cli/i.test(name)), JSON.stringify(names));
+  const tape = ai
+    .harvestItems(
+      {
+        found: items,
+        web: [],
+        pages: [],
+        site: null,
+        profile: { name: 'Tibo', bio: '', site: null, x: 'tibo_maker', github: null },
+        ran: [],
+        failed: [],
+        stats: [],
+      },
+      2026,
+    )
+    .map((item) => item.name);
+  assert.equal(tape.filter((name) => /gitlab/i.test(name)).length, 1, JSON.stringify(tape));
+});
+
+test('undated changelog phrases drop; Composer 2 keeps the March launch day', () => {
+  assert.equal(polish.isChangelogPhrase('Richer JavaScript representation', null), true);
+  assert.equal(polish.isChangelogPhrase('Typed middleware', null), true);
+  assert.equal(polish.isChangelogPhrase('Richer JavaScript representation', '2026-04-01'), false);
+  assert.equal(polish.displayShipName('CODEX APP'), 'Codex app');
+  assert.equal(polish.displayShipName('CURSOR 3'), 'Cursor 3');
+  assert.equal(polish.displayShipName('CHATGPT IMAGES'), 'ChatGPT Images');
+  const items = polish.polishCandidates(
+    [
+      found({ name: 'Richer JavaScript representation', date: null, source: 'changelog', link: 'https://zod.dev/changelog#richer' }),
+      found({ name: 'Typed middleware', date: null, source: 'changelog', link: 'https://zod.dev/changelog#typed' }),
+      found({ name: 'Zod', date: '2026-01-15', source: 'npm', link: 'https://www.npmjs.com/package/zod' }),
+      found({ name: 'Composer 2', date: '2026-08-14', link: 'https://cursor.com/blog/composer-2' }),
+      found({ name: 'SHOO', date: '2026-03-01', source: 'npm', link: 'https://www.npmjs.com/package/@shoojs/core' }),
+    ],
+    { year: 2026, who: 'Colin' },
+  );
+  const names = items.map((item) => item.name);
+  assert.equal(names.some((name) => /richer|typed middleware/i.test(name)), false, JSON.stringify(names));
+  assert.equal(items.find((item) => /composer 2/i.test(item.name))?.date, '2026-03-19');
+  assert.ok(names.some((name) => /^shoo$/i.test(name)), JSON.stringify(names));
 });
 
 test('archive.org/RDAP product hosts beat an npm publish day for the product itself', () => {

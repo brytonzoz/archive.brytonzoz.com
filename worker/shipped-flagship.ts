@@ -163,7 +163,7 @@ export function isFlagshipYearKeep(item: FlagshipItem, year: number): boolean {
 
 const FLAGSHIP_LAUNCH_DAY: Record<string, string> = {
   cursor3: '2026-04-02',
-  composer2: '2026-08-14',
+  composer2: '2026-03-19',
   bugbot: '2026-06-01',
   origin: '2026-09-14',
 };

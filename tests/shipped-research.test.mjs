@@ -155,7 +155,8 @@ test('cashier note and stats are specific to the items, never stock copy', () =>
     { role: 'ceo', company: 'OpenAI' },
   );
   assert.match(ceo, /OpenAI|4|company/i);
-  assert.doesNotMatch(ceo, /^CODEX/i);
+  assert.doesNotMatch(ceo, /^CODEX\s+APP/i);
+  assert.match(ceo, /OpenAI|Sam|ChatGPT/i);
   const stats = ai.formatStats(items);
   assert.match(stats[0], /3 launches/);
   assert.match(stats[0], /GitHub/);
@@ -180,6 +181,12 @@ test('cashier note and stats are specific to the items, never stock copy', () =>
   assert.equal(ai.cashierNoteLooksCanned('runs on a wish and a prayer'), true);
   assert.equal(ai.cashierNoteLooksCanned('Nobody asked for ChatGPT for Research.'), true);
   assert.equal(ai.cashierNoteLooksCanned('200/mo public revenue. Same maker, more SKUs.'), true);
+  assert.equal(ai.noteFailsVoice("Tibo's year is CODEX APP through FASTER STEERING IN CODEX: 55 public lines, all theirs."), true);
+  assert.equal(ai.noteFailsVoice("Jack's year lives at https://www.npmjs.com/package/postbridge-cli."), true);
+  assert.equal(ai.noteFailsVoice('Codex grew long-running work this year, and Tibo\'s agents now stay clocked in overnight.'), false);
+  assert.doesNotMatch(note, /\blines\b|https?:\/\/|CODEX APP/i);
+  assert.doesNotMatch(one, /\blines\b|https?:\/\/|www\./i);
+  assert.doesNotMatch(ceo, /\blines\b|https?:\/\/|\b\d+\s+public\s+ships\b/i);
   const draft = ai.validateDraft(
     {
       items: items.map((item) => ({ name: item.name, description: item.description, date: item.date, status: item.status, link: item.link })),

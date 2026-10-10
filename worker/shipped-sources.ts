@@ -39,7 +39,7 @@ import {
   type XProfile,
 } from './shipped-identity';
 import { hostNamesOwner, ownerFromProfile, ownerTokens } from './shipped-ownership';
-import { isJunkProductName, isJunkRepoName, isShipRepo, looksLikeCodeIdentifier, looksLikePersonName, looksLikeProductReadme } from './shipped-repos';
+import { isJunkProductName, isJunkRepoName, isKnownPackageFamily, isShipRepo, looksLikeCodeIdentifier, looksLikePersonName, looksLikeProductReadme } from './shipped-repos';
 import {
   compactNumber,
   describeWithStat,
@@ -816,6 +816,7 @@ const npm: SourceProvider = {
         if (!inYear(day(entry.package.date), year)) return false;
         const name = String(entry.package.name ?? '');
         const desc = String(entry.package.description ?? '');
+        if (isKnownPackageFamily(name)) return true;
         if (isJunkProductName(name, users[0], profile.name)) return false;
         if (looksLikeCodeIdentifier(name) || looksLikePersonName(name, profile.name)) return false;
         if (desc.trim().length < 12 || !looksLikeProductReadme(desc)) return false;
@@ -834,7 +835,7 @@ const npm: SourceProvider = {
       const link = publicUrl(links.npm);
       const homepage = publicUrl(links.homepage);
       const weekly = Number(downloads[i]?.downloads) || 0;
-      if (!weekly && !homepage) return null;
+      if (!isKnownPackageFamily(String(pkg.name ?? '')) && !weekly && !homepage) return null;
       return {
         name: clean(pkg.name, 60),
         description: clean(pkg.description, 140),

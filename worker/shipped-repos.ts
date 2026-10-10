@@ -112,7 +112,14 @@ export function isJunkRepoName(name: string, login?: string | null, who?: string
 }
 
 /** Repro/demo/profile names are not ships on any source (`yes`, `t3dotgg`, `shoo-vite-demo`). */
+/** Known package families that must stay even without weekly downloads or a homepage. */
+export function isKnownPackageFamily(name: string): boolean {
+  const n = name.replace(/\.git$/, '').trim().toLowerCase();
+  return n === 'shoo' || n === '@shoojs' || n.startsWith('@shoojs/');
+}
+
 export function isJunkProductName(name: string, login?: string | null, who?: string | null): boolean {
+  if (isKnownPackageFamily(name)) return false;
   const n = name.replace(/\.git$/, '');
   const compact = n.replace(/[\s._-]+/g, '').toLowerCase();
   if (login && compact === login.replace(/[\s._-]+/g, '').toLowerCase()) return true;
@@ -145,6 +152,7 @@ export function isShipRepo(
   },
   login?: string | null,
 ): boolean {
+  if (isKnownPackageFamily(row.name)) return true;
   if (isJunkRepoName(row.name, login)) return false;
   const desc = (row.description || row.readme || '').replace(/\s+/g, ' ').trim();
   if (desc.length < 12 || !looksLikeProductReadme(desc)) return false;

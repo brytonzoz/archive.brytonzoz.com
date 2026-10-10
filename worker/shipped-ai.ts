@@ -11,7 +11,7 @@ import { shipName } from './shipped-changelog';
 import { shareKeywords } from './shipped-decisions';
 import { ownerFromProfile } from './shipped-ownership';
 import { flagshipLaunchName, isFlagshipYearKeep, isJoinOrAcquire, isPriorYearJoin, logFlagshipGate } from './shipped-flagship';
-import { cleanDescription, cleanShipTitle, cleanStatus, noteCountMismatch, polishCandidates, prettyBrand } from './shipped-polish';
+import { cleanDescription, cleanShipTitle, cleanStatus, displayShipName, noteCountMismatch, polishCandidates, prettyBrand } from './shipped-polish';
 import type { Affiliation } from './shipped-affiliation';
 import { RECEIPT_BUDGET_MICROS, formatReceiptStats, searchBudget, type SourcedStat } from './shipped-research';
 
@@ -191,7 +191,7 @@ export function formatStats(items: { source?: string }[], sourced: SourcedStat[]
 }
 
 const TEMPLATE_NOTE =
-  /is first on the tape|led the year|closed the year|set the tone|through-line|Receipt paper running low|Someone likes the publish button|\d+\s+launches?\s+·|night shift|publish button|\bthe tape\b|\bthe register\b|stock the shelves|counted receipts|got the paperwork|rings the publish|cashier has seen worse|mostly i just|wish and a prayer|nobody asked|same maker, more skus|runs on a wish|plus 0 more|github stars (llm|blog) for |supposed to be quiet|still be quoting|earned the grin|kept the year interesting|plus \d+ more, and /i;
+  /is first on the tape|led the year|closed the year|set the tone|through-line|Receipt paper running low|Someone likes the publish button|\d+\s+launches?\s+·|night shift|publish button|\bthe tape\b|\bthe register\b|stock the shelves|counted receipts|got the paperwork|rings the publish|cashier has seen worse|mostly i just|wish and a prayer|nobody asked|same maker, more skus|runs on a wish|plus 0 more|github stars (llm|blog) for |supposed to be quiet|still be quoting|earned the grin|kept the year interesting|plus \d+ more, and |\byear is\b.+\bthrough\b|\b\d+\s+public\s+(ships?|lines?)\b|\bpublic lines\b/i;
 
 /** A number in the note must be the item count, or a sourced stars/downloads figure that is labeled. */
 export function noteMisusesStats(note: string, count: number, stats: string[] = []): boolean {
@@ -209,23 +209,43 @@ export function noteMisusesStats(note: string, count: number, stats: string[] = 
   return numbers.some((n) => n !== count && (n < 2000 || n > 2100) && n > 1);
 }
 
+/** URLs, raw stat dumps, ALL-CAPS tape names, or the word "lines" — a human note never does this. */
+export function noteFailsVoice(note: string): boolean {
+  const text = note.replace(/\s+/g, ' ').trim();
+  if (!text) return true;
+  if (/https?:\/\/|\bwww\./i.test(text)) return true;
+  if (/\b[\w.-]+\.(com|io|dev|ai|org|net|app)\b/i.test(text)) return true;
+  if (/\blines\b/i.test(text)) return true;
+  if (/\byear is\b/i.test(text) && /\bthrough\b/i.test(text)) return true;
+  if (/\b\d+\s+public\s+(ships?|lines?)\b/i.test(text)) return true;
+  if (/\b[A-Z]{3,}(?:\s+[A-Z0-9][A-Z0-9.+-]*){1,}\b/.test(text)) return true;
+  return false;
+}
+
 /** Notes that read like a leftover slogan, a fallback stat line, or the same cashier bit. */
 export function cashierNoteLooksCanned(note: string): boolean {
   const text = note.trim();
   if (!text) return true;
-  if (TEMPLATE_NOTE.test(text) || AI_VOICE.test(text)) return true;
+  if (TEMPLATE_NOTE.test(text) || AI_VOICE.test(text) || noteFailsVoice(text)) return true;
   return false;
 }
 
 function statPhrase(line: string): string {
-  const head = line.replace(/\s*·\s*.*$/, '').replace(/\s+/g, ' ').trim();
+  const head = line
+    .replace(/\s*·\s*.*$/, '')
+    .replace(/https?:\/\/\S+/gi, '')
+    .replace(/\b[\w.-]+\.(com|io|dev|ai|org|net|app)(?:\/\S*)?/gi, '')
+    .replace(/\s+/g, ' ')
+    .trim();
   const numbered = head.match(/^((?:[\d.,]+[kmb]?)\s+(?:github stars|stars|upvotes|weekly downloads|downloads|users|hn points))/i);
-  return numbered ? numbered[1] : head;
+  if (numbered) return numbered[1];
+  const hunt = head.match(/^((?:[\d.,]+[kmb]?)\s+(?:product hunt\s+)?(?:upvotes|stars|downloads))/i);
+  return hunt ? hunt[1] : head.replace(/\b[\w.-]+\.(com|io|dev|ai|org|net|app)\b/gi, '').trim();
 }
 
 function statAbout(line: string): string {
-  const head = line.replace(/\s*·\s*.*$/, '').replace(/\s+/g, ' ').trim();
-  return head.replace(/^[\d.,]+[kmb]?\s+(?:github stars|stars|upvotes|weekly downloads|downloads|users|hn points)\s*/i, '').trim();
+  const head = line.replace(/\s*·\s*.*$/, '').replace(/https?:\/\/\S+/gi, '').replace(/\s+/g, ' ').trim();
+  return head.replace(/^[\d.,]+[kmb]?\s+(?:github stars|stars|product hunt\s+upvotes|upvotes|weekly downloads|downloads|users|hn points)\s*/i, '').trim();
 }
 
 const GENERIC_NOTE_NAME = /^(blog|llm|site|website|home|docs|readme|app|cli|api|web|www)$/i;
@@ -256,21 +276,22 @@ function distinctiveNames(items: DraftItem[]): string[] {
   return out;
 }
 
-/** Warm-roast, one sentence, grounded in this person's actual ships. Never a stock line. */
+/** Warm-roast, one or two sentences, grounded in this person's actual ships. Never a stock line. */
 export function groundedNote(items: DraftItem[], seed: number, profileName = '', stats: string[] = [], ctx: NoteContext = {}): string {
   const real = items.filter((item) => item.source !== 'none' && !GENERIC_NOTE_NAME.test(item.name.trim()));
   if (!real.length) return POTENTIAL_NOTES[seed % POTENTIAL_NOTES.length];
   const who = (ctx.who || profileName).split(/\s+/).filter(Boolean)[0] ?? '';
   const company = prettyBrand(ctx.company, null) || (ctx.company || '').trim();
-  const named = distinctiveNames(real);
-  const headline = named[0] ?? real[0]!.name;
-  const closer = named[named.length - 1] ?? headline;
+  const named = distinctiveNames(real).map(displayShipName);
+  const headline = named[0] ?? displayShipName(real[0]!.name);
+  const other = named.find((name) => name !== headline) ?? (named.length > 1 ? named[named.length - 1] : '');
+  const pair = other && other !== headline ? `${headline} and ${other}` : headline;
   if ((ctx.role === 'ceo' || ctx.role === 'founder') && real.length >= 4) {
     const label = company || who || 'They';
     const variants = [
-      `${label} put ${real.length} public ships on the year, from ${headline} through ${closer}.`,
-      `${who ? `${who} ran ` : ''}${label} across ${real.length} public lines, with ${headline} still first on the list.`,
-      `${label}'s ${real.length} public ships this year run from ${headline} to ${closer}.`,
+      `${label} made ${headline} the loud one${other ? `, then slipped ${other} in beside it` : ''}.`,
+      `${who ? `${who} kept ` : ''}${label} busy: ${headline} first${other ? `, ${other} later` : ''}.`,
+      `${label} bet on ${headline}${other ? ` and ${other}` : ''}. That was the year.`,
     ];
     return clipSentence(variants[seed % variants.length], 140);
   }
@@ -278,6 +299,7 @@ export function groundedNote(items: DraftItem[], seed: number, profileName = '',
     .map((line) => {
       const phrase = statPhrase(line);
       if (!phrase || !/\b(stars|upvotes|downloads|users)\b/i.test(phrase) || /\brepos\b/i.test(line) || /\/mo\b/i.test(line)) return null;
+      if (/https?:\/\/|\b[\w.-]+\.(com|io|dev|ai|org|net|app)\b/i.test(phrase)) return null;
       const about = statAbout(line);
       const match = about
         ? real.find((item) => {
@@ -293,26 +315,26 @@ export function groundedNote(items: DraftItem[], seed: number, profileName = '',
     })
     .find((row): row is { phrase: string; item: DraftItem } => Boolean(row));
   if (paired) {
+    const ship = displayShipName(paired.item.name);
     const variants = [
-      `${who ? `${who}'s ` : ''}${paired.item.name} is the one carrying ${paired.phrase} this year.`,
-      `${paired.item.name} still holds ${paired.phrase}${who ? `, which is very ${who}` : ''}.`,
-      `${who || paired.item.name} put ${paired.phrase} on ${paired.item.name} and let the other lines ride along.`,
+      `${ship} is the one carrying ${paired.phrase} this year${who ? `, which is very ${who}` : ''}.`,
+      `${who ? `${who}'s ` : ''}${ship} still holds ${paired.phrase}.`,
+      `${ship} sits at ${paired.phrase}. ${who || 'They'} let everything else be quieter.`,
     ];
     return clipSentence(variants[seed % variants.length], 140);
   }
   if (real.length === 1) {
-    const only = real[0]?.name ?? headline;
     const variants = [
-      `${who ? `${who} printed ` : ''}${only} as the only public ship this year.`,
-      `Just ${only} this year${who ? ` for ${who}` : ''}, printed as a single line.`,
-      `${only} stands alone on ${who ? `${who}'s ` : 'the '}receipt. Nothing else made the cut.`,
+      `${who ? `${who} spent the year on ` : ''}${headline}. One ship, no encore.`,
+      `Just ${headline} this year${who ? ` for ${who}` : ''}. Nothing else made the cut.`,
+      `${headline} stands alone${who ? ` on ${who}'s year` : ''}. That was the whole show.`,
     ];
     return clipSentence(variants[seed % variants.length], 140);
   }
   const variants = [
-    `${who ? `${who}'s ` : ''}year is ${headline}${closer !== headline ? ` through ${closer}` : ''}: ${real.length} public lines, all theirs.`,
-    `${headline} opens ${who ? `${who}'s ` : 'the '}receipt${closer !== headline ? `; ${closer} closes it` : ''}. ${real.length} lines, all theirs.`,
-    `${who || 'They'} shipped ${headline}${named[1] ? ` and ${named[1]}` : ''} this year — ${real.length} lines, none borrowed.`,
+    `${who ? `${who} kept stacking ` : ''}${pair}.`,
+    `${headline} is the one people will remember${who ? ` from ${who}` : ''}${other ? `; ${other} is the sleeper` : ''}.`,
+    `${who || 'They'} spent the year on ${headline}${other ? `, then ${other}` : ''}.`,
   ];
   return clipSentence(variants[(seed + real.length) % variants.length], 140);
 }
@@ -422,7 +444,7 @@ function finish(items: DraftItem[], note: string, seed: number, modulesRaw?: unk
   const whoNote =
     ok(note) &&
     !cashierNoteLooksCanned(note) &&
-    /\d/.test(note) &&
+    !noteFailsVoice(note) &&
     !noteCountMismatch(note, sorted.length) &&
     !noteMisusesStats(note, sorted.length, Array.isArray(statsRaw) ? statsRaw : stats)
       ? note
@@ -454,35 +476,40 @@ export function demoReceipt(gathered: Gathered, year: number, seed: number): Dra
 }
 
 function noteOnlyPrompt(subject: Subject, items: DraftItem[], stats: string[], year: number, affiliation?: Affiliation | null): string {
-  const tape = items.slice(0, 40).map((item) => ({ name: item.name, description: item.description, date: item.date, via: item.via ?? undefined }));
+  const tape = items.slice(0, 40).map((item) => ({
+    name: displayShipName(item.name),
+    description: item.description,
+    date: item.date,
+  }));
   const who = {
     name: clean(subject.display, 60),
     role: affiliation?.role || undefined,
     company: affiliation?.company || undefined,
   };
-  return `<found>\n${JSON.stringify({ who, year, items: tape, stats })}\n</found>\nWrite the cashier note for the SHIPPED IN ${year} receipt. JSON only: {"note":""}`;
+  return `<found>\n${JSON.stringify({ who, year, items: tape, stats })}\n</found>\nWrite the cashier note for the SHIPPED IN ${year} receipt from this final item list. JSON only: {"note":""}`;
 }
 
 function noteOnlySystem(year: number, affiliation?: Affiliation | null, count = 0) {
   const ceo =
     affiliation && (affiliation.role === 'ceo' || affiliation.role === 'founder')
-      ? `This person is the ${affiliation.role} of ${affiliation.company || 'the company'}. Summarize the COMPANY-WIDE year (several products, a count). Never write a note that only names one product.`
+      ? `This person is the ${affiliation.role} of ${affiliation.company || 'the company'}. Speak to the company-wide year. Name two real ships, never only one.`
       : '';
   return [
     `You write only the cashier note on a SHIPPED IN ${year} receipt. The items are already printed — do not list or invent any.`,
-    'One sentence, warm-roast tone: playful and admiring, never mean. Built on the single most impressive REAL fact in <found> (a count, a big launch, or a streak). Max ~140 characters. Never cut a word. Copy the fact exactly — no misread stats, no "/mo" glued onto a product name.',
+    'One or two sentences. A human voice: wry, specific, a sharp friend. Max ~140 characters. Never cut a word.',
+    'Name 1 or 2 real ships from the final item list, in natural case (Codex app, Cursor 3, ChatGPT Images). Never ALL CAPS product names.',
+    'Never write a URL, a host, the word "lines", or a raw stat string. Prefer no number. A number is allowed only when copied from <found>.stats and labeled as stars or downloads.',
+    'Do not recap the year as "from X through Y" or "N public ships".',
     ceo,
     'Good: "Codex grew long-running work this year, and Tibo\'s agents now stay clocked in overnight."',
     'Good: "cn is at 8.2M weekly downloads. The other packages are just opening acts."',
-    'Good: "104 public Replit ships later and Amjad still treats shipped like a first draft."',
-    'Good: "OpenAI put 80 public ships on the year, and none of them get the whole note."',
+    'Good: "Cursor 3 landed in April, and Michael still treats Composer 2 like the real headline."',
+    'Bad: "year is CODEX APP through FASTER STEERING: 55 public lines, all theirs"',
+    'Bad: "Jack\'s year lives at https://www.npmjs.com/package/postbridge-cli"',
     'Bad: "runs on a wish and a prayer"',
     'Bad: "Nobody asked for ChatGPT for Research."',
-    'Bad: "200/mo public revenue on CHATGPT FOR RESEARCH"',
-    'Bad: "13k GitHub stars llm for LLM-MRCHATTERBOX"',
-    'Bad: "1.4k GitHub stars blog for NEW INSTANT ROLLBACK FLOW"',
-    `The tape has exactly ${count} printed line${count === 1 ? '' : 's'} — if you mention a ship/line/launch/item/project/repo count, it must be ${count}. A star or download figure is fine only when it is copied from <found>.stats and labeled as stars or downloads. Never write "plus 0 more". For a 1-item tape, write a one-ship note.`,
-    'Banned: wish and a prayer, Nobody asked, Same maker more SKUs, night shift, publish button, the tape, the register, receipt paper, stock the shelves, invented numbers, insults, exclamation marks, emoji, pairing a star count with the wrong product, "supposed to be quiet", "the one people will still be quoting", "plus N more". Name the person. Make the sentence about their year, not a reusable slogan.',
+    `The tape has ${count} printed item${count === 1 ? '' : 's'}. If you mention that count, it must be ${count}. Never write "plus 0 more" or the word "lines". For a 1-item tape, write a one-ship note.`,
+    'Banned: URLs, hosts, "lines", ALL CAPS ship names, wish and a prayer, Nobody asked, night shift, publish button, the tape, the register, invented numbers, insults, exclamation marks, emoji.',
     'Finish with only a JSON object, no markdown: {"note":""}',
   ]
     .filter(Boolean)
@@ -502,7 +529,7 @@ function systemPrompt(year: number, searches: number) {
     '"link" must be a URL that appears in the data or your search results, copied exactly, or null. Never make up a URL.',
     'Status (one allowed word) goes where a price would. LIVE for a running product or site, RELEASED for a version/release, LAUNCHED for a launch post, SHIPPED otherwise, BETA if it says beta, DECEASED if shut down.',
     'Item names: a clean short product name people would recognize (ChatGPT Images 2.5, Codex long-running work, Composer 2). Strip Introducing/Launching/How. Truncate on a word boundary, never mid-word. Max 40 characters. Description: a specific one-liner grounded in the source (what it is, not a slogan), max 70 characters.',
-    'Cashier "note": one sentence, ~140 characters, warm-roast (playful, admiring, never mean), built on the single most impressive real fact (a count, a big launch, a streak). Copy the number exactly. If they are a CEO or founder, summarize the company-wide year, never one product. Good: "Codex grew long-running work this year, and Tibo\'s agents now stay clocked in overnight." Good: "cn is at 8.2M weekly downloads. The other packages are just opening acts." Good: "104 public Replit ships later and Amjad still treats shipped like a first draft." Bad: "runs on a wish and a prayer" Bad: "Nobody asked for ChatGPT for Research." Bad: "13k GitHub stars llm for LLM-MRCHATTERBOX" Banned: wish and a prayer, Nobody asked, Same maker more SKUs, night shift, publish button, the tape, invented stats, pairing a star count with the wrong product.',
+    'Cashier "note": one or two sentences, ~140 characters, wry and specific. Name 1 or 2 real ships in natural case (Codex app, not CODEX APP). Never URLs, hosts, the word "lines", or raw stat strings. A number only if copied from <found>.stats as stars or downloads. If they are a CEO or founder, speak to the company-wide year with two ships. Good: "Codex grew long-running work this year, and Tibo\'s agents now stay clocked in overnight." Good: "Cursor 3 landed in April, and Michael still treats Composer 2 like the real headline." Bad: "year is CODEX APP through FASTER STEERING: 55 public lines" Bad: a note with an npm URL. Banned: URLs, "lines", ALL CAPS ships, wish and a prayer, Nobody asked, night shift, publish button, the tape.',
     'Also output "stats": 1-4 short lines copied from <found>.stats (GitHub stars, npm weekly downloads, PH upvotes, App Store ratings, public MRR, user counts, HN points). Keep the source host/path on each line. Never invent a number.',
     'Banned words and moves everywhere: delve, testament, journey, innovative, seamless, elevate, unlock, empower, leverage, cutting-edge, game-changer, robust, passion, incredible, amazing, "truly", loser, pathetic, scam, flop, cringe, exclamation marks, emoji, em dashes, and praise like "impressive year".',
     `Do not add extra receipt bands. The tape is short: items, a one-line cashier note, stamp and serial. If you output modules, ids only from ${REQUIRED_MODULES.join(', ')}. Never output HTML, markdown, CSS, filler ids (deep-cut, first-last, platforms, still-running, volume, friend, sources, serial) or extra keys.`,

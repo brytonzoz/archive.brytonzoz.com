@@ -445,6 +445,9 @@ export function shareKeywords(
   const x = loose(a.name);
   const y = loose(b.name);
   if (!x || !y || x.length < 4 || y.length < 4) return false;
+  const [shorter] = x.length <= y.length ? [x, y] : [y, x];
+  // "GitLab Support" vs "GitLab Support in Codex" is one ship even across adjacent changelog days.
+  if (containedName(x, y) && shorter.length >= 10) return true;
   const day = (value?: string | null) => (value && /^\d{4}-\d{2}-\d{2}$/.test(value) ? value : '');
   // Dated changelog cards are different ships even when they share "Codex" + "app".
   if (day(a.date) && day(b.date) && day(a.date) !== day(b.date) && x !== y) return false;

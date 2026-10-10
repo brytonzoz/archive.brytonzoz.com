@@ -230,6 +230,7 @@ export function isJunkTitle(title: string, opts: { who?: string | null; company?
   if (isAboutPerson(text, opts.who)) return true;
   if (looksLikePersonName(text, opts.who) || looksLikeCodeIdentifier(text)) return true;
   if (isPricingOrMetricNote(text)) return true;
+  if (isNotAShipTitle(text)) return true;
   if (/^(the )?(guy|person|one) who made\b/i.test(text)) return true;
   const whoLast = (opts.who || '').split(/\s+/).filter((word) => word.length > 2);
   if (/^[A-Z]\s+[A-Z]{2,}$/.test(text) && whoLast.some((word) => loose(text).includes(loose(word)))) return true;
@@ -256,6 +257,61 @@ export function isPricingOrMetricNote(name: string): boolean {
   if (/\b(pric(e|ing|es)|plans?|billing|skus?)\b/i.test(text) && !/\b(app|cli|sdk|api|model)\b/i.test(text)) return true;
   if (/^(improved|better|faster|cheaper|reduced|lower|higher)\s+[A-Za-z]+(?:\s+[A-Za-z]+)?$/i.test(text)) return true;
   return false;
+}
+
+/** Removals, docs updates, @handles, and vague "X updates" titles are not ships. */
+export function isNotAShipTitle(name: string): boolean {
+  const text = tidy(name);
+  if (!text) return true;
+  if (/^@[\w.-]+$/.test(text)) return true;
+  if (/\b(removed|retired|deprecated|sunsetting|sunset|deleted|discontinued)\b/i.test(text)) return true;
+  if (/\b(docs?|documentation|readme|governance docs)\b/i.test(text) && /\b(update|updated|updates)\b/i.test(text)) return true;
+  if (/\bmodels? for model availability\b/i.test(text) || /\bmodel availability update\b/i.test(text)) return true;
+  if (/\binto the\b/i.test(text)) return true;
+  if (/\bupdates\s*:/i.test(text)) return true;
+  if (/·\s*\d+\s+updates?\s+in\s+/i.test(text)) return false;
+  if (/^(?:[A-Za-z][\w.+-]*\s+and\s+)?.+\s+updates$/i.test(text)) return true;
+  return false;
+}
+
+/** Undated adjective phrases ("Richer JavaScript representation") are changelog copy, not products. */
+export function isChangelogPhrase(name: string, date?: string | null): boolean {
+  if (date) return false;
+  const text = tidy(name);
+  if (!text || /\d/.test(text)) return false;
+  if (/\b(cli|app|sdk|api|bot|kit|auth|cursor|codex|chatgpt|composer|zod|shoo)\b/i.test(text)) return false;
+  return /^(richer|typed|better|improved|faster|fuller|native|optional|simple|lightweight|advanced)\b/i.test(text);
+}
+
+const SHIP_WORD: Record<string, string> = {
+  chatgpt: 'ChatGPT',
+  gpt: 'GPT',
+  openai: 'OpenAI',
+  macos: 'macOS',
+  ios: 'iOS',
+  cli: 'CLI',
+  sdk: 'SDK',
+  api: 'API',
+  mcp: 'MCP',
+  ai: 'AI',
+  hn: 'HN',
+  npm: 'npm',
+  js: 'JS',
+  ts: 'TS',
+};
+
+/** Tape names stay uppercase; notes speak them in natural case (Codex app, not CODEX APP). */
+export function displayShipName(name: string): string {
+  const text = tidy(name);
+  if (!text) return '';
+  const small = new Set(['for', 'the', 'in', 'of', 'and', 'or', 'a', 'an', 'to', 'on', 'at', 'with', 'app']);
+  let index = 0;
+  return text.replace(/[A-Za-z0-9.+]+/g, (word) => {
+    const key = word.toLowerCase();
+    const out = SHIP_WORD[key] ?? (small.has(key) && index > 0 ? key : word.charAt(0).toUpperCase() + word.slice(1).toLowerCase());
+    index += 1;
+    return out;
+  });
 }
 
 const VERSION = String.raw`v?(?:\d{4}\.\d{1,2}\.\d{1,2}|\d{1,3}(?:\.\d+){1,3})`;
@@ -623,7 +679,7 @@ export function rollupVersions<T extends Polishable>(items: T[]): T[] {
     const latest = list.slice().sort((a, b) => (b.item.date ?? '').localeCompare(a.item.date ?? ''))[0]!.item;
     kept.push({
       ...latest,
-      name: `${product} · ${count} update${count === 1 ? '' : 's'} in ${mon}`,
+      name: count <= 1 ? product : `${product} · ${count} updates in ${mon}`,
       description: '',
     });
   }
@@ -771,6 +827,10 @@ export function polishCandidates<T extends Polishable>(items: T[], opts: PolishO
     const date =
       knownFlagshipDate({ ...item, name }, year) ??
       (isFlagshipYearKeep(item, year) && item.date ? String(item.date).slice(0, 10) : inYearDate(item.date, year));
+    if (isChangelogPhrase(name, date)) {
+      drop(item, 'changelog-phrase');
+      continue;
+    }
     out.push({
       ...item,
       name,

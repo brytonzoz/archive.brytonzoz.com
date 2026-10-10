@@ -13,6 +13,7 @@
 // After 4b865b5: npm packages are dated from the product homepage too.
 // After 05fa76d: revert npm dating (Zod is older than 2026); take earliest URL evidence.
 // After de3d3e3: version monthly rollup, person-name gate, archive/RDAP beats npm for the product itself.
+// After note-voice: human cashier notes, drop removals/docs/handles/generic updates, Composer 2 = 2026-03-19.
 //
 //   ADMIN_PASSWORD=… node scripts/reprint-shipped.mjs [origin]
 const RECEIPT_PATH = (id) => `/r/${id}/`;

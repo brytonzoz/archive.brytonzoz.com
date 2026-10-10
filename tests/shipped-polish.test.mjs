@@ -189,7 +189,7 @@ test('scrape-dated changelog cards are dropped', () => {
       found({ name: 'Visit our YouTube channel', date: '2026-06-01', link: 'https://cursor.com/youtube' }),
       found({ name: 'Cursor 2', date: today, link: 'https://cursor.com/changelog/today' }),
       found({ name: 'Agents Window', date: '2026-04-02', link: 'https://cursor.com/changelog/agents' }),
-      found({ name: 'Codex App', date: null, link: 'https://developers.openai.com/codex/app', source: 'changelog' }),
+      found({ name: 'Codex App', date: null, link: 'https://developers.openai.com/codex/app', source: 'changelog', thisYear: true }),
       found({ name: 'Vicent Martí · 27M', date: '2026-08-14', link: 'https://cursor.com/blog/vicent' }),
       found({ name: 'UNDER: COMPANY', date: '2026-07-06', link: 'https://cursor.com/blog/firetiger' }),
       found({ name: 'CURSOR WEB ·', date: '2026-09-28', link: 'https://cursor.com/docs/release-notes' }),
@@ -200,7 +200,7 @@ test('scrape-dated changelog cards are dropped', () => {
   assert.equal(items.some((item) => /youtube|visit our/i.test(item.name)), false);
   assert.equal(items.some((item) => item.date === today), false);
   assert.ok(items.some((item) => /agents window/i.test(item.name)));
-  assert.ok(items.some((item) => /codex app/i.test(item.name) && item.date == null));
+  assert.ok(items.some((item) => /codex app/i.test(item.name) && item.date == null && item.thisYear));
   assert.equal(items.some((item) => /vicent|under:|cursor web\s*·|pull requests/i.test(item.name)), false);
 });
 
@@ -231,8 +231,10 @@ test('changelog rows no longer print sitemap lastmod and docs nav slugs stay out
   const items = changelog.itemsFromSitemap(xml, 2026);
   assert.equal(items.some((item) => /overview/i.test(item.name)), false);
   assert.ok(items.some((item) => /cursor 2/i.test(item.name)));
-  assert.equal(items.find((item) => /cursor 2/i.test(item.name))?.date, null);
-  assert.doesNotMatch(items.find((item) => /cursor 2/i.test(item.name))?.description ?? '', /sitemap lastmod/i);
+  const cursor2 = items.find((item) => /cursor 2/i.test(item.name));
+  assert.equal(cursor2?.date, null);
+  assert.equal(cursor2?.thisYear, true);
+  assert.doesNotMatch(cursor2?.description ?? '', /sitemap lastmod/i);
 });
 
 test('harvest drops other-year changelog dates and sorts remaining lines chronologically', () => {

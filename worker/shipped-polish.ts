@@ -584,7 +584,7 @@ export function polishCandidates<T extends Polishable>(items: T[], opts: PolishO
       date,
       via: sourceVia({ ...item, name }, opts.affiliation),
       status: cleanStatus(item.status),
-      thisYear: Boolean(date && String(date).startsWith(String(year))),
+      thisYear: Boolean(item.thisYear) || Boolean(date && String(date).startsWith(String(year))),
     });
   }
   const beforeHref = out.length;

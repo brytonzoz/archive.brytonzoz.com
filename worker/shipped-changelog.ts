@@ -303,6 +303,7 @@ function row(name: string, date: string | null, url: string, year: number, _hint
   const title = cleanTitle(name);
   if (!title) return null;
   const dated = Boolean(date && date.startsWith(String(year)));
+  const otherYear = Boolean(date && /^\d{4}/.test(date) && !date.startsWith(String(year)));
   return {
     name: title,
     description: hostOf(url) ?? '',
@@ -313,7 +314,7 @@ function row(name: string, date: string | null, url: string, year: number, _hint
     source: 'changelog',
     status: 'LAUNCHED',
     score: dated ? 7 : 5,
-    thisYear: dated,
+    thisYear: dated || !otherYear,
   };
 }
 

@@ -3,6 +3,7 @@
 // Push-default FORCE_IDS: 16, 17, 18, 19, 20 (Tibo, Cursor, jackfriks, Zod, Theo).
 // After 7bdfa60: undated changelog rows stay, handle.com pins, musl rollup.
 // After 712cf78: thisYear survives polish; #16 attaches OpenAI cache.
+// After 5dd73e8: friend homepages are not project lists.
 //
 //   ADMIN_PASSWORD=… node scripts/reprint-shipped.mjs [origin]
 const RECEIPT_PATH = (id) => `/r/${id}/`;

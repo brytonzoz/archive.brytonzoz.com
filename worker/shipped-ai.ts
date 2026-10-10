@@ -11,7 +11,7 @@ import { shipName } from './shipped-changelog';
 import { shareKeywords } from './shipped-decisions';
 import { ownerFromProfile, type OwnerContext } from './shipped-ownership';
 import { flagshipLaunchName, isFlagshipYearKeep, isJoinOrAcquire, isPriorYearJoin, logFlagshipGate } from './shipped-flagship';
-import { cleanDescription, cleanShipTitle, cleanStatus, gateReceiptItems, isChangelogEntryHref, noteCountMismatch, spokenShipName } from './shipped-polish';
+import { cleanDescription, cleanShipTitle, cleanStatus, gateReceiptItems, isChangelogEntryHref, isOpenAiCompanyWide, noteCountMismatch, spokenShipName } from './shipped-polish';
 import { emptyAffiliation, type Affiliation } from './shipped-affiliation';
 import { looksLikePersonName } from './shipped-repos';
 import { RECEIPT_BUDGET_MICROS, formatReceiptStats, searchBudget, type SourcedStat } from './shipped-research';
@@ -213,7 +213,7 @@ export function noteMisusesStats(note: string, count: number, stats: string[] = 
 }
 
 const BANNED_NOTE_SHAPE =
-  /kept \w[\w.]* busy:|(^|[.!?]\s+)\S[\w.]* first,\s+\S.+ later|spent the (rest of the )?year on |kept stacking|people will remember|\bthe sleeper\b|the loud one|slipped .+ beside|\bthe pair is\b|\bdoes one job\b|\bdoes another\b|\bopens on\b|\bopened the year\b|\byear opens\b|\bno encore\b|\bthe bio\b.{0,48}\b(talking|menu|heavy lifting)\b|\bvibes bio\b|\breceipt is just the receipt\b|\bworth a second look\b.{0,80}\bthe rest\b|\bthin (receipt|tape)\b|\bentries,\s+most of them\b/i;
+  /kept \w[\w.]* busy:|(^|[.!?]\s+)\S[\w.]* first,\s+\S.+ later|spent the (rest of the )?year on |kept stacking|people will remember|\bthe sleeper\b|the loud one|slipped .+ beside|\bthe pair is\b|\bdoes one job\b|\bdoes another\b|\bopens on\b|\bopened the year\b|\byear opens\b|\bno encore\b|\bthe bio\b.{0,48}\b(talking|menu|heavy lifting)\b|\bvibes bio\b|\breceipt is just the receipt\b|\bworth a second look\b.{0,80}\bthe rest\b|\bthin (receipt|tape)\b|\bentries,\s+most of them\b|\bshowed up\b|\bis the one that stuck\b|\bkeeps coming back\b|\breceipts?, and\b/i;
 
 const MISSING_DATA_NOTE =
   /\b(no description|without a description|with no description|lacks a description|has no description|went out with no|missing (a )?(description|date|copy)|undated|no date|without (a )?date|has no date)\b/i;
@@ -539,13 +539,53 @@ export function scoreCashierNote(
     score -= 18;
   }
   if (
-    /\bthe bio\b|\bbio does\b|\bbio is\b|\bvibes bio\b|\bheavy lifting\b|\bthin (receipt|tape)\b|\breceipt is just the receipt\b|\bworth a second look\b|\bthe rest are short\b|\bmost of them\b.{0,40}\b(codex|chatgpt)\b|\bentries,\s+most of them\b/i.test(
+    /\bthe bio\b|\bbio does\b|\bbio is\b|\bvibes bio\b|\bheavy lifting\b|\bthin (receipt|tape)\b|\breceipt is just the receipt\b|\bworth a second look\b|\bthe rest are short\b|\bmost of them\b.{0,40}\b(codex|chatgpt)\b|\bentries,\s+most of them\b|\bshowed up\b|\bis the one that stuck\b|\bkeeps coming back\b|\breceipts?, and\b/i.test(
       text,
     )
   ) {
     score -= 24;
   }
+  const detail = noteDescriptionOverlap(text, items);
+  if (detail >= 2) score += 16;
+  else if (detail === 1) score += 8;
   return score;
+}
+
+const NOTE_STOP = new Set([
+  'the',
+  'a',
+  'an',
+  'and',
+  'or',
+  'to',
+  'of',
+  'in',
+  'on',
+  'for',
+  'with',
+  'from',
+  'that',
+  'this',
+  'is',
+  'are',
+  'was',
+  'it',
+  'its',
+  'as',
+  'at',
+  'by',
+  'be',
+  'one',
+]);
+
+function wordsIn(text: string): string[] {
+  return (text.toLowerCase().match(/[a-z][a-z0-9.+-]{2,}/g) || []).filter((word) => !NOTE_STOP.has(word));
+}
+
+export function noteDescriptionOverlap(note: string, items: { name?: string; spoken?: string; description?: string }[]): number {
+  const desc = new Set(items.flatMap((item) => wordsIn(item.description || '')));
+  const names = new Set(items.flatMap((item) => wordsIn(`${item.name || ''} ${item.spoken || ''}`)));
+  return wordsIn(note).filter((word) => desc.has(word) && !names.has(word)).length;
 }
 
 export function rankCashierNotes(
@@ -620,24 +660,43 @@ export function isBareProductNote(note: string, items: DraftItem[] = []): boolea
   });
 }
 
+function shipWhatItDoes(item: DraftItem): string {
+  const desc = (item.description || '').replace(/\s+/g, ' ').trim();
+  if (!desc || /^(dated |linked from )/i.test(desc) || /^[a-z0-9.-]+\.[a-z]{2,}$/i.test(desc)) return '';
+  const first = desc.split(/[.!?]/)[0]?.trim() || '';
+  if (first.length < 8) return '';
+  return first.length > 72 ? `${first.slice(0, 72).replace(/\s+\S*$/, '')}` : first;
+}
+
+function kindFromShipName(name: string): string {
+  if (/-cli$|\bcli\b/i.test(name)) return 'command-line tool';
+  if (/\bmcp\b/i.test(name)) return 'MCP server';
+  if (/\bapp\b/i.test(name)) return 'app';
+  return 'product';
+}
+
 /** When Claude is up but every candidate died: a sentence, never a bare product name. */
 export function sentenceFallbackNote(items: DraftItem[], ctx: NoteContext = {}): string {
   const notable = notableShip(items);
   if (!notable) return POTENTIAL_NOTES[0] ?? '';
   const spoken = spokenOf(notable);
+  const does = shipWhatItDoes(notable);
+  const kind = kindFromShipName(`${notable.name} ${spoken}`);
   const who = (ctx.who || '').replace(/^@/, '').split(/\s+/).filter(Boolean)[0] || '';
+  const lead = does ? does.charAt(0).toLowerCase() + does.slice(1) : '';
   const candidates = [
-    `${spoken} is the one that stuck.`,
-    who ? `${spoken} is the one I'd put next to ${who}.` : `${spoken} is the one I'd keep.`,
-    `${spoken} showed up, and it reads like the real ship.`,
-  ];
+    does ? `${spoken} ${lead}.`.replace(/\.\.$/, '.') : '',
+    does ? `${spoken} is the one on this tape: ${does}.` : '',
+    who && does ? `${spoken} is ${who}'s ${kind}: ${lead}.` : '',
+    `${spoken} is a ${kind} that shipped this year.`,
+  ].filter(Boolean);
   for (const note of candidates) {
     if (hardRejectNote(note, items, [], ctx)) continue;
     if (isBareProductNote(note, items)) continue;
     if (!printable(note)) continue;
     return clipSentence(note, 140);
   }
-  return clipSentence(`${spoken} showed up.`, 140);
+  return clipSentence(`${spoken} is a ${kind} that shipped this year.`, 140);
 }
 
 /** Last resort only: the notable ship name. No sentence costume. */
@@ -721,6 +780,22 @@ function toDraftItem(item: Found, year: number): DraftItem | null {
   };
 }
 
+function boostCeoFlagship(draft: DraftItem | null, affiliation?: Affiliation | null): DraftItem | null {
+  if (!draft) return null;
+  if (!affiliation || (affiliation.role !== 'ceo' && affiliation.role !== 'founder')) return draft;
+  if (!/openai/i.test(affiliation.company || '')) return draft;
+  if (isOpenAiCompanyWide(draft.name, draft.link)) {
+    return { ...draft, significance: Math.max(draft.significance ?? 0, 80) };
+  }
+  if (flagshipLaunchName(draft) && !/\bcodex\b/i.test(draft.name)) {
+    return { ...draft, significance: Math.max(draft.significance ?? 0, 70) };
+  }
+  if (/\bcodex\b/i.test(draft.name) || /\/codex\b/i.test(draft.link || '')) {
+    return { ...draft, significance: Math.min(draft.significance ?? 20, 12) };
+  }
+  return draft;
+}
+
 function printGateOpts(gathered: Gathered, year: number) {
   return {
     year,
@@ -747,8 +822,9 @@ export function harvestItems(gathered: Gathered, year: number): DraftItem[] {
   const seen = new Set<string>();
   const items: DraftItem[] = [];
   const polished = gateReceiptItems(gathered.found, printGateOpts(gathered, year));
+  const affiliation = gathered.profile.affiliation;
   for (const item of polished) {
-    const draft = toDraftItem(item, year);
+    const draft = boostCeoFlagship(toDraftItem(item, year), affiliation);
     if (!draft) continue;
     const key = loose(draft.name);
     if (!key || seen.has(key)) continue;
@@ -901,6 +977,8 @@ function noteOnlySystem(year: number, affiliation?: Affiliation | null, count = 
     'Never invent a plugin, extension, extra product, or fact that is not in the item list or bio.',
     'If you name a person, it must be this customer (their name or handle only). Never another person — including a name hiding inside a repo (jev-tetris is a product, not Jev).',
     'Never mention a missing description, missing date, or that something shipped without copy.',
+    'Reuse a concrete detail from the item description — what the ship does. Thin tapes still get one specific line about that one ship.',
+    'Do not write "showed up", "is the one that stuck", or "N receipts, and X keeps coming back".',
     'Do not restate two item names and a month as the whole note. Do not talk down a thin tape or say the bio does the talking.',
     desk,
     'The bar (do not copy these, and never write about these invented people):',

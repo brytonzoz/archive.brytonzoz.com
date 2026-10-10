@@ -152,6 +152,13 @@ export function flagshipLaunchName(item: FlagshipItem): string | null {
   const device = name.match(/^(?:introducing\s+)?((?:openai|chatgpt)\s+(?:device|computer|phone|hardware))$/i);
   if (device && isCompanyShip(item)) return titleCaseProduct(device[1]);
 
+  if (/openai\.com\/index\/gpt-6\b/i.test(path) || /openai\.com\/index\/gpt-6/i.test(link)) return 'GPT-6';
+  if (/openai\.com\/index\/(?:chatgpt-)?images\b/i.test(path)) return 'ChatGPT Images';
+  if (/openai\.com\/index\/chatgpt-atlas\b/i.test(path)) return 'ChatGPT Atlas';
+  if (/openai\.com\/index\/chatgpt-health\b/i.test(path)) return 'ChatGPT Health';
+  if (/openai\.com\/sora(\/|$)/i.test(link)) return 'Sora';
+  if (/openai\.com\/device(\/|$)/i.test(link)) return 'OpenAI Device';
+
   return null;
 }
 

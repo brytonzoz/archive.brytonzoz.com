@@ -234,6 +234,22 @@ test('time-plus-heading changelog cards become dated ships; month-only titles dr
   assert.ok(sameLine.some((item) => /0\.145\.0/.test(item.name)), JSON.stringify(sameLine));
 });
 
+test('Vercel changelog dates every card under a day <time datetime>', () => {
+  const html = `
+    <time dateTime="2026-10-09T20:24+00:00">October 9</time>
+    <a href="/changelog/v0-platform-api-now-in-beta"><h3>v0 Platform API now in beta</h3></a>
+    <a href="/changelog/vercel-agent-now-in-slack"><h3>Vercel Agent now in Slack</h3></a>
+    <a href="/changelog/skip-sending-request-bodies-to-routing-middleware"><h3>Skip sending request bodies to Routing Middleware</h3></a>
+    <time dateTime="2026-10-08T12:00+00:00">October 8</time>
+    <h3><a href="/changelog/grok-imagine-video-1-5-lite-on-ai-gateway">Grok Imagine Video 1.5 Lite on AI Gateway</a></h3>`;
+  const items = changelog.itemsFromTimedHeadings(html, 'https://vercel.com/changelog', 2026);
+  const dated = items.filter((item) => item.date === '2026-10-09');
+  assert.ok(dated.length >= 3, JSON.stringify(items));
+  assert.ok(items.some((item) => /v0 platform api/i.test(item.name) && item.date === '2026-10-09'), JSON.stringify(items));
+  assert.ok(items.some((item) => /vercel agent/i.test(item.name) && item.date === '2026-10-09'), JSON.stringify(items));
+  assert.ok(items.some((item) => /grok imagine/i.test(item.name) && item.date === '2026-10-08'), JSON.stringify(items));
+});
+
 test('blocked challenge pages are dropped; TinyFish markdown still extracts dated ships', () => {
   assert.equal(company.looksBlockedPage('<html>Just a moment...</html>', 'Just a moment...'), true);
   assert.equal(company.looksBlockedPage('Attention Required! | Cloudflare', 'Attention Required'), true);

@@ -29,7 +29,9 @@ import {
   itemsFromFeedXml,
   itemsFromJsonLd,
   itemsFromSitemap,
+  itemsFromTimedHeadings,
   mergeChangelog,
+  parseFlexibleDate,
   productPaths,
   sitemapChildLocs,
   type ChangelogFound,
@@ -156,11 +158,9 @@ export function compactCompanyFound(found: Found[], cap = COMPANY_CACHE_CAP): Fo
     if (item.source === 'changelog') n += 80;
     if (/\/(changelog|release-notes|whats-new|docs\/changelog)/i.test(url)) n += 50;
     if (item.date && /^\d{4}-\d{2}-\d{2}$/.test(item.date)) n += 30;
-    if (
-      /openai\.com\/(index|sora|device)\b/i.test(url) &&
-      (item.date || /\b(gpt-?\d|chatgpt|sora|atlas|health|device|images)\b/i.test(name))
-    ) {
-      n += 40;
+    if (/openai\.com\/(index|sora|device)\b/i.test(url)) {
+      n += 90;
+      if (item.date || /\b(gpt-?\d|chatgpt|sora|atlas|health|device|images)\b/i.test(name)) n += 50;
     }
     if (/\/(blog|news|research)\//i.test(url) && !/changelog|\/index\//i.test(url)) n -= 20;
     if (looksLikeNotAShip(item) && !flagshipLaunchName(item)) n -= 80;
@@ -363,6 +363,7 @@ async function pagesForCompany(
   const feeds: string[] = [];
   const extraHosts: string[] = [];
   const follow: string[] = [];
+  const changelogFollow: string[] = [];
   let usedTinyfish = false;
   const apex = hostOf(base);
   const absorb = (page: CompanyPage | null) => {
@@ -386,6 +387,10 @@ async function pagesForCompany(
         const next = link.url.replace(/\/+$/, '');
         if (!fetched.has(next) && !follow.includes(next)) follow.push(next);
       }
+      if (host && sameRegistrable(host, apex) && /\/changelog\/[a-z0-9][a-z0-9-]{3,}/i.test(link.url)) {
+        const next = link.url.replace(/\/+$/, '');
+        if (!fetched.has(next) && !changelogFollow.includes(next) && !follow.includes(next)) changelogFollow.push(next);
+      }
     }
   };
   for (const page of pages) absorb(page);
@@ -406,6 +411,10 @@ async function pagesForCompany(
       if (extra.length) usedTinyfish = true;
       for (const page of extra) absorb(page);
     }
+  }
+  if (changelogFollow.length) {
+    const more = await mapLimit(changelogFollow.slice(0, 28), 6, (url) => readCompanyPage(url, ctx?.blocked));
+    for (const page of more) absorb(page);
   }
   return { found, feeds, extraHosts, tinyfish: usedTinyfish };
 }
@@ -454,6 +463,55 @@ async function harvestSitemaps(origin: string, year: number, ctx?: FetchCtx): Pr
   const children = xmls.flatMap((page) => sitemapChildLocs(page.text));
   const more = children.length ? await mapLimit(children, 3, (url) => fetchText(url, 2_000_000, undefined, ctx?.blocked)) : [];
   return mergeChangelog([...xmls, ...more.filter(Boolean)].map((page) => itemsFromSitemap(page!.text, year))).map(asFound);
+}
+
+function dateFromEntryHtml(html: string, url: string, year: number): string | null {
+  const time = html.match(/<time\b([^>]*)>([\s\S]*?)<\/time>/i);
+  const fromTime = time
+    ? parseFlexibleDate(tidyTime(time[1].match(/datetime=["']([^"']+)["']/i)?.[1] || time[2]), year)
+    : null;
+  if (fromTime) return fromTime;
+  const timed = itemsFromTimedHeadings(html, url, year).find((row) => row.date);
+  if (timed?.date) return timed.date;
+  const json = itemsFromJsonLd(html, year).find((row) => row.date);
+  if (json?.date) return json.date;
+  return itemsFromDatedCards(html, url, year).find((row) => row.date)?.date ?? null;
+}
+
+function tidyTime(value: string): string {
+  return String(value || '')
+    .replace(/<[^>]+>/g, ' ')
+    .replace(/\s+/g, ' ')
+    .trim();
+}
+
+/** Undated /changelog/slug and openai.com/index cards take the entry page's <time datetime>. */
+async function hydrateChangelogEntryDates(found: Found[], year: number, ctx?: FetchCtx): Promise<Found[]> {
+  const need = found.filter((item) => {
+    if (item.date || !item.link) return false;
+    return (
+      /\/changelog\/[a-z0-9][a-z0-9-]{3,}/i.test(item.link) ||
+      /openai\.com\/(index\/[a-z0-9-]+|sora|device)(\/|$)/i.test(item.link)
+    );
+  });
+  const seen = new Set<string>();
+  const unique = need.filter((item) => {
+    const url = item.link as string;
+    if (seen.has(url)) return false;
+    seen.add(url);
+    return true;
+  }).slice(0, 28);
+  if (!unique.length) return found;
+  const pages = await mapLimit(unique, 6, (item) => fetchText(item.link as string, 160_000, undefined, ctx?.blocked));
+  const byUrl = new Map(unique.map((item, i) => [item.link, pages[i]]));
+  return found.map((item) => {
+    if (item.date || !item.link) return item;
+    const page = byUrl.get(item.link);
+    if (!page) return item;
+    const date = dateFromEntryHtml(page.text, item.link, year);
+    if (!date) return item;
+    return { ...item, date, thisYear: true, dateConfidence: 'exact' as const };
+  });
 }
 
 /** Sitemap rows have no lastmod-as-date. Fetch the flagship posts so Cursor 3 / Composer 2 keep a day. */
@@ -733,7 +791,7 @@ export async function harvestCompany(opts: {
   if (opts.storeOnly) {
     return { found: [], spend: emptyXaiSpend(), ran: ['company-store-miss'], cacheHit: false };
   }
-  const cacheKey = opts.deep ? `company:deep:v13:${year}:${slug}` : `company:v15:${year}:${slug}`;
+  const cacheKey = opts.deep ? `company:deep:v16:${year}:${slug}` : `company:v16:${year}:${slug}`;
   const load = async (): Promise<CompanyHarvest> => {
     const via = viaFor(affiliation);
     const ran: string[] = [];
@@ -936,7 +994,9 @@ export async function harvestCompany(opts: {
       }
     }
 
-    return { found: compactCompanyFound(found), spend, ran, cacheHit: false };
+    const dated = await hydrateFlagshipDates(found, year, ctx).catch(() => found);
+    const hydrated = await hydrateChangelogEntryDates(dated, year, ctx).catch(() => dated);
+    return { found: compactCompanyFound(hydrated), spend, ran, cacheHit: false };
   };
   const harvested = opts.rebuild
     ? await load()

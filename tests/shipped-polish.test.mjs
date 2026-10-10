@@ -765,3 +765,31 @@ test('undated crumbs need ownership plus a description', async () => {
   assert.equal(names.some((name) => /trpc|number|all checks/i.test(name)), false, JSON.stringify(names));
   assert.ok(names.some((name) => /^zod$/i.test(name)), JSON.stringify(names));
 });
+
+test('Vercel customer stories and chopped Decision-1 drop; two policy knobs roll up', () => {
+  assert.equal(polish.isJunkTitle("FEATURED'S USERS MAKE 100K MEDIA PITCHES PER MONTH"), true);
+  assert.equal(polish.isJunkTitle('MICROSOFT DECISION 1'), true);
+  assert.equal(polish.isMinorPlatformChange('PRO TEAMS NOW DEFAULT TO 30 DAY DEPLOYMENT RETENTION'), true);
+  assert.equal(polish.isMinorPlatformChange('SKIP SENDING REQUEST BODIES TO ROUTING MIDDLEWARE'), true);
+  assert.equal(polish.isMinorPlatformChange('V0 API'), false);
+  const items = polish.polishCandidates(
+    [
+      found({
+        name: 'Pro teams now default to 30-day deployment retention',
+        date: '2026-10-09',
+        link: 'https://vercel.com/changelog/new-pro-teams-now-default-to-30-day-deployment-retention',
+      }),
+      found({
+        name: 'Skip sending request bodies to Routing Middleware',
+        date: '2026-10-08',
+        link: 'https://vercel.com/changelog/skip-sending-request-bodies-to-routing-middleware',
+      }),
+      found({ name: 'v0 API', date: '2026-03-01', link: 'https://vercel.com/blog/v0-api' }),
+    ],
+    { year: 2026, who: 'Guillermo Rauch' },
+  );
+  const names = items.map((item) => item.name);
+  assert.ok(names.some((name) => /v0 api/i.test(name)), JSON.stringify(names));
+  assert.ok(names.some((name) => /vercel platform · 2 updates in oct/i.test(name)), JSON.stringify(names));
+  assert.equal(names.some((name) => /retention|request bodies|microsoft decision/i.test(name)), false, JSON.stringify(names));
+});

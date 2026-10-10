@@ -32,7 +32,11 @@ const INSTRUCTIONAL = /^(if you|those |your agent can|you can|you don|use a |use
 const RESEARCH_GERUND =
   /^(improving|bootstrapping|deprecating|continually|reward hacking|evaluating|keeping|reproducing|disclosing|migrating|deploying)\b/i;
 const ACQUISITION = /\b(is now a part of|acquired by|has been acquired)\b/i;
-const CUSTOMER_STORY = /\bships\s+[\d.,]+[×x]\s+faster\b|·\s*\d+[kmb]\s*$/i;
+const CUSTOMER_STORY =
+  /\bships\s+[\d.,]+[×x]\s+faster\b|·\s*\d+[kmb]\s*$|\busers?\s+(make|made|send|sent)\s+[\d.,]+[kmb]?\b|\b\d+[kmb]\s+(media|pitches|users|customers|engineers)\b|\bfeatured'?s?\s+users\b|\bcustomer stor(?:y|ies)\b/i;
+const PLATFORM_POLICY =
+  /\b(deployment retention|default to \d+[-\s]?day|retain(?:s|ed|ing)? (fewer )?deployments|skip sending|request bodies|routing middleware|billing begins|spend management|per-user budgets|hobby projects now retain|edge requests are now called|no longer caches|timestamp attributes are now supported)\b/i;
+const CHOPPED_GATEWAY = /^microsoft decision[- ]?1$/i;
 const TRAILING_PREP =
   /\b(of|in|to|for|and|or|the|a|an|with|on|as|by|from|into|longer|kind|new|our|your|through|their|its|vs|lower|higher|more|less|day|days|every|managed|security|controlled|trusted|general|advanced|remote|task|chat|now|key|third|are|image|usage|delay|preview|zero)$/i;
 export const CUT_OFF_ENDINGS =
@@ -366,7 +370,7 @@ export function isJunkTitle(
   if (!text) return true;
   if (text.length < 3 && !/^v\d$/i.test(text)) return true;
   if (BYLINE.test(text) || NAME_LIST.test(text) || ROUNDUP.test(text) || READ_THE.test(text) || INSTRUCTIONAL.test(text)) return true;
-  if (RESEARCH_GERUND.test(text) || CUSTOMER_STORY.test(text) || isAcquisitionNews(text)) return true;
+  if (RESEARCH_GERUND.test(text) || CUSTOMER_STORY.test(text) || CHOPPED_GATEWAY.test(text) || isAcquisitionNews(text)) return true;
   if (CTA_NAV.test(text) || CTA_TRAIL.test(text)) return true;
   if (/^(download on the|get it on|get the app|affiliates|analytics|available on|filed under|quitting)\b/i.test(text)) return true;
   if (CODE_TITLE.test(text) || /^(object|query|router|number|string|boolean|date|type|value|array|null|undefined|any)$/i.test(text)) return true;
@@ -409,11 +413,21 @@ export function isPricingOrMetricNote(name: string): boolean {
   return false;
 }
 
+/** Settings, retention, and middleware knobs — roll up, don't print as ships. */
+export function isMinorPlatformChange(name: string): boolean {
+  const text = tidy(name);
+  if (!text || flagshipLaunchName({ name: text })) return false;
+  if (CHOPPED_GATEWAY.test(text) || CUSTOMER_STORY.test(text)) return false;
+  if (/\b(v0|vercel agent|botid)\b/i.test(text)) return false;
+  return PLATFORM_POLICY.test(text) || /\bpro teams now default\b/i.test(text);
+}
+
 /** Removals, docs updates, @handles, and vague "X updates" titles are not ships. */
 export function isNotAShipTitle(name: string): boolean {
   const text = tidy(name);
   if (!text) return true;
   if (/^@[\w.-]+$/.test(text)) return true;
+  if (CHOPPED_GATEWAY.test(text) || CUSTOMER_STORY.test(text)) return true;
   if (/\b(removed|retired|deprecated|sunsetting|sunset|deleted|discontinued)\b/i.test(text)) return true;
   if (/\b(docs?|documentation|readme|governance docs)\b/i.test(text) && /\b(update|updated|updates)\b/i.test(text)) return true;
   if (/\bmodels? for model availability\b/i.test(text) || /\bmodel availability update\b/i.test(text)) return true;
@@ -966,6 +980,35 @@ export function rollupCursorModels<T extends Polishable>(items: T[]): T[] {
   return kept;
 }
 
+/** Minor Vercel settings/policy cards collapse to one monthly platform line. A lone knob drops. */
+export function rollupPlatformSettings<T extends Polishable>(items: T[]): T[] {
+  const minor: T[] = [];
+  const kept: T[] = [];
+  for (const item of items) {
+    if (isMinorPlatformChange(item.name)) minor.push(item);
+    else kept.push(item);
+  }
+  if (!minor.length) return items;
+  const groups = new Map<string, T[]>();
+  for (const item of minor) {
+    const month = (item.date || '').match(/^(\d{4}-\d{2})/)?.[1] || 'undated';
+    const list = groups.get(month) ?? [];
+    list.push(item);
+    groups.set(month, list);
+  }
+  for (const [month, list] of groups) {
+    if (list.length < 2 || month === 'undated') continue;
+    const latest = list.slice().sort((a, b) => (b.date ?? '').localeCompare(a.date ?? ''))[0]!;
+    const mon = MONTHS_SHORT[Number(month.slice(5, 7)) - 1] || month;
+    kept.push({
+      ...latest,
+      name: `Vercel Platform · ${list.length} updates in ${mon}`,
+      description: '',
+    });
+  }
+  return kept;
+}
+
 const COUNT_ONES: Record<string, number> = {
   zero: 0,
   one: 1,
@@ -1166,7 +1209,9 @@ export function polishCandidates<T extends Polishable>(items: T[], opts: PolishO
   if (packaged.length < beforePkg) drop({ name: `${beforePkg - packaged.length} platform packages` }, 'platform-rollup');
   const models = rollupCursorModels(packaged);
   if (models.length < packaged.length) drop({ name: `${packaged.length - models.length} model notes` }, 'model-rollup');
-  const inherited = inheritDates(models);
+  const platform = rollupPlatformSettings(models);
+  if (platform.length < models.length) drop({ name: `${models.length - platform.length} platform settings` }, 'platform-rollup');
+  const inherited = inheritDates(platform);
   const unique = dedupeNormalized(inherited);
   if (unique.length < inherited.length) drop({ name: `${inherited.length - unique.length} duplicate names` }, 'name-dedupe');
   const capped = capUndated(unique, drop);
@@ -1178,10 +1223,19 @@ export function polishCandidates<T extends Polishable>(items: T[], opts: PolishO
   return rolled.sort((a, b) => (a.date ?? '9999').localeCompare(b.date ?? '9999'));
 }
 
-function isOpenAiCompanyWide(name: string): boolean {
+export function isOpenAiCompanyWide(name: string, link?: string | null): boolean {
   if (/\bin codex\b|gpt-[\d.]+-codex|\bcodex and\b/i.test(name)) return false;
   if (/chatgpt for ios\s*·/i.test(name)) return false;
+  if (/openai\.com\/(index|sora|device)\b/i.test(link || '')) return true;
   return /\b(gpt-?\d|chatgpt|sora|(openai|chatgpt)\s+(device|computer|phone|hardware)|atlas)\b/i.test(name);
+}
+
+function isOpenAiLeadCrumb(name: string, link?: string | null): boolean {
+  if (isOpenAiCompanyWide(name, link)) return false;
+  if (/\bcodex\b/i.test(name) || /\/codex\b/i.test(link || '')) return true;
+  if (/developers\.openai\.com\/codex|learn\.chatgpt\.com\/docs/i.test(link || '')) return true;
+  if (/^(feature|announcement|including:?|update|v1\/responses)$/i.test(name)) return true;
+  return false;
 }
 
 /** CEO tapes keep company-wide flagships; a product-lead changelog (Codex) collapses to one line. */
@@ -1194,8 +1248,8 @@ export function rollupCeoLeadCrumbs<T extends Polishable>(items: T[], affiliatio
   const lead: T[] = [];
   const other: T[] = [];
   for (const item of items) {
-    if (isOpenAiCompanyWide(item.name) || (flagshipLaunchName(item) && !/\bcodex\b/i.test(item.name))) wide.push(item);
-    else if (/\bcodex\b/i.test(item.name)) lead.push(item);
+    if (isOpenAiCompanyWide(item.name, item.link) || (flagshipLaunchName(item) && !/\bcodex\b/i.test(item.name))) wide.push(item);
+    else if (isOpenAiLeadCrumb(item.name, item.link)) lead.push(item);
     else other.push(item);
   }
   const monthly = other.filter((item) => /·\s*\d+\s+updates?\s+in\s+/i.test(item.name));

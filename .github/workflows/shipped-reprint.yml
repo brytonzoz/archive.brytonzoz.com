@@ -20,8 +20,13 @@ on:
       - worker/shipped-ownership.ts
       - worker/shipped-decisions.ts
       - worker/shipped-flagship.ts
+      - worker/shipped-company.ts
       - worker/shipped-repos.ts
       - worker/shipped-dates.ts
+      - scripts/check-shipped-live-goldens.mjs
+      - tests/lib/shipped-goldens.mjs
+      - tests/fixtures/shipped-golden/tapes.json
+      - tests/fixtures/shipped-junk.json
   workflow_dispatch:
     inputs:
       ids:
@@ -66,3 +71,9 @@ jobs:
             exit 1
           fi
           node --no-warnings scripts/reprint-shipped.mjs
+
+      - name: Assert live goldens
+        env:
+          SHIPPED_ORIGIN: ${{ github.event_name == 'workflow_dispatch' && inputs.origin || 'https://shipped-staging.brytonzoz.com' }}
+          SHIPPED_LIVE_WAIT_MS: '65000'
+        run: node --no-warnings --experimental-transform-types scripts/check-shipped-live-goldens.mjs

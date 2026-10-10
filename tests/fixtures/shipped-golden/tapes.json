@@ -936,7 +936,7 @@
   "rauch": {
     "who": "Guillermo Rauch",
     "handle": "rauchg",
-    "min": 15,
+    "min": 30,
     "requiredAny": [
       {
         "key": "v0",
@@ -974,6 +974,17 @@
         "description": "",
         "date": "2026-10-09",
         "link": "https://vercel.com/changelog/agents-can-now-buy-domains-with-the-vercel-cli",
+        "source": "changelog",
+        "status": "LAUNCHED",
+        "score": 7,
+        "thisYear": true,
+        "icon": null
+      },
+      {
+        "name": "Featured's users make 100K media pitches per month",
+        "description": "",
+        "date": "2026-09-12",
+        "link": "https://vercel.com/blog/featured-users",
         "source": "changelog",
         "status": "LAUNCHED",
         "score": 7,

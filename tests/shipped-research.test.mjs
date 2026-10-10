@@ -356,6 +356,43 @@ test('cashier note and stats are specific to the items, never stock copy', () =>
   assert.doesNotMatch(softOnly, /^(PhotoAI|InteriorAI|SuperLevels)$/i);
   assert.equal(ai.isBareProductNote('PhotoAI', [{ name: 'PHOTOAI', spoken: 'PhotoAI' }]), true);
   assert.equal(ai.isBareProductNote('PhotoAI is the one that stuck.', [{ name: 'PHOTOAI', spoken: 'PhotoAI' }]), false);
+  assert.equal(
+    ai.hardRejectNote(
+      'Lsp4j-MCP showed up.',
+      [{ name: 'LSP4J-MCP', spoken: 'Lsp4j-MCP', description: 'MCP server for language servers', source: 'github' }],
+      [],
+      { who: 'Stephanj' },
+    ),
+    'banned-phrase',
+  );
+  assert.equal(
+    ai.hardRejectNote(
+      'Twenty-five receipts, and Codex keeps coming back with new versions.',
+      [{ name: 'GPT-6', spoken: 'GPT-6', description: 'frontier model', source: 'changelog' }],
+      [],
+      { who: 'Sam Altman' },
+    ),
+    'banned-phrase',
+  );
+  const detailed = ai.scoreCashierNote(
+    'postbridge-cli posts to every network from one command.',
+    [{ name: 'POSTBRIDGE-CLI', spoken: 'postbridge-cli', description: 'posts to every network from one command', source: 'github' }],
+    [],
+    { who: 'Jack Friks', handle: 'jackfriks' },
+  );
+  const thinStuck = ai.scoreCashierNote(
+    'postbridge-cli is the one that stuck.',
+    [{ name: 'POSTBRIDGE-CLI', spoken: 'postbridge-cli', description: 'posts to every network from one command', source: 'github' }],
+    [],
+    { who: 'Jack Friks', handle: 'jackfriks' },
+  );
+  assert.ok(detailed > thinStuck, `${detailed} vs ${thinStuck}`);
+  const fallback = ai.sentenceFallbackNote(
+    [{ name: 'LSP4J-MCP', spoken: 'Lsp4j-MCP', description: 'bridges language servers over MCP', date: '2026-03-01', status: 'LAUNCHED', link: 'https://github.com/s/lsp', icon: null, source: 'github' }],
+    { who: 'Stephanj' },
+  );
+  assert.match(fallback, /language servers|MCP/i);
+  assert.doesNotMatch(fallback, /showed up|stuck/i);
   const sealed = ai.finish(
     [{ name: 'PHOTOAI', spoken: 'PhotoAI', description: 'headshots', date: '2026-01-20', status: 'LAUNCHED', link: 'https://photoai.com', icon: null, source: 'site' }],
     '',

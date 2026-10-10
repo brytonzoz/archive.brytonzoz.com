@@ -593,12 +593,31 @@ export function mergeChangelog(lists: ChangelogFound[][]): ChangelogFound[] {
   return out;
 }
 
-/** Every generic extractor on one page: HTML text + optional raw HTML + feeds already inlined. */
-/** `<time>2026-10-08</time>` next to an `<h3>` — docs changelogs (Codex, API, many Mintlify/Starlight sites). */
+function resolvePageUrl(href: string | undefined, base: string): string {
+  if (!href || /^(javascript:|#)/i.test(href)) return base;
+  try {
+    return publicUrl(new URL(href, base).toString()) || base;
+  } catch {
+    return base;
+  }
+}
+
+function headingHref(chunk: string, headingIndex: number, titleHtml: string, base: string): string {
+  const inner = titleHtml.match(/<a\b[^>]*href=["']([^"']+)["']/i)?.[1];
+  if (inner) return resolvePageUrl(inner, base);
+  const before = chunk.slice(Math.max(0, headingIndex - 240), headingIndex);
+  const wrapped = before.match(/<a\b[^>]*href=["']([^"']+)["'][^>]*>\s*$/i)?.[1];
+  if (wrapped) return resolvePageUrl(wrapped, base);
+  const after = chunk.slice(headingIndex, headingIndex + 280);
+  const nearby = after.match(/<a\b[^>]*href=["']([^"'#]+\/(?:changelog|index|sora|device)\/[^"']+)["']/i)?.[1];
+  return resolvePageUrl(nearby, base);
+}
+
+/** `<time datetime>` then every card heading until the next time — Vercel groups many h3s under one day. */
 export function itemsFromTimedHeadings(html: string, url: string, year: number): ChangelogFound[] {
   const found: ChangelogFound[] = [];
   const seen = new Set<string>();
-  const add = (dateRaw: string, titleHtml: string) => {
+  const add = (dateRaw: string, titleHtml: string, link = url) => {
     const date = parseFlexibleDate(tidy(dateRaw.replace(/<[^>]+>/g, ' ')), year);
     const span = titleHtml.match(/<span\b[^>]*>([\s\S]*?)<\/span>/i)?.[1];
     const name = cleanTitle(
@@ -607,20 +626,27 @@ export function itemsFromTimedHeadings(html: string, url: string, year: number):
     const key = loose(name);
     if (!date || !name || key.length < 3 || seen.has(key)) return;
     seen.add(key);
-    const item = row(name, date, url, year);
+    const item = row(name, date, link, year);
     if (item) found.push(item);
   };
-  const timeThenHeading = new RegExp(
-    `<time\\b([^>]*)>([\\s\\S]*?)</time>[\\s\\S]{0,500}?<h[1-4]\\b[^>]*>([\\s\\S]*?)</h[1-4]>`,
-    'gi',
-  );
+  const times = [...html.matchAll(/<time\b([^>]*)>([\s\S]*?)<\/time>/gi)].map((match) => ({
+    index: match.index ?? 0,
+    end: (match.index ?? 0) + match[0].length,
+    date: match[1].match(/datetime=["']([^"']+)["']/i)?.[1] || match[2],
+  }));
+  for (let i = 0; i < times.length; i++) {
+    const start = times[i].end;
+    const end = i + 1 < times.length ? times[i + 1].index : Math.min(html.length, start + 12_000);
+    const chunk = html.slice(start, end);
+    const headings = [...chunk.matchAll(/<h[2-4]\b[^>]*>([\s\S]*?)<\/h[2-4]>/gi)].slice(0, 24);
+    for (const heading of headings) {
+      add(times[i].date, heading[1], headingHref(chunk, heading.index ?? 0, heading[1], url));
+    }
+  }
   const headingThenTime = new RegExp(
     `<h[1-4]\\b[^>]*>([\\s\\S]*?)</h[1-4]>[\\s\\S]{0,500}?<time\\b([^>]*)>([\\s\\S]*?)</time>`,
     'gi',
   );
-  for (const match of html.matchAll(timeThenHeading)) {
-    add(match[1].match(/datetime=["']([^"']+)["']/i)?.[1] || match[2], match[3]);
-  }
   for (const match of html.matchAll(headingThenTime)) {
     add(match[2].match(/datetime=["']([^"']+)["']/i)?.[1] || match[3], match[1]);
   }

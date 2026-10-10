@@ -1,0 +1,36 @@
+{
+  "year": 2026,
+  "companies": [
+    {
+      "company": "OpenAI",
+      "products": ["Codex", "ChatGPT"],
+      "sites": ["https://openai.com/", "https://developers.openai.com/", "https://learn.chatgpt.com/"]
+    },
+    { "company": "Anthropic", "products": ["Claude"], "sites": ["https://www.anthropic.com/", "https://docs.anthropic.com/"] },
+    { "company": "Cursor", "products": ["Cursor"], "sites": ["https://cursor.com/", "https://docs.cursor.com/"] },
+    { "company": "Vercel", "sites": ["https://vercel.com/"] },
+    { "company": "Replit", "sites": ["https://replit.com/", "https://blog.replit.com/"] },
+    { "company": "Higgsfield", "sites": ["https://higgsfield.ai/"] },
+    { "company": "xAI", "products": ["Grok"], "sites": ["https://x.ai/"] },
+    { "company": "Google DeepMind", "products": ["Gemini"], "sites": ["https://deepmind.google/", "https://blog.google/"] },
+    { "company": "Meta AI", "products": ["Llama"], "sites": ["https://ai.meta.com/"] },
+    { "company": "Perplexity", "sites": ["https://www.perplexity.ai/"] },
+    { "company": "Lovable", "sites": ["https://lovable.dev/"] },
+    { "company": "Bolt", "sites": ["https://bolt.new/"] },
+    { "company": "Supabase", "sites": ["https://supabase.com/"] },
+    { "company": "Linear", "sites": ["https://linear.app/"] },
+    { "company": "Notion", "sites": ["https://www.notion.so/", "https://www.notion.com/"] },
+    { "company": "Figma", "sites": ["https://www.figma.com/"] },
+    { "company": "Stripe", "sites": ["https://stripe.com/"] },
+    { "company": "Raycast", "sites": ["https://www.raycast.com/"] },
+    { "company": "The Browser Company", "products": ["Arc"], "sites": ["https://thebrowser.company/", "https://arc.net/"] },
+    { "company": "Midjourney", "sites": ["https://www.midjourney.com/"] },
+    { "company": "ElevenLabs", "sites": ["https://elevenlabs.io/"] },
+    { "company": "Runway", "sites": ["https://runwayml.com/"] },
+    { "company": "Suno", "sites": ["https://suno.com/"] },
+    { "company": "Pika", "sites": ["https://pika.art/"] },
+    { "company": "Mistral", "sites": ["https://mistral.ai/"] },
+    { "company": "GitHub", "products": ["Copilot"], "sites": ["https://github.blog/", "https://github.com/"] },
+    { "company": "Shopify", "sites": ["https://www.shopify.com/"] }
+  ]
+}

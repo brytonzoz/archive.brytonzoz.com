@@ -4,6 +4,7 @@
 import { extraResearchPaths, itemsFromProjectList } from './shipped-research';
 import { companyOrgGuess, companyScope, companySlug, companyTokens, leadProductTokens, type Affiliation } from './shipped-affiliation';
 import { type XaiEnv, type XaiSpend, emptyXaiSpend } from './shipped-xai';
+import { stripVia, type CompanyStore } from './shipped-company-store';
 import {
   cached,
   clean,
@@ -42,6 +43,7 @@ type FetchCtx = {
   tinyfish: TinyfishAccess;
   left: { n: number };
   used: number;
+  blocked: string[];
 };
 
 export function looksBlockedPage(text: string, title = ''): boolean {
@@ -158,7 +160,7 @@ async function mapLimit<T, R>(items: T[], n: number, fn: (item: T) => Promise<R>
   return out;
 }
 
-async function fetchText(url: string, maxBytes: number, types?: string[]): Promise<{ url: string; text: string } | null> {
+async function fetchText(url: string, maxBytes: number, types?: string[], blocked?: string[]): Promise<{ url: string; text: string } | null> {
   const safe = publicUrl(url);
   if (!safe) return null;
   const page = await safeFetch(safe, {
@@ -168,9 +170,15 @@ async function fetchText(url: string, maxBytes: number, types?: string[]): Promi
     types,
     userAgent: UA,
   }).catch(() => null);
-  if (!page) return null;
+  if (!page) {
+    if (blocked && isPriorityCompanyUrl(safe)) blocked.push(safe);
+    return null;
+  }
   const text = new TextDecoder().decode(page.bytes);
-  if (looksBlockedPage(text)) return null;
+  if (looksBlockedPage(text)) {
+    if (blocked && isPriorityCompanyUrl(safe)) blocked.push(safe);
+    return null;
+  }
   return { url: page.url || safe, text };
 }
 
@@ -232,8 +240,8 @@ async function fetchViaTinyfish(urls: string[], ctx: FetchCtx | undefined): Prom
   return pages.map(companyPageFromTinyfish).filter((page): page is CompanyPage => Boolean(page));
 }
 
-export async function readCompanyPage(siteUrl: string): Promise<CompanyPage | null> {
-  const fetched = await fetchText(siteUrl, 2_500_000, ['text/html', 'application/xhtml', 'text/xml', 'application/xml']);
+export async function readCompanyPage(siteUrl: string, blocked?: string[]): Promise<CompanyPage | null> {
+  const fetched = await fetchText(siteUrl, 2_500_000, ['text/html', 'application/xhtml', 'text/xml', 'application/xml'], blocked);
   if (!fetched) return null;
   const html = fetched.text.slice(0, 1_800_000);
   const base = fetched.url;
@@ -300,7 +308,7 @@ async function pagesForCompany(
   ];
   const unique = [...new Set(roots)].slice(0, 36);
   const fetched = new Set(unique.map((url) => url.replace(/\/+$/, '')));
-  const pages = await mapLimit(unique, 8, (url) => readCompanyPage(url));
+  const pages = await mapLimit(unique, 8, (url) => readCompanyPage(url, ctx?.blocked));
   const found: Found[] = [];
   const feeds: string[] = [];
   const extraHosts: string[] = [];
@@ -341,7 +349,7 @@ async function pagesForCompany(
     for (const page of fallback) absorb(page);
   }
   if (follow.length) {
-    const more = await mapLimit(follow.slice(0, 10), 6, (url) => readCompanyPage(url));
+    const more = await mapLimit(follow.slice(0, 10), 6, (url) => readCompanyPage(url, ctx?.blocked));
     for (const page of more) absorb(page);
     if (!found.length && ctx?.tinyfish) {
       const extra = await fetchViaTinyfish(follow.filter(isPriorityCompanyUrl).slice(0, 4), ctx);
@@ -364,7 +372,7 @@ function isIndexShipPath(url: string): boolean {
 
 async function harvestFeeds(urls: string[], year: number, ctx?: FetchCtx): Promise<Found[]> {
   const unique = [...new Set(urls)].slice(0, 10);
-  const pages = await mapLimit(unique, 4, (url) => fetchText(url, 4_000_000));
+  const pages = await mapLimit(unique, 4, (url) => fetchText(url, 4_000_000, undefined, ctx?.blocked));
   const found: Found[] = [];
   const absorb = (text: string) => found.push(...itemsFromFeedXml(text, year).map(asFound));
   for (const page of pages) {
@@ -380,14 +388,14 @@ async function harvestFeeds(urls: string[], year: number, ctx?: FetchCtx): Promi
 async function harvestSitemaps(origin: string, year: number, ctx?: FetchCtx): Promise<Found[]> {
   const root = origin.replace(/\/+$/, '');
   const seeds = [`${root}/sitemap.xml`, `${root}/sitemap_index.xml`, `${root}/sitemap-0.xml`];
-  const first = await mapLimit(seeds, 3, (url) => fetchText(url, 2_000_000));
+  const first = await mapLimit(seeds, 3, (url) => fetchText(url, 2_000_000, undefined, ctx?.blocked));
   let xmls = first.filter((page): page is { url: string; text: string } => Boolean(page));
   if (!xmls.length && ctx?.tinyfish) {
     const fallback = await fetchViaTinyfish(seeds, ctx);
     xmls = fallback.map((page) => ({ url: page.url, text: page.text }));
   }
   const children = xmls.flatMap((page) => sitemapChildLocs(page.text));
-  const more = children.length ? await mapLimit(children, 3, (url) => fetchText(url, 2_000_000)) : [];
+  const more = children.length ? await mapLimit(children, 3, (url) => fetchText(url, 2_000_000, undefined, ctx?.blocked)) : [];
   return mergeChangelog([...xmls, ...more.filter(Boolean)].map((page) => itemsFromSitemap(page!.text, year))).map(asFound);
 }
 
@@ -596,26 +604,48 @@ export async function harvestCompany(opts: {
   gapFillX?: boolean;
   /** When first-party hosts block Worker IPs, TinyFish Fetch reads changelog/blog/news pages. */
   tinyfish?: TinyfishAccess;
+  /** Off-worker lists written by the company-cache GitHub Action (D1/R2). */
+  store?: CompanyStore;
+  /** Ignore isolate + off-worker caches (Actions rebuild). */
+  rebuild?: boolean;
+  /** Extra first-party hosts from the seed list (docs/learn/developers). */
+  extraSites?: string[];
 }): Promise<CompanyHarvest> {
   const { affiliation, year, env } = opts;
   const slug = companySlug(affiliation.company);
   if (!slug || companyScope(affiliation) === 'none') {
     return { found: [], spend: emptyXaiSpend(), ran: [], cacheHit: false };
   }
+  const via = viaFor(affiliation);
+  if (!opts.rebuild && opts.store) {
+    const off = await opts.store.get(year, slug);
+    if (off) {
+      const scoped = scopeFilter(affiliation, stripVia(off.found));
+      if (scoped.length || companyScope(affiliation) === 'all') {
+        return {
+          found: withVia(scoped, via),
+          spend: emptyXaiSpend(),
+          ran: ['company-offworker', ...off.ran.slice(0, 8)],
+          cacheHit: true,
+        };
+      }
+    }
+  }
   const cacheKey = opts.deep ? `company:deep:v13:${year}:${slug}` : `company:v15:${year}:${slug}`;
-  const harvested = await cached(
-    cacheKey,
-    7 * 1440 * MIN,
-    async () => {
+  const load = async (): Promise<CompanyHarvest> => {
     const via = viaFor(affiliation);
     const ran: string[] = [];
     const found: Found[] = [];
     const spend = emptyXaiSpend();
-    const ctx: FetchCtx | undefined = opts.tinyfish
-      ? { tinyfish: opts.tinyfish, left: { n: TINYFISH_COMPANY_CAP }, used: 0 }
-      : undefined;
+    const ctx: FetchCtx = {
+      tinyfish: opts.tinyfish ?? null,
+      left: { n: TINYFISH_COMPANY_CAP },
+      used: 0,
+      blocked: [],
+    };
     const seeds = [
       affiliation.companySite,
+      ...(opts.extraSites ?? []),
       ...hostGuesses(affiliation.company ?? ''),
       ...hostGuesses(affiliation.product ?? ''),
     ].filter((u): u is string => Boolean(u));
@@ -722,7 +752,7 @@ export async function harvestCompany(opts: {
         // Prefer a direct HTML read: TinyFish markdown is short, and docs hosts like learn.* often allow Worker fetches.
         const missing: string[] = [];
         for (const url of urls) {
-          const htmlPage = await readCompanyPage(url);
+          const htmlPage = await readCompanyPage(url, ctx?.blocked);
           if (htmlPage) absorbPage(htmlPage);
           else missing.push(url);
         }
@@ -781,10 +811,57 @@ export async function harvestCompany(opts: {
       ran.push('company-x:skipped-first-party');
     }
 
-    if (ctx?.used) ran.push(`company-tinyfish-urls:${ctx.used}`);
+    if (ctx.used) ran.push(`company-tinyfish-urls:${ctx.used}`);
+
+    if (found.length < 12 && ctx.blocked.length) {
+      try {
+        const { browseShipPage, xaiConfigured } = await import('./shipped-xai');
+        if (xaiConfigured(env)) {
+          const blockedChangelogs = [...new Set(ctx.blocked.filter((url) => /changelog|releases?|whats-new|docs\//i.test(url)))].slice(0, 3);
+          for (const url of blockedChangelogs) {
+            const browsed = await browseShipPage({ env, url, year, who: affiliation.company || slug });
+            if (browsed.found.length) {
+              found.push(...withVia(browsed.found, via));
+              ran.push(`company-xai-browse:${hostOf(url)}`);
+            }
+            Object.assign(spend, {
+              inputTokens: spend.inputTokens + browsed.spend.inputTokens,
+              outputTokens: spend.outputTokens + browsed.spend.outputTokens,
+              posts: spend.posts + browsed.spend.posts,
+              profiles: spend.profiles + browsed.spend.profiles,
+              web: spend.web + browsed.spend.web,
+              ticks: spend.ticks + browsed.spend.ticks,
+              costMicros: spend.costMicros + browsed.spend.costMicros,
+            });
+          }
+        }
+      } catch {
+        ran.push('company-xai-browse:miss');
+      }
+    }
+
     return { found, spend, ran, cacheHit: false };
-    },
-    (harvest) => harvest.found.length > 0,
-  );
+  };
+  const harvested = opts.rebuild
+    ? await load()
+    : await cached(cacheKey, 7 * 1440 * MIN, load, (harvest) => harvest.found.length > 0);
+
+  if (!opts.rebuild && opts.store && harvested.found.length < 8) {
+    const fresh = await opts.store
+      .queue({
+        slug,
+        company: affiliation.company || slug,
+        product: affiliation.product,
+        site: affiliation.companySite || opts.extraSites?.[0] || null,
+      })
+      .catch(() => false);
+    if (fresh) await opts.store.dispatch?.(slug).catch(() => undefined);
+    ranNote(harvested, 'company-queued');
+  }
+
   return { ...harvested, found: scopeFilter(affiliation, harvested.found) };
+}
+
+function ranNote(harvest: CompanyHarvest, note: string) {
+  if (!harvest.ran.includes(note)) harvest.ran.push(note);
 }

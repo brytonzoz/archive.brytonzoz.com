@@ -500,3 +500,25 @@ export async function searchWebShips(opts: {
   );
   return { found, spend: result.spend };
 }
+
+/** One web_search on a known changelog URL that the Worker could not fetch (~$0.005). */
+export async function browseShipPage(opts: {
+  env: XaiEnv;
+  url: string;
+  year: number;
+  who: string;
+}): Promise<{ found: Found[]; spend: XaiSpend }> {
+  if (!xaiConfigured(opts.env) || !publicUrl(opts.url)) return { found: [], spend: emptyXaiSpend() };
+  const prompt = [
+    `Read this public page and list every ${opts.year} product, feature, model, app, or release by ${opts.who}: ${opts.url}`,
+    `Use web_search (one call) for that exact URL. Do not invent names. Skip tutorials, ads, and policy posts.`,
+    `JSON only: {"ships":[{"name":"","date":"YYYY-MM-DD or null","url":"https://...","why":""}]}`,
+  ].join('\n');
+  const result = await xaiResponses(opts.env, {
+    input: [{ role: 'user', content: prompt }],
+    tools: [{ type: 'web_search' }],
+    max_turns: 2,
+  });
+  if (!result) return { found: [], spend: emptyXaiSpend() };
+  return { found: parseShips(outputText(result.body), opts.year).slice(0, 40), spend: result.spend };
+}

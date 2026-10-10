@@ -1,5 +1,6 @@
 import './resolve-ts.mjs';
 import assert from 'node:assert/strict';
+import { readFileSync } from 'node:fs';
 import { test } from 'node:test';
 
 const changelog = await import('../worker/shipped-changelog.ts');
@@ -211,4 +212,113 @@ test('blocked challenge pages are dropped; TinyFish markdown still extracts date
   assert.ok(page);
   const items = changelog.itemsFromCompanyPage({ text: page.text, html: page.html, url: page.url, year: 2026, links: page.links });
   assert.ok(items.some((item) => /0\.145\.0/.test(item.name) && item.date === '2026-07-21'), JSON.stringify(items));
+});
+
+test('off-worker cache is preferred and scoped on read', async () => {
+  const storeMod = await import('../worker/shipped-company-store.ts');
+  const cached = [
+    {
+      name: 'Codex CLI 0.145.0',
+      description: 'CLI',
+      date: '2026-07-21',
+      link: 'https://developers.openai.com/codex/changelog',
+      source: 'changelog',
+      status: 'LAUNCHED',
+      score: 7,
+      thisYear: true,
+      via: 'via OpenAI',
+    },
+    {
+      name: 'ChatGPT Images 2.5',
+      description: 'images',
+      date: '2026-06-01',
+      link: 'https://openai.com/index/images',
+      source: 'changelog',
+      status: 'LAUNCHED',
+      score: 7,
+      thisYear: true,
+    },
+  ];
+  const store = {
+    async get() {
+      return { fetchedAt: Date.now(), slug: 'openai', year: 2026, found: storeMod.stripVia(cached), ran: ['gha'] };
+    },
+    async queue() {
+      return false;
+    },
+  };
+  const lead = { ...affiliation.emptyAffiliation(), company: 'OpenAI', role: 'lead', product: 'Codex', typedCompany: true };
+  const got = await company.harvestCompany({ affiliation: lead, year: 2026, env: {}, store });
+  assert.equal(got.cacheHit, true);
+  assert.ok(got.ran.includes('company-offworker'));
+  assert.ok(got.found.some((item) => /codex cli/i.test(item.name)));
+  assert.ok(!got.found.some((item) => /images/i.test(item.name)));
+  assert.ok(got.found.every((item) => item.via === 'via OpenAI · Codex'));
+
+  const ceo = { ...affiliation.emptyAffiliation(), company: 'OpenAI', role: 'ceo', typedCompany: true };
+  const all = await company.harvestCompany({ affiliation: ceo, year: 2026, env: {}, store });
+  assert.equal(all.found.length, 2);
+  assert.ok(all.found.every((item) => item.via === 'via OpenAI'));
+});
+
+test('seed list includes OpenAI Codex plus the companies Bryton will look up', () => {
+  const seeds = JSON.parse(readFileSync(new URL('../data/shipped-companies.json', import.meta.url), 'utf8'));
+  const openai = seeds.companies.find((row) => row.company === 'OpenAI');
+  assert.ok(openai, 'OpenAI seed');
+  assert.ok(openai.products.includes('Codex'));
+  assert.ok(openai.products.includes('ChatGPT'));
+  assert.ok(openai.sites.some((site) => /learn\.chatgpt\.com/.test(site)));
+  assert.ok(openai.sites.some((site) => /developers\.openai\.com/.test(site)));
+  const names = seeds.companies.map((row) => row.company);
+  for (const need of [
+    'Anthropic',
+    'Cursor',
+    'Vercel',
+    'Replit',
+    'Higgsfield',
+    'xAI',
+    'Google DeepMind',
+    'Meta AI',
+    'Perplexity',
+    'Lovable',
+    'Bolt',
+    'Supabase',
+    'Linear',
+    'Notion',
+    'Figma',
+    'Stripe',
+    'Raycast',
+    'The Browser Company',
+    'Midjourney',
+    'ElevenLabs',
+    'Runway',
+    'Suno',
+    'Pika',
+    'Mistral',
+    'GitHub',
+    'Shopify',
+  ]) {
+    assert.ok(names.includes(need), need);
+  }
+});
+
+test('off-worker cache payload expires after 7 days', async () => {
+  const storeMod = await import('../worker/shipped-company-store.ts');
+  const fresh = storeMod.parseOffworkerCache({
+    fetchedAt: Date.now(),
+    slug: 'openai',
+    year: 2026,
+    found: [{ name: 'Codex CLI', description: '', date: '2026-07-21', link: 'https://developers.openai.com/codex/changelog', source: 'changelog', status: 'LAUNCHED', score: 7, thisYear: true }],
+    ran: [],
+  });
+  assert.ok(fresh);
+  assert.equal(fresh.found.length, 1);
+  const stale = storeMod.parseOffworkerCache({
+    fetchedAt: Date.now() - 8 * 24 * 60 * 60 * 1000,
+    slug: 'openai',
+    year: 2026,
+    found: fresh.found,
+    ran: [],
+  });
+  assert.equal(stale, null);
 });

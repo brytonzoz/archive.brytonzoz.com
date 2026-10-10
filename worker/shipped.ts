@@ -50,6 +50,7 @@ import {
   type SaleKind,
 } from '../lib/shipped-upgrade';
 import { brandIcon, candidatesFromIdentity, clean, faviconUrl, gather, hostOf, readSite, resolveIdentity, tinyfishAccess, type SourceEnv } from './shipped-sources';
+import { makeCompanyStore } from './shipped-company-store';
 import { TINYFISH_DAILY, type TinyfishKind, type TinyfishMeter } from './shipped-tinyfish';
 import { checkFetchUrl, finalUrl } from './shipped-fetch';
 import {
@@ -260,6 +261,11 @@ const SCHEMA = [
     created_at INTEGER NOT NULL, paid_at INTEGER, shipped_at INTEGER, note TEXT)`,
   'CREATE INDEX IF NOT EXISTS print_orders_status ON print_orders (status)',
   'CREATE UNIQUE INDEX IF NOT EXISTS print_orders_checkout ON print_orders (checkout_id)',
+  `CREATE TABLE IF NOT EXISTS shipped_company_cache (
+    slug TEXT NOT NULL, year INTEGER NOT NULL, n INTEGER NOT NULL, found TEXT NOT NULL,
+    r2_key TEXT, fetched_at INTEGER NOT NULL, PRIMARY KEY (slug, year))`,
+  `CREATE TABLE IF NOT EXISTS shipped_company_queue (
+    slug TEXT PRIMARY KEY, company TEXT NOT NULL, product TEXT, site TEXT, queued_at INTEGER NOT NULL)`,
 ];
 // Columns added after the tables first shipped; "duplicate column" means it's already there.
 const COLUMNS = [
@@ -341,10 +347,26 @@ function sourceNames(env: ShippedEnv): string[] {
   return names;
 }
 
+function gatherEnv(env: ShippedEnv, db: D1Database | null, extra: Partial<SourceEnv> = {}): SourceEnv {
+  return Object.assign(Object.create(env) as ShippedEnv, {
+    companyStore: db ? makeCompanyStore(env, db) : undefined,
+    ...extra,
+  });
+}
+
 async function generatorState(env: ShippedEnv, db: D1Database | null, off?: Set<Switch>): Promise<GeneratorState> {
   const human = humanCheck(env);
   const year = yearOf(env);
-  const base = { turnstileSiteKey: human.kind === 'turnstile' ? human.siteKey : null, human, year, sources: sourceNames(env) };
+  const sources = sourceNames(env);
+  if (db) {
+    const hit = await db
+      .prepare('SELECT 1 AS x FROM shipped_company_cache WHERE slug = ? AND year = ?')
+      .bind('openai', year)
+      .first()
+      .catch(() => null);
+    if (hit) sources.push('company-cache');
+  }
+  const base = { turnstileSiteKey: human.kind === 'turnstile' ? human.siteKey : null, human, year, sources };
   const stop = (reason: string): GeneratorState => ({ ...base, enabled: false, demo: false, reason });
   if (!db) return stop('no-database');
   if (isClosed(env)) return stop('closed');
@@ -598,7 +620,7 @@ async function generate(
 ): Promise<Response> {
   const seed = seedOf(key);
   try {
-    const gathered = await gather(subject, Object.assign(Object.create(env) as typeof env, { xaiMeter: d1XaiMeter(db, env) }), year, tinyfishMeter(db));
+    const gathered = await gather(subject, gatherEnv(env, db, { xaiMeter: d1XaiMeter(db, env) }), year, tinyfishMeter(db));
     if (gathered.profile.name && !hasBlockedWord(gathered.profile.name)) subject.display = clean(gathered.profile.name, 60);
     let model: string | null = null;
     let usage = { input: 0, output: 0, searches: 0, cost: 0 };
@@ -1417,7 +1439,7 @@ async function rerunFullReceipt(db: D1Database, env: ShippedEnv, id: number): Pr
     const meter = saleXaiMeter(xaiSaleAllowanceUsd(env));
     const gathered = await gather(
       current.subject,
-      Object.assign(Object.create(env) as typeof env, { xaiMeter: meter }),
+      gatherEnv(env, db, { xaiMeter: meter }),
       year,
       tinyfishMeter(db),
       { mode: 'full' },
@@ -1998,7 +2020,7 @@ async function reprintReceipt(env: ShippedEnv, db: D1Database, id: number): Prom
   if (!slot) return json({ error: 'busy' }, 503);
   let reserved = 0;
   try {
-    const gathered = await gather(subject, env, year, tinyfishMeter(db));
+    const gathered = await gather(subject, gatherEnv(env, db), year, tinyfishMeter(db));
     if (subject.kind === 'github' && gathered.profile.name && !hasBlockedWord(gathered.profile.name)) subject.display = clean(gathered.profile.name, 60);
     let model: string | null = null;
     let usage = { input: 0, output: 0, searches: 0, cost: 0 };

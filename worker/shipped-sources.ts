@@ -71,6 +71,7 @@ export interface SourceEnv {
   xaiMeter?: import('./shipped-xai').XaiMeter;
   OPENAI_API_KEY?: string;
   OPENAI_API_BASE?: string;
+  companyStore?: import('./shipped-company-store').CompanyStore;
 }
 
 export type DateConfidence = 'exact' | 'year' | 'inferred' | 'unknown';
@@ -1605,7 +1606,7 @@ export async function gather(
   const tinyfish = tinyfishAccess(env, meter);
   const resolved = await resolveIdentity(subject, env, tinyfish);
   const mode: GatherMode = opts?.mode === 'full' ? 'full' : 'free';
-  const key = mode === 'full' ? `gather:full:v17:${year}:${resolved.cacheKey}` : `gather:v26:${year}:${resolved.cacheKey}`;
+  const key = mode === 'full' ? `gather:full:v18:${year}:${resolved.cacheKey}` : `gather:v27:${year}:${resolved.cacheKey}`;
   return cached(
     key,
     1440 * MIN,
@@ -1916,6 +1917,7 @@ async function gatherFresh(
       deep: mode === 'full',
       gapFillX: mode === 'full' || found.length < 6,
       tinyfish,
+      store: env.companyStore,
     });
     if (company.found.length) found.push(...company.found);
     ran.push(...company.ran);

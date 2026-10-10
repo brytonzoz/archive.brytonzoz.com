@@ -1,0 +1,64 @@
+name: Shipped company cache
+
+# First-party changelogs (openai.com, learn.chatgpt.com) 403 from the Worker. Harvest them on
+# Actions, write D1 + R2, then reprint Tibo / thsottiaux / Sam on staging.
+on:
+  schedule:
+    - cron: '0 */6 * * *'
+  workflow_dispatch:
+  repository_dispatch:
+    types: [shipped-company-cache]
+  push:
+    branches: [cursor/shipped-receipt-page-918f]
+    paths:
+      - .github/workflows/shipped-company-cache.yml
+      - scripts/cache-shipped-companies.mjs
+      - data/shipped-companies.json
+      - worker/shipped-company.ts
+      - worker/shipped-company-store.ts
+      - worker/shipped-changelog.ts
+
+permissions:
+  contents: read
+
+concurrency:
+  group: shipped-company-cache
+  cancel-in-progress: false
+
+jobs:
+  harvest:
+    name: Harvest company changelogs
+    runs-on: ubuntu-latest
+    timeout-minutes: 60
+    steps:
+      - uses: actions/checkout@v5
+
+      - uses: actions/setup-node@v5
+        with:
+          node-version: 22
+          cache: npm
+
+      - run: npm ci
+
+      - name: Harvest and write D1 + R2
+        env:
+          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          SHIPPED_GITHUB_TOKEN: ${{ secrets.SHIPPED_GITHUB_TOKEN }}
+          TINYFISH: ${{ secrets.TINYFISH }}
+          TINYFISH_API_KEY: ${{ secrets.TINYFISH_API_KEY }}
+          XAI_KEY: ${{ secrets.XAI_KEY }}
+          XAI_API_KEY: ${{ secrets.XAI_KEY }}
+          OPENAI_KEY: ${{ secrets.OPENAI_KEY }}
+          OPENAI_API_KEY: ${{ secrets.OPENAI_KEY }}
+          PRODUCTHUNT_KEY: ${{ secrets.PRODUCTHUNT_KEY }}
+          PRODUCTHUNT_SECRET: ${{ secrets.PRODUCTHUNT_SECRET }}
+          PRODUCTHUNT_TOKEN: ${{ secrets.PRODUCTHUNT_TOKEN }}
+          ADMIN_PASSWORD: ${{ secrets.ADMIN_PASSWORD }}
+          SHIPPED_YEAR: '2026'
+          SHIPPED_CACHE_ONLY: ${{ github.event.client_payload.slug }}
+        run: |
+          if [ -z "$CLOUDFLARE_API_TOKEN" ]; then
+            echo "::error::CLOUDFLARE_API_TOKEN is required to write the company cache."
+            exit 1
+          fi
+          node --experimental-transform-types --no-warnings scripts/cache-shipped-companies.mjs

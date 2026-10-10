@@ -10,7 +10,7 @@
 import React, { useCallback, useEffect, useRef, useState } from 'react';
 import { press } from './feel';
 import { Ticket } from './paper';
-import { feedFrames, rubber, spring, springStep, stubClip, tornEdge, type SpringConfig } from './physics';
+import { rubber, spring, springStep, stubClip, tornEdge, type SpringConfig } from './physics';
 import { click, motorOff, motorOn, rip, tick, useSound } from './sound';
 
 type JobBase = {
@@ -206,7 +206,15 @@ export function Machine({ job, display, tone, onPrinted, onTorn, tearSignal = 0,
       }, 0);
     };
     p.style.transform = '';
+    const clip = (hidden: number) => {
+      const value = hidden <= 0 ? '' : `inset(0 0 ${hidden}px 0)`;
+      el.style.clipPath = value;
+      el.style.setProperty('-webkit-clip-path', value);
+    };
+    const height = Math.max(1, el.offsetHeight);
+    clip(height);
     if (reducedMotion()) {
+      clip(0);
       const rest = { x: 0, y: REST_Y, r: 0 };
       pos.current = rest;
       p.style.transform = transformOf(rest);
@@ -216,37 +224,30 @@ export function Machine({ job, display, tone, onPrinted, onTorn, tearSignal = 0,
         cancelled = true;
       };
     }
-    const height = Math.max(1, el.offsetHeight);
-    const { frames, duration } = feedFrames(height, shown.key, shown.slip ? 0.45 : shown.fast ? 0.9 : 0.36);
-    const animation = el.animate(
-      frames.map((frame) => ({
-        offset: frame.offset,
-        transform: frame.transform,
-        clipPath: frame.clipPath,
-        // iOS Safari's WAAPI ignores unprefixed clipPath; both names keep the header-first reveal.
-        webkitClipPath: frame.clipPath,
-        easing: frame.easing,
-      })),
-      { duration, fill: 'both' },
-    );
+    const line = 20;
+    const stepMs = shown.slip ? 32 : shown.fast ? 42 : 82;
+    let printed = 0;
     shiver = body.current?.animate(
       [{ transform: 'translateY(0)' }, { transform: 'translateY(0.7px)' }, { transform: 'translateY(-0.3px)' }, { transform: 'translateY(0)' }],
       { duration: 110, iterations: Infinity },
     );
     motorOn();
-    frames
-      .filter((frame, i) => i > 0 && frames[i - 1].clipPath !== frame.clipPath)
-      .filter((_, i) => i % 2 === 0)
-      .forEach((frame) => timers.push(window.setTimeout(tick, frame.offset * duration)));
-    animation.finished
-      .then(() => {
-        if (cancelled) return;
-        shiver?.cancel();
-        motorOff();
-        setPhase('hanging');
-        tell(true, false);
-      })
-      .catch(() => undefined);
+    const feedLine = () => {
+      if (cancelled) return;
+      printed = Math.min(height, printed + line);
+      clip(height - printed);
+      tick();
+      if (printed < height) {
+        timers.push(window.setTimeout(feedLine, stepMs));
+        return;
+      }
+      shiver?.cancel();
+      motorOff();
+      clip(0);
+      setPhase('hanging');
+      tell(true, false);
+    };
+    timers.push(window.setTimeout(feedLine, 40));
     return () => {
       cancelled = true;
       timers.forEach((t) => window.clearTimeout(t));
@@ -275,20 +276,29 @@ export function Machine({ job, display, tone, onPrinted, onTorn, tearSignal = 0,
     if (hidden < 12) return;
     fedHeight.current = height;
     if (phaseRef.current === 'printing' || phaseRef.current === 'tearing' || reducedMotion()) return;
-    const { frames, duration } = feedFrames(hidden, `${shown.key}:grow:${revision}`, 0.55);
+    const clip = (left: number) => {
+      const value = left <= 0 ? '' : `inset(0 0 ${left}px 0)`;
+      el.style.clipPath = value;
+      el.style.setProperty('-webkit-clip-path', value);
+    };
+    let left = hidden;
+    clip(left);
     motorOn();
-    const animation = el.animate(
-      frames.map((frame) => ({
-        offset: frame.offset,
-        clipPath: frame.clipPath,
-        webkitClipPath: frame.clipPath,
-        easing: frame.easing,
-      })),
-      { duration: Math.min(duration, 1600), fill: 'none' },
-    );
-    animation.finished.then(() => motorOff()).catch(() => motorOff());
+    const timers: number[] = [];
+    const step = () => {
+      left = Math.max(0, left - 20);
+      clip(left);
+      tick();
+      if (left > 0) {
+        timers.push(window.setTimeout(step, 70));
+        return;
+      }
+      clip(0);
+      motorOff();
+    };
+    timers.push(window.setTimeout(step, 40));
     return () => {
-      animation.cancel();
+      timers.forEach((t) => window.clearTimeout(t));
       motorOff();
     };
   }, [live, shown.key, shown.kind, revision]);

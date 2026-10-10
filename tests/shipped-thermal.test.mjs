@@ -102,6 +102,7 @@ test('long tapes print significance group headers without a status tilde', () =>
   assert.ok(text.includes('NOTABLE LAUNCH'), text);
   assert.ok(text.includes('MINOR FIX'), text);
   assert.ok(text.includes('via OpenAI · Codex'), text);
+  assert.equal(text.includes('via OpenAI · Codex  A real line'), false, 'via and the description are not one run-on line');
   assert.equal(
     doc.lines.some((line) => line.kind === 'lead' && String(line.right).includes('~')),
     false,

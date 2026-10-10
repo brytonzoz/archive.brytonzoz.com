@@ -112,8 +112,9 @@ export function receiptToDoc(receipt: ThermalReceipt): PrintDoc {
       else if (printed > 0 && group.label) feed(receipt.compact ? 4 : 10);
       if (item.logo && !receipt.compact) lines.push({ kind: 'logo', src: item.logo, align: 'left' });
       lead(lines, item.name, item.status, { bold: true });
-      if (!receipt.compact && (item.description || item.date || item.via)) {
-        const detail = [item.via, item.description, item.date].filter(Boolean).join('  ');
+      if (!receipt.compact && item.via) text(lines, item.via, 'left', { small: true, faint: true });
+      if (!receipt.compact && (item.description || item.date)) {
+        const detail = [item.description, item.date].filter(Boolean).join('  ');
         text(lines, detail, 'left', { small: true });
       }
       printed += 1;

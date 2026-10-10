@@ -128,7 +128,7 @@ const ORDER_ERRORS: Record<string, string> = {
 function MailedPrint({ receipt }: { receipt: Printed }) {
   const state = useShippedState();
   const human = useRef<HumanCheckHandle>(null);
-  const [token, setToken] = useState<string | null>(null);
+  const [, setToken] = useState<string | null>(null);
   const [asked, setAsked] = useState(false);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -169,7 +169,8 @@ function MailedPrint({ receipt }: { receipt: Printed }) {
   async function order() {
     setBusy(true);
     setError(null);
-    const humanToken = token ?? (await human.current?.execute()) ?? null;
+    human.current?.reset();
+    const humanToken = (await human.current?.execute()) ?? null;
     if (!humanToken) {
       setBusy(false);
       setAsked(true);
@@ -223,7 +224,7 @@ function MailedPrint({ receipt }: { receipt: Printed }) {
 function UpgradePay({ receipt, kind }: { receipt: Printed; kind: 'full' | 'bundle' }) {
   const state = useShippedState();
   const human = useRef<HumanCheckHandle>(null);
-  const [token, setToken] = useState<string | null>(null);
+  const [, setToken] = useState<string | null>(null);
   const [asked, setAsked] = useState(false);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -247,7 +248,8 @@ function UpgradePay({ receipt, kind }: { receipt: Printed; kind: 'full' | 'bundl
   async function order() {
     setBusy(true);
     setError(null);
-    const humanToken = token ?? (await human.current?.execute()) ?? null;
+    human.current?.reset();
+    const humanToken = (await human.current?.execute()) ?? null;
     if (!humanToken) {
       setBusy(false);
       setAsked(true);

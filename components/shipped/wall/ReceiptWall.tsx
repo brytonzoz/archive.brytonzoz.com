@@ -27,9 +27,7 @@ export function ReceiptWall({ page = false }: { page?: boolean }) {
   const [next, setNext] = useState<number | null>(null);
   const [total, setTotal] = useState(0);
   const [ready, setReady] = useState(false);
-  const [width, setWidth] = useState(() =>
-    typeof window === 'undefined' ? 320 : Math.max(280, Math.round(window.innerWidth - 32)),
-  );
+  const [width, setWidth] = useState(320);
   const [view, setView] = useState({ top: 0, height: 800 });
   const [crumpled, setCrumpledIds] = useState<Set<number>>(() => new Set());
   const [focus, setFocus] = useState<number | null>(null);

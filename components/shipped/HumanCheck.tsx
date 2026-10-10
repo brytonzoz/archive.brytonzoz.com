@@ -82,7 +82,9 @@ export const HumanCheck = forwardRef<HumanCheckHandle, Props>(function HumanChec
       else setRound((n) => n + 1);
     },
     execute: async () => {
-      if (token.current) return token.current;
+      token.current = null;
+      onToken(null);
+      if (checkRef.current?.kind === 'turnstile') turnstile.current?.reset();
       const start = Date.now();
       while (!checkRef.current && Date.now() - start < 8_000) {
         await new Promise((resolve) => window.setTimeout(resolve, 50));

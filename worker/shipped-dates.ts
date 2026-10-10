@@ -258,7 +258,7 @@ function isOwnedPin(
   item: { name?: string; date?: string | null; link?: string | null; source?: string; description?: string },
   owner?: OwnerContext | null,
 ): boolean {
-  if (item.source !== 'site' && item.source !== 'web' && item.source !== 'npm') return false;
+  if (item.source !== 'site' && item.source !== 'web') return false;
   return ownedByBuilder(item, owner);
 }
 
@@ -309,7 +309,8 @@ export async function dateOwnedPins<T extends { name: string; date: string | nul
       });
       for (const url of urls.slice(0, 3)) {
         evidence.push(...(await evidenceForUrl(url)));
-        if (evidence.some((row) => row.source === 'archive.org' || row.source === 'appstore' || row.source === 'producthunt' || row.source === 'github')) break;
+        // Keep going until a pre-year first-launch record shows up; a 2026 article must not hide a 2024 domain.
+        if (evidence.some((row) => Number(row.date.slice(0, 4)) < year && (row.source === 'archive.org' || row.source === 'appstore' || row.source === 'producthunt' || row.source === 'github'))) break;
       }
       // Copyright only from the product page, never the maker's portfolio footer.
       const productPage = urls.find((url) => !STORE_HOST.test(hostOf(url) ?? ''));

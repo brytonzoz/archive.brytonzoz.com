@@ -51,6 +51,7 @@ test('schema: only documented keys, only sourced items, only links the sources r
     'name',
     'significance',
     'source',
+    'spoken',
     'status',
     'via',
   ]);

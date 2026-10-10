@@ -1,6 +1,7 @@
 // Reprint wall receipts via POST /api/admin/shipped { action: 'reprint-receipt', affiliation? }.
 // Names and counts only. Never prints the admin password or receipt bodies.
-// Push-default FORCE_IDS: 16, 17, 18, 19, 20 (Tibo, Cursor, jackfriks, Zod, Theo).
+// Push-default FORCE_IDS: 6, 7, 13, 16, 17, 18, 19, 20
+// (levelsio, Guillermo, Sam, Tibo, Cursor, jackfriks, Zod, Theo).
 // After 7bdfa60: undated changelog rows stay, handle.com pins, musl rollup.
 // After 712cf78: thisYear survives polish; #16 attaches OpenAI cache.
 // After 5dd73e8: friend homepages are not project lists.
@@ -37,6 +38,7 @@ const AFFILIATION_BY_ID = {
   16: { company: 'OpenAI', role: 'lead' },
   17: { company: 'Cursor', role: 'ceo' },
   13: { company: 'OpenAI', role: 'ceo' },
+  7: { company: 'Vercel', role: 'ceo' },
 };
 
 const DEFAULT_TARGETS = [

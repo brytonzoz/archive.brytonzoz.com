@@ -621,3 +621,69 @@ test('sitemap slugs become flagship names and june-2026 slugs get a day', () => 
   assert.ok(bugbot);
   assert.equal(bugbot.date, '2026-06-01');
 });
+
+test('vague leftover headings drop; spoken names keep source casing', () => {
+  assert.equal(polish.isVagueOrCutTitle('CHATGPT WORK OR CODEX CHAT AND WORK'), true);
+  assert.equal(polish.isVagueOrCutTitle('PETS CONTROLS IN THE CHATGPT DESKTOP'), true);
+  assert.equal(polish.isVagueOrCutTitle('CLOUD WORK'), true);
+  assert.equal(polish.isVagueOrCutTitle('NEW CONTROLS FOR LONG-RUNNING WORK'), true);
+  assert.equal(polish.isJunkTitle('NUMBER'), true);
+  assert.equal(polish.spokenShipName('TSC-RS'), 'tsc-rs');
+  assert.equal(polish.spokenShipName('BOTID'), 'BotID');
+  assert.equal(polish.spokenShipName('TSC-RS', 'tsc-rs'), 'tsc-rs');
+  assert.equal(polish.spokenShipName('BOTID', 'BotID'), 'BotID');
+  assert.equal(polish.displayShipName('CODEX APP'), 'Codex app');
+  const leftover = polish.polishCandidates(
+    [
+      found({ name: 'CHATGPT WORK OR CODEX CHAT AND WORK', date: '2026-04-01', link: 'https://developers.openai.com/codex/or' }),
+      found({ name: 'PETS CONTROLS IN THE CHATGPT DESKTOP', date: '2026-04-02', link: 'https://openai.com/chatgpt/pets' }),
+      found({ name: 'CLOUD WORK', date: '2026-04-03', link: 'https://developers.openai.com/codex/cloud-work' }),
+      found({ name: 'NEW CONTROLS FOR LONG-RUNNING WORK', date: '2026-04-04', link: 'https://developers.openai.com/codex/controls' }),
+      found({ name: 'Codex CLI', date: '2026-02-14', link: 'https://openai.com/codex' }),
+    ],
+    { year: 2026, who: 'Tibo' },
+  );
+  const leftoverNames = leftover.map((item) => item.name);
+  assert.equal(leftoverNames.some((name) => / or |pets controls|cloud work|new controls/i.test(name)), false, JSON.stringify(leftoverNames));
+  assert.ok(leftoverNames.some((name) => /codex cli/i.test(name)));
+});
+
+test('undated crumbs need ownership plus a description', async () => {
+  const ownership = await import('../worker/shipped-ownership.ts');
+  const colin = { name: 'Colin McDonnell', github: 'colinhacks' };
+  assert.equal(
+    ownership.undatedPassesGate(
+      { name: 'TRPC', description: '', date: null, source: 'npm', link: 'https://www.npmjs.com/package/@trpc/server' },
+      colin,
+    ),
+    false,
+  );
+  assert.equal(
+    ownership.undatedPassesGate(
+      { name: 'NUMBER', description: '', date: null, source: 'npm', link: 'https://www.npmjs.com/package/number' },
+      colin,
+    ),
+    false,
+  );
+  assert.equal(
+    ownership.undatedPassesGate(
+      { name: 'ZOD', description: 'TypeScript-first schema validation', date: '2026-01-15', source: 'npm', link: 'https://www.npmjs.com/package/zod' },
+      colin,
+    ),
+    true,
+  );
+  const items = polish.polishCandidates(
+    [
+      found({ name: 'TRPC', date: null, source: 'npm', link: 'https://www.npmjs.com/package/@trpc/server', description: '' }),
+      found({ name: 'NUMBER', date: null, source: 'npm', link: 'https://www.npmjs.com/package/number', description: '' }),
+      found({ name: 'Zod', date: '2026-01-15', source: 'npm', link: 'https://www.npmjs.com/package/zod', description: 'Schema' }),
+      found({ name: 'Boron', date: '2026-02-01', source: 'github', link: 'https://github.com/colinhacks/boron', description: 'Schema core' }),
+      found({ name: 'Nub', date: '2026-02-08', source: 'github', link: 'https://github.com/colinhacks/nub', description: 'Tiny helper' }),
+      found({ name: 'Frizz', date: null, source: 'github', link: 'https://github.com/colinhacks/frizz', description: 'A small CSS helper Colin ships' }),
+    ],
+    { year: 2026, who: 'Colin McDonnell', handle: 'colinhacks', owner: colin },
+  );
+  const names = items.map((item) => item.name);
+  assert.equal(names.some((name) => /trpc|number/i.test(name)), false, JSON.stringify(names));
+  assert.ok(names.some((name) => /^zod$/i.test(name)), JSON.stringify(names));
+});

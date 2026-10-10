@@ -105,6 +105,32 @@ export function ownedByBuilder(
   return ownershipEvidence(item, owner) !== 'none';
 }
 
+/** Undated crumbs need real ownership plus a description (or an own-host / own-repo link). */
+export function undatedPassesGate(
+  item: { name?: string; description?: string; link?: string | null; source?: string; date?: string | null },
+  owner?: OwnerContext | null,
+): boolean {
+  if (item.date) return true;
+  const kind = ownershipEvidence(item, owner);
+  if (kind === 'none') return false;
+  const desc = (item.description || '').replace(/\s+/g, ' ').trim();
+  const hasDesc = desc.length >= 12;
+  if (kind === 'company') return true;
+  if (kind === 'developer') {
+    if (githubOwned(item.link, owner)) return true;
+    const host = hostOf(item.link);
+    if (host === 'npmjs.com' || host === 'www.npmjs.com') {
+      const n = loose(item.name || '');
+      return ownerTokens(owner).some((token) => n.includes(token) || token.includes(n));
+    }
+    return hasDesc && hostNamesOwner(host, owner);
+  }
+  if (kind === 'named' || kind === 'portfolio') {
+    return hasDesc || hostNamesOwner(hostOf(item.link), owner);
+  }
+  return false;
+}
+
 export function ownerFromProfile(
   profile?: {
     name?: string | null;

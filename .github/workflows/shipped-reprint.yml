@@ -27,7 +27,7 @@ on:
       ids:
         description: Comma-separated receipt ids (e.g. 17,13)
         required: true
-        default: '16,17,18,19,20'
+        default: '6,7,13,16,17,18,19,20'
       origin:
         description: Shipped origin
         required: true
@@ -58,7 +58,7 @@ jobs:
           ADMIN_PASSWORD: ${{ secrets.ADMIN_PASSWORD }}
           SHIPPED_ORIGIN: ${{ github.event_name == 'workflow_dispatch' && inputs.origin || 'https://shipped-staging.brytonzoz.com' }}
           SHIPPED_REPRINT_FORCE: '1'
-          SHIPPED_REPRINT_FORCE_IDS: ${{ github.event_name == 'workflow_dispatch' && inputs.ids || '16,17,18,19,20' }}
+          SHIPPED_REPRINT_FORCE_IDS: ${{ github.event_name == 'workflow_dispatch' && inputs.ids || '6,7,13,16,17,18,19,20' }}
         run: |
           if [ -z "$ADMIN_PASSWORD" ]; then
             echo "::error::ADMIN_PASSWORD is required to reprint receipts."

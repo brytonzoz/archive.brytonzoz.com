@@ -13,7 +13,7 @@ import {
   logFlagshipGate,
   stripDateSuffix,
 } from './shipped-flagship';
-import { ownedByBuilder, type OwnerContext } from './shipped-ownership';
+import { ownedByBuilder, undatedPassesGate, type OwnerContext } from './shipped-ownership';
 import type { ItemStatus } from '../lib/shipped-year';
 import { ITEM_STATUSES } from '../lib/shipped-year';
 
@@ -223,7 +223,8 @@ export function isJunkTitle(title: string, opts: { who?: string | null; company?
   if (RESEARCH_GERUND.test(text) || CUSTOMER_STORY.test(text) || isAcquisitionNews(text)) return true;
   if (CTA_NAV.test(text) || CTA_TRAIL.test(text)) return true;
   if (/^(download on the|get it on|get the app|affiliates|analytics|available on|filed under|quitting)\b/i.test(text)) return true;
-  if (CODE_TITLE.test(text) || /^(object|query|router)$/i.test(text)) return true;
+  if (CODE_TITLE.test(text) || /^(object|query|router|number|string|boolean|date|type|value|array|null|undefined|any)$/i.test(text)) return true;
+  if (isVagueOrCutTitle(text)) return true;
   if (/\bgithub stars\b|\bweekly downloads\b/i.test(text) && !/\b(zod|nub|tsc|cli|app)\b/i.test(text)) return true;
   if (/^respectively\.?$/i.test(text)) return true;
   if (DOCS_NAV.test(text) || /^(recent highlights|cursor support|under:|blog\s*\/\s*research|blog|research)$/i.test(text)) return true;
@@ -274,6 +275,17 @@ export function isNotAShipTitle(name: string): boolean {
   return false;
 }
 
+/** Cut headings, mashed alternatives, and vague two-word "work/controls" titles. */
+export function isVagueOrCutTitle(name: string): boolean {
+  const text = tidy(name);
+  if (!text) return true;
+  if (/\b or \b/i.test(text)) return true;
+  if (/^cloud work$/i.test(text) || /^new controls\b/i.test(text)) return true;
+  if (/\bin the chatgpt desktop$/i.test(text)) return true;
+  if (/^(pets|cloud|new)\s+[a-z]+$/i.test(text) && !/\b(cli|app|sdk|api|gpt|codex|cursor|chatgpt)\b/i.test(text)) return true;
+  return false;
+}
+
 /** Undated adjective phrases ("Richer JavaScript representation") are changelog copy, not products. */
 export function isChangelogPhrase(name: string, date?: string | null): boolean {
   if (date) return false;
@@ -302,18 +314,69 @@ const SHIP_WORD: Record<string, string> = {
   ts: 'TS',
 };
 
-/** Tape names stay uppercase; notes speak them in natural case (Codex app, not CODEX APP). */
-export function displayShipName(name: string): string {
-  const text = tidy(name);
-  if (!text) return '';
-  const small = new Set(['for', 'the', 'in', 'of', 'and', 'or', 'a', 'an', 'to', 'on', 'at', 'with', 'app']);
+const PROPER_SHIP: Record<string, string> = {
+  ...SHIP_WORD,
+  botid: 'BotID',
+  tscrs: 'tsc-rs',
+  trpc: 'tRPC',
+  zod: 'Zod',
+  shoo: 'Shoo',
+  nub: 'Nub',
+  cn: 'cn',
+  sora: 'Sora',
+  bugbot: 'Bugbot',
+  photoai: 'PhotoAI',
+  interiorai: 'InteriorAI',
+  superlevels: 'SuperLevels',
+  postbridgecli: 'postbridge-cli',
+  postbridge: 'Post Bridge',
+};
+
+const SMALL_SHIP_WORD = new Set(['for', 'the', 'in', 'of', 'and', 'or', 'a', 'an', 'to', 'on', 'at', 'with', 'app']);
+
+function formatSpokenToken(word: string, index: number): string {
+  const key = loose(word);
+  if (PROPER_SHIP[key]) return PROPER_SHIP[key];
+  if (/^[a-z0-9]+(?:-[a-z0-9.]+)+$/.test(word)) return word;
+  if (/[a-z]/.test(word) && /[A-Z]/.test(word) && word !== word.toUpperCase()) return word;
+  if (/^[A-Z][A-Z0-9]*(-[A-Z][A-Z0-9]*)+$/.test(word) && !/\d/.test(word)) return word.toLowerCase();
+  if (word.includes('-')) {
+    return word
+      .split('-')
+      .map((part, partIndex) => formatSpokenToken(part, index + partIndex))
+      .join('-');
+  }
+  const lower = word.toLowerCase();
+  if (SMALL_SHIP_WORD.has(lower) && index > 0) return lower;
+  if (/^\d/.test(word)) return word;
+  return word.charAt(0).toUpperCase() + word.slice(1).toLowerCase();
+}
+
+/**
+ * Spoken product name: keep the source's casing (tsc-rs, BotID) and never
+ * Title-Case a kebab or camel token. Tape ALL-CAPS falls back to PROPER_SHIP.
+ */
+export function spokenShipName(name: string, source?: string | null): string {
+  const original = tidy(source || '');
+  const fallback = tidy(name);
+  if (!original && !fallback) return '';
+  const mapped = PROPER_SHIP[loose(original || fallback)];
+  if (mapped && (original || fallback).split(/\s+/).length <= 3) return mapped;
+  const keepSource =
+    Boolean(original) &&
+    ((/[a-z]/.test(original) && /[A-Z]/.test(original)) || /^[a-z0-9]+(?:-[a-z0-9.]+)+$/.test(original));
+  const input = keepSource ? original : fallback;
   let index = 0;
-  return text.replace(/[A-Za-z0-9.+]+/g, (word) => {
-    const key = word.toLowerCase();
-    const out = SHIP_WORD[key] ?? (small.has(key) && index > 0 ? key : word.charAt(0).toUpperCase() + word.slice(1).toLowerCase());
+  return input.replace(/[A-Za-z0-9.+]+(?:-[A-Za-z0-9.+]+)*/g, (word) => {
+    const out = formatSpokenToken(word, index);
     index += 1;
     return out;
   });
+}
+
+/** Tape names stay uppercase; notes speak them in natural / source case. */
+export function displayShipName(name: string, source?: string | null): string {
+  return spokenShipName(name, source);
 }
 
 const VERSION = String.raw`v?(?:\d{4}\.\d{1,2}\.\d{1,2}|\d{1,3}(?:\.\d+){1,3})`;
@@ -831,6 +894,10 @@ export function polishCandidates<T extends Polishable>(items: T[], opts: PolishO
       (isFlagshipYearKeep(item, year) && item.date ? String(item.date).slice(0, 10) : inYearDate(item.date, year));
     if (isChangelogPhrase(name, date)) {
       drop(item, 'changelog-phrase');
+      continue;
+    }
+    if (opts.owner && !undatedPassesGate({ ...item, name, date }, opts.owner)) {
+      drop(item, 'undated-unowned');
       continue;
     }
     out.push({

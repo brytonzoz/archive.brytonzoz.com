@@ -131,7 +131,7 @@ test('cashier note and stats are specific to the items, never stock copy', () =>
     { name: 'INTERIORAI', description: 'Rooms', date: '2026-04', status: 'LIVE', link: 'https://interiorai.com/', icon: null, source: 'site' },
     { name: 'SUPERLEVELS', description: 'Repo', date: '2026-04-23', status: 'SHIPPED', link: 'https://github.com/levelsio/superlevels', icon: null, source: 'github' },
   ];
-  const note = ai.groundedNote(items, 1, 'levelsio', ['553 GitHub stars SuperLevels · github.com/levelsio/superlevels']);
+  const note = ai.groundedNote(items, 2, 'levelsio', ['553 GitHub stars SuperLevels · github.com/levelsio/superlevels']);
   const clumsy = ai.groundedNote(
     [
       { name: 'LLM-MRCHATTERBOX', description: 'Chat', date: '2026-01', status: 'SHIPPED', link: 'https://github.com/simonw/llm-mrchatterbox', icon: null, source: 'github' },
@@ -183,9 +183,29 @@ test('cashier note and stats are specific to the items, never stock copy', () =>
   assert.equal(ai.cashierNoteLooksCanned('200/mo public revenue. Same maker, more SKUs.'), true);
   assert.equal(ai.noteFailsVoice("Tibo's year is CODEX APP through FASTER STEERING IN CODEX: 55 public lines, all theirs."), true);
   assert.equal(ai.noteFailsVoice("Jack's year lives at https://www.npmjs.com/package/postbridge-cli."), true);
-  assert.equal(ai.noteFailsVoice('levelsio spent the year on Dronesim.com, then Infinite Slop.'), false);
+  assert.equal(ai.noteFailsVoice('levelsio spent the year on Dronesim.com, then Infinite Slop.'), true);
+  assert.equal(ai.noteFailsVoice('Guillermo kept Vercel busy: BotID first, Serve later.'), true);
+  assert.equal(ai.noteFailsVoice('Sam kept OpenAI busy: Codex app first, GPT-5.3-Codex later.'), true);
   assert.equal(ai.cashierNoteLooksCanned("Codex grew long-running work this year, and Tibo's agents now stay clocked in overnight."), true);
   assert.equal(ai.noteFailsVoice('Tibo kept Codex on long-running work, then shipped GitLab support into Codex Cloud.'), false);
+  const styles = [0, 1, 2, 3, 4, 5].map((seed) =>
+    ai.groundedNote(items, seed, 'levelsio', ['553 GitHub stars SuperLevels · github.com/levelsio/superlevels']),
+  );
+  assert.ok(new Set(styles).size >= 3, JSON.stringify(styles));
+  for (const line of styles) {
+    assert.equal(ai.noteFailsVoice(line), false, line);
+    assert.doesNotMatch(line, /kept \w+ busy:|spent the year on .+, then |people will remember|the loud one/i);
+    assert.equal(ai.noteCitesUnknownShip(line, items, 'levelsio'), false, line);
+  }
+  assert.equal(
+    ai.noteCitesUnknownShip('Post Bridge also landed as a ChatGPT plugin.', [{ name: 'POSTBRIDGE-CLI', description: 'CLI' }], 'Jack'),
+    true,
+  );
+  assert.equal(
+    ai.noteCitesUnknownShip('Post Bridge also landed as a ChatGPT plugin.', [{ name: 'POST BRIDGE IN CHATGPT', description: 'Pin' }], 'Jack'),
+    false,
+  );
+  assert.equal(ai.noteCitesUnknownShip('Jack shipped DataFast this year.', [{ name: 'POSTBRIDGE-CLI', description: 'CLI' }], 'Jack'), true);
   assert.doesNotMatch(note, /\blines\b|https?:\/\/|CODEX APP/i);
   assert.doesNotMatch(one, /\blines\b|https?:\/\/|www\./i);
   assert.doesNotMatch(ceo, /\blines\b|https?:\/\/|\b\d+\s+public\s+ships\b/i);

@@ -117,8 +117,16 @@ function tidy(value: unknown): string {
     .normalize('NFKC')
     .replace(/&amp;/gi, '&')
     .replace(/&quot;/gi, '"')
-    .replace(/&#39;|&apos;/gi, "'")
+    .replace(/&#x27;|&#39;|&apos;/gi, "'")
     .replace(/&nbsp;/gi, ' ')
+    .replace(/&#x([0-9a-f]+);/gi, (_, hex: string) => {
+      const code = Number.parseInt(hex, 16);
+      return Number.isFinite(code) ? String.fromCodePoint(code) : '';
+    })
+    .replace(/&#(\d+);/g, (_, dec: string) => {
+      const code = Number.parseInt(dec, 10);
+      return Number.isFinite(code) ? String.fromCodePoint(code) : '';
+    })
     .replace(/[\u0000-\u001f\u007f-\u009f\u200b-\u200f\u2028-\u202e]/g, ' ')
     .replace(/\s+/g, ' ')
     .trim();
@@ -214,7 +222,7 @@ export function isAboutPerson(title: string, who: string | null | undefined): bo
 }
 
 const JOB_TITLE =
-  /\b(software engineer|staff engineer|engineering manager|developer advocate|engineer at|python engineers?)\b/i;
+  /\b(software engineer|staff engineer|engineering manager|developer advocate|director of engineering|engineer at|python engineers?|head of engineering|vp of engineering)\b/i;
 
 function isSelfNameTitle(title: string, opts: { who?: string | null; handle?: string | null } = {}): boolean {
   const text = tidy(title);
@@ -251,7 +259,22 @@ export function isBlogEssayTitle(title: string): boolean {
   if (/^open-weight\b/i.test(text)) return true;
   if (/\bfor (python |javascript |js |typescript )?engineers\b/i.test(text)) return true;
   if (/\bproduction index\b/i.test(text)) return true;
+  if (/\brecap\b/i.test(text)) return true;
+  if (/\b(security boundaries|credential sprawl)\b/i.test(text)) return true;
   return false;
+}
+
+/** Docs pages and blog category indexes are not ships, whatever the heading says. */
+export function isDocsOrCategoryHref(url: string | null | undefined): boolean {
+  if (!url) return false;
+  try {
+    const path = new URL(url).pathname.replace(/\/+$/, '').toLowerCase();
+    if (/^\/docs(?:\/|$)/.test(path)) return true;
+    if (/\/blog\/category(?:\/|$)/.test(path)) return true;
+    return false;
+  } catch {
+    return false;
+  }
 }
 
 const TITLE_MONTH: Record<string, string> = {
@@ -980,6 +1003,10 @@ export function polishCandidates<T extends Polishable>(items: T[], opts: PolishO
       drop(item, 'legacy-family');
       continue;
     }
+    if (isDocsOrCategoryHref(item.link)) {
+      drop(item, 'docs-href');
+      continue;
+    }
     if (opts.owner && !ownedByBuilder({ ...item, name }, opts.owner)) {
       if (flagship) logFlagshipGate(item, 'not-owned', flagship);
       else {
@@ -1043,6 +1070,8 @@ export function polishCandidates<T extends Polishable>(items: T[], opts: PolishO
 }
 
 function isOpenAiCompanyWide(name: string): boolean {
+  if (/\bin codex\b|gpt-[\d.]+-codex|\bcodex and\b/i.test(name)) return false;
+  if (/chatgpt for ios\s*·/i.test(name)) return false;
   return /\b(gpt-?\d|chatgpt|sora|(openai|chatgpt)\s+(device|computer|phone|hardware)|atlas)\b/i.test(name);
 }
 
@@ -1060,11 +1089,20 @@ export function rollupCeoLeadCrumbs<T extends Polishable>(items: T[], affiliatio
     else if (/\bcodex\b/i.test(item.name)) lead.push(item);
     else other.push(item);
   }
-  if (wide.length < 1 || lead.length <= 1) return items;
+  const monthly = other.filter((item) => /·\s*\d+\s+updates?\s+in\s+/i.test(item.name));
+  const rest = other.filter((item) => !/·\s*\d+\s+updates?\s+in\s+/i.test(item.name));
+  const monthKeep = new Map<string, T>();
+  for (const item of monthly) {
+    const product = tidy(item.name).replace(/\s*·\s*\d+\s+updates?\s+in\s+\w+\s*$/i, '').trim() || item.name;
+    const key = loose(product);
+    const prev = monthKeep.get(key);
+    if (!prev || (item.date ?? '') > (prev.date ?? '')) monthKeep.set(key, { ...item, name: product });
+  }
+  if (wide.length < 1 || lead.length <= 1) return [...wide, ...rest, ...monthKeep.values(), ...lead];
   const app =
     lead.find((item) => /^codex app\b/i.test(item.name)) ??
     lead.slice().sort((a, b) => (b.significance ?? 0) - (a.significance ?? 0) || (a.date ?? '').localeCompare(b.date ?? ''))[0];
-  return [...wide, ...other, ...(app ? [app] : [])];
+  return [...wide, ...rest, ...monthKeep.values(), ...(app ? [app] : [])];
 }
 
 /**

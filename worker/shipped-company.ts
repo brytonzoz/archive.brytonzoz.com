@@ -156,7 +156,8 @@ export function compactCompanyFound(found: Found[], cap = COMPANY_CACHE_CAP): Fo
   const out: Found[] = [];
   for (const item of ranked) {
     const key = item.name.toLowerCase().replace(/[^a-z0-9]+/g, '');
-    if (key.length < 4 || seen.has(key)) continue;
+    const letters = item.name.replace(/[^a-zA-Z]/g, '').length;
+    if (key.length < 4 || letters < 3 || seen.has(key)) continue;
     seen.add(key);
     out.push(item);
     if (out.length >= cap) break;

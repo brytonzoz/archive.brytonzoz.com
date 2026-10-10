@@ -95,6 +95,7 @@ const CUSTOMER_STORY =
 const SHIP_PREFIX = /^(introducing|launching|announcing|presenting|meet|say hello to|now available[:\s]+|how to|how|the)\s+/i;
 const BARE_VERSION = /^v?\d+(?:\.\d+){1,4}[a-z0-9.-]*$/i;
 const BARE_YEAR = /^20\d\d(?:-\d{2}){0,2}$/;
+const BARE_ID_SLUG = /^(?:[a-z]+-)?(?:20)?\d{2,4}(?:-\d{2}){1,3}(?:-[a-z0-9]+)*$/i;
 
 function tidy(value: unknown): string {
   if (typeof value !== 'string') return '';
@@ -119,7 +120,8 @@ function clean(value: unknown, max: number): string {
 
 function isNoiseTitle(text: string): boolean {
   if (!text || text.length < 3 || SKIP_TITLE.test(text)) return true;
-  if (BARE_YEAR.test(text) || BARE_VERSION.test(text)) return true;
+  if (BARE_YEAR.test(text) || BARE_VERSION.test(text) || BARE_ID_SLUG.test(text)) return true;
+  if ((text.replace(/[^a-zA-Z]/g, '').length < 3) && /\d/.test(text)) return true;
   if (/^by\s+\S/i.test(text)) return true;
   if (/\bmin(?:ute)?s?\s+read\b/i.test(text)) return true;
   if (ARTICLE_TITLE.test(text) || CUSTOMER_STORY.test(text)) return true;
@@ -573,7 +575,7 @@ export function itemsFromTimedHeadings(html: string, url: string, year: number):
   for (const match of html.matchAll(datedLi)) {
     const date = parseFlexibleDate(match[1], year);
     const heading = match[2].match(/<h[1-4]\b[^>]*>([\s\S]*?)<\/h[1-4]>/i)?.[1] ?? '';
-    if (date) add(date, heading || match[1].split(`${year}-`).pop() || '');
+    if (date && heading) add(date, heading);
   }
   return found;
 }

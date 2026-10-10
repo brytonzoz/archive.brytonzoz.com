@@ -23,7 +23,7 @@ permissions:
 
 concurrency:
   group: shipped-company-cache
-  cancel-in-progress: false
+  cancel-in-progress: true
 
 jobs:
   harvest:

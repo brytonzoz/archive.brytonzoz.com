@@ -151,6 +151,8 @@ test('ship names strip launch words, skip bylines, and never cut mid-word', () =
   assert.equal(changelog.shipName('Replit Agent v0.213.1'), 'Replit Agent v0.213.1');
   assert.equal(changelog.shipName('v0.213.1'), '');
   assert.equal(changelog.shipName('2026'), '');
+  assert.equal(changelog.shipName('6-02-05'), '');
+  assert.equal(changelog.shipName('codex-2026-02-05-cli'), '');
   assert.equal(changelog.shipName('Launched as a desktop'), '');
   assert.equal(changelog.shipName('Rakuten uses Codex to ship faster'), '');
   assert.equal(changelog.shipName('Ramp engineers accelerate code review'), '');

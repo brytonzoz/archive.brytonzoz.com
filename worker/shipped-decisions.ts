@@ -449,14 +449,6 @@ export function shareKeywords(
   // Require a prefix so "Codex Cloud" does not collapse into "GitLab Support in Codex Cloud".
   if (containedName(x, y) && shorter.length >= 10 && longer.startsWith(shorter)) return true;
   const day = (value?: string | null) => (value && /^\d{4}-\d{2}-\d{2}$/.test(value) ? value : '');
-  // Dated changelog cards are different ships even when they share "Codex" + "app".
-  if (day(a.date) && day(b.date) && day(a.date) !== day(b.date) && x !== y) return false;
-  if (containedName(x, y)) return true;
-  const ta = coreTokens(a.name);
-  const tb = coreTokens(b.name);
-  let overlap = 0;
-  for (const token of ta) if (tb.has(token)) overlap += 1;
-  if (overlap >= 2) return true;
   const host = (url: string | null) => {
     try {
       return url ? new URL(url).hostname.replace(/^www\./, '') : '';
@@ -471,10 +463,30 @@ export function shareKeywords(
       return '';
     }
   };
-  const pa = pathOf(a.link);
-  const pb = pathOf(b.link);
+  const hashOf = (url: string | null) => {
+    try {
+      return url ? new URL(url).hash.replace(/^#/, '').toLowerCase() : '';
+    } catch {
+      return '';
+    }
+  };
   const changelogIndex = (path: string) =>
     /\/(changelog|release-notes|whats-new|updates|docs\/changelog|docs\/whats-new)(\/|$)/i.test(path);
+  // Dated changelog cards are different ships even when they share "Codex" + "app".
+  if (day(a.date) && day(b.date) && day(a.date) !== day(b.date) && x !== y) return false;
+  const pa = pathOf(a.link);
+  const pb = pathOf(b.link);
+  if (a.link && b.link && host(a.link) && host(a.link) === host(b.link) && (changelogIndex(pa) || changelogIndex(pb))) {
+    const ha = hashOf(a.link);
+    const hb = hashOf(b.link);
+    if (x !== y && (ha !== hb || pa !== pb)) return false;
+  }
+  if (containedName(x, y)) return true;
+  const ta = coreTokens(a.name);
+  const tb = coreTokens(b.name);
+  let overlap = 0;
+  for (const token of ta) if (tb.has(token)) overlap += 1;
+  if (overlap >= 2) return true;
   if (a.link && b.link && host(a.link) && host(a.link) === host(b.link) && pa && pb && pa !== '/') {
     // One changelog index lists many ships; sharing that URL is not the same launch.
     if (changelogIndex(pa) || changelogIndex(pb)) return false;

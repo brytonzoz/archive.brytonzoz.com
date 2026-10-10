@@ -353,6 +353,20 @@ test('same_ship pairs share keywords; weaker duplicate is dropped', async () => 
   );
   assert.equal(
     decisions.shareKeywords(
+      found({ name: 'Chat while you work', date: '2026-09-16', link: 'https://learn.chatgpt.com/docs/changelog#chat-while' }),
+      found({ name: 'Share an app window', date: '2026-09-16', link: 'https://learn.chatgpt.com/docs/changelog#share-window' }),
+    ),
+    false,
+  );
+  assert.equal(
+    decisions.shareKeywords(
+      found({ name: 'Record & Replay remote handoff', date: '2026-08-04', link: 'https://learn.chatgpt.com/docs/changelog#replay' }),
+      found({ name: 'Record & Replay expands to the EU', date: '2026-08-04', link: 'https://learn.chatgpt.com/docs/changelog#replay-eu' }),
+    ),
+    false,
+  );
+  assert.equal(
+    decisions.shareKeywords(
       found({ name: 'Codex Cloud', date: '2026-09-29', link: 'https://developers.openai.com/codex/cloud' }),
       found({ name: 'GitLab Support in Codex Cloud', date: '2026-08-19', link: 'https://developers.openai.com/codex/changelog#gitlab-19' }),
     ),

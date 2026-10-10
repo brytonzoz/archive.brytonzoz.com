@@ -48,7 +48,7 @@ concurrency:
 jobs:
   reprint:
     name: Reprint receipts (no xAI)
-    if: github.event_name == 'workflow_dispatch' || contains(github.event.head_commit.message, '[shipped-reprint]')
+    if: github.event_name == 'workflow_dispatch' || contains(github.event.head_commit.message, '[shipped-reprint')
     runs-on: ubuntu-latest
     timeout-minutes: 45
     steps:

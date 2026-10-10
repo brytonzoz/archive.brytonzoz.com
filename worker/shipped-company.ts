@@ -162,8 +162,15 @@ function withVia(items: Found[], via: string | null): Found[] {
 
 const COMPANY_CACHE_CAP = 200;
 
+/** "GPT-6.1 Sol in Codex and ChatGPT" is a model dump, not a company flagship. */
+function isCodexModelListing(item: Found): boolean {
+  const name = item.name || '';
+  return /\bgpt-?[\d.]+/i.test(name) && /\bin codex(?:\s+and\s+chatgpt)?\b/i.test(name);
+}
+
 /** Company-wide launches that must survive the 200-cap even when changelog dumps are huge. */
 function isCompactMustKeep(item: Found): boolean {
+  if (isCodexModelListing(item)) return false;
   if (flagshipLaunchName(item)) return true;
   const url = item.link || '';
   const name = item.name || '';
@@ -186,12 +193,18 @@ function isThinCodexTitle(name: string): boolean {
 export function isNamedCodexCard(item: Found): boolean {
   const name = item.name || '';
   const url = item.link || '';
-  if (!name || versionParts(name) || isThinCodexTitle(name) || looksLikeNotAShip(item)) return false;
+  if (!name || versionParts(name) || isThinCodexTitle(name) || looksLikeNotAShip(item) || isCodexModelListing(item)) {
+    return false;
+  }
   const words = name.split(/\s+/).filter(Boolean);
   if (words.length > 14) return false;
   if (/\bcodex\b/i.test(name) || /\/codex\b/i.test(url) || /#codex-/i.test(url)) return true;
   if (!/learn\.chatgpt\.com\/docs\/changelog/i.test(url)) return false;
   return words.length >= 1;
+}
+
+function isChangelogFeatureCard(item: Found): boolean {
+  return /learn\.chatgpt\.com\/docs\/changelog/i.test(item.link || '') && isNamedCodexCard(item);
 }
 
 /** Keep dated changelog cards; drop sitemap-sized dumps before D1/R2 ingest. */
@@ -204,10 +217,15 @@ export function compactCompanyFound(found: Found[], cap = COMPANY_CACHE_CAP): Fo
     if (item.source === 'changelog') n += 80;
     if (/\/(changelog|release-notes|whats-new|docs\/changelog)/i.test(url)) n += 50;
     if (item.date && /^\d{4}-\d{2}-\d{2}$/.test(item.date)) n += 30;
-    if (/openai\.com\/(sora|device)(\/|$)/i.test(url) || /openai\.com\/index\/(gpt-6|chatgpt-images|chatgpt-atlas|chatgpt-health|images)\b/i.test(url)) {
+    if (
+      !/\bcodex\b/i.test(name) &&
+      (/openai\.com\/(sora|device)(\/|$)/i.test(url) || /openai\.com\/index\/(gpt-6|chatgpt-images|chatgpt-atlas|chatgpt-health|images)\b/i.test(url))
+    ) {
       n += 160;
     } else if (/openai\.com\/index\//i.test(url)) {
-      if (/\b(gpt-?\d|chatgpt images|sora|atlas|health|device)\b/i.test(name) && !/\b(journeys?|academy|partnership|incident|blueprint)\b/i.test(name)) {
+      if (/\bcodex\b/i.test(name)) {
+        n -= 20;
+      } else if (/\b(gpt-?\d|chatgpt images|sora|atlas|health|device)\b/i.test(name) && !/\b(journeys?|academy|partnership|incident|blueprint)\b/i.test(name)) {
         n += 80;
       } else {
         n -= 50;
@@ -221,6 +239,9 @@ export function compactCompanyFound(found: Found[], cap = COMPANY_CACHE_CAP): Fo
     if (item.source === 'company' && /github\.com\//i.test(url)) n -= 50;
     if (isNamedCodexCard(item)) n += 55;
     else if (/\bcodex\b/i.test(name) && !versionParts(name)) n -= 20;
+    if (/learn\.chatgpt\.com\/docs\/changelog/i.test(url) && isNamedCodexCard(item) && !/^gpt-[\d.]+/i.test(name)) {
+      n += 90;
+    }
     if (versionParts(name) && !flagshipLaunchName(item) && !isCompactMustKeep(item)) n -= 45;
     if (/\/(blog|news|research)\//i.test(url) && !/changelog|\/index\//i.test(url)) n -= 90;
     if (looksLikeNotAShip(item) && !flagshipLaunchName(item)) n -= 80;
@@ -259,14 +280,25 @@ export function compactCompanyFound(found: Found[], cap = COMPANY_CACHE_CAP): Fo
     return /\b(gpt-?\d|chatgpt|sora|atlas|v0)\b/i.test(name) && !/\bcodex\b/i.test(name) && !/^[A-Za-z][\w'’]*(?:\s+AI)?(?:'s)?\s+(brings|trusts|reviewed|ships|widens|completes|improves)\b/i.test(name);
   };
   const isNamedCodex = (item: Found) => isNamedCodexCard(item);
+  const isFeature = (item: Found) => isChangelogFeatureCard(item);
   const must = ranked.filter(isCompactMustKeep).sort(byWeight);
-  const wide = ranked.filter((item) => !isCompactMustKeep(item) && isWide(item)).sort(byWeight);
-  const namedCodex = ranked.filter((item) => !isCompactMustKeep(item) && !isWide(item) && isNamedCodex(item)).sort(byWeight);
-  const rest = ranked.filter((item) => !isCompactMustKeep(item) && !isWide(item) && !isNamedCodex(item)).sort(byWeight);
+  const features = ranked.filter((item) => !isCompactMustKeep(item) && isFeature(item)).sort(byWeight);
+  const wide = ranked.filter((item) => !isCompactMustKeep(item) && !isFeature(item) && isWide(item)).sort(byWeight);
+  const namedCodex = ranked.filter((item) => !isCompactMustKeep(item) && !isFeature(item) && !isWide(item) && isNamedCodex(item)).sort(byWeight);
+  const rest = ranked.filter((item) => !isCompactMustKeep(item) && !isFeature(item) && !isWide(item) && !isNamedCodex(item)).sort(byWeight);
   const seen = new Set<string>();
   const out: Found[] = [];
   const sliceCap = Math.min(80, Math.max(8, Math.floor(cap * 0.4)));
-  for (const item of must) accept(item, seen, out);
+  const featureReserve = Math.min(sliceCap, features.length);
+  const mustCap = Math.max(0, cap - featureReserve);
+  for (const item of must) {
+    if (out.length >= mustCap) break;
+    accept(item, seen, out);
+  }
+  for (const item of features) {
+    if (out.filter(isFeature).length >= sliceCap) break;
+    accept(item, seen, out);
+  }
   for (const item of wide) {
     if (out.filter(isWide).length >= sliceCap) break;
     accept(item, seen, out);
@@ -917,7 +949,7 @@ export async function harvestCompany(opts: {
   if (opts.storeOnly) {
     return { found: [], spend: emptyXaiSpend(), ran: ['company-store-miss'], cacheHit: false };
   }
-  const cacheKey = opts.deep ? `company:deep:v29:${year}:${slug}` : `company:v29:${year}:${slug}`;
+  const cacheKey = opts.deep ? `company:deep:v31:${year}:${slug}` : `company:v31:${year}:${slug}`;
   const load = async (): Promise<CompanyHarvest> => {
     const via = viaFor(affiliation);
     const ran: string[] = [];

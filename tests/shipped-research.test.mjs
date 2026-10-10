@@ -441,6 +441,18 @@ test('cashier note and stats are specific to the items, never stock copy', () =>
     ], [], { who: 'Guillermo Rauch' }),
     'title-restate',
   );
+  assert.equal(
+    ai.hardRejectNote(
+      'Keep an eye on Aws databases are now live on the Vercel Marketplace and V0; 2 public ships landed this year.',
+      [
+        { name: 'AWS DATABASES ARE NOW LIVE ON THE VERCEL MARKETPLACE AND V0', spoken: 'Aws databases are now live on the Vercel Marketplace and V0' },
+        { name: 'VERCEL PLUGIN', spoken: 'Vercel Plugin' },
+      ],
+      [],
+      { who: 'Guillermo Rauch' },
+    ),
+    'title-restate',
+  );
   const awsFallback = ai.sentenceFallbackNote(
     [
       { name: 'AWS DATABASES ARE NOW LIVE', spoken: 'Aws databases are now live', description: 'managed databases', date: '2026-10-01', status: 'LAUNCHED', link: 'https://vercel.com/changelog/aws', icon: null, source: 'changelog' },

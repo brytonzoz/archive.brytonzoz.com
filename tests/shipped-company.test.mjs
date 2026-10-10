@@ -530,6 +530,40 @@ test('OpenAI compact keeps quality changelog cards over Codex fragments', () => 
   assert.ok(names.some((name) => /team config/i.test(name)), JSON.stringify(names));
 });
 
+test('OpenAI compact prefers changelog feature cards over GPT-in-Codex listings', () => {
+  const models = Array.from({ length: 80 }, (_, i) => ({
+    name: `GPT-6.${i} Sol in Codex and ChatGPT`,
+    description: '',
+    date: '2026-09-22',
+    link: `https://openai.com/index/gpt-6-${i}-sol`,
+    source: 'changelog',
+    status: 'LAUNCHED',
+    score: 7,
+    thisYear: true,
+    icon: null,
+  }));
+  const features = [
+    { name: 'Record & Replay', date: '2026-06-11', hash: 'record-replay' },
+    { name: 'Chat while you work', date: '2026-09-11', hash: 'chat-while' },
+    { name: 'Codex Remote reaches general availability', date: '2026-06-20', hash: 'remote' },
+  ].map((row) => ({
+    name: row.name,
+    description: '',
+    date: row.date,
+    link: `https://learn.chatgpt.com/docs/changelog#${row.hash}`,
+    source: 'changelog',
+    status: 'LAUNCHED',
+    score: 6,
+    thisYear: true,
+    icon: null,
+  }));
+  const compact = company.compactCompanyFound([...models, ...features], 20);
+  const names = compact.map((item) => item.name);
+  assert.ok(names.some((name) => /record/i.test(name)), JSON.stringify(names));
+  assert.ok(names.some((name) => /chat while you work/i.test(name)), JSON.stringify(names));
+  assert.ok(names.some((name) => /remote/i.test(name)), JSON.stringify(names));
+});
+
 test('OpenAI compact does not treat ChatGPT for iOS versions as company-wide', () => {
   const ios = Array.from({ length: 40 }, (_, i) => ({
     name: `ChatGPT for iOS 1.2026.${i}`,

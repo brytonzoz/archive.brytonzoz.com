@@ -528,7 +528,25 @@ function noteCopiesDescription(note: string, items: DraftItem[]): boolean {
   });
 }
 
+const TITLE_RESTATE_WRAPPER =
+  /^(keep|an|eye|on|watch|the|this|that|year|public|ships?|landed|tape|and|which|is|are|now|live|with|for|of|a|to|plus|more|entries|lines?|\d+)$/;
+
+function noteManglesTitleCase(note: string, items: DraftItem[]): boolean {
+  const runs = note.match(/[A-Z][a-z]+(?:\s+[A-Z][a-z]+){2,}/g) || [];
+  if (!runs.length) return false;
+  return items.some((item) => {
+    const raw = String(item.name || '');
+    if (raw.split(/\s+/).length < 4 || raw !== raw.toUpperCase()) return false;
+    const title = foldNote(raw);
+    return runs.some((run) => {
+      const folded = foldNote(run);
+      return folded.length >= 12 && (title.startsWith(folded) || folded.startsWith(title.slice(0, folded.length)));
+    });
+  });
+}
+
 function noteRestatesTitle(note: string, items: DraftItem[]): boolean {
+  if (noteManglesTitleCase(note, items)) return true;
   const hay = foldNote(note);
   return items.some((item) => {
     const titles = [...new Set([item.spoken, item.name].filter(Boolean).map((value) => foldNote(String(value))))];
@@ -543,7 +561,9 @@ function noteRestatesTitle(note: string, items: DraftItem[]): boolean {
         return /^(sits|is the one|is now|are now)\b/.test(extra);
       }
       const extra = hay.replace(title, '').trim();
-      return extra.split(/\s+/).filter(Boolean).length <= 4;
+      const extraWords = extra.split(/\s+/).filter(Boolean);
+      if (extraWords.length <= 4) return true;
+      return extraWords.every((word) => TITLE_RESTATE_WRAPPER.test(word));
     });
   });
 }
@@ -701,7 +721,7 @@ export function isBareProductNote(note: string, items: DraftItem[] = []): boolea
 
 function shipWhatItDoes(item: DraftItem): string {
   const desc = (item.description || '').replace(/\s+/g, ' ').trim();
-  if (!desc || /^(dated |linked from |listed on )/i.test(desc) || /^[a-z0-9.-]+\.[a-z]{2,}$/i.test(desc)) return '';
+  if (!desc || /^(dated |linked from |listed (on|under) )/i.test(desc) || /^[a-z0-9.-]+\.[a-z]{2,}$/i.test(desc)) return '';
   const first = desc.split(/[.!?]/)[0]?.trim() || '';
   if (first.length < 8) return '';
   return first.length > 72 ? `${first.slice(0, 72).replace(/\s+\S*$/, '')}` : first;

@@ -4,6 +4,7 @@
 // After 7bdfa60: undated changelog rows stay, handle.com pins, musl rollup.
 // After 712cf78: thisYear survives polish; #16 attaches OpenAI cache.
 // After 5dd73e8: friend homepages are not project lists.
+// After cd2b2cd: ownership evidence, title gate, undated cap (U ≤ D/3).
 //
 //   ADMIN_PASSWORD=… node scripts/reprint-shipped.mjs [origin]
 const RECEIPT_PATH = (id) => `/r/${id}/`;

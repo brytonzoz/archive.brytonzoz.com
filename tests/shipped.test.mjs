@@ -268,7 +268,7 @@ test('the printer mouth and receipt sponsor cells do not share a class (absolute
   const year = fs.readFileSync(new URL('../components/shipped/YearReceipt.tsx', import.meta.url), 'utf8');
   const css = fs.readFileSync(new URL('../app/shipped/receipt.css', import.meta.url), 'utf8');
   assert.match(machine, /shipped-aperture/);
-  assert.match(machine, /webkitClipPath/);
+  assert.match(machine, /webkit-clip-path|webkitClipPath|WebkitClipPath/);
   assert.equal(machine.includes('className="shipped-slot"'), false);
   assert.match(year, /className="shipped-slot"/);
   assert.match(css, /\.shipped-aperture\s*\{[^}]*position:\s*absolute/s);

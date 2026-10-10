@@ -15,6 +15,14 @@ const KICKER: Record<YearReceipt['subject']['kind'], string> = {
   name: 'NAME',
 };
 
+function titleCustomer(raw: string): string {
+  const from = raw.match(/^(.+?)\s+(?:from|at|of)\s+.+$/i);
+  const name = (from?.[1] || raw).trim();
+  if (!name) return raw;
+  if (/[a-z]/.test(name) && /[A-Z]/.test(name) && /\s/.test(name)) return name;
+  return name.replace(/[A-Za-z][A-Za-z']*/g, (word) => word[0].toUpperCase() + word.slice(1).toLowerCase());
+}
+
 /** The hero slot prints as "presented by", the grid as the paid-for lines (names only; QR codes stay on the DOM receipt). */
 export function paidByLines(sponsors: SponsorBlock | null): Pick<ThermalReceipt, 'presented' | 'paidBy'> {
   const slots = [...(sponsors?.slots ?? [])].sort((a, b) => a.slot - b.slot);
@@ -23,13 +31,19 @@ export function paidByLines(sponsors: SponsorBlock | null): Pick<ThermalReceipt,
 }
 
 export function fromLoaded({ receipt, sponsors }: LoadedReceipt): ThermalReceipt {
-  const who = subjectLabel(receipt.subject);
-  const kicker = receipt.subject.kind === 'github' && receipt.subject.display !== who ? `@${receipt.subject.id} · GITHUB` : KICKER[receipt.subject.kind];
+  const who = titleCustomer(subjectLabel(receipt.subject));
+  const kicker = receipt.subject.x
+    ? `@${receipt.subject.x} · X`
+    : receipt.subject.kind === 'github' && receipt.subject.display !== who
+      ? `@${receipt.subject.id} · GITHUB`
+      : receipt.subject.kind === 'name'
+        ? ''
+        : KICKER[receipt.subject.kind];
   const modules = receiptModules({ receipt });
   return {
     id: `r${receipt.id}`,
     year: receipt.year,
-    who: receipt.subject.kind === 'github' ? receipt.subject.display : who,
+    who,
     kicker,
     date: receiptDate(receipt.printedAt),
     number: receiptNumber(receipt.id),

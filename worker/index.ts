@@ -1,13 +1,18 @@
 // Serves songs from R2 at /audio/<key> on the site's own domain (seekable, edge-cached), and the
-// listening metrics API at /api/* (worker/metrics.ts) and the Scrapwrk checkout (worker/store.ts). Every other path is handled by static
+// listening metrics API at /api/* (worker/metrics.ts), the Scrapwrk checkout (worker/store.ts) and
+// /shipped's printed receipts and sponsor lines (worker/shipped.ts). Every other path is handled by static
 // assets before this script runs (see run_worker_first).
 import { handleApi, type MetricsEnv } from './metrics';
 import { placeManualOrders, reconcileMerch, type MerchEnv } from './merch';
+import { handleShipped, handleShippedPage, shippedCron } from './shipped';
+import { handleShippedHost } from './shipped-host';
 import { handleStore } from './store';
 
 interface Env extends MetricsEnv, MerchEnv {
   ASSETS: Fetcher;
   MUSIC: R2Bucket;
+  /** Shipped's own host (worker/shipped-host.ts); brytonzoz.com/shipped/* redirects there. */
+  SHIPPED_HOST?: string;
 }
 
 const AUDIO_PREFIX = '/audio/';
@@ -107,7 +112,14 @@ export default {
   async fetch(request: Request, env: Env, ctx: ExecutionContext): Promise<Response> {
     const url = new URL(request.url);
     if (url.pathname.startsWith(AUDIO_PREFIX)) return serveAudio(request, env, ctx);
-    if (url.pathname.startsWith('/api/')) return (await handleStore(request, env)) ?? handleApi(request, env);
+    if (url.pathname.startsWith('/api/')) {
+      return (await handleShipped(request, env, ctx)) ?? (await handleStore(request, env)) ?? handleApi(request, env);
+    }
+    // Shipped at the root of its own host, and the redirects to it (worker/shipped-host.ts).
+    const shipped = await handleShippedHost(request, env, ctx);
+    if (shipped) return shipped;
+    // Without SHIPPED_HOST (local dev), receipts stay under /shipped/r/ (worker/shipped.ts).
+    if (url.pathname.startsWith('/shipped/r/')) return handleShippedPage(request, env, ctx);
     // Campaign links for posts and bios: brytonzoz.com/go/ig -> the homepage, tagged "ig" in /admin.
     if (url.pathname.startsWith('/go/')) {
       const code = url.pathname.slice(4).replace(/\/+$/, '').toLowerCase();
@@ -125,5 +137,7 @@ export default {
     const db = { ...env, DB: env.DB };
     ctx.waitUntil(reconcileMerch(db).catch((error) => console.error('reconcile failed', error)));
     ctx.waitUntil(placeManualOrders(db).catch((error) => console.error('manual orders failed', error)));
+    // Once an hour: Shipped's retention (shipping addresses, emails) and old rate-limit rows.
+    if (new Date(_controller.scheduledTime).getUTCMinutes() < 10) ctx.waitUntil(shippedCron(env).catch((error) => console.error('shipped cron failed', error)));
   },
 } satisfies ExportedHandler<Env>;

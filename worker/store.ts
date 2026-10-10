@@ -6,6 +6,8 @@
 // Secrets: STRIPE_SECRET_KEY (and optionally STRIPE_WEBHOOK_SECRET), set by the deploy workflows.
 import catalog from '../lib/store-catalog.json';
 import shareImages from '../lib/share-images.json';
+import { verifySignature } from './stripe-signature';
+export { verifySignature };
 import { encodeMerch, fulfillMerch, MERCH_PREFIX, merchLineItems, merchOrders, parseMerch, type MerchEnv } from './merch';
 
 export interface StoreEnv {
@@ -62,14 +64,16 @@ function form(data: Record<string, unknown>, prefix = '', out = new URLSearchPar
   return out;
 }
 
-export async function stripe<T>(env: StoreEnv, method: 'GET' | 'POST', path: string, body?: Record<string, unknown>): Promise<T> {
+export async function stripe<T>(env: StoreEnv, method: 'GET' | 'POST', path: string, body?: Record<string, unknown>, idempotencyKey?: string): Promise<T> {
   const response = await fetch(`${env.STRIPE_API_BASE ?? 'https://api.stripe.com'}/v1/${path}`, {
     method,
     headers: {
       authorization: `Bearer ${env.STRIPE_SECRET_KEY}`,
       ...(body ? { 'content-type': 'application/x-www-form-urlencoded' } : {}),
+      ...(idempotencyKey ? { 'idempotency-key': idempotencyKey } : {}),
     },
     body: body ? form(body) : undefined,
+    signal: AbortSignal.timeout(15000),
   });
   const data = await response.json() as T & { error?: { message?: string } };
   if (!response.ok) throw new Error(data.error?.message ?? `Stripe ${response.status}`);
@@ -255,19 +259,6 @@ async function order(url: URL, env: MerchEnv & { DB: D1Database }): Promise<Resp
 }
 
 // Optional: Stripe webhook (checkout.session.completed / .expired) for instant updates.
-async function verifySignature(payload: string, header: string, secret: string): Promise<boolean> {
-  const parts = Object.fromEntries(header.split(',').map((part) => part.split('=') as [string, string]));
-  const timestamp = Number(parts.t);
-  if (!parts.v1 || !Number.isFinite(timestamp) || Math.abs(Date.now() / 1000 - timestamp) > 300) return false;
-  const key = await crypto.subtle.importKey('raw', new TextEncoder().encode(secret), { name: 'HMAC', hash: 'SHA-256' }, false, ['sign']);
-  const signature = new Uint8Array(await crypto.subtle.sign('HMAC', key, new TextEncoder().encode(`${parts.t}.${payload}`)));
-  const expected = Array.from(signature, (byte) => byte.toString(16).padStart(2, '0')).join('');
-  if (expected.length !== parts.v1.length) return false;
-  let diff = 0;
-  for (let i = 0; i < expected.length; i++) diff |= expected.charCodeAt(i) ^ parts.v1.charCodeAt(i);
-  return diff === 0;
-}
-
 async function webhook(request: Request, env: MerchEnv & { DB: D1Database }): Promise<Response> {
   if (!env.STRIPE_WEBHOOK_SECRET) return json({ error: 'not-configured' }, 503);
   const payload = await request.text();

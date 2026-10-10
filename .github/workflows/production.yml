@@ -35,6 +35,8 @@ jobs:
           key: media-${{ hashFiles('scripts/build-media.mjs', 'scripts/build-share-images.mjs', 'assets-src/**') }}
           restore-keys: media-
 
+      - run: npm test
+
       - run: npm run build
 
       # Staging and production read the same R2 bucket, so staging proves the songs are there
@@ -126,6 +128,32 @@ jobs:
             exit 0
           fi
           printf '%s' "$PRINTIFY_ACCESS" | npx wrangler secret put PRINTIFY_ACCESS --env=""
+
+      # Shipped: every secret its Worker needs, copied from the repository secrets in one `wrangler secret bulk`
+      # (scripts/sync-worker-secrets.mjs maps the names, skips empty ones, prints names only, never values).
+      # TURNSTILE_SITE_KEY is public (the Worker hands it to the page); TURNSTILE_SECRET_KEY stays server-side.
+      - name: Sync Shipped secrets
+        env:
+          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          CLAUDE_KEY: ${{ secrets.CLAUDE_KEY }}
+          ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}
+          CLAUDE_WORKSPACE: ${{ secrets.CLAUDE_WORKSPACE }}
+          ANTHROPIC_WORKSPACE_ID: ${{ secrets.ANTHROPIC_WORKSPACE_ID }}
+          TINYFISH: ${{ secrets.TINYFISH }}
+          TINYFISH_API_KEY: ${{ secrets.TINYFISH_API_KEY }}
+          SHIPPED_GITHUB_TOKEN: ${{ secrets.SHIPPED_GITHUB_TOKEN }}
+          PRODUCTHUNT_KEY: ${{ secrets.PRODUCTHUNT_KEY }}
+          PRODUCTHUNT_SECRET: ${{ secrets.PRODUCTHUNT_SECRET }}
+          PRODUCTHUNT_TOKEN: ${{ secrets.PRODUCTHUNT_TOKEN }}
+          BRANDFETCH_API: ${{ secrets.BRANDFETCH_API }}
+          XAI_KEY: ${{ secrets.XAI_KEY }}
+          XAI_API_KEY: ${{ secrets.XAI_KEY }}
+          OPENAI_KEY: ${{ secrets.OPENAI_KEY }}
+          OPENAI_API_KEY: ${{ secrets.OPENAI_KEY }}
+          TURNSTILE_SITE_KEY: ${{ secrets.TURNSTILE_SITE_KEY }}
+          TURNSTILE_SECRET_KEY: ${{ secrets.TURNSTILE_SECRET_KEY }}
+          STRIPE_SHIPPED_WEBHOOK_SECRET: ${{ secrets.STRIPE_SHIPPED_WEBHOOK_SECRET }}
+        run: node scripts/sync-worker-secrets.mjs production
 
       - name: Deploy www/archive redirects
         env:

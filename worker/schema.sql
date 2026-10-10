@@ -86,3 +86,22 @@ CREATE TABLE IF NOT EXISTS manual_orders (
   created_at INTEGER,
   updated_at INTEGER
 );
+
+-- Company ship lists harvested off-Worker (GitHub Actions). The Worker reads these for 7 days.
+CREATE TABLE IF NOT EXISTS shipped_company_cache (
+  slug TEXT NOT NULL,
+  year INTEGER NOT NULL,
+  n INTEGER NOT NULL,
+  found TEXT NOT NULL,
+  r2_key TEXT,
+  fetched_at INTEGER NOT NULL,
+  rev TEXT,
+  PRIMARY KEY (slug, year)
+);
+CREATE TABLE IF NOT EXISTS shipped_company_queue (
+  slug TEXT PRIMARY KEY,
+  company TEXT NOT NULL,
+  product TEXT,
+  site TEXT,
+  queued_at INTEGER NOT NULL
+);

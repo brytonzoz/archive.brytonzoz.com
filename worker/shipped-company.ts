@@ -1,0 +1,1145 @@
+// First-party company harvest, cached 7 days per company slug. Discovers changelog / blog / news
+// / releases / updates, <link rel=alternate> feeds, sitemap.xml (2026 lastmod), GitHub org
+// releases, and App Store version rows. No per-company URL tables.
+import { extraResearchPaths, itemsFromProjectList } from './shipped-research';
+import { looksLikeNotAShip } from './shipped-decisions';
+import { flagshipLaunchName, flagshipProbePaths, knownFlagshipDate, logFlagshipGate } from './shipped-flagship';
+import { isPrereleaseShip, prettyBrand, versionParts } from './shipped-polish';
+import { companyOrgGuess, companyScope, companySlug, companyTokens, matchesLeadProduct, type Affiliation } from './shipped-affiliation';
+import { type XaiEnv, type XaiSpend, emptyXaiSpend } from './shipped-xai';
+import { stripVia, type CompanyStore } from './shipped-company-store';
+import {
+  cached,
+  clean,
+  hostOf,
+  publicUrl,
+  type Found,
+  type SourceEnv,
+  type TinyfishAccess,
+} from './shipped-sources';
+import { tinyfishFetch, tinyfishSearch, type TinyfishPage } from './shipped-tinyfish';
+import { safeFetch } from './shipped-fetch';
+import {
+  COMPANY_PATHS,
+  FEED_PATHS,
+  changelogEntryHrefs,
+  extractAlternateFeeds,
+  isShipPath,
+  itemsFromCompanyPage,
+  itemsFromDatedCards,
+  itemsFromFeedXml,
+  itemsFromJsonLd,
+  itemsFromSitemap,
+  itemsFromTimedHeadings,
+  mergeChangelog,
+  parseFlexibleDate,
+  productPaths,
+  sitemapChildLocs,
+  type ChangelogFound,
+} from './shipped-changelog';
+
+const MIN = 60;
+const UA =
+  'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/128.0.0.0 Safari/537.36';
+const PREFIX_HOSTS = ['developers', 'platform', 'docs', 'help', 'blog', 'news', 'changelog'];
+/** TinyFish Fetch is metered (600/day). Cap first-party fallback URLs per company harvest. */
+const TINYFISH_COMPANY_CAP = 24;
+
+export type CompanyEnv = SourceEnv & XaiEnv;
+
+type FetchCtx = {
+  tinyfish: TinyfishAccess;
+  left: { n: number };
+  used: number;
+  blocked: string[];
+};
+
+export function looksBlockedPage(text: string, title = ''): boolean {
+  const hay = `${title}\n${text}`.slice(0, 6000).toLowerCase();
+  if (
+    /just a moment|attention required|enable javascript to continue|cf-browser-verification|challenge-platform|checking your browser|verify you are (a )?human|unusual traffic from your computer|access denied|request unsuccessful|sorry, you have been blocked|blocked because of|bot detection/.test(
+      hay,
+    )
+  ) {
+    return true;
+  }
+  return text.length < 1200 && /cloudflare|please enable javascript|captcha/.test(hay);
+}
+
+export function isPriorityCompanyUrl(url: string): boolean {
+  try {
+    const path = new URL(url).pathname.replace(/\/+$/, '') || '/';
+    if (path === '/' || path === '/index') return true;
+    if (/\/index\/[a-z0-9-]+/i.test(path)) return true;
+    return /\/(changelog|blog|news|releases?|release-notes|updates|whats-new|feed|rss|atom|sitemap|sora|device)(\/|$|\.)/i.test(path);
+  } catch {
+    return false;
+  }
+}
+
+/** Changelog/release paths first so TinyFish's small batch is not spent on /blog and /news. */
+export function priorityCompanyScore(url: string): number {
+  try {
+    const path = new URL(url).pathname.replace(/\/+$/, '') || '/';
+    if (/\/changelog\b/i.test(path)) return 0;
+    if (/\/(releases?|release-notes|updates?|whats-new|index\/|sora|device)\b/i.test(path)) return 1;
+    if (path === '/' || path === '/index') return 2;
+    if (/\/(feed|rss|atom|sitemap)/i.test(path)) return 3;
+    if (/\/(blog|news)\b/i.test(path)) return 4;
+    return 5;
+  } catch {
+    return 9;
+  }
+}
+
+export type CompanyHarvest = { found: Found[]; spend: XaiSpend; ran: string[]; cacheHit: boolean };
+
+type CompanyPage = {
+  url: string;
+  title: string;
+  text: string;
+  html: string;
+  links: { text: string; url: string }[];
+  feeds: string[];
+};
+
+export function hostGuesses(company: string): string[] {
+  const tokens = companyTokens(company);
+  const names = tokens.length ? tokens : [company];
+  const out: string[] = [];
+  for (const name of names) {
+    const slug = companySlug(name);
+    if (!slug) continue;
+    const hyphen = name.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '');
+    for (const tld of ['com', 'ai', 'dev', 'io', 'so']) {
+      const apex = `https://${slug}.${tld}/`;
+      if (!out.includes(apex)) out.push(apex);
+      if (hyphen && hyphen !== slug) {
+        const dashed = `https://${hyphen}.${tld}/`;
+        if (!out.includes(dashed)) out.push(dashed);
+      }
+    }
+  }
+  return out.slice(0, 12);
+}
+
+function prefixHosts(apex: string): string[] {
+  const host = hostOf(apex);
+  if (!host) return [];
+  return PREFIX_HOSTS.map((prefix) => `https://${prefix}.${host}/`);
+}
+
+function viaFor(affiliation: Affiliation): string | null {
+  if (!affiliation.company) return null;
+  const brand = prettyBrand(affiliation.company) || affiliation.company;
+  if (companyScope(affiliation) === 'product' && affiliation.product) {
+    return `via ${brand} · ${affiliation.product}`;
+  }
+  if (companyScope(affiliation) === 'all') return `via ${brand}`;
+  return null;
+}
+
+function withVia(items: Found[], via: string | null): Found[] {
+  return items.map((item) => ({
+    ...item,
+    via: via ? item.via ?? via : item.via ?? null,
+    source: item.source === 'site' || item.source === 'web' ? 'changelog' : item.source,
+  }));
+}
+
+const COMPANY_CACHE_CAP = 200;
+
+/** Company-wide launches that must survive the 200-cap even when changelog dumps are huge. */
+function isCompactMustKeep(item: Found): boolean {
+  if (flagshipLaunchName(item)) return true;
+  const url = item.link || '';
+  const name = item.name || '';
+  if (/openai\.com\/(sora|device)(\/|$)/i.test(url)) return true;
+  if (/openai\.com\/index\/(gpt-6|chatgpt-images|chatgpt-atlas|chatgpt-health|images)\b/i.test(url)) return true;
+  if (/\bv0\b/i.test(name) && /vercel\.com\/(blog|changelog)\//i.test(url)) return true;
+  if (/\bvercel agent\b/i.test(name) || /\/changelog\/vercel-agent\b/i.test(url)) return true;
+  if (/\bcodex cloud\b/i.test(name) || /\/codex\/cloud(?:\/|$)/i.test(url)) return true;
+  return false;
+}
+
+/** Keep dated changelog cards; drop sitemap-sized dumps before D1/R2 ingest. */
+export function compactCompanyFound(found: Found[], cap = COMPANY_CACHE_CAP): Found[] {
+  const ranked = found.filter((item) => item && item.name && item.thisYear !== false);
+  const weight = (item: Found) => {
+    let n = (item.score || 0) * 8;
+    const url = (item.link || '').toLowerCase();
+    const name = item.name || '';
+    if (item.source === 'changelog') n += 80;
+    if (/\/(changelog|release-notes|whats-new|docs\/changelog)/i.test(url)) n += 50;
+    if (item.date && /^\d{4}-\d{2}-\d{2}$/.test(item.date)) n += 30;
+    if (/openai\.com\/(sora|device)(\/|$)/i.test(url) || /openai\.com\/index\/(gpt-6|chatgpt-images|chatgpt-atlas|chatgpt-health|images)\b/i.test(url)) {
+      n += 160;
+    } else if (/openai\.com\/index\//i.test(url)) {
+      if (/\b(gpt-?\d|chatgpt images|sora|atlas|health|device)\b/i.test(name) && !/\b(journeys?|academy|partnership|incident|blueprint)\b/i.test(name)) {
+        n += 80;
+      } else {
+        n -= 50;
+      }
+    }
+    if (/\bv0\b/i.test(name) || /\/(blog|changelog)\/(?:introducing-the-new-)?v0\b/i.test(url)) n += 110;
+    if (/\bvercel agent\b/i.test(name) || /\/changelog\/vercel-agent\b/i.test(url)) n += 90;
+    if (/\bcodex cloud\b/i.test(name) || /\/codex\/cloud(?:\/|$)/i.test(url)) n += 70;
+    if (/vercel\.com\/changelog\//i.test(url)) n += 90;
+    if (/github\.com\/(vercel|openai)\//i.test(url)) n -= 70;
+    if (item.source === 'company' && /github\.com\//i.test(url)) n -= 50;
+    if (/\bcodex\b/i.test(name) && !versionParts(name)) n += 50;
+    if (versionParts(name) && !flagshipLaunchName(item) && !isCompactMustKeep(item)) n -= 45;
+    if (/\/(blog|news|research)\//i.test(url) && !/changelog|\/index\//i.test(url)) n -= 90;
+    if (looksLikeNotAShip(item) && !flagshipLaunchName(item)) n -= 80;
+    if (/\b(bug fixes?|get started|configuration details|see setup)\b/i.test(name)) n -= 60;
+    if (/\b(codex|chatgpt|claude|cursor|gpt-?\d)/i.test(name) && name.length <= 72) n += 25;
+    if (isCompactMustKeep(item)) n += 200;
+    return n;
+  };
+  const accept = (item: Found, seen: Set<string>, out: Found[]) => {
+    const key = item.name.toLowerCase().replace(/[^a-z0-9]+/g, '');
+    const letters = item.name.replace(/[^a-zA-Z]/g, '').length;
+    if (key.length < 4 || letters < 3 || seen.has(key) || out.length >= cap) return;
+    if (looksLikeNotAShip(item) && !flagshipLaunchName(item) && !isCompactMustKeep(item)) return;
+    if (looksLikeNotAShip(item) && flagshipLaunchName(item)) logFlagshipGate(item, 'company-compact-not-a-ship', flagshipLaunchName(item));
+    if (/\b(get started with|configuration details|see setup)\b/i.test(item.name)) return;
+    seen.add(key);
+    out.push(item);
+  };
+  const byWeight = (a: Found, b: Found) => weight(b) - weight(a);
+  const isWide = (item: Found) => {
+    const url = item.link || '';
+    const name = item.name || '';
+    if (isCompactMustKeep(item)) return true;
+    if (/chatgpt for (ios|android|ipad)/i.test(name)) return false;
+    if (versionParts(name) && !flagshipLaunchName(item)) return false;
+    if (/openai\.com\/(sora|device|index)\b/i.test(url) && !/\bcodex\b/i.test(name)) return true;
+    return /\b(gpt-?\d|chatgpt|sora|atlas|v0)\b/i.test(name) && !/\bcodex\b/i.test(name);
+  };
+  const isNamedCodex = (item: Found) => {
+    const name = item.name || '';
+    const url = item.link || '';
+    if (!/\bcodex\b/i.test(name) && !/\/codex\b/i.test(url)) return false;
+    return !versionParts(name);
+  };
+  const must = ranked.filter(isCompactMustKeep).sort(byWeight);
+  const wide = ranked.filter((item) => !isCompactMustKeep(item) && isWide(item)).sort(byWeight);
+  const namedCodex = ranked.filter((item) => !isCompactMustKeep(item) && !isWide(item) && isNamedCodex(item)).sort(byWeight);
+  const rest = ranked.filter((item) => !isCompactMustKeep(item) && !isWide(item) && !isNamedCodex(item)).sort(byWeight);
+  const seen = new Set<string>();
+  const out: Found[] = [];
+  const sliceCap = Math.min(80, Math.max(8, Math.floor(cap * 0.4)));
+  for (const item of must) accept(item, seen, out);
+  for (const item of wide) {
+    if (out.filter(isWide).length >= sliceCap) break;
+    accept(item, seen, out);
+  }
+  for (const item of namedCodex) {
+    if (out.filter(isNamedCodex).length >= sliceCap) break;
+    accept(item, seen, out);
+  }
+  for (const item of rest) accept(item, seen, out);
+  return out;
+}
+
+function asFound(row: ChangelogFound): Found {
+  return {
+    name: row.name,
+    description: row.description,
+    date: row.date,
+    dateConfidence: row.dateConfidence,
+    link: row.link,
+    icon: row.icon,
+    source: row.source,
+    status: row.status,
+    score: row.score,
+    thisYear: row.thisYear,
+  };
+}
+
+async function mapLimit<T, R>(items: T[], n: number, fn: (item: T) => Promise<R>): Promise<R[]> {
+  const out: R[] = [];
+  for (let i = 0; i < items.length; i += n) {
+    out.push(...(await Promise.all(items.slice(i, i + n).map(fn))));
+  }
+  return out;
+}
+
+async function fetchText(
+  url: string,
+  maxBytes: number,
+  types?: string[],
+  blocked?: string[],
+  timeoutMs = 8000,
+): Promise<{ url: string; text: string } | null> {
+  const safe = publicUrl(url);
+  if (!safe) return null;
+  const page = await safeFetch(safe, {
+    accept: 'text/html, application/xhtml+xml, application/xml, application/rss+xml, application/atom+xml, text/xml, */*',
+    maxBytes,
+    timeoutMs,
+    types,
+    userAgent: UA,
+  }).catch(() => null);
+  if (!page) {
+    if (blocked && isPriorityCompanyUrl(safe)) blocked.push(safe);
+    return null;
+  }
+  const text = new TextDecoder().decode(page.bytes);
+  if (looksBlockedPage(text)) {
+    if (blocked && isPriorityCompanyUrl(safe)) blocked.push(safe);
+    return null;
+  }
+  return { url: page.url || safe, text };
+}
+
+function linksFromMarkdown(text: string, base: string): { text: string; url: string }[] {
+  const out: { text: string; url: string }[] = [];
+  for (const match of text.matchAll(/\[([^\]]{1,80})\]\((https?:\/\/[^)\s]+)\)/g)) {
+    const href = publicUrl(match[2]);
+    const label = clean(match[1], 80);
+    if (href && label && !out.some((row) => row.url === href)) out.push({ text: label, url: href });
+    if (out.length >= 400) break;
+  }
+  if (out.length) return out;
+  for (const match of text.matchAll(/https?:\/\/[^\s)"']+/g)) {
+    try {
+      const href = publicUrl(new URL(match[0], base).toString());
+      const label = clean(match[0].split('/').filter(Boolean).pop() ?? '', 80);
+      if (href && label && !out.some((row) => row.url === href)) out.push({ text: label, url: href });
+    } catch {
+      /* skip */
+    }
+    if (out.length >= 200) break;
+  }
+  return out;
+}
+
+export function companyPageFromTinyfish(page: TinyfishPage): CompanyPage | null {
+  const url = publicUrl(page.url);
+  if (!url || !page.text || looksBlockedPage(page.text, page.title)) return null;
+  const fromApi = page.links
+    .map((href) => {
+      try {
+        const abs = publicUrl(new URL(href, url).toString());
+        const label = clean(href.split('/').filter(Boolean).pop() ?? href, 80);
+        return abs && label ? { text: label, url: abs } : null;
+      } catch {
+        return null;
+      }
+    })
+    .filter((row): row is { text: string; url: string } => Boolean(row));
+  const links = fromApi.length ? fromApi : linksFromMarkdown(page.text, url);
+  const text = page.text.slice(0, 140_000);
+  return {
+    url,
+    title: clean(page.title, 100),
+    text,
+    html: text,
+    links,
+    feeds: extractAlternateFeeds(page.text, url),
+  };
+}
+
+async function fetchViaTinyfish(urls: string[], ctx: FetchCtx | undefined): Promise<CompanyPage[]> {
+  if (!ctx?.tinyfish || ctx.left.n <= 0) return [];
+  const want = [...new Set(urls.map((url) => publicUrl(url)).filter((url): url is string => Boolean(url)))].slice(0, Math.min(10, ctx.left.n));
+  if (!want.length) return [];
+  ctx.left.n -= want.length;
+  ctx.used += want.length;
+  const pages = await tinyfishFetch(want, ctx.tinyfish.key, ctx.tinyfish.meter).catch(() => []);
+  return pages.map(companyPageFromTinyfish).filter((page): page is CompanyPage => Boolean(page));
+}
+
+export async function readCompanyPage(siteUrl: string, blocked?: string[]): Promise<CompanyPage | null> {
+  const fetched = await fetchText(siteUrl, 2_500_000, ['text/html', 'application/xhtml', 'text/xml', 'application/xml'], blocked);
+  if (!fetched) return null;
+  const html = fetched.text.slice(0, 1_800_000);
+  const base = fetched.url;
+  const abs = (href: string | null) => {
+    try {
+      return href ? publicUrl(new URL(href, base).toString()) : null;
+    } catch {
+      return null;
+    }
+  };
+  const links: CompanyPage['links'] = [];
+  for (const match of html.matchAll(/<a\b([^>]*)>([\s\S]*?)<\/a>/gi)) {
+    const href = abs(/href=["']([^"']+)["']/i.exec(match[1])?.[1] ?? null);
+    const text = clean(match[2].replace(/<[^>]+>/g, ' '), 80);
+    if (href && text && !links.some((l) => l.url === href)) links.push({ text, url: href });
+    if (links.length >= 400) break;
+  }
+  for (const extra of changelogEntryHrefs(html, base)) {
+    if (!links.some((l) => l.url === extra.url)) links.push(extra);
+    if (links.length >= 400) break;
+  }
+  const headings = (html.match(/<h[1-3][^>]*>[\s\S]*?<\/h[1-3]>/gi) ?? [])
+    .map((tag) => `# ${clean(tag.replace(/<[^>]+>/g, ' '), 80)}`)
+    .filter(Boolean)
+    .join('\n');
+  const rawText = html
+    .replace(/<(script|style|noscript|svg)[\s\S]*?<\/\1>/gi, '\n')
+    .replace(/<br\s*\/?>/gi, '\n')
+    .replace(/<\/(p|div|li|h[1-6]|tr|section|article)>/gi, '\n')
+    .replace(/<[^>]+>/g, ' ')
+    .replace(/[ \t]+\n/g, '\n')
+    .replace(/\n{3,}/g, '\n\n');
+  const dated = (rawText.match(/(?:^|\n).{0,40}20\d\d[-/.]\d{1,2}.{0,100}/g) ?? []).join('\n');
+  const text = `${headings}\n${dated}\n${rawText}`.slice(0, 140_000);
+  return {
+    url: base,
+    title: clean(html.match(/<title[^>]*>([\s\S]*?)<\/title>/i)?.[1] ?? '', 100),
+    text,
+    html,
+    links,
+    feeds: extractAlternateFeeds(html, base),
+  };
+}
+
+function sameRegistrable(a: string | null, b: string | null): boolean {
+  if (!a || !b) return false;
+  const left = a.split('.').slice(-2).join('.');
+  const right = b.split('.').slice(-2).join('.');
+  return left.length >= 3 && left === right;
+}
+
+async function pagesForCompany(
+  site: string,
+  year: number,
+  product: string | null,
+  ctx?: FetchCtx,
+  company?: string | null,
+): Promise<{ found: Found[]; feeds: string[]; extraHosts: string[]; tinyfish: boolean }> {
+  const base = publicUrl(site);
+  if (!base) return { found: [], feeds: [], extraHosts: [], tinyfish: false };
+  const root = base.replace(/\/+$/, '');
+  const changelogFirst = (path: string) => /changelog|releases?|updates?|whats-new/i.test(path);
+  const roots = [
+    `${root}/`,
+    ...productPaths(product).map((path) => `${root}${path}`),
+    ...COMPANY_PATHS.filter(changelogFirst).map((path) => `${root}${path}`),
+    ...flagshipProbePaths(company || product).map((path) => `${root}${path}`),
+    ...COMPANY_PATHS.filter((path) => !changelogFirst(path)).map((path) => `${root}${path}`),
+    ...extraResearchPaths(base),
+  ];
+  const unique = [...new Set(roots)].slice(0, 36);
+  const fetched = new Set(unique.map((url) => url.replace(/\/+$/, '')));
+  const pages = await mapLimit(unique, 8, (url) => readCompanyPage(url, ctx?.blocked));
+  const found: Found[] = [];
+  for (const url of unique) {
+    const stubName = flagshipLaunchName({ name: '', link: url, source: 'changelog' });
+    if (!stubName) continue;
+    found.push({
+      name: stubName,
+      description: '',
+      date: knownFlagshipDate({ name: stubName, link: url, source: 'changelog' }, year),
+      link: url,
+      icon: null,
+      source: 'changelog',
+      status: 'LAUNCHED',
+      score: 9,
+      thisYear: true,
+    });
+  }
+  const feeds: string[] = [];
+  const extraHosts: string[] = [];
+  const follow: string[] = [];
+  const changelogFollow: string[] = [];
+  let usedTinyfish = false;
+  const apex = hostOf(base);
+  const absorb = (page: CompanyPage | null) => {
+    if (!page) return;
+    const extracted = itemsFromCompanyPage({ text: page.text, html: page.html, url: page.url, year, links: page.links });
+    found.push(...extracted.map(asFound));
+    found.push(
+      ...itemsFromProjectList({ text: `${page.title}\n${page.text}`, url: page.url, year }).map((item) => ({
+        ...item,
+        source: item.source === 'site' ? 'changelog' : item.source,
+      })),
+    );
+    const stubName = flagshipLaunchName({ name: page.title || '', link: page.url, source: 'changelog' });
+    if (stubName) {
+      found.push({
+        name: stubName,
+        description: '',
+        date: knownFlagshipDate({ name: stubName, link: page.url, source: 'changelog' }, year),
+        link: publicUrl(page.url),
+        icon: null,
+        source: 'changelog',
+        status: 'LAUNCHED',
+        score: 8,
+        thisYear: true,
+      });
+    }
+    for (const feed of page.feeds) if (!feeds.includes(feed)) feeds.push(feed);
+    for (const link of page.links) {
+      const host = hostOf(link.url);
+      if (host && sameRegistrable(host, apex) && PREFIX_HOSTS.some((p) => host.startsWith(`${p}.`))) {
+        const origin = `https://${host}/`;
+        if (!extraHosts.includes(origin)) extraHosts.push(origin);
+      }
+      if (host && sameRegistrable(host, apex) && isIndexShipPath(link.url)) {
+        const next = link.url.replace(/\/+$/, '');
+        if (!fetched.has(next) && !follow.includes(next)) follow.push(next);
+      }
+      if (host && sameRegistrable(host, apex) && /\/changelog\/[a-z0-9][a-z0-9-]{3,}/i.test(link.url)) {
+        const next = link.url.replace(/\/+$/, '');
+        if (!fetched.has(next) && !changelogFollow.includes(next) && !follow.includes(next)) changelogFollow.push(next);
+      }
+    }
+  };
+  for (const page of pages) absorb(page);
+  if (!found.length && !feeds.length && ctx?.tinyfish) {
+    const priority = unique
+      .filter(isPriorityCompanyUrl)
+      .sort((a, b) => priorityCompanyScore(a) - priorityCompanyScore(b) || a.length - b.length)
+      .slice(0, 10);
+    const fallback = await fetchViaTinyfish(priority.length ? priority : unique.slice(0, 6), ctx);
+    if (fallback.length) usedTinyfish = true;
+    for (const page of fallback) absorb(page);
+  }
+  if (follow.length) {
+    const more = await mapLimit(follow.slice(0, 28), 6, (url) => readCompanyPage(url, ctx?.blocked));
+    for (const page of more) absorb(page);
+    if (!found.length && ctx?.tinyfish) {
+      const extra = await fetchViaTinyfish(follow.filter(isPriorityCompanyUrl).slice(0, 4), ctx);
+      if (extra.length) usedTinyfish = true;
+      for (const page of extra) absorb(page);
+    }
+  }
+  if (changelogFollow.length) {
+    const more = await mapLimit(changelogFollow.slice(0, 80), 6, (url) => readCompanyPage(url, ctx?.blocked));
+    for (const page of more) absorb(page);
+  }
+  return { found, feeds, extraHosts, tinyfish: usedTinyfish };
+}
+
+function isIndexShipPath(url: string): boolean {
+  try {
+    const path = new URL(url).pathname.replace(/\/+$/, '');
+    const parts = path.split('/').filter(Boolean);
+    return parts.length <= 3 && isShipPath(url) && !/\d{4}\/\d{2}/.test(path);
+  } catch {
+    return false;
+  }
+}
+
+export function feedPriority(url: string): number {
+  if (/\/\/(www\.)?vercel\.com\/(changelog\/(rss|atom|feed)|atom)(\.xml)?$/i.test(url)) return -2;
+  if (/\/\/(www\.)?openai\.com\/(changelog\/(rss|atom|feed)|atom)(\.xml)?$/i.test(url)) return -1;
+  if (/\/changelog\/(rss|feed|atom)/i.test(url)) return 0;
+  if (/\/(atom|rss)(\.xml)?$/i.test(url) && /vercel\.com/i.test(url)) return 0;
+  if (/changelog/i.test(url)) return 1;
+  if (/\/(atom|rss|feed)(\.xml)?$/i.test(url)) return 2;
+  if (/\.(xml)$/i.test(url)) return 3;
+  return 4;
+}
+
+async function harvestFeeds(urls: string[], year: number, ctx?: FetchCtx): Promise<Found[]> {
+  const preferred = urls.filter((url) => /\/(changelog\/(rss|atom|feed)|atom)(\.xml)?$/i.test(url));
+  const rest = urls.filter((url) => !preferred.includes(url));
+  const unique = [...new Set([...preferred, ...rest])]
+    .sort((a, b) => feedPriority(a) - feedPriority(b) || a.length - b.length)
+    .slice(0, 10);
+  const pages = await mapLimit(unique, 3, (url) => fetchText(url, 12_000_000, undefined, ctx?.blocked, 25_000));
+  const found: Found[] = [];
+  const absorb = (text: string) => found.push(...itemsFromFeedXml(text, year).map(asFound));
+  let fetched = 0;
+  for (const page of pages) {
+    if (!page?.text) continue;
+    fetched += 1;
+    absorb(page.text);
+  }
+  if (!found.length && ctx?.tinyfish) {
+    const fallback = await fetchViaTinyfish(unique.filter(isPriorityCompanyUrl).slice(0, 4), ctx);
+    for (const page of fallback) absorb(page.text);
+  }
+  console.log(JSON.stringify({ shipped: 'company-feeds', tried: unique.slice(0, 8), fetched, n: found.length }));
+  return found;
+}
+
+async function harvestSitemaps(origin: string, year: number, ctx?: FetchCtx): Promise<Found[]> {
+  const root = origin.replace(/\/+$/, '');
+  const seeds = [`${root}/sitemap.xml`, `${root}/sitemap_index.xml`, `${root}/sitemap-0.xml`];
+  const first = await mapLimit(seeds, 3, (url) => fetchText(url, 2_000_000, undefined, ctx?.blocked));
+  let xmls = first.filter((page): page is { url: string; text: string } => Boolean(page));
+  if (!xmls.length && ctx?.tinyfish) {
+    const fallback = await fetchViaTinyfish(seeds, ctx);
+    xmls = fallback.map((page) => ({ url: page.url, text: page.text }));
+  }
+  const children = xmls.flatMap((page) => sitemapChildLocs(page.text));
+  const more = children.length ? await mapLimit(children, 3, (url) => fetchText(url, 2_000_000, undefined, ctx?.blocked)) : [];
+  return mergeChangelog([...xmls, ...more.filter(Boolean)].map((page) => itemsFromSitemap(page!.text, year))).map(asFound);
+}
+
+function dateFromEntryHtml(html: string, url: string, year: number): string | null {
+  const time = html.match(/<time\b([^>]*)>([\s\S]*?)<\/time>/i);
+  const fromTime = time
+    ? parseFlexibleDate(tidyTime(time[1].match(/datetime=["']([^"']+)["']/i)?.[1] || time[2]), year)
+    : null;
+  if (fromTime) return fromTime;
+  const timed = itemsFromTimedHeadings(html, url, year).find((row) => row.date);
+  if (timed?.date) return timed.date;
+  const json = itemsFromJsonLd(html, year).find((row) => row.date);
+  if (json?.date) return json.date;
+  return itemsFromDatedCards(html, url, year).find((row) => row.date)?.date ?? null;
+}
+
+function tidyTime(value: string): string {
+  return String(value || '')
+    .replace(/<[^>]+>/g, ' ')
+    .replace(/\s+/g, ' ')
+    .trim();
+}
+
+/** Undated /changelog/slug and openai.com/index cards take the entry page's <time datetime>. */
+async function hydrateChangelogEntryDates(found: Found[], year: number, ctx?: FetchCtx): Promise<Found[]> {
+  const need = found.filter((item) => {
+    if (item.date || !item.link) return false;
+    return (
+      /\/changelog\/[a-z0-9][a-z0-9-]{3,}/i.test(item.link) ||
+      /openai\.com\/(index\/[a-z0-9-]+|sora|device)(\/|$)/i.test(item.link)
+    );
+  });
+  const seen = new Set<string>();
+  const unique = need.filter((item) => {
+    const url = item.link as string;
+    if (seen.has(url)) return false;
+    seen.add(url);
+    return true;
+  }).slice(0, 80);
+  if (!unique.length) return found;
+  const pages = await mapLimit(unique, 6, (item) => fetchText(item.link as string, 160_000, undefined, ctx?.blocked));
+  const byUrl = new Map(unique.map((item, i) => [item.link, pages[i]]));
+  return found.map((item) => {
+    if (item.date || !item.link) return item;
+    const page = byUrl.get(item.link);
+    if (!page) return item;
+    const date = dateFromEntryHtml(page.text, item.link, year);
+    if (!date) return item;
+    return { ...item, date, thisYear: true, dateConfidence: 'exact' as const };
+  });
+}
+
+/** Sitemap rows have no lastmod-as-date. Fetch the flagship posts so Cursor 3 / Composer 2 keep a day. */
+async function hydrateFlagshipDates(found: Found[], year: number, ctx?: FetchCtx): Promise<Found[]> {
+  found = found.map((item) => {
+    const flagship = flagshipLaunchName(item);
+    if (!flagship) return item;
+    const known = knownFlagshipDate(item, year);
+    if (!known || item.date === known) return item;
+    logFlagshipGate(item, item.date ? 'date-override' : 'known-date', flagship);
+    return { ...item, date: known, thisYear: true, dateConfidence: 'exact' as const };
+  });
+  const need = found.filter((item) => !item.date && flagshipLaunchName(item) && item.link);
+  const seen = new Set<string>();
+  const unique = need.filter((item) => {
+    const url = item.link as string;
+    if (seen.has(url)) return false;
+    seen.add(url);
+    return true;
+  }).slice(0, 12);
+  if (!unique.length) return found;
+  const pages = await mapLimit(unique, 4, (item) => fetchText(item.link as string, 160_000, undefined, ctx?.blocked));
+  const byUrl = new Map(unique.map((item, i) => [item.link, pages[i]]));
+  return found.map((item) => {
+    const flagship = flagshipLaunchName(item);
+    if (item.date || !flagship || !item.link) return item;
+    const page = byUrl.get(item.link);
+    if (!page) return item;
+    const fromPage = [...itemsFromJsonLd(page.text, year), ...itemsFromDatedCards(page.text, item.link, year)].find((row) => row.date);
+    if (!fromPage?.date) return item;
+    logFlagshipGate(item, 'sitemap-undated', flagship);
+    return { ...item, date: fromPage.date, thisYear: true, dateConfidence: 'exact' as const };
+  });
+}
+
+async function githubOrgShips(org: string, env: SourceEnv, year: number): Promise<Found[]> {
+  const login = org.replace(/^@/, '');
+  if (!/^[A-Za-z0-9-]{1,39}$/.test(login)) return [];
+  const response = await fetch(`https://api.github.com/orgs/${encodeURIComponent(login)}/repos?sort=pushed&per_page=100`, {
+    headers: {
+      'user-agent': 'brytonzoz.com-shipped (+https://shipped.brytonzoz.com/)',
+      accept: 'application/vnd.github+json',
+      ...(env.GITHUB_TOKEN ? { authorization: `Bearer ${env.GITHUB_TOKEN}` } : {}),
+    },
+    signal: AbortSignal.timeout(7000),
+  }).catch(() => null);
+  if (!response?.ok) return [];
+  const repos = (await response.json().catch(() => [])) as {
+    name?: string;
+    html_url?: string;
+    description?: string;
+    homepage?: string | null;
+    pushed_at?: string;
+    created_at?: string;
+    stargazers_count?: number;
+    fork?: boolean;
+  }[];
+  if (!Array.isArray(repos)) return [];
+  const own = repos.filter((repo) => !repo.fork);
+  const notable = own.filter((repo) => {
+    if (typeof repo.created_at !== 'string' || !repo.created_at.startsWith(String(year))) return false;
+    if ((repo.stargazers_count ?? 0) < 200) return false;
+    const home = String(repo.homepage || '').trim();
+    if (!home || /github\.com/i.test(home)) return false;
+    const name = clean(repo.name, 60);
+    if (isPrereleaseShip(name) || /\b(starter|course|action|example|template|foundations|academy|rules?)\b/i.test(name)) {
+      return false;
+    }
+    return true;
+  });
+  const releaseItems = await githubOrgReleases(login, own, env, year).catch(() => []);
+  const repoItems = notable
+    .slice(0, 20)
+    .map((repo): Found => {
+      const home = publicUrl(String(repo.homepage || '').trim());
+      return {
+        name: clean(repo.name, 60),
+        description: clean(repo.description, 140),
+        date: repo.created_at ? repo.created_at.slice(0, 10) : null,
+        dateConfidence: 'exact',
+        link: home || publicUrl(repo.html_url),
+        icon: null,
+        source: 'company',
+        status: 'SHIPPED',
+        score: 4 + Math.log10(1 + (repo.stargazers_count ?? 0)),
+        thisYear: true,
+      };
+    })
+    .filter((item) => item.name && item.link);
+  return [...releaseItems, ...repoItems];
+}
+
+async function githubOrgReleases(
+  org: string,
+  repos: { name?: string; stargazers_count?: number }[],
+  env: SourceEnv,
+  year: number,
+): Promise<Found[]> {
+  const targets = [...repos]
+    .sort((a, b) => (b.stargazers_count ?? 0) - (a.stargazers_count ?? 0))
+    .map((repo) => repo.name)
+    .filter((name): name is string => Boolean(name))
+    .slice(0, 20);
+  const pages = await Promise.all(
+    targets.map((name) =>
+      fetch(`https://api.github.com/repos/${encodeURIComponent(org)}/${encodeURIComponent(name)}/releases?per_page=15`, {
+        headers: {
+          'user-agent': 'brytonzoz.com-shipped (+https://shipped.brytonzoz.com/)',
+          accept: 'application/vnd.github+json',
+          ...(env.GITHUB_TOKEN ? { authorization: `Bearer ${env.GITHUB_TOKEN}` } : {}),
+        },
+        signal: AbortSignal.timeout(7000),
+      })
+        .then(async (response) =>
+          response.ok
+            ? ((await response.json()) as { name?: string; tag_name?: string; html_url?: string; published_at?: string; body?: string; prerelease?: boolean }[])
+            : [],
+        )
+        .catch(() => [] as { name?: string; tag_name?: string; html_url?: string; published_at?: string; body?: string; prerelease?: boolean }[]),
+    ),
+  );
+  const found: Found[] = [];
+  for (const releases of pages) {
+    if (!Array.isArray(releases)) continue;
+    for (const release of releases) {
+      const published = typeof release.published_at === 'string' ? release.published_at : '';
+      if (!published.startsWith(String(year))) continue;
+      const name = clean(release.name || release.tag_name, 60);
+      const link = publicUrl(release.html_url);
+      if (!name || !link) continue;
+      if (isPrereleaseShip(name) || (release as { prerelease?: boolean }).prerelease) continue;
+      found.push({
+        name,
+        description: clean(release.body, 140),
+        date: published.slice(0, 10),
+        dateConfidence: 'exact',
+        link,
+        icon: null,
+        source: 'company',
+        status: 'RELEASED',
+        score: 7,
+        thisYear: true,
+      });
+    }
+  }
+  return found;
+}
+
+async function appStoreCompanyShips(company: string, year: number): Promise<Found[]> {
+  const term = company.replace(/[^A-Za-z0-9 .+-]/g, ' ').trim();
+  if (term.length < 2) return [];
+  const urls = [
+    `https://itunes.apple.com/search?term=${encodeURIComponent(term)}&entity=software&attribute=softwareDeveloper&limit=25&country=us`,
+    `https://itunes.apple.com/search?term=${encodeURIComponent(term)}&entity=software&limit=12&country=us`,
+  ];
+  const pages = await Promise.all(
+    urls.map((url) =>
+      fetch(url, { signal: AbortSignal.timeout(7000), headers: { 'user-agent': UA } })
+        .then((response) => (response.ok ? (response.json() as Promise<{ results?: Record<string, unknown>[] }>) : { results: [] }))
+        .catch(() => ({ results: [] })),
+    ),
+  );
+  const want = term.toLowerCase().replace(/[^a-z0-9]+/g, '');
+  const apps = pages.flatMap((page) => page.results ?? []).filter((app) => {
+    const artist = String(app.artistName ?? '').toLowerCase().replace(/[^a-z0-9]+/g, '');
+    const seller = String(app.sellerName ?? '').toLowerCase().replace(/[^a-z0-9]+/g, '');
+    return artist.includes(want) || seller.includes(want) || want.includes(artist) && artist.length >= 4;
+  });
+  const found: Found[] = [];
+  const seen = new Set<string>();
+  for (const app of apps) {
+    const released = typeof app.releaseDate === 'string' && app.releaseDate.startsWith(String(year)) ? app.releaseDate.slice(0, 10) : null;
+    const updated =
+      typeof app.currentVersionReleaseDate === 'string' && app.currentVersionReleaseDate.startsWith(String(year))
+        ? app.currentVersionReleaseDate.slice(0, 10)
+        : null;
+    const date = updated || released;
+    if (!date) continue;
+    const name = clean(String(app.trackName ?? ''), 60);
+    const version = clean(String(app.version ?? ''), 16);
+    const label = version ? `${name} ${version}` : name;
+    const link = publicUrl(String(app.trackViewUrl ?? '').split('?')[0]);
+    const key = label.toLowerCase();
+    if (!label || !link || seen.has(key)) continue;
+    seen.add(key);
+    found.push({
+      name: label,
+      description: clean(String(app.description ?? '').split(/[.\n]/)[0], 140) || `${name} on the App Store`,
+      date,
+      dateConfidence: 'exact',
+      link,
+      icon: publicUrl(String(app.artworkUrl100 ?? '')),
+      source: 'company',
+      status: 'RELEASED',
+      score: 6,
+      thisYear: true,
+    });
+  }
+  const history = await Promise.all(
+    apps.slice(0, 4).map((app) => appStoreVersionHistory(Number(app.trackId), String(app.trackName ?? ''), year)),
+  );
+  for (const rows of history) found.push(...rows);
+  return found;
+}
+
+async function appStoreVersionHistory(trackId: number, appName: string, year: number): Promise<Found[]> {
+  if (!Number.isFinite(trackId) || trackId <= 0) return [];
+  const page = await fetchText(`https://apps.apple.com/us/app/id${trackId}`, 600_000, ['text/html', 'application/xhtml']);
+  if (!page) return [];
+  const found: Found[] = [];
+  const seen = new Set<string>();
+  const re = new RegExp(`(?:Version|Ver)\\s+([0-9][0-9A-Za-z.-]{0,16}).{0,80}(${year}[-/]\\d{1,2}[-/]\\d{1,2}|(?:Jan|Feb|Mar|Apr|May|Jun|Jul|Aug|Sep|Oct|Nov|Dec)[a-z]*\\s+\\d{1,2},?\\s+${year})`, 'gi');
+  const { parseFlexibleDate } = await import('./shipped-changelog');
+  for (const match of page.text.matchAll(re)) {
+    const date = parseFlexibleDate(match[2], year);
+    const name = clean(`${appName} ${match[1]}`, 60);
+    if (!date || !name || seen.has(name.toLowerCase())) continue;
+    seen.add(name.toLowerCase());
+    found.push({
+      name,
+      description: `${appName} App Store version history`,
+      date,
+      dateConfidence: 'exact',
+      link: publicUrl(page.url),
+      icon: null,
+      source: 'company',
+      status: 'RELEASED',
+      score: 6,
+      thisYear: true,
+    });
+  }
+  return found.slice(0, 12);
+}
+
+function scopeFilter(affiliation: Affiliation, found: Found[]): Found[] {
+  if (companyScope(affiliation) !== 'product' || !affiliation.product) return found;
+  return found.filter((item) => matchesLeadProduct(item, affiliation.product, affiliation.company));
+}
+
+export async function harvestCompany(opts: {
+  affiliation: Affiliation;
+  year: number;
+  env: CompanyEnv;
+  /** Paid full run: company X search is included and cached separately. */
+  deep?: boolean;
+  /** Free gap-fill: company X only after first-party sources, and only if those were thin. */
+  gapFillX?: boolean;
+  /** When first-party hosts block Worker IPs, TinyFish Fetch reads changelog/blog/news pages. */
+  tinyfish?: TinyfishAccess;
+  /** Off-worker lists written by the company-cache GitHub Action (D1/R2). */
+  store?: CompanyStore;
+  /** Ignore isolate + off-worker caches (Actions rebuild). */
+  rebuild?: boolean;
+  /** Extra first-party hosts from the seed list (docs/learn/developers). */
+  extraSites?: string[];
+  /** First-paint path: D1/R2 only, never a live crawl. */
+  storeOnly?: boolean;
+}): Promise<CompanyHarvest> {
+  const { affiliation, year, env } = opts;
+  const slugs = [...new Set([companySlug(affiliation.company), ...companyTokens(affiliation.company).map((token) => companySlug(token))].filter((s): s is string => Boolean(s)))];
+  const slug = slugs[0] ?? null;
+  if (!slug || companyScope(affiliation) === 'none') {
+    return { found: [], spend: emptyXaiSpend(), ran: [], cacheHit: false };
+  }
+  const via = viaFor(affiliation);
+  // Always prefer the off-worker list. `rebuild` only skips the isolate cache so
+  // Actions can harvest live; Worker reprints still need the D1/R2 tape.
+  // Try every company token (Anysphere / Cursor) so a paren name still hits the seed cache.
+  if (opts.store) {
+    for (const key of slugs) {
+      const off = await opts.store.get(year, key);
+      if (!off) continue;
+      const scoped = scopeFilter(affiliation, stripVia(off.found));
+      // An empty cache row is a miss (the Actions job may be mid-write). Never
+      // treat zero ships as a hit or a CEO tape collapses to nothing.
+      if (scoped.length) {
+        return {
+          found: withVia(scoped, via),
+          spend: emptyXaiSpend(),
+          ran: ['company-offworker', ...off.ran.slice(0, 8)],
+          cacheHit: true,
+        };
+      }
+    }
+  }
+  if (opts.storeOnly) {
+    return { found: [], spend: emptyXaiSpend(), ran: ['company-store-miss'], cacheHit: false };
+  }
+  const cacheKey = opts.deep ? `company:deep:v23:${year}:${slug}` : `company:v23:${year}:${slug}`;
+  const load = async (): Promise<CompanyHarvest> => {
+    const via = viaFor(affiliation);
+    const ran: string[] = [];
+    const found: Found[] = [];
+    const spend = emptyXaiSpend();
+    const ctx: FetchCtx = {
+      tinyfish: opts.tinyfish ?? null,
+      left: { n: TINYFISH_COMPANY_CAP },
+      used: 0,
+      blocked: [],
+    };
+    const seeds = [
+      affiliation.companySite,
+      ...(opts.extraSites ?? []),
+      ...hostGuesses(affiliation.company ?? ''),
+      ...hostGuesses(affiliation.product ?? ''),
+    ].filter((u): u is string => Boolean(u));
+    const seenHost = new Set<string>();
+    const liveOrigins: string[] = [];
+    const feeds: string[] = [];
+
+    const discoveredHosts: string[] = [];
+    const takePages = async (site: string, tag: string) => {
+      const host = hostOf(site);
+      if (!host) return false;
+      const exact = /\/(changelog|atom|rss|feed|index)(\/|$)/i.test(site);
+      if (seenHost.has(host) && !exact) return false;
+      const pageItems = await pagesForCompany(site, year, affiliation.product, ctx, affiliation.company);
+      if (!pageItems.found.length && !pageItems.feeds.length && !pageItems.extraHosts.length) return false;
+      seenHost.add(host);
+      liveOrigins.push(site);
+      found.push(...withVia(pageItems.found, via));
+      for (const feed of pageItems.feeds) if (!feeds.includes(feed)) feeds.push(feed);
+      for (const extra of pageItems.extraHosts) {
+        if (!discoveredHosts.includes(extra)) discoveredHosts.push(extra);
+      }
+      ran.push(`${tag}:${host}`);
+      if (pageItems.tinyfish) ran.push(`company-tinyfish:${host}`);
+      return true;
+    };
+
+    const firstSeeds = seeds.slice(0, 6);
+    const prefixed = firstSeeds[0] ? prefixHosts(firstSeeds[0]) : [];
+    await Promise.all([...prefixed, ...firstSeeds].map((site) => takePages(site, 'company-site')));
+    await Promise.all(discoveredHosts.map((extra) => takePages(extra, 'company-site')));
+
+    const feedOrigins = [...new Set([firstSeeds[0], affiliation.companySite, ...liveOrigins].filter(Boolean))] as string[];
+    await Promise.all(
+      feedOrigins.slice(0, 6).map(async (origin) => {
+        const root = origin.replace(/\/+$/, '');
+        feeds.unshift(`${root}/atom`, `${root}/rss`, `${root}/changelog/rss`, `${root}/changelog/atom`);
+        for (const path of FEED_PATHS) feeds.push(`${root}${path}`);
+        const sitemapItems = await harvestSitemaps(origin, year, ctx).catch(() => []);
+        if (sitemapItems.length) {
+          const dated = await hydrateFlagshipDates(sitemapItems, year, ctx).catch(() => sitemapItems);
+          found.push(...withVia(dated, via));
+          ran.push(`company-sitemap:${hostOf(origin)}`);
+        }
+      }),
+    );
+    const feedItems = await harvestFeeds(feeds, year, ctx).catch(() => []);
+    if (feedItems.length) {
+      found.push(...withVia(feedItems, via));
+      ran.push('company-feeds');
+    }
+
+    if (ctx?.tinyfish && found.length < 12) {
+      const apex = hostOf(liveOrigins[0] || firstSeeds[0] || '');
+      const queries = [
+        apex ? `site:${apex} (changelog OR "release notes") ${year}` : '',
+        affiliation.product
+          ? `"${affiliation.product}" changelog OR "what's new" ${year}`
+          : affiliation.company
+            ? `"${affiliation.company}" changelog OR "release notes" ${year}`
+            : '',
+      ].filter(Boolean);
+      for (const query of queries.slice(0, 2)) {
+        const hits = await tinyfishSearch(query, year, ctx.tinyfish.key, ctx.tinyfish.meter).catch(() => []);
+        const urls = [
+          ...new Set(
+            hits
+              .map((hit) => publicUrl(hit.url))
+              .filter((url): url is string => Boolean(url) && (isPriorityCompanyUrl(url) || /changelog|releases?|whats-new|docs\//i.test(url)))
+              .flatMap((url) => {
+                const out = [url];
+                try {
+                  const parsed = new URL(url);
+                  if (/^(developers|docs|learn|platform)\./i.test(parsed.hostname) && !/changelog/i.test(parsed.pathname)) {
+                    out.push(`${parsed.origin}/docs/changelog`, `${parsed.origin}/changelog`);
+                  }
+                } catch {
+                  /* skip */
+                }
+                return out;
+              }),
+          ),
+        ].slice(0, 10);
+        if (!urls.length) continue;
+        ran.push(`company-tinyfish-search:${urls.length}`);
+        const absorbPage = (page: CompanyPage) => {
+          const extracted = itemsFromCompanyPage({
+            text: page.text,
+            html: page.html,
+            url: page.url,
+            year,
+            links: page.links,
+          });
+          found.push(...withVia(extracted.map(asFound), via));
+          found.push(
+            ...itemsFromProjectList({ text: `${page.title}\n${page.text}`, url: page.url, year }).map((item) => ({
+              ...item,
+              source: item.source === 'site' ? 'changelog' : item.source,
+              via: via ?? item.via ?? null,
+            })),
+          );
+        };
+        // Prefer a direct HTML read: TinyFish markdown is short, and docs hosts like learn.* often allow Worker fetches.
+        const missing: string[] = [];
+        for (const url of urls) {
+          const htmlPage = await readCompanyPage(url, ctx?.blocked);
+          if (htmlPage) absorbPage(htmlPage);
+          else missing.push(url);
+        }
+        if (missing.length) {
+          for (const page of await fetchViaTinyfish(missing, ctx)) absorbPage(page);
+        }
+      }
+    }
+
+    const org = affiliation.companyGithub || companyOrgGuess(affiliation.company) || slug;
+    const orgItems = await githubOrgShips(org, env, year).catch(() => []);
+    if (orgItems.length) {
+      found.push(...withVia(orgItems, via));
+      ran.push(`company-github:${org}`);
+    }
+
+    const storeItems = await appStoreCompanyShips(affiliation.company ?? slug, year).catch(() => []);
+    if (storeItems.length) {
+      found.push(...withVia(storeItems, via));
+      ran.push('company-appstore');
+    }
+
+    const firstParty = found.length;
+    ran.push(`company-first-party:${firstParty}`);
+
+    const wantCompanyX = Boolean(affiliation.companyX) && (opts.deep || (opts.gapFillX && firstParty < 10));
+    if (wantCompanyX && affiliation.companyX) {
+      try {
+        const { searchXShips } = await import('./shipped-xai');
+        const companyX = await searchXShips({
+          env,
+          year,
+          handles: [affiliation.companyX],
+          who: affiliation.company || affiliation.companyX,
+          company: affiliation.company,
+          kind: 'company',
+          deep: Boolean(opts.deep),
+        });
+        if (companyX.found.length) {
+          found.push(...withVia(companyX.found, via));
+          ran.push(`company-x:${affiliation.companyX}`);
+        }
+        Object.assign(spend, {
+          inputTokens: spend.inputTokens + companyX.spend.inputTokens,
+          outputTokens: spend.outputTokens + companyX.spend.outputTokens,
+          posts: spend.posts + companyX.spend.posts,
+          profiles: spend.profiles + companyX.spend.profiles,
+          web: spend.web + companyX.spend.web,
+          ticks: spend.ticks + companyX.spend.ticks,
+          costMicros: spend.costMicros + companyX.spend.costMicros,
+        });
+      } catch {
+        ran.push('company-x:miss');
+      }
+    } else if (affiliation.companyX && firstParty >= 8) {
+      ran.push('company-x:skipped-first-party');
+    }
+
+    if (ctx.used) ran.push(`company-tinyfish-urls:${ctx.used}`);
+
+    if (found.length < 12 && ctx.blocked.length) {
+      try {
+        const { browseShipPage, xaiConfigured } = await import('./shipped-xai');
+        if (xaiConfigured(env)) {
+          const blockedChangelogs = [...new Set(ctx.blocked.filter((url) => /changelog|releases?|whats-new|docs\//i.test(url)))].slice(0, 3);
+          for (const url of blockedChangelogs) {
+            const browsed = await browseShipPage({ env, url, year, who: affiliation.company || slug });
+            if (browsed.found.length) {
+              found.push(...withVia(browsed.found, via));
+              ran.push(`company-xai-browse:${hostOf(url)}`);
+            }
+            Object.assign(spend, {
+              inputTokens: spend.inputTokens + browsed.spend.inputTokens,
+              outputTokens: spend.outputTokens + browsed.spend.outputTokens,
+              posts: spend.posts + browsed.spend.posts,
+              profiles: spend.profiles + browsed.spend.profiles,
+              web: spend.web + browsed.spend.web,
+              ticks: spend.ticks + browsed.spend.ticks,
+              costMicros: spend.costMicros + browsed.spend.costMicros,
+            });
+          }
+        }
+      } catch {
+        ran.push('company-xai-browse:miss');
+      }
+    }
+
+    const dated = await hydrateFlagshipDates(found, year, ctx).catch(() => found);
+    const hydrated = await hydrateChangelogEntryDates(dated, year, ctx).catch(() => dated);
+    return { found: compactCompanyFound(hydrated), spend, ran, cacheHit: false };
+  };
+  const harvested = opts.rebuild
+    ? await load()
+    : await cached(cacheKey, 7 * 1440 * MIN, load, (harvest) => harvest.found.length > 0);
+
+  if (!opts.rebuild && opts.store && harvested.found.length < 8) {
+    const fresh = await opts.store
+      .queue({
+        slug,
+        company: affiliation.company || slug,
+        product: affiliation.product,
+        site: affiliation.companySite || opts.extraSites?.[0] || null,
+      })
+      .catch(() => false);
+    if (fresh) await opts.store.dispatch?.(slug).catch(() => undefined);
+    ranNote(harvested, 'company-queued');
+  }
+
+  return { ...harvested, found: scopeFilter(affiliation, harvested.found) };
+}
+
+function ranNote(harvest: CompanyHarvest, note: string) {
+  if (!harvest.ran.includes(note)) harvest.ran.push(note);
+}

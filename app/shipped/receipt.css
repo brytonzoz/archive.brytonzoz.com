@@ -14,7 +14,7 @@
   --coral: hsl(6 85% 60%);
   --ease-out: cubic-bezier(0.23, 1, 0.32, 1);
   --ease-drawer: cubic-bezier(0.32, 0.72, 0, 1);
-  --shipped-pill-stack: 168px;
+  --shipped-pill-stack: 120px;
   min-height: 100svh;
   color: var(--cream);
   font-family: var(--font-ui), ui-sans-serif, system-ui, -apple-system, 'Segoe UI', sans-serif;
@@ -1406,6 +1406,11 @@ html.shipped-focus .shipped-board {
   overflow: auto;
   overscroll-behavior: contain;
   padding-bottom: calc(var(--shipped-pill-stack) + env(safe-area-inset-bottom, 0px));
+}
+
+.shipped-printer.is-focus .shipped-tilt.is-more::after,
+.shipped-printer.is-hero .shipped-tilt.is-more::after {
+  display: none;
 }
 
 .shipped-printer.is-focus .shipped-pull {

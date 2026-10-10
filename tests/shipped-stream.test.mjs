@@ -156,9 +156,10 @@ test('shared receipt pages are the hero; DATE/RECEIPT pairs do not collide; chec
   assert.match(paper, /shipped-lead-v/);
 
   const css = fs.readFileSync(new URL('../app/shipped/receipt.css', import.meta.url), 'utf8');
-  assert.match(css, /--shipped-pill-stack/);
+  assert.match(css, /--shipped-pill-stack: 120px/);
   assert.match(css, /text-wrap: balance/);
   assert.match(css, /\.shipped-printer\.is-hero \.shipped-printer-body/);
+  assert.match(css, /\.shipped-printer\.is-hero \.shipped-tilt\.is-more::after/);
 
   const pay = fs.readFileSync(new URL('../worker/shipped.ts', import.meta.url), 'utf8');
   assert.match(pay, /\/r\/\$\{id\}\/\?paid=\{CHECKOUT_SESSION_ID\}/);

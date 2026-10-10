@@ -44,6 +44,8 @@ import {
   extractPublicStats,
   formatReceiptStats,
   githubContributions,
+  itemsFromDatedJournal,
+  itemsFromPersonalFeed,
   itemsFromProjectList,
   mergeStats,
   sourcedStat,
@@ -1630,7 +1632,7 @@ export async function gather(
     gatherFresh(subject, resolved.profile, env, year, meter, tinyfish, resolved.notes, mode, opts?.onPartial);
   if (opts?.rebuild && !opts.onPartial) return load();
   if (opts?.rebuild) return load();
-  const key = mode === 'full' ? `gather:full:v23:${year}:${resolved.cacheKey}` : `gather:v32:${year}:${resolved.cacheKey}`;
+  const key = mode === 'full' ? `gather:full:v24:${year}:${resolved.cacheKey}` : `gather:v33:${year}:${resolved.cacheKey}`;
   return cached(
     key,
     1440 * MIN,
@@ -1840,7 +1842,7 @@ async function gatherFresh(
     ...trustmrrUrls(profile),
   ]
     .filter((url, i, all) => all.findIndex((u) => u.replace(/\/+$/, '') === url.replace(/\/+$/, '')) === i)
-    .slice(0, 10);
+    .slice(0, 14);
   const [results, site, extraSites, searched, storeHarvest, githubOverview] = await Promise.all([
     Promise.allSettled(SOURCES.filter((source) => source.enabled(ctx)).map(async (source) => ({ id: source.id, found: await raceTimeout(source.run(ctx), SOURCE_TIMEOUT_MS, []) }))),
     homepage ? raceTimeout(readSite(homepage).catch(() => null), SOURCE_TIMEOUT_MS, null) : Promise.resolve(null),
@@ -1875,8 +1877,9 @@ async function gatherFresh(
   let pages: PageInfo[] = [];
   const crawlTargets = [
     homepage,
+    ...(homepage ? extraResearchPaths(homepage) : []),
+    ...(homepage ? extraSitePaths(homepage).slice(1) : []),
     ...sitesOf(profile),
-    ...(homepage ? extraSitePaths(homepage).slice(1, 4) : []),
     ...web.map((w) => w.url),
   ]
     .map((url) => publicUrl(url))
@@ -1907,7 +1910,10 @@ async function gatherFresh(
 
   const projectPages = [site, ...ownPages].filter((page): page is SiteInfo => Boolean(page));
   for (const page of projectPages) {
-    found.push(...itemsFromProjectList({ text: `${page.title}\n${page.description}\n${page.text}`, url: page.url, year }));
+    const text = `${page.title}\n${page.description}\n${page.text}`;
+    found.push(...itemsFromProjectList({ text, url: page.url, year }));
+    found.push(...itemsFromDatedJournal({ text, url: page.url, year }));
+    found.push(...itemsFromPersonalFeed({ text, url: page.url, year }));
   }
   if (storeHarvest.found.length) {
     found.push(...storeHarvest.found);
@@ -1940,7 +1946,7 @@ async function gatherFresh(
   const { polishCandidates } = await import('./shipped-polish');
   const { heuristicVerify } = await import('./shipped-decisions');
   const emitPartial = (items: Found[], tag: string) => {
-    const polished = polishCandidates(items, { year, who, affiliation });
+    const polished = polishCandidates(items, { year, who, handle: profile.x, affiliation });
     const verified = heuristicVerify(polished, year, affiliation, viaNow);
     const snap: Gathered = {
       found: verified,
@@ -1959,7 +1965,7 @@ async function gatherFresh(
 
   if (key) {
     try {
-      pages = (await tinyfishFetch(crawlTargets.slice(0, 8), key, meter!)).map(toPage).filter((page): page is PageInfo => Boolean(page));
+      pages = (await tinyfishFetch(crawlTargets.slice(0, 12), key, meter!)).map(toPage).filter((page): page is PageInfo => Boolean(page));
       if (crawlTargets.length) ran.push('tinyfish-fetch');
     } catch (error) {
       failed.push(`tinyfish-fetch:${(error as Error).message}`);
@@ -1968,6 +1974,8 @@ async function gatherFresh(
   found.push(...itemsFromWebEvidence({ profile, site, pages, web, year }));
   for (const page of pages) {
     found.push(...itemsFromProjectList({ text: `${page.title}\n${page.text}`, url: page.url, year }));
+    found.push(...itemsFromDatedJournal({ text: `${page.title}\n${page.text}`, url: page.url, year }));
+    found.push(...itemsFromPersonalFeed({ text: `${page.title}\n${page.text}`, url: page.url, year }));
     pageStats.push(...extractPublicStats(`${page.title}\n${page.text}`, page.url));
   }
 
@@ -2006,7 +2014,7 @@ async function gatherFresh(
       year,
       env,
       deep: mode === 'full',
-      gapFillX: mode === 'full' || found.length < 6,
+      gapFillX: mode === 'full' || found.length < 10,
       tinyfish,
       store: env.companyStore,
     });
@@ -2022,7 +2030,7 @@ async function gatherFresh(
 
   deduped = polishCandidates(
     dedupeFound(found).map((item) => ({ ...item, description: describeWithStat(item) })),
-    { year, who, affiliation },
+    { year, who, handle: profile.x, affiliation },
   );
   emitPartial(deduped, 'partial:company');
   const via = viaLabel(affiliation, defaultAttribution(affiliation.role, affiliation.typedCompany));
@@ -2033,11 +2041,11 @@ async function gatherFresh(
     ran.push(verified.usedDecisions ? 'decisions' : 'decisions:heuristic');
     const same = await dedupeSameShips({ env, items: verified.items });
     decisionsMicros += same.spend.costMicros;
-    deduped = polishCandidates(sortByDate(same.items), { year, who, affiliation });
+    deduped = polishCandidates(sortByDate(same.items), { year, who, handle: profile.x, affiliation });
   } catch {
     failed.push('decisions');
     ran.push('decisions:heuristic');
-    deduped = polishCandidates(deduped, { year, who, affiliation });
+    deduped = polishCandidates(deduped, { year, who, handle: profile.x, affiliation });
   }
 
   const prolific = Boolean(profile.github || profile.site || affiliation.company || (profile.bio && profile.bio.length > 20));
@@ -2047,6 +2055,7 @@ async function gatherFresh(
       await import('./shipped-xai');
     const wantDeep = deep && xaiConfigured(env);
     const wantGap = !deep && xaiConfigured(env) && xaiShouldGapFill(deduped.length, prolific);
+    if (wantGap) ran.push(`xai-gap-trigger:${deduped.length}`);
     if (wantDeep) {
       const sweep = await searchPersonAndCompanyX({
         env,
@@ -2075,7 +2084,7 @@ async function gatherFresh(
         const { verifyCandidates, dedupeSameShips, sortByDate } = await import('./shipped-decisions');
         const extra = await verifyCandidates({
           env,
-          items: polishCandidates([...sweep.found, ...web.found], { year, who, affiliation }),
+          items: polishCandidates([...sweep.found, ...web.found], { year, who, handle: profile.x, affiliation }),
           year,
           who,
           affiliation,
@@ -2084,7 +2093,7 @@ async function gatherFresh(
         decisionsMicros += extra.spend.costMicros;
         const same = await dedupeSameShips({ env, items: [...deduped, ...extra.items] });
         decisionsMicros += same.spend.costMicros;
-        deduped = polishCandidates(sortByDate(same.items), { year, who, affiliation });
+        deduped = polishCandidates(sortByDate(same.items), { year, who, handle: profile.x, affiliation });
       }
       const cap = xaiDeepMaxPosts(env);
       if (xaiPosts >= cap && cap > 0) ran.push('xai-capped:deep');
@@ -2109,7 +2118,7 @@ async function gatherFresh(
         const { verifyCandidates, dedupeSameShips, sortByDate } = await import('./shipped-decisions');
         const extra = await verifyCandidates({
           env,
-          items: polishCandidates(personX.found, { year, who, affiliation }),
+          items: polishCandidates(personX.found, { year, who, handle: profile.x, affiliation }),
           year,
           who,
           affiliation,
@@ -2118,20 +2127,20 @@ async function gatherFresh(
         decisionsMicros += extra.spend.costMicros;
         const same = await dedupeSameShips({ env, items: [...deduped, ...extra.items] });
         decisionsMicros += same.spend.costMicros;
-        deduped = polishCandidates(sortByDate(same.items), { year, who, affiliation });
+        deduped = polishCandidates(sortByDate(same.items), { year, who, handle: profile.x, affiliation });
       }
       const cap = xaiMaxPosts(env);
       if (xaiPosts >= cap && cap > 0) ran.push('xai-capped:free');
     } else if (xaiConfigured(env) && wantGap && !profile.x) {
       ran.push('xai-skipped:no-handle');
     } else if (xaiConfigured(env) && !deep) {
-      ran.push(deduped.length >= 6 ? 'xai-skipped:enough' : 'xai-skipped:not-prolific');
+      ran.push(deduped.length >= 10 ? 'xai-skipped:enough' : 'xai-skipped:not-prolific');
     }
   } catch {
     failed.push(deep ? 'xai-deep' : 'xai-gapfill');
   }
 
-  deduped = polishCandidates(deduped, { year, who, affiliation });
+  deduped = polishCandidates(deduped, { year, who, handle: profile.x, affiliation });
   stats = mergeStats([pageStats, deduped.flatMap((item) => item.metrics ?? [])]);
   const finalGaps = detectGaps({ ...draft, found: deduped, stats, profile });
   // Never invent a leftover count. A number only when we sliced a unique list past MAX_ITEMS.

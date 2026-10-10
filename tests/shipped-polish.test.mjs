@@ -60,6 +60,28 @@ test('same article href collapses to the best title; changelog index cards stay 
     found({ name: 'Codex CLI 0.2', date: '2026-02-02', link: 'https://developers.openai.com/codex/changelog' }),
   ]);
   assert.equal(index.length, 2);
+  const journal = polish.collapseSameHref([
+    found({ name: 'hotelist.com', link: 'https://levels.io/', source: 'site' }),
+    found({ name: 'infiniteslop.ai', link: 'https://levels.io/', source: 'site' }),
+    found({ name: 'Photo AI feature', link: 'https://levels.io/#photo-ai', source: 'site' }),
+  ]);
+  assert.equal(journal.length, 3);
+  assert.equal(polish.isShipListHref('https://levels.io/projects'), true);
+  assert.equal(polish.isShipListHref('https://levels.io/'), true);
+});
+
+test('indie polish drops are labeled per item', () => {
+  const drops = [];
+  const kept = polish.polishCandidates(
+    [
+      found({ name: 'hotelist.com', date: '2026-10-05', source: 'site', link: 'https://levels.io/#hotelist' }),
+      found({ name: 'GPT-3.5 turbo leftover', date: '2026-01-01', source: 'site', link: 'https://levels.io/#old' }),
+      found({ name: 'READ THE CHANGELOG', date: '2026-02-01', source: 'site', link: 'https://levels.io/#read' }),
+    ],
+    { year: 2026, who: 'levelsio', handle: 'levelsio', onDrop: (drop) => drops.push(drop) },
+  );
+  assert.ok(kept.some((item) => /hotelist/i.test(item.name)));
+  assert.ok(drops.some((drop) => drop.reason === 'year-other' || drop.reason === 'junk-title' || drop.reason === 'title-empty'));
 });
 
 test('point releases roll up to one line per product per month unless named', () => {

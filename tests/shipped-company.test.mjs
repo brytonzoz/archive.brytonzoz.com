@@ -410,3 +410,97 @@ test('off-worker cache payload expires after 7 days', async () => {
   });
   assert.equal(stale, null);
 });
+
+test('company cache writes a new version and refuses to swap a thin rebuild over a fat tape', async () => {
+  const storeMod = await import('../worker/shipped-company-store.ts');
+  assert.equal(storeMod.shouldSwapCompanyCache(null, 70), true);
+  assert.equal(storeMod.shouldSwapCompanyCache(0, 70), true);
+  assert.equal(storeMod.shouldSwapCompanyCache(2, 70), true);
+  assert.equal(storeMod.shouldSwapCompanyCache(70, 69), true);
+  assert.equal(storeMod.shouldSwapCompanyCache(70, 2), false);
+  assert.equal(storeMod.shouldSwapCompanyCache(70, 7), false);
+  assert.equal(storeMod.shouldSwapCompanyCache(70, 0), false);
+  assert.match(storeMod.companyCacheRevKey(2026, 'cursor', '9'), /company-cache\/v2\/2026\/cursor\/9\.json/);
+  assert.match(storeMod.companyCachePointerKey(2026, 'cursor'), /company-cache\/v2\/2026\/cursor\.json$/);
+
+  const rows = new Map();
+  const objects = new Map();
+  const db = {
+    prepare(sql) {
+      return {
+        bind(...args) {
+          return {
+            async first() {
+              if (/SELECT n FROM shipped_company_cache/.test(sql)) return rows.get(`${args[0]}|${args[1]}`) || null;
+              return null;
+            },
+            async run() {
+              if (/INSERT INTO shipped_company_cache/.test(sql)) {
+                rows.set(`${args[0]}|${args[1]}`, { n: args[2], found: args[3], r2_key: args[4], fetched_at: args[5], rev: args[6] });
+              }
+              return { success: true };
+            },
+          };
+        },
+      };
+    },
+  };
+  const bucket = {
+    async put(key, body) {
+      objects.set(key, String(body));
+    },
+  };
+  const fat = storeMod.offworkerPayload({
+    slug: 'cursor',
+    year: 2026,
+    fetchedAt: Date.now(),
+    found: Array.from({ length: 70 }, (_, i) => ({
+      name: `Cursor ${i + 1}`,
+      description: '',
+      date: '2026-03-01',
+      link: `https://cursor.com/changelog#${i}`,
+      source: 'changelog',
+      status: 'LAUNCHED',
+      score: 7,
+      thisYear: true,
+    })),
+  });
+  const thin = storeMod.offworkerPayload({
+    slug: 'cursor',
+    year: 2026,
+    fetchedAt: Date.now() + 1000,
+    found: [
+      {
+        name: 'Cursor 1',
+        description: '',
+        date: '2026-03-01',
+        link: 'https://cursor.com/changelog#1',
+        source: 'changelog',
+        status: 'LAUNCHED',
+        score: 7,
+        thisYear: true,
+      },
+      {
+        name: 'Cursor 2',
+        description: '',
+        date: '2026-03-02',
+        link: 'https://cursor.com/changelog#2',
+        source: 'changelog',
+        status: 'LAUNCHED',
+        score: 7,
+        thisYear: true,
+      },
+    ],
+  });
+  assert.ok(fat && thin);
+  const first = await storeMod.putOffworkerCache(db, bucket, fat);
+  assert.equal(first.swapped, true);
+  assert.equal(first.n, 70);
+  assert.equal(rows.get('cursor|2026').n, 70);
+  const second = await storeMod.putOffworkerCache(db, bucket, thin);
+  assert.equal(second.swapped, false);
+  assert.equal(second.kept, 70);
+  assert.equal(rows.get('cursor|2026').n, 70);
+  assert.ok([...objects.keys()].some((key) => /company-cache\/v2\/2026\/cursor\/\d+\.json$/.test(key)));
+  assert.ok(JSON.parse(objects.get(storeMod.companyCachePointerKey(2026, 'cursor'))).found.length === 70);
+});

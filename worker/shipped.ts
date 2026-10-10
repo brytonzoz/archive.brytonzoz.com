@@ -263,7 +263,7 @@ const SCHEMA = [
   'CREATE UNIQUE INDEX IF NOT EXISTS print_orders_checkout ON print_orders (checkout_id)',
   `CREATE TABLE IF NOT EXISTS shipped_company_cache (
     slug TEXT NOT NULL, year INTEGER NOT NULL, n INTEGER NOT NULL, found TEXT NOT NULL,
-    r2_key TEXT, fetched_at INTEGER NOT NULL, PRIMARY KEY (slug, year))`,
+    r2_key TEXT, fetched_at INTEGER NOT NULL, rev TEXT, PRIMARY KEY (slug, year))`,
   `CREATE TABLE IF NOT EXISTS shipped_company_queue (
     slug TEXT PRIMARY KEY, company TEXT NOT NULL, product TEXT, site TEXT, queued_at INTEGER NOT NULL)`,
 ];
@@ -278,6 +278,7 @@ const COLUMNS = [
   'ALTER TABLE shipped_bids ADD COLUMN serial INTEGER',
   'ALTER TABLE print_orders ADD COLUMN refund_cents INTEGER',
   'ALTER TABLE print_orders ADD COLUMN kind TEXT',
+  'ALTER TABLE shipped_company_cache ADD COLUMN rev TEXT',
 ];
 
 async function migrate(db: D1Database) {
@@ -2245,9 +2246,9 @@ export async function adminShipped(request: Request, env: ShippedEnv): Promise<R
       ran: body.ran,
     });
     if (!parsed) return json({ error: 'bad-cache' }, 400);
-    await putOffworkerCache(db, env.SHIPPED, parsed);
+    const wrote = await putOffworkerCache(db, env.SHIPPED, parsed);
     await dropListedCache(env);
-    return json({ ok: true, slug: parsed.slug, n: parsed.found.length });
+    return json({ ok: true, slug: parsed.slug, n: wrote.n, swapped: wrote.swapped, kept: wrote.kept, rev: wrote.rev });
   }
   if (url.pathname !== '/api/admin/shipped') return json({ error: 'not-found' }, 404);
 

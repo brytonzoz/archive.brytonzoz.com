@@ -820,7 +820,7 @@ export async function harvestCompany(opts: {
     const firstParty = found.length;
     ran.push(`company-first-party:${firstParty}`);
 
-    const wantCompanyX = Boolean(affiliation.companyX) && (opts.deep || (opts.gapFillX && firstParty < 8));
+    const wantCompanyX = Boolean(affiliation.companyX) && (opts.deep || (opts.gapFillX && firstParty < 10));
     if (wantCompanyX && affiliation.companyX) {
       try {
         const { searchXShips } = await import('./shipped-xai');

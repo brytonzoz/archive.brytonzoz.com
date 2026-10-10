@@ -149,9 +149,14 @@ test('tutorials, case studies, and research writeups are not ships', () => {
 test('xAI is a keyword gap-fill with a hard post cap and monthly fail-closed', async () => {
   assert.equal(xai.xaiMaxPosts({}), 10);
   assert.equal(xai.xaiMaxPosts({ XAI_MAX_POSTS: '10' }), 10);
-  assert.equal(xai.xaiKeywordQuery('sama', 2026), 'from:sama (shipped OR launched OR live OR released) since:2026-01-01');
+  assert.equal(
+    xai.xaiKeywordQuery('sama', 2026),
+    'from:sama (shipped OR launched OR live OR released OR built OR made OR "just shipped" OR "now live") since:2026-01-01',
+  );
   assert.equal(xai.xaiShouldGapFill(1, true), true);
-  assert.equal(xai.xaiShouldGapFill(6, true), false);
+  assert.equal(xai.xaiShouldGapFill(9, true), true);
+  assert.equal(xai.xaiShouldGapFill(10, true), false);
+  assert.equal(xai.xaiShouldGapFill(6, true), true);
   assert.equal(xai.xaiShouldGapFill(1, false), false);
   assert.equal(xai.ticksToMicros(37_756_000), 3776);
   assert.equal(xai.ticksToUsd(10_000_000_000), 1);

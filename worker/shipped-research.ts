@@ -4,6 +4,7 @@
 // source URL. This file is parsers + scoring; gather() in shipped-sources.ts runs the passes.
 
 import type { ItemSource, ItemStatus } from '../lib/shipped-year';
+import { itemsFromFeedXml } from './shipped-changelog';
 
 type Found = {
   name: string;
@@ -108,12 +109,14 @@ export function itemsFromProjectList(opts: { text: string; url: string; year: nu
     if (key.length < 2 || seen.has(key)) return;
     if (/^(home|about|blog|contact|projects?|changelog)$/i.test(trimmed)) return;
     seen.add(key);
+    const slug = key.replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '').slice(0, 48);
+    const href = publicUrl(url);
     found.push({
       name: trimmed,
       description: clean(hint || `Listed under ${year} on ${hostOf(url) ?? 'their site'}`, 140),
       date,
       dateConfidence: date ? 'exact' : 'year',
-      link: publicUrl(url),
+      link: href && slug ? `${href.replace(/#.*$/, '')}#${slug}` : href,
       icon: null,
       source: 'site',
       status: 'LIVE',
@@ -148,6 +151,150 @@ export function itemsFromProjectList(opts: { text: string; url: string; year: nu
   );
   for (const match of text.matchAll(namedDate)) add(match[1], null, `Dated ${year} on ${hostOf(url) ?? 'their site'}`);
 
+  return found.slice(0, 80);
+}
+
+const MONTH_NAME =
+  'jan(?:uary)?|feb(?:ruary)?|mar(?:ch)?|apr(?:il)?|may|jun(?:e)?|jul(?:y)?|aug(?:ust)?|sep(?:t(?:ember)?)?|oct(?:ober)?|nov(?:ember)?|dec(?:ember)?';
+const MONTH_NUM: Record<string, string> = {
+  jan: '01',
+  january: '01',
+  feb: '02',
+  february: '02',
+  mar: '03',
+  march: '03',
+  apr: '04',
+  april: '04',
+  may: '05',
+  jun: '06',
+  june: '06',
+  jul: '07',
+  july: '07',
+  aug: '08',
+  august: '08',
+  sep: '09',
+  sept: '09',
+  september: '09',
+  oct: '10',
+  october: '10',
+  nov: '11',
+  november: '11',
+  dec: '12',
+  december: '12',
+};
+
+const PERSON_SHIP =
+  /\b(i (?:made|built|launched|shipped|released|added|published|open[- ]sourced|vibe ?coded|registered|ported|remade)|i have made|just (?:launched|shipped|released|built)|now (?:live|free|out)\b|hit (?:a new )?(?:record )?\$|passed \$\s?\d|registered [a-z0-9-]+\.(?:com|ai|io|app|dev|co))\b/i;
+
+/** Indie blog / X-style posts that are actually ships, not commentary. */
+export function looksLikePersonalShip(title: string): boolean {
+  const text = title.trim();
+  if (!text || text.length < 6) return false;
+  if (PERSON_SHIP.test(text)) return true;
+  return /\b(hit|passed|reached|crossed)\b/i.test(text) && /\$\s?\d/.test(text);
+}
+
+/** Pull a short product / milestone name out of "I made hotelist.com to fix…". */
+export function journalShipName(raw: string): string {
+  const text = clean(raw.replace(/𝕏/g, ''), 160);
+  if (!text) return '';
+  const host = text.match(/\b((?:[a-z0-9-]+\.)+(?:com|ai|io|app|dev|co))\b/i);
+  if (host && /\b(made|built|registered|launched|shipped|released)\b/i.test(text)) {
+    if (/\bfree\b/i.test(text)) return clean(`${host[1]} free`, 40);
+    return host[1];
+  }
+  const money = text.match(/\$\s?[\d,.]+(?:\s*[kKmMbB])?(?:\s*\/\s*(?:mo|y|yr|year)|\/y|\/mo|\s*MRR)?/i);
+  if (money && /\b(hit|passed|reached|crossed|record)\b/i.test(text)) {
+    return clean(`${money[0].replace(/\s+/g, '')} milestone`, 40);
+  }
+  const into = text.match(/\b(?:added|built|shipped|vibe ?coded).{0,80}?\b(?:into|to|for|on)\s+([A-Z][A-Za-z0-9 .+-]{2,32})/i);
+  if (into) return clean(`${into[1].replace(/[.,].*$/, '').trim()} feature`, 40);
+  const named = text.match(
+    /\b(?:i (?:made|built|launched|shipped|released|added|vibe ?coded|registered|ported|remade)|just (?:launched|shipped|built))\s+(?:a |an |the |my |our )?([^,.]{2,48})/i,
+  );
+  if (named) return clean(named[1].replace(/\b(yesterday|today|tonight|this (?:week|month)|completely|with)\b.*$/i, '').trim(), 40);
+  return clean(text, 40);
+}
+
+/**
+ * levels.io / indie-blog archives: "October 2026" then "- 5 Oct I made hotelist.com…".
+ * Commentary stays out; only first-person ships, launches, and revenue milestones.
+ */
+export function itemsFromDatedJournal(opts: { text: string; url: string; year: number }): Found[] {
+  const { text, url, year } = opts;
+  const found: Found[] = [];
+  const seen = new Set<string>();
+  const monthRe = new RegExp(`(?:^|\\n)\\s*(?:#{1,3}\\s*)?(${MONTH_NAME})\\s+${year}\\b`, 'gi');
+  const marks = [...text.matchAll(monthRe)];
+  const add = (name: string, date: string, hint: string) => {
+    const trimmed = journalShipName(name);
+    if (!trimmed || trimmed.length < 2) return;
+    const key = loose(trimmed);
+    if (key.length < 2 || seen.has(key)) return;
+    seen.add(key);
+    const slug = key.replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '').slice(0, 48);
+    const href = publicUrl(url);
+    found.push({
+      name: trimmed,
+      description: clean(hint || `Announced ${date} on ${hostOf(url) ?? 'their site'}`, 140),
+      date,
+      dateConfidence: 'exact',
+      link: href && slug ? `${href.replace(/#.*$/, '')}#${slug}` : href,
+      icon: null,
+      source: 'site',
+      status: 'LAUNCHED',
+      score: 7,
+      thisYear: true,
+    });
+  };
+
+  for (let i = 0; i < marks.length; i++) {
+    const monthToken = (marks[i][1] || '').toLowerCase().replace(/[^a-z]/g, '');
+    const month = MONTH_NUM[monthToken] || MONTH_NUM[monthToken.slice(0, 3)];
+    if (!month) continue;
+    const start = (marks[i].index ?? 0) + marks[i][0].length;
+    const end = i + 1 < marks.length ? (marks[i + 1].index ?? text.length) : Math.min(text.length, start + 8000);
+    const chunk = text.slice(start, end);
+    const bulletRe = new RegExp(
+      `(?:^|\\n)\\s*(?:[-*•●]|\\d+[.)])?\\s*(\\d{1,2})\\s+(${MONTH_NAME})(?:\\s+'?\\d{2,4})?\\s+(.+?)(?=\\n|$)`,
+      'gi',
+    );
+    for (const match of chunk.matchAll(bulletRe)) {
+      const day = match[1].padStart(2, '0');
+      const raw = match[3].replace(/𝕏/g, '').trim();
+      if (!looksLikePersonalShip(raw)) continue;
+      add(raw, `${year}-${month}-${day}`, `Announced ${year}-${month}-${day} on ${hostOf(url) ?? 'their site'}`);
+    }
+  }
+
+  return found.slice(0, 80);
+}
+
+/** RSS/Atom on a personal site: keep dated 2026 ships, drop commentary. */
+export function itemsFromPersonalFeed(opts: { text: string; url: string; year: number }): Found[] {
+  if (!/<item\b|<entry\b/i.test(opts.text)) return [];
+  const found: Found[] = [];
+  const seen = new Set<string>();
+  for (const item of itemsFromFeedXml(opts.text, opts.year)) {
+    const raw = `${item.name} ${item.description || ''}`;
+    if (!looksLikePersonalShip(raw) && !looksLikePersonalShip(item.name)) continue;
+    const name = journalShipName(item.name);
+    const key = loose(name);
+    if (!name || key.length < 2 || seen.has(key)) continue;
+    seen.add(key);
+    found.push({
+      name,
+      description: clean(item.description || `Announced ${item.date} on ${hostOf(opts.url) ?? 'their site'}`, 140),
+      date: item.date,
+      dateConfidence: item.dateConfidence,
+      link: item.link,
+      icon: null,
+      source: 'site',
+      status: 'LAUNCHED',
+      score: 7.5,
+      thisYear: true,
+    });
+  }
   return found.slice(0, 80);
 }
 
@@ -226,7 +373,7 @@ export function detectGaps(gathered: Gathered): ResearchGap[] {
   if (hasSite && siteItems < 2) gaps.push('own-site');
   if (hasSite && !found.some((item) => item.source === 'site' && item.thisYear)) gaps.push('project-list');
   if (github && !stats.some((s) => s.kind === 'repos' || s.kind === 'contributions')) gaps.push('github-profile');
-  if (found.length < 6 && (Boolean(github) || hasSite)) gaps.push('thin-for-prolific');
+  if (found.length < 10 && (Boolean(github) || hasSite)) gaps.push('thin-for-prolific');
   if (!stats.some((s) => s.kind === 'mrr') && /trustmrr|\$\d/i.test(`${gathered.site?.text ?? ''} ${gathered.profile.bio}`)) gaps.push('revenue');
   if (gathered.profile.x && !found.some((item) => item.source === 'producthunt')) gaps.push('producthunt');
   return [...new Set(gaps)];
@@ -280,7 +427,20 @@ export function extraResearchPaths(siteUrl: string): string[] {
   const url = publicUrl(siteUrl);
   if (!url) return [];
   const base = url.replace(/\/+$/, '');
-  return [`${base}/projects`, `${base}/now`, `${base}/changelog`, `${base}/2026`, `${base}/work`, `${base}/shipped`];
+  return [
+    `${base}/projects`,
+    `${base}/now`,
+    `${base}/changelog`,
+    `${base}/2026`,
+    `${base}/work`,
+    `${base}/shipped`,
+    `${base}/products`,
+    `${base}/apps`,
+    `${base}/blog`,
+    `${base}/rss`,
+    `${base}/feed`,
+    `${base}/rss.xml`,
+  ];
 }
 
 export function trustmrrUrls(profile: Profile): string[] {

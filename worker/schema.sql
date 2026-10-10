@@ -95,6 +95,7 @@ CREATE TABLE IF NOT EXISTS shipped_company_cache (
   found TEXT NOT NULL,
   r2_key TEXT,
   fetched_at INTEGER NOT NULL,
+  rev TEXT,
   PRIMARY KEY (slug, year)
 );
 CREATE TABLE IF NOT EXISTS shipped_company_queue (

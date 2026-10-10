@@ -255,6 +255,52 @@ test('a /projects page dated 2026 becomes found items', () => {
   assert.equal(news.some((item) => /legacy/i.test(item.name)), false);
 });
 
+test('indie blog month archives become dated ships and skip commentary', () => {
+  const text = `October 2026
+
+- 8 Oct I discovered that thousands of bots monitor every new link posted on X
+- 5 Oct I made hotelist.com to fix Airbnb's 4.5 to 5.0 rating scale
+- 1 Oct An Apple Store in Dubai leaves Apple Watches lying freely
+
+September 2026
+
+- 23 Sep I passed $10M/y in revenue and investment gains with a 94.5% profit margin
+- 5 Sep After a decade, I have made nomads.com free for everyone now
+
+August 2026
+
+- 30 Aug I made infiniteslop.ai yesterday completely on my phone
+- 29 Aug I built Infinite Slop, an infinite interactive AI generated live stream
+- 1 Aug I vibecoded a full video editor into Photo AI that generates and edits videos
+`;
+  const items = research.itemsFromDatedJournal({ text, url: 'https://levels.io/', year: 2026 });
+  const names = items.map((item) => item.name).join(' | ');
+  assert.ok(items.some((item) => /hotelist/i.test(item.name)), names);
+  assert.ok(items.some((item) => /infiniteslop/i.test(item.name)), names);
+  assert.ok(items.some((item) => /nomads/i.test(item.name)), names);
+  assert.ok(items.some((item) => /photo ai/i.test(item.name)), names);
+  assert.ok(items.some((item) => /10m|milestone/i.test(item.name)), names);
+  assert.equal(items.some((item) => /bots monitor/i.test(item.name)), false);
+  assert.equal(items.some((item) => /apple store/i.test(item.name)), false);
+  assert.ok(items.every((item) => item.date && item.date.startsWith('2026-')));
+  assert.ok(items.find((item) => /hotelist/i.test(item.name))?.date === '2026-10-05');
+  assert.ok(research.looksLikePersonalShip('I made hotelist.com to fix ratings'));
+  assert.equal(research.looksLikePersonalShip('I discovered that thousands of bots monitor X'), false);
+  assert.ok(research.extraResearchPaths('https://levels.io').some((url) => /\/blog$/.test(url)));
+  assert.ok(research.extraResearchPaths('https://levels.io').some((url) => /\/rss$/.test(url)));
+});
+
+test('personal RSS keeps dated ships and drops commentary', () => {
+  const xml = `<?xml version="1.0"?>
+  <rss><channel>
+    <item><title>I made hotelist.com to fix Airbnb ratings</title><link>https://levels.io/hotelist</link><pubDate>Sun, 05 Oct 2026 12:00:00 GMT</pubDate></item>
+    <item><title>I discovered that thousands of bots monitor X</title><link>https://levels.io/bots</link><pubDate>Wed, 08 Oct 2026 12:00:00 GMT</pubDate></item>
+  </channel></rss>`;
+  const items = research.itemsFromPersonalFeed({ text: xml, url: 'https://levels.io/rss', year: 2026 });
+  assert.ok(items.some((item) => /hotelist/i.test(item.name) && item.date === '2026-10-05'));
+  assert.equal(items.some((item) => /bots/i.test(item.name)), false);
+});
+
 test('public MRR and stars keep their source URL', () => {
   const stats = research.extractPublicStats(
     'photoai.com is making $105,000/mo revenue and SuperLevels has 553 stars',

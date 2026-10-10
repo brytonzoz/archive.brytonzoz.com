@@ -4,7 +4,10 @@ import { companySlug } from './shipped-affiliation';
 import type { Found } from './shipped-sources';
 
 export const COMPANY_CACHE_TTL_MS = 7 * 24 * 60 * 60 * 1000;
-export const COMPANY_CACHE_VERSION = 'v1';
+export const COMPANY_CACHE_VERSION = 'v2';
+/** Do not replace a finished fat tape with a mid-rebuild sliver. */
+export const COMPANY_CACHE_THIN = 8;
+export const COMPANY_CACHE_FAT = 15;
 
 export type OffworkerCache = {
   fetchedAt: number;
@@ -55,7 +58,7 @@ export function makeCompanyStore(env: CompanyStoreEnv, db?: D1Database | null): 
             /* fall through to R2 */
           }
         }
-        const key = row?.r2_key || companyCacheObjectKey(year, slug);
+        const key = row?.r2_key || companyCachePointerKey(year, slug);
         const object = await env.SHIPPED?.get(key);
         if (object) {
           const parsed = parseOffworkerCache(await object.json());
@@ -63,7 +66,7 @@ export function makeCompanyStore(env: CompanyStoreEnv, db?: D1Database | null): 
         }
         return null;
       }
-      const object = await env.SHIPPED?.get(companyCacheObjectKey(year, slug));
+      const object = await env.SHIPPED?.get(companyCachePointerKey(year, slug));
       if (!object) return null;
       return parseOffworkerCache(await object.json());
     },
@@ -106,8 +109,26 @@ export function makeCompanyStore(env: CompanyStoreEnv, db?: D1Database | null): 
   };
 }
 
-export function companyCacheObjectKey(year: number, slug: string): string {
+export function companyCachePointerKey(year: number, slug: string): string {
   return `company-cache/${COMPANY_CACHE_VERSION}/${year}/${slug}.json`;
+}
+
+export function companyCacheRevKey(year: number, slug: string, rev: string | number): string {
+  return `company-cache/${COMPANY_CACHE_VERSION}/${year}/${slug}/${rev}.json`;
+}
+
+/** Last-complete pointer. Kept so older call sites still resolve. */
+export function companyCacheObjectKey(year: number, slug: string, rev?: string | number): string {
+  return rev == null || rev === '' ? companyCachePointerKey(year, slug) : companyCacheRevKey(year, slug, rev);
+}
+
+/** Readers keep the last complete list. Never swap an empty or collapsed rebuild into the pointer. */
+export function shouldSwapCompanyCache(currentN: number | null | undefined, newN: number): boolean {
+  if (!Number.isFinite(newN) || newN <= 0) return false;
+  if (currentN == null || !Number.isFinite(currentN) || currentN <= 0) return true;
+  if (currentN >= COMPANY_CACHE_FAT && newN < COMPANY_CACHE_THIN) return false;
+  if (currentN >= COMPANY_CACHE_FAT && newN < Math.floor(currentN * 0.25)) return false;
+  return true;
 }
 
 export function parseOffworkerCache(raw: unknown): OffworkerCache | null {
@@ -141,8 +162,9 @@ export function offworkerPayload(input: { slug: string; year: number; found: Fou
   });
 }
 
-export async function putOffworkerCache(db: D1Database, bucket: R2Bucket | undefined, payload: OffworkerCache): Promise<void> {
-  const key = companyCacheObjectKey(payload.year, payload.slug);
+export type CompanyCacheWrite = { swapped: boolean; n: number; kept: number; rev: string; r2Key: string };
+
+export async function putOffworkerCache(db: D1Database, bucket: R2Bucket | undefined, payload: OffworkerCache): Promise<CompanyCacheWrite> {
   const row: OffworkerCache = {
     fetchedAt: payload.fetchedAt,
     slug: payload.slug,
@@ -150,15 +172,48 @@ export async function putOffworkerCache(db: D1Database, bucket: R2Bucket | undef
     found: stripVia(payload.found),
     ran: payload.ran,
   };
-  await db
-    .prepare(
-      `INSERT INTO shipped_company_cache (slug, year, n, found, r2_key, fetched_at)
-       VALUES (?, ?, ?, ?, ?, ?)
-       ON CONFLICT(slug, year) DO UPDATE SET
-         n = excluded.n, found = excluded.found, r2_key = excluded.r2_key, fetched_at = excluded.fetched_at`,
-    )
-    .bind(row.slug, row.year, row.found.length, JSON.stringify(row), key, row.fetchedAt)
-    .run();
-  await bucket?.put(key, JSON.stringify(row), { httpMetadata: { contentType: 'application/json' } });
+  const n = row.found.length;
+  const rev = String(row.fetchedAt || Date.now());
+  const revKey = companyCacheRevKey(row.year, row.slug, rev);
+  const pointerKey = companyCachePointerKey(row.year, row.slug);
+  const body = JSON.stringify(row);
+  const headers = { httpMetadata: { contentType: 'application/json' } };
+  // Write the new version first. The pointer still names the last complete list
+  // until this rebuild is on disk and passes the swap check.
+  await bucket?.put(revKey, body, headers);
+
+  const current = await db
+    .prepare('SELECT n FROM shipped_company_cache WHERE slug = ? AND year = ?')
+    .bind(row.slug, row.year)
+    .first<{ n: number }>()
+    .catch(() => null);
+  const kept = current?.n ?? 0;
+  const swapped = shouldSwapCompanyCache(current?.n, n);
+  if (swapped) {
+    await bucket?.put(pointerKey, body, headers);
+    try {
+      await db
+        .prepare(
+          `INSERT INTO shipped_company_cache (slug, year, n, found, r2_key, fetched_at, rev)
+           VALUES (?, ?, ?, ?, ?, ?, ?)
+           ON CONFLICT(slug, year) DO UPDATE SET
+             n = excluded.n, found = excluded.found, r2_key = excluded.r2_key,
+             fetched_at = excluded.fetched_at, rev = excluded.rev`,
+        )
+        .bind(row.slug, row.year, n, body, revKey, row.fetchedAt, rev)
+        .run();
+    } catch {
+      await db
+        .prepare(
+          `INSERT INTO shipped_company_cache (slug, year, n, found, r2_key, fetched_at)
+           VALUES (?, ?, ?, ?, ?, ?)
+           ON CONFLICT(slug, year) DO UPDATE SET
+             n = excluded.n, found = excluded.found, r2_key = excluded.r2_key, fetched_at = excluded.fetched_at`,
+        )
+        .bind(row.slug, row.year, n, body, revKey, row.fetchedAt)
+        .run();
+    }
+  }
   await db.prepare('DELETE FROM shipped_company_queue WHERE slug = ?').bind(row.slug).run().catch(() => undefined);
+  return { swapped, n, kept, rev, r2Key: swapped ? revKey : current ? companyCacheRevKey(row.year, row.slug, 'kept') : revKey };
 }

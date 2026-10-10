@@ -439,7 +439,20 @@ export function extraSitePaths(siteUrl: string): string[] {
   const base = url.replace(/\/+$/, '');
   const host = hostOf(url);
   if (!host || isDomain(host) === false) return [];
-  return [`${base}/`, `${base}/now`, `${base}/projects`, `${base}/changelog`, `${base}/shipped`, `${base}/2026`, `${base}/work`];
+  return [
+    `${base}/`,
+    `${base}/now`,
+    `${base}/projects`,
+    `${base}/changelog`,
+    `${base}/shipped`,
+    `${base}/2026`,
+    `${base}/work`,
+    `${base}/products`,
+    `${base}/apps`,
+    `${base}/blog`,
+    `${base}/rss`,
+    `${base}/feed`,
+  ];
 }
 
 export { httpsUrl, namesClose, uniqueUrls };

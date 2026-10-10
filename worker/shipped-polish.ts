@@ -67,8 +67,16 @@ export type Polishable = {
 export type PolishOpts = {
   year: number;
   who?: string | null;
+  handle?: string | null;
   affiliation?: Affiliation | null;
+  onDrop?: (drop: PolishDrop) => void;
 };
+
+export type PolishDrop = { name: string; reason: string };
+
+function shouldLogIndieDrops(who?: string | null, handle?: string | null): boolean {
+  return /levelsio|pieter levels|marc ?lou|marclou|marc_lou/i.test(`${who || ''} ${handle || ''}`);
+}
 
 function tidy(value: unknown): string {
   if (typeof value !== 'string') return '';
@@ -116,6 +124,18 @@ export function isChangelogIndexHref(url: string | null | undefined): boolean {
   try {
     const path = new URL(url).pathname.replace(/\/+$/, '') || '/';
     return /\/(changelog|docs\/changelog|whats-new|what-s-new|releases|updates|release-notes)$/i.test(path);
+  } catch {
+    return false;
+  }
+}
+
+/** Personal project lists and homepage journals share one URL for many ships. */
+export function isShipListHref(url: string | null | undefined): boolean {
+  if (!url) return false;
+  try {
+    const path = new URL(url).pathname.replace(/\/+$/, '') || '/';
+    if (path === '/') return true;
+    return /\/(projects?|now|shipped|launches?|apps?|work|products?|blog|2026)$/i.test(path);
   } catch {
     return false;
   }
@@ -341,7 +361,7 @@ export function collapseSameHref<T extends Polishable>(items: T[]): T[] {
       none.push(item);
       continue;
     }
-    if (isChangelogIndexHref(item.link)) {
+    if (isChangelogIndexHref(item.link) || isShipListHref(item.link) || item.source === 'site') {
       indexCards.push(item);
       continue;
     }
@@ -409,13 +429,31 @@ export function polishCandidates<T extends Polishable>(items: T[], opts: PolishO
   const year = opts.year;
   const who = opts.who || opts.affiliation?.name || '';
   const out: T[] = [];
+  const drops: PolishDrop[] = [];
+  const drop = (item: Polishable, reason: string) => {
+    const row = { name: item.name, reason };
+    drops.push(row);
+    opts.onDrop?.(row);
+  };
   for (const item of items) {
-    if (!inYearStrict(item, year)) continue;
+    if (!inYearStrict(item, year)) {
+      drop(item, otherYearProduct(item.name, year) ? 'year-other' : isFutureDate(item.date) ? 'year-future' : 'year-strict');
+      continue;
+    }
     const name = cleanShipTitle(item.name);
-    if (!name) continue;
-    if (isJunkTitle(name, { who, company: opts.affiliation?.company })) continue;
+    if (!name) {
+      drop(item, isJunkTitle(item.name, { who, company: opts.affiliation?.company }) ? 'junk-title' : 'title-empty');
+      continue;
+    }
+    if (isJunkTitle(name, { who, company: opts.affiliation?.company })) {
+      drop(item, 'junk-title');
+      continue;
+    }
     const date = inYearDate(item.date, year) ?? (item.source === 'changelog' || item.source === 'company' ? null : item.date);
-    if ((item.source === 'changelog' || item.source === 'company') && !date) continue;
+    if ((item.source === 'changelog' || item.source === 'company') && !date) {
+      drop(item, 'company-undated');
+      continue;
+    }
     out.push({
       ...item,
       name,
@@ -426,8 +464,20 @@ export function polishCandidates<T extends Polishable>(items: T[], opts: PolishO
       thisYear: Boolean(date && String(date).startsWith(String(year))),
     });
   }
+  const beforeHref = out.length;
   const collapsed = collapseSameHref(out);
+  if (collapsed.length < beforeHref) {
+    const kept = new Set(collapsed.map((item) => item.name));
+    for (const item of out) {
+      if (!kept.has(item.name)) drop(item, 'href-collapse');
+    }
+  }
+  const beforeRoll = collapsed.length;
   const rolled = rollupVersions(collapsed);
+  if (rolled.length < beforeRoll) drop({ name: `${beforeRoll - rolled.length} version rows` }, 'version-rollup');
+  if ((shouldLogIndieDrops(who, opts.handle) || shouldLogIndieDrops(opts.who, opts.handle)) && drops.length) {
+    console.log(JSON.stringify({ shipped: 'polish-drops', who, handle: opts.handle || null, kept: rolled.length, drops: drops.slice(0, 80) }));
+  }
   return rolled
     .map((item) => ({ ...item, name: versionParts(item.name) ? item.name : wordClamp(item.name, TITLE_MAX) }))
     .sort((a, b) => (a.date ?? '9999').localeCompare(b.date ?? '9999'));

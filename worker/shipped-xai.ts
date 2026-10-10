@@ -1,6 +1,6 @@
 // xAI is a GAP-FILL only. Free sources (GitHub, PH, App Store, npm, HN, changelogs, TinyFish)
 // plus OpenAI Decisions run first. x_search runs when a prolific-looking person still has
-// fewer than ~6 verified lines, or to resolve a missing handle/role. Absent XAI_API_KEY,
+// fewer than ~10 verified lines, or to resolve a missing handle/role. Absent XAI_API_KEY,
 // or a closed monthly cap, skips to the non-xAI pipeline.
 //
 // Billing (docs.x.ai): x_search is $5/1k posts fetched + $10/1k profiles; web_search $5/1k
@@ -18,7 +18,7 @@ export const XAI_POST_MICROS = 5_000;
 export const XAI_PROFILE_MICROS = 10_000;
 export const XAI_WEB_MICROS = 5_000;
 export const XAI_TICKS_PER_USD = 10_000_000_000;
-export const XAI_GAP_BELOW = 6;
+export const XAI_GAP_BELOW = 10;
 export const XAI_DEFAULT_MAX_POSTS = 10;
 export const XAI_HARD_MAX_POSTS = 25;
 export const XAI_DEEP_MAX_POSTS = 40;
@@ -122,7 +122,7 @@ export function xaiShouldGapFill(verified: number, prolific: boolean): boolean {
 
 export function xaiKeywordQuery(handle: string, year: number): string {
   const who = handle.replace(/^@/, '');
-  return `from:${who} (shipped OR launched OR live OR released) since:${year}-01-01`;
+  return `from:${who} (shipped OR launched OR live OR released OR built OR made OR "just shipped" OR "now live") since:${year}-01-01`;
 }
 
 /** Per-sale meter for a paid FULL run. Does not touch the free monthly xAI budget. */

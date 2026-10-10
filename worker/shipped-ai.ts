@@ -323,6 +323,7 @@ export function harvestItems(gathered: Gathered, year: number): DraftItem[] {
   const polished = polishCandidates(gathered.found, {
     year,
     who: gathered.profile.name || gathered.profile.affiliation?.name,
+    handle: gathered.profile.x,
     affiliation: gathered.profile.affiliation,
   });
   for (const item of polished) {

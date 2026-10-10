@@ -214,6 +214,46 @@ test('blocked challenge pages are dropped; TinyFish markdown still extracts date
   assert.ok(items.some((item) => /0\.145\.0/.test(item.name) && item.date === '2026-07-21'), JSON.stringify(items));
 });
 
+test('company harvests keep dated changelog cards and drop sitemap dumps', () => {
+  const dump = Array.from({ length: 80 }, (_, i) => ({
+    name: `Research post ${i}`,
+    description: '',
+    date: null,
+    link: `https://openai.com/index/research-${i}`,
+    source: 'changelog',
+    status: 'LAUNCHED',
+    score: 3,
+    thisYear: true,
+  }));
+  const keep = [
+    {
+      name: 'Codex CLI 0.145.0',
+      description: 'CLI',
+      date: '2026-07-21',
+      link: 'https://developers.openai.com/codex/changelog',
+      source: 'changelog',
+      status: 'LAUNCHED',
+      score: 7,
+      thisYear: true,
+    },
+    {
+      name: 'GPT-6.1 Sol Ultrafast',
+      description: '',
+      date: '2026-10-08',
+      link: 'https://learn.chatgpt.com/docs/changelog',
+      source: 'changelog',
+      status: 'LAUNCHED',
+      score: 8,
+      thisYear: true,
+    },
+  ];
+  const compact = company.compactCompanyFound([...dump, ...keep], 20);
+  assert.ok(compact.some((item) => /codex cli/i.test(item.name)));
+  assert.ok(compact.some((item) => /sol ultrafast/i.test(item.name)));
+  assert.ok(compact.length <= 20);
+  assert.ok(compact.findIndex((item) => /codex cli/i.test(item.name)) < 5);
+});
+
 test('off-worker cache is preferred and scoped on read', async () => {
   const storeMod = await import('../worker/shipped-company-store.ts');
   const cached = [

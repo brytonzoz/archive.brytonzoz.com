@@ -136,7 +136,7 @@ export function offworkerPayload(input: { slug: string; year: number; found: Fou
     fetchedAt: input.fetchedAt ?? Date.now(),
     slug: input.slug,
     year: input.year,
-    found: stripVia(input.found),
+    found: stripVia(input.found).slice(0, 200),
     ran: input.ran ?? [],
   });
 }

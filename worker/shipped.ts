@@ -2118,7 +2118,7 @@ export async function adminShipped(request: Request, env: ShippedEnv): Promise<R
       return json({ ok: true, queue: queue.results, cached: cachedRows.results });
     }
     if (request.method !== 'POST') return json({ error: 'method' }, 405);
-    const body = await readJsonCapped(request, 400_000);
+    const body = await readJsonCapped(request, 800_000);
     if (!body) return json({ error: 'bad-request' }, 400);
     const parsed = parseOffworkerCache({
       fetchedAt: typeof body.fetchedAt === 'number' ? body.fetchedAt : Date.now(),

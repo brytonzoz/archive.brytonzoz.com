@@ -137,6 +137,33 @@ function withVia(items: Found[], via: string | null): Found[] {
   }));
 }
 
+const COMPANY_CACHE_CAP = 200;
+
+/** Keep dated changelog cards; drop sitemap-sized dumps before D1/R2 ingest. */
+export function compactCompanyFound(found: Found[], cap = COMPANY_CACHE_CAP): Found[] {
+  const ranked = found.filter((item) => item && item.name && item.thisYear !== false);
+  const weight = (item: Found) => {
+    let n = (item.score || 0) * 8;
+    const url = (item.link || '').toLowerCase();
+    if (item.source === 'changelog') n += 80;
+    if (/\/(changelog|release-notes|whats-new|docs\/changelog)/i.test(url)) n += 50;
+    if (item.date && /^\d{4}-\d{2}-\d{2}$/.test(item.date)) n += 30;
+    if (/\/(blog|news|research|index)\//i.test(url) && !/changelog/i.test(url)) n -= 20;
+    return n;
+  };
+  ranked.sort((a, b) => weight(b) - weight(a));
+  const seen = new Set<string>();
+  const out: Found[] = [];
+  for (const item of ranked) {
+    const key = item.name.toLowerCase().replace(/[^a-z0-9]+/g, '');
+    if (key.length < 4 || seen.has(key)) continue;
+    seen.add(key);
+    out.push(item);
+    if (out.length >= cap) break;
+  }
+  return out;
+}
+
 function asFound(row: ChangelogFound): Found {
   return {
     name: row.name,
@@ -840,7 +867,7 @@ export async function harvestCompany(opts: {
       }
     }
 
-    return { found, spend, ran, cacheHit: false };
+    return { found: compactCompanyFound(found), spend, ran, cacheHit: false };
   };
   const harvested = opts.rebuild
     ? await load()

@@ -25,11 +25,13 @@ function asItem(row) {
 }
 
 function gateRow(row) {
+  const company = row.company || row.affiliation?.company || null;
   return polish.gateReceiptItems([asItem(row)], {
     year: 2026,
     who: row.who || null,
     handle: row.handle || null,
     owner: row.owner || null,
+    affiliation: company ? { company, role: row.role || 'ceo' } : undefined,
   });
 }
 

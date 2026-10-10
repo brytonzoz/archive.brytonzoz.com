@@ -607,6 +607,95 @@
       "date": "2026-02-01",
       "source": "changelog",
       "link": "https://openai.com/index/gpt-image-2"
+    },
+    {
+      "name": "STRIPE",
+      "date": "2026-10-01",
+      "source": "changelog",
+      "link": "https://vercel.com/changelog/stripe",
+      "company": "Vercel"
+    },
+    {
+      "name": "BUN",
+      "date": "2026-10-01",
+      "source": "changelog",
+      "link": "https://vercel.com/changelog/bun",
+      "company": "Vercel"
+    },
+    {
+      "name": "CURSOR CLOUD AGENTS",
+      "date": "2026-10-01",
+      "source": "changelog",
+      "link": "https://vercel.com/changelog/cursor-cloud-agents",
+      "company": "Vercel"
+    },
+    {
+      "name": "GPT-5.6 SOL",
+      "date": "2026-10-01",
+      "source": "changelog",
+      "link": "https://vercel.com/changelog/gpt-5-6-sol",
+      "company": "Vercel"
+    },
+    {
+      "name": "REDUCE FUTURE DEPLOYMENT SIZE BY REMOVING UNNECESSARY BUIL",
+      "date": "2026-10-01",
+      "source": "changelog",
+      "link": "https://vercel.com/changelog/reduce-future-deployment-size",
+      "company": "Vercel"
+    },
+    {
+      "name": "GPT-5.6 SOL HELPS RUN QUANTUM COMPUTING EXPERIMENTS APPLIED",
+      "date": "2026-09-08",
+      "source": "changelog",
+      "link": "https://openai.com/index/codex-quantum-computing-experiments"
+    },
+    {
+      "name": "CHATGPT",
+      "date": "2026-10-01",
+      "source": "changelog",
+      "link": "https://openai.com/chatgpt"
+    },
+    {
+      "name": "INSTALLATION AND CONNECTION",
+      "date": "2026-04-01",
+      "source": "changelog",
+      "link": "https://learn.chatgpt.com/docs/changelog#install"
+    },
+    {
+      "name": "MODEL SELECTION",
+      "date": "2026-04-01",
+      "source": "changelog",
+      "link": "https://learn.chatgpt.com/docs/changelog#models"
+    },
+    {
+      "name": "EXPANDED AUTO-REVIEW DOCUMENTATION",
+      "date": "2026-04-01",
+      "source": "changelog",
+      "link": "https://learn.chatgpt.com/docs/changelog#docs"
+    },
+    {
+      "name": "WORKSPACE MODEL AVAILABILITY",
+      "date": "2026-04-01",
+      "source": "changelog",
+      "link": "https://learn.chatgpt.com/docs/changelog#availability"
+    },
+    {
+      "name": "PUBLIC PLUGIN CATALOG CSV EXPORT",
+      "date": "2026-04-01",
+      "source": "changelog",
+      "link": "https://learn.chatgpt.com/docs/changelog#csv"
+    },
+    {
+      "name": "USAGE RESETS AND BROWSER DEVELOPER MODE",
+      "date": "2026-04-01",
+      "source": "changelog",
+      "link": "https://learn.chatgpt.com/docs/changelog#resets"
+    },
+    {
+      "name": "CODEX JOINING",
+      "date": "2026-04-01",
+      "source": "changelog",
+      "link": "https://learn.chatgpt.com/docs/changelog#joining"
     }
   ],
   "keep": [
@@ -637,6 +726,21 @@
       "source": "changelog",
       "link": "https://cursor.com/blog/origin",
       "who": "Michael Truell"
+    },
+    {
+      "name": "GPT-6 ASTRA: A NEW GENERATION OF INTELLIGENCE",
+      "date": "2026-09-03",
+      "source": "changelog",
+      "link": "https://openai.com/index/gpt-6-astra",
+      "who": "Sam Altman"
+    },
+    {
+      "name": "DEPLOY FROM CLAUDE DESIGN TO VERCEL",
+      "date": "2026-10-01",
+      "source": "changelog",
+      "link": "https://vercel.com/changelog/claude-design",
+      "company": "Vercel",
+      "who": "Guillermo Rauch"
     },
     {
       "name": "CODEX APP",

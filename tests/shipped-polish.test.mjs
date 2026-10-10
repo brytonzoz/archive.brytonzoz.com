@@ -841,6 +841,31 @@ test('prereleases, starters, and Gateway model listings are not ships', () => {
   assert.match(polish.cleanShipTitle('Use Codex with Amazon Bedrock'), /codex with amazon bedrock|use codex with amazon bedrock/i);
   assert.match(polish.cleanShipTitle('Build and install plugins in Codex'), /plugins in codex|build and install plugins/i);
   assert.equal(polish.cleanShipTitle('Use a random leftover'), '');
+  assert.match(polish.cleanShipTitle('GPT-6 Astra: A new generation of intelligence'), /gpt-6 astra$/i);
+  assert.match(polish.cleanShipTitle('Deploy from Claude Design to Vercel'), /claude design deploys/i);
+  assert.equal(polish.cleanShipTitle('REDUCE FUTURE DEPLOYMENT SIZE BY REMOVING UNNECESSARY BUIL'), '');
+  assert.equal(polish.isDocsOrReferenceTitle('INSTALLATION AND CONNECTION'), true);
+  assert.equal(polish.isDocsOrReferenceTitle('MODEL SELECTION'), true);
+  assert.equal(polish.isVagueOrCutTitle('CHATGPT'), true);
+  assert.equal(polish.isVagueOrCutTitle('CODEX JOINING'), true);
+  assert.equal(polish.isBlogEssayTitle('GPT-5.6 Sol helps run quantum computing experiments applied'), true);
+  assert.equal(polish.isForeignProductOnCompanyTape('STRIPE', 'Vercel'), true);
+  assert.equal(polish.isForeignProductOnCompanyTape('CURSOR', 'Vercel'), true);
+  assert.equal(polish.isForeignProductOnCompanyTape('CURSOR', 'Cursor'), false);
+  assert.equal(polish.isForeignProductOnCompanyTape('CURSOR CLOUD AGENTS', 'Vercel'), true);
+  assert.equal(polish.isForeignProductOnCompanyTape('GPT-5.6 SOL', 'Vercel'), true);
+  assert.equal(polish.isForeignProductOnCompanyTape('Vercel for Slack', 'Vercel'), false);
+  const vercelTape = polish.polishCandidates(
+    [
+      found({ name: 'STRIPE', date: '2026-10-01', link: 'https://vercel.com/changelog/stripe' }),
+      found({ name: 'Deploy from Claude Design to Vercel', date: '2026-10-01', link: 'https://vercel.com/changelog/claude-design' }),
+      found({ name: 'Vercel for Slack', date: '2026-10-01', link: 'https://vercel.com/changelog/vercel-for-slack' }),
+    ],
+    { year: 2026, who: 'Guillermo Rauch', affiliation: { company: 'Vercel', role: 'ceo' } },
+  );
+  const vercelNames = vercelTape.map((item) => item.name);
+  assert.ok(!vercelNames.some((name) => /^stripe$/i.test(name)), JSON.stringify(vercelNames));
+  assert.ok(vercelNames.some((name) => /claude design deploys/i.test(name)), JSON.stringify(vercelNames));
   const items = polish.polishCandidates(
     [
       found({ name: "Liquid AI's d1 is available on AI Gateway", date: '2026-10-08', link: 'https://vercel.com/changelog/liquid-d1' }),

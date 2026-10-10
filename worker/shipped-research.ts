@@ -296,30 +296,70 @@ export function itemsFromDatedJournal(opts: { text: string; url: string; year: n
   return found.slice(0, 80);
 }
 
+const SKIP_PRODUCT_HOST =
+  /substack|twitter|x\.com|youtube|amazonaws|googleusercontent|facebook|linkedin|gravatar|github\.com|producthunt|cdn\.|cloudfront/i;
+
+/** First-party product hosts mentioned in a newsletter / journal body. */
+export function productUrlsFromCopy(html: string, pageHost: string | null): { name: string; url: string }[] {
+  const out: { name: string; url: string }[] = [];
+  const seen = new Set<string>();
+  for (const match of html.matchAll(/https?:\/\/[a-z0-9.-]+\.[a-z]{2,}[^\s"'<>]*/gi)) {
+    const raw = match[0].replace(/[),.;]+$/g, '');
+    const url = publicUrl(raw);
+    if (!url) continue;
+    const host = hostOf(url);
+    if (!host || host === pageHost || SKIP_PRODUCT_HOST.test(host) || SKIP_PRODUCT_HOST.test(url)) continue;
+    if (/^(news|blog|help|docs|www)\./i.test(host) && !/\.(app|dev|ai)$/i.test(host)) continue;
+    const leaf = host.replace(/^www\./, '').split('.')[0] || '';
+    if (leaf.length < 3) continue;
+    const key = leaf.toLowerCase();
+    if (seen.has(key)) continue;
+    seen.add(key);
+    out.push({ name: leaf.replace(/(\d+)/g, ' $1 ').replace(/[-_]+/g, ' ').replace(/\s+/g, ' ').trim(), url });
+  }
+  return out.slice(0, 8);
+}
+
 /** RSS/Atom on a personal site: keep dated 2026 ships, drop commentary. */
 export function itemsFromPersonalFeed(opts: { text: string; url: string; year: number }): Found[] {
   if (!/<item\b|<entry\b/i.test(opts.text)) return [];
   const found: Found[] = [];
   const seen = new Set<string>();
-  for (const item of itemsFromFeedXml(opts.text, opts.year)) {
-    const raw = `${item.name} ${item.description || ''}`;
-    if (!looksLikePersonalShip(raw) && !looksLikePersonalShip(item.name)) continue;
-    const name = journalShipName(item.name);
-    const key = loose(name);
-    if (!name || key.length < 2 || seen.has(key)) continue;
+  const pageHost = hostOf(opts.url);
+  const add = (name: string, date: string | null, link: string | null, desc: string) => {
+    const trimmed = clean(name, 48);
+    const key = loose(trimmed);
+    if (!trimmed || key.length < 2 || seen.has(key)) return;
     seen.add(key);
     found.push({
-      name,
-      description: clean(item.description || `Announced ${item.date} on ${hostOf(opts.url) ?? 'their site'}`, 140),
-      date: item.date,
-      dateConfidence: item.dateConfidence,
-      link: item.link,
+      name: trimmed,
+      description: clean(desc, 140),
+      date,
+      dateConfidence: date ? 'exact' : 'unknown',
+      link,
       icon: null,
       source: 'site',
       status: 'LAUNCHED',
       score: 7.5,
       thisYear: true,
     });
+  };
+  const blocks = [...opts.text.matchAll(/<item\b[\s\S]*?<\/item>|<entry\b[\s\S]*?<\/entry>/gi)];
+  for (const item of itemsFromFeedXml(opts.text, opts.year)) {
+    const raw = `${item.name} ${item.description || ''}`;
+    const products = productUrlsFromCopy(raw, pageHost);
+    if (!looksLikePersonalShip(raw) && !looksLikePersonalShip(item.name) && !products.length) continue;
+    const named = journalShipName(item.name);
+    const name = products[0] && (!named || named.split(/\s+/).length > 4 || /^a |^an |^the /i.test(named)) ? products[0].name : named;
+    add(name || products[0]?.name || item.name, item.date, products[0]?.url || item.link, item.description || `Announced ${item.date} on ${pageHost ?? 'their site'}`);
+    for (const extra of products.slice(named && name === named ? 0 : 1)) {
+      add(extra.name, item.date, extra.url, `Linked from ${item.name}`);
+    }
+  }
+  for (const block of blocks) {
+    const date = itemsFromFeedXml(block[0], opts.year)[0]?.date ?? null;
+    if (!date) continue;
+    for (const extra of productUrlsFromCopy(block[0], pageHost)) add(extra.name, date, extra.url, `Linked from ${pageHost ?? 'their site'}`);
   }
   return found.slice(0, 80);
 }
@@ -465,6 +505,7 @@ export function extraResearchPaths(siteUrl: string): string[] {
     `${base}/blog`,
     `${base}/rss`,
     `${base}/feed`,
+    `${base}/feed.xml`,
     `${base}/rss.xml`,
   ];
 }

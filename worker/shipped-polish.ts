@@ -207,11 +207,16 @@ export function looksFragment(text: string): boolean {
 }
 
 /** Last word is a chopped headline ending. Short product nouns like "FLUX 3 Image" stay. */
+const KEEP_TAIL_ACRONYM = /^(cli|sdk|api|app|gpt|cdn|dns|sso|cpu|gpu|sql|css|html|aws|v0|ui|ai|mcp|npm|mrr|ios|mac|dev|sol)$/i;
+
 export function endsWithCutOffWord(text: string): boolean {
   const words = tidy(text).split(/\s+/).filter(Boolean);
   const last = words[words.length - 1] || '';
   if (/^(now|and|with|for|of|the|on|key|third|are|zero)$/i.test(last) && words.length >= 2) return true;
   if (/^(image|usage|delay|preview)$/i.test(last) && words.length >= 4) return true;
+  if (words.length >= 5 && /^[A-Za-z]{3,4}$/.test(last) && !KEEP_TAIL_ACRONYM.test(last) && !/\d/.test(last)) {
+    return true;
+  }
   return false;
 }
 
@@ -264,9 +269,15 @@ function isSelfNameTitle(
 export function isDocsOrReferenceTitle(title: string): boolean {
   const text = tidy(title);
   if (!text) return true;
-  if (/^(last updated|what'?s new|deploying to|docs agent)\b/i.test(text)) return true;
+  if (/^(last updated|what'?s new|deploying to|docs agent|installation and connection|model selection)\b/i.test(text)) {
+    return true;
+  }
   if (/\b(js\s+)?sdk\s+reference\b/i.test(text)) return true;
   if (/\breference$/i.test(text) && /\b(sdk|api|cli|js|flags|queues)\b/i.test(text)) return true;
+  if (/\b(expanded .+ documentation|auto-review documentation)\b/i.test(text)) return true;
+  if (/\b(workspace )?model availability\b/i.test(text)) return true;
+  if (/\bcsv export\b/i.test(text) || /^public plugin catalog\b/i.test(text)) return true;
+  if (/^usage resets\b/i.test(text)) return true;
   return false;
 }
 
@@ -291,6 +302,14 @@ export function isBlogEssayTitle(title: string): boolean {
   if (/\b(helping (older adults|small businesses)|supporting the blind|big air tour|expand(?:s|ing) (access|their partnership)|academy with)\b/i.test(text)) return true;
   if (/^(towards|disrupting|advancing|acceleration|daybreak|eternal|path to|publication)\b/i.test(text)) return true;
   if (/^openai delivers\b/i.test(text) || /\b(at scale|in production)\s+engineering\b/i.test(text)) return true;
+  if (/\bhelps run\b.+\bexperiments\b/i.test(text) || /\bquantum computing experiments\b/i.test(text)) return true;
+  if (/^(how|helping)\b/i.test(text) && !/\b(chatgpt|codex|gpt-?\d)\b/i.test(text.split(/\s+/).slice(0, 3).join(' '))) {
+    return true;
+  }
+  if (/\b(cuts?|boosts?|saves?|turns?|halves?)\b.+\bwith\b/i.test(text)) return true;
+  if (/\b(safety overview|system card|blueprint|partner network|for (singapore|india|countries))\b/i.test(text)) {
+    return true;
+  }
   if (/\b(company|safety|research|engineering)\s+(jan|feb|mar|apr|may|jun|jul|aug|sep|oct|nov|dec)\b/i.test(text) && !/\b(gpt-?\d|sora|chatgpt images|codex app|v0)\b/i.test(text)) {
     return true;
   }
@@ -421,6 +440,7 @@ function normalizeVersionTokens(text: string): string {
 
 export function isPricingOrMetricNote(name: string): boolean {
   const text = tidy(name);
+  if (/\breduc(?:e|ing) (future )?deployment size\b/i.test(text)) return true;
   if (/\b(pric(e|ing|es)|billing|skus?)\b/i.test(text) && !/\b(app|cli|sdk|api|model)\b/i.test(text)) return true;
   if (/\b(pricing plans?|plan pricing|teams plans?)\b/i.test(text)) return true;
   if (/^(improved|better|faster|cheaper|reduced|lower|higher)\s+[A-Za-z]+(?:\s+[A-Za-z]+)?$/i.test(text)) return true;
@@ -474,6 +494,28 @@ export function isUnnotableCompanyRepo(item: { name?: string; link?: string | nu
   return true;
 }
 
+const FOREIGN_VENDOR_BARE =
+  /^(stripe|bun|cursor|claude|anthropic|openai|chatgpt|github|gitlab|slack|aws|amazon)$/i;
+const FOREIGN_VENDOR_PRODUCT =
+  /^(cursor cloud agents|gpt-[\d.]+(?:\s+sol)?)$/i;
+
+/** Another company's product on this company's tape, with no first-party feature phrasing. */
+export function isForeignProductOnCompanyTape(
+  name: string,
+  company?: string | null,
+): boolean {
+  const text = tidy(name);
+  const who = tidy(company);
+  if (!text || !who) return false;
+  if (new RegExp(`\\b${who.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}\\b`, 'i').test(text)) return false;
+  if (/vercel/i.test(who)) {
+    if (/\b(vercel|v0|ai gateway|ai sdk|sandbox|marketplace)\b/i.test(text)) return false;
+    if (/^deploy from /i.test(text) || /\bdeploys$/i.test(text)) return false;
+    if (FOREIGN_VENDOR_BARE.test(text) || FOREIGN_VENDOR_PRODUCT.test(text)) return true;
+  }
+  return false;
+}
+
 /** Settings, retention, and middleware knobs — roll up, don't print as ships. */
 export function isMinorPlatformChange(name: string): boolean {
   const text = tidy(name);
@@ -508,6 +550,7 @@ export function isVagueOrCutTitle(name: string): boolean {
   if (/^cloud work$/i.test(text) || /^new controls\b/i.test(text) || /^all\s+[a-z]+$/i.test(text)) return true;
   if (/\brolling out to all users\b/i.test(text) || /^beta and rolling\b/i.test(text)) return true;
   if (/\bin the chatgpt desktop$/i.test(text)) return true;
+  if (/^(codex joining|chatgpt)$/i.test(text)) return true;
   if (/^(pets|cloud|new)\s+[a-z]+$/i.test(text) && !/\b(cli|app|sdk|api|gpt|codex|cursor|chatgpt)\b/i.test(text)) return true;
   return false;
 }
@@ -696,6 +739,12 @@ export function cleanShipTitle(raw: unknown, max = TITLE_MAX): string {
   if (/^install the chatgpt desktop app on linux$/i.test(text) || /^chatgpt desktop app on linux$/i.test(text)) {
     text = 'ChatGPT Desktop for Linux';
   }
+  const deployFrom = text.match(/^deploy from (.+) to vercel$/i);
+  if (deployFrom) text = `${deployFrom[1].trim()} deploys`;
+  const tagline = text.match(/^([A-Za-z0-9][\w.+ -]{1,40}):\s+(.+)$/);
+  if (tagline && /\b(new generation|next generation|the next|a new)\b/i.test(tagline[2])) {
+    text = tagline[1].trim();
+  }
   text = text.replace(/^the new\s+/i, '').replace(/^new\s+(v\d\b)/i, '$1');
   text = text.replace(/-+$/, '').trim();
   text = text
@@ -830,7 +879,7 @@ export function inYearStrict(item: Polishable, year: number): boolean {
   const company = item.source === 'changelog' || item.source === 'company';
   if (company && isScrapeDate(item.date) && !flagshipLaunchName(item)) return false;
   if (company && item.date && !inYearDate(item.date, year) && !isFlagshipYearKeep(item, year)) return false;
-  if (company && !item.date && !flagshipLaunchName(item) && !knownFlagshipDate(item, year)) return false;
+  if (company && !item.date && !knownFlagshipDate(item, year)) return false;
   return true;
 }
 
@@ -1266,6 +1315,10 @@ export function polishCandidates<T extends Polishable>(items: T[], opts: PolishO
         drop(item, 'junk-title');
         continue;
       }
+    }
+    if (isForeignProductOnCompanyTape(name, opts.affiliation?.company || junkOpts.company)) {
+      drop(item, 'foreign-vendor');
+      continue;
     }
     if (isJunkProductName(name, opts.handle || opts.owner?.github, who)) {
       drop(item, 'github-junk');

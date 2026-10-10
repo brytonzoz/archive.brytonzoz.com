@@ -139,16 +139,24 @@ export function flagshipLaunchName(item: FlagshipItem): string | null {
   const meet = name.match(/^meet the new\s+(.+)$/i);
   if (meet?.[1] && slug.match(/-(\d+)$/)) return `${titleCaseProduct(meet[1])} ${slug.match(/-(\d+)$/)?.[1]}`;
 
+  const gpt6 = name.match(
+    /^(?:introducing\s+)?(gpt-?6(?:\.\d+)?(?:\s+(?:sol|luna|astra)(?:\s+and\s+(?:sol|luna|astra))?(?:\s+\w+)*)?)$/i,
+  );
+  if (gpt6 && isCompanyShip(item)) return gpt6[1].replace(/^gpt-?/i, 'GPT-').replace(/\b([a-z])/g, (letter) => letter.toUpperCase());
+
   const intro = name.match(/^(?:introducing|launching)\s+([A-Za-z][\w.+-]*(?:\s+\d+(?:\.\d+)?)?)/i);
-  if (intro?.[1] && /\d/.test(intro[1]) && isCompanyShip(item) && !isCursorModelNote({ ...item, name: intro[1] })) {
+  if (
+    intro?.[1] &&
+    /\d/.test(intro[1]) &&
+    !/^gpt-?\d/i.test(intro[1]) &&
+    isCompanyShip(item) &&
+    !isCursorModelNote({ ...item, name: intro[1] })
+  ) {
     return titleCaseProduct(intro[1]);
   }
 
   const joining = name.match(/^([A-Za-z][\w.-]{1,32})\s+(?:is joining|joins)\s+([A-Za-z][\w.-]{1,32})/i);
   if (joining && isCompanyShip(item)) return `${titleCaseProduct(joining[1])} joining ${titleCaseProduct(joining[2])}`;
-
-  const gpt6 = name.match(/^(?:introducing\s+)?(gpt-?6(?:\.\d+)?(?:\s+sol(?:\s+\w+)*)?)$/i);
-  if (gpt6 && isCompanyShip(item)) return gpt6[1].replace(/^gpt-?/i, 'GPT-').replace(/\b([a-z])/g, (letter) => letter.toUpperCase());
 
   const chatgpt = name.match(/^(?:introducing\s+)?(chatgpt\s+(?:images(?:\s+[\d.]+)?|voice|atlas|health))$/i);
   if (chatgpt && isCompanyShip(item)) return titleCaseProduct(chatgpt[1]);
@@ -201,84 +209,7 @@ const FLAGSHIP_LAUNCH_DAY: Record<string, string> = {
   composer2: '2026-03-19',
   bugbot: '2026-06-01',
   origin: '2026-09-14',
-  gpt6: '2026-05-01',
-  sora: '2026-03-01',
-  chatgptimages: '2026-02-01',
-  chatgptatlas: '2026-04-11',
-  chatgpthealth: '2026-06-02',
-  opendevice: '2026-09-05',
 };
-
-/** Dated 2026 ChatGPT / API cards on openai.com/products/release-notes (page 403s from most IPs). */
-export const OPENAI_PRODUCT_NOTES_2026 = [
-  {
-    name: 'ChatGPT for Word',
-    date: '2026-09-17',
-    hash: 'CL-20260917-CHAT-478',
-    description: 'ChatGPT add-in for Microsoft Word',
-  },
-  {
-    name: 'Privacy Center in ChatGPT',
-    date: '2026-09-21',
-    hash: 'CL-20260921-CHAT-484',
-    description: 'Privacy controls inside ChatGPT',
-  },
-  {
-    name: 'GPT-6 Sol and GPT-6 Luna',
-    date: '2026-09-22',
-    hash: 'CL-20260922-APIP-485',
-    description: 'GPT-6 Sol and Luna on the API',
-  },
-  {
-    name: 'Security History in ChatGPT',
-    date: '2026-09-25',
-    hash: 'CL-20260925-CHAT-490',
-    description: 'Sign-in and security log in ChatGPT',
-  },
-  {
-    name: 'Team Tasks in ChatGPT',
-    date: '2026-09-29',
-    hash: 'CL-20260929-CHAT-512',
-    description: 'Shared tasks for ChatGPT Team',
-  },
-  {
-    name: 'Decisions API with GPT-6 Luna',
-    date: '2026-10-06',
-    hash: 'CL-20261006-APIP-521',
-    description: 'Decisions API powered by GPT-6 Luna',
-  },
-  {
-    name: 'Audio uploads in ChatGPT',
-    date: '2026-10-06',
-    hash: 'CL-20261006-CHAT-523',
-    description: 'Upload audio files in ChatGPT',
-  },
-] as const;
-
-export function openaiProductNoteShips(year: number): {
-  name: string;
-  description: string;
-  date: string;
-  link: string;
-  icon: null;
-  source: 'changelog';
-  status: 'LAUNCHED';
-  score: number;
-  thisYear: true;
-}[] {
-  if (year !== 2026) return [];
-  return OPENAI_PRODUCT_NOTES_2026.map((row) => ({
-    name: row.name,
-    description: row.description,
-    date: row.date,
-    link: `https://openai.com/products/release-notes#${row.hash}`,
-    icon: null,
-    source: 'changelog' as const,
-    status: 'LAUNCHED' as const,
-    score: 8,
-    thisYear: true as const,
-  }));
-}
 
 /** First-party posts the sitemap often misses (older Cursor launches live on /blog, not the latest changelog page). */
 export function flagshipProbePaths(company: string | null | undefined): string[] {

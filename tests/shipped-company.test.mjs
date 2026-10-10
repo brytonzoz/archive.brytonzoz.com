@@ -8,7 +8,6 @@ const affiliation = await import('../worker/shipped-affiliation.ts');
 const company = await import('../worker/shipped-company.ts');
 const decisions = await import('../worker/shipped-decisions.ts');
 const identity = await import('../worker/shipped-identity.ts');
-const flagship = await import('../worker/shipped-flagship.ts');
 
 test('name queries without a handle need a cheap person resolve', () => {
   const tibo = affiliation.parseAffiliationQuery('Tibo from OpenAI');
@@ -357,24 +356,16 @@ test('company harvests keep dated changelog cards and drop sitemap dumps', () =>
   assert.ok(compact.findIndex((item) => /codex cli/i.test(item.name)) < 5);
 });
 
-test('OpenAI product release-notes ships survive a Codex dump', () => {
-  const dump = Array.from({ length: 180 }, (_, i) => ({
-    name: `Codex CLI 0.${i}.0`,
-    description: '',
-    date: '2026-07-21',
-    link: `https://learn.chatgpt.com/docs/changelog#v${i}`,
-    source: 'changelog',
-    status: 'LAUNCHED',
-    score: 7,
-    thisYear: true,
-    icon: null,
-  }));
-  const notes = flagship.openaiProductNoteShips(2026);
-  const compact = company.compactCompanyFound([...dump, ...notes], 30);
-  assert.ok(compact.some((item) => /chatgpt for word/i.test(item.name)), JSON.stringify(compact.map((i) => i.name)));
-  assert.ok(compact.some((item) => /team tasks/i.test(item.name)));
-  assert.ok(compact.some((item) => /privacy center/i.test(item.name)));
-  assert.ok(compact.some((item) => /audio uploads/i.test(item.name)));
+test('OpenAI news RSS keeps Introducing launches and drops customer stories', () => {
+  const xml = `<?xml version="1.0"?><rss><channel>
+    <item><title>Introducing GPT-6.1 Sol</title><link>https://openai.com/index/introducing-gpt-6-1-sol</link><pubDate>Tue, 29 Sep 2026 00:00:00 GMT</pubDate><description>A new GPT-6 model</description></item>
+    <item><title>How Oracle turns days of work into minutes with ChatGPT</title><link>https://openai.com/index/oracle</link><pubDate>Thu, 08 Oct 2026 00:00:00 GMT</pubDate></item>
+    <item><title>Asana cuts model costs 76x in browser tests with GPT-6.1 Sol</title><link>https://openai.com/index/asana-browser-agent</link><pubDate>Fri, 09 Oct 2026 00:00:00 GMT</pubDate></item>
+  </channel></rss>`;
+  const items = changelog.itemsFromFeedXml(xml, 2026);
+  assert.ok(items.some((item) => /gpt-6\.1 sol/i.test(item.name)), JSON.stringify(items.map((i) => i.name)));
+  assert.ok(!items.some((item) => /oracle|asana/i.test(item.name)));
+  assert.ok(items.every((item) => item.link && /^https:\/\//.test(item.link)));
 });
 
 test('compact force-keeps v0, Sora, Images, and Codex Cloud under a dump', () => {

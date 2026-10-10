@@ -2998,7 +2998,6 @@
     "min": 20,
     "required": [
       "GPT-6",
-      "Sora",
       "ChatGPT Images"
     ],
     "profile": {

@@ -54,7 +54,9 @@ export const FEED_PATHS = [
   '/blog/rss',
   '/blog/feed',
   '/news/rss',
+  '/news/rss.xml',
   '/news/feed',
+  '/blog/rss.xml',
   '/releases/feed',
   '/index.xml',
 ];
@@ -303,7 +305,7 @@ function cleanTitle(name: string): string {
   return trimmed;
 }
 
-function row(name: string, date: string | null, url: string, year: number, _hint?: string): ChangelogFound | null {
+function row(name: string, date: string | null, url: string, year: number, hint?: string): ChangelogFound | null {
   const flagship = flagshipLaunchName({ name, link: url, source: 'changelog', date });
   const title = flagship || cleanTitle(name);
   if (!title) return null;
@@ -316,9 +318,10 @@ function row(name: string, date: string | null, url: string, year: number, _hint
   const resolved = known || (date && date.startsWith(String(year)) ? date : slugDate);
   const dated = Boolean(resolved && resolved.startsWith(String(year)));
   const otherYear = Boolean(resolved && /^\d{4}/.test(resolved) && !resolved.startsWith(String(year)));
+  const desc = clean(hint || '', 140);
   return {
     name: title,
-    description: hostOf(url) ?? '',
+    description: desc && desc.toLowerCase() !== (hostOf(url) ?? '').toLowerCase() ? desc : '',
     date: dated ? resolved : null,
     dateConfidence: dated ? 'exact' : 'unknown',
     link: publicUrl(url),
@@ -457,11 +460,10 @@ export function itemsFromFeedXml(xml: string, year: number): ChangelogFound[] {
     const date = parseFlexibleDate(datedRaw, year);
     if (!date || !title || !link) continue;
     if (!date.startsWith(String(year))) continue;
-    if (/\/blog\//i.test(link) && !/changelog/i.test(link)) {
-      if (ARTICLE_TITLE.test(title) || CUSTOMER_STORY.test(title) || /^how\s+/i.test(title) || /^state of\b/i.test(title) || /\brecap\b/i.test(title)) {
-        continue;
-      }
-    }
+    if (isNoiseTitle(title) || ARTICLE_TITLE.test(title) || CUSTOMER_STORY.test(title)) continue;
+    if (/^(how|helping)\b/i.test(title) || /\brecap\b/i.test(title) || /^state of\b/i.test(title)) continue;
+    if (/\b(cuts?|boosts?|saves?|turns?|halves?)\b.+\bwith\b/i.test(title)) continue;
+    if (/\band openai (expand|bring|reach|partner)/i.test(title)) continue;
     const key = loose(title);
     if (seen.has(key)) continue;
     seen.add(key);

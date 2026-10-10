@@ -406,8 +406,25 @@ test('cashier note and stats are specific to the items, never stock copy', () =>
     ],
     { who: 'Guillermo Rauch' },
   );
-  assert.doesNotMatch(multi, /the one public ship|the one on this tape/i);
-  assert.match(multi, /v0|Vercel Agent|2 ships/i);
+  assert.doesNotMatch(multi, /the one public ship|the one on this tape|leads \d+ ships/i);
+  assert.match(multi, /v0|Vercel Agent|tape/i);
+  assert.equal(
+    ai.hardRejectNote('v0 leads 54 ships: generate UI from a prompt', [
+      { name: 'V0', spoken: 'v0', description: 'generate UI from a prompt' },
+      { name: 'VERCEL AGENT', spoken: 'Vercel Agent' },
+    ], [], { who: 'Guillermo Rauch' }),
+    'banned-phrase',
+  );
+  assert.equal(
+    ai.hardRejectNote('Cursor in JetBrains IDEs · Cursor kept the year moving.', [{ name: 'CURSOR IN JETBRAINS IDES', spoken: 'Cursor in JetBrains IDEs' }], [], { who: 'Michael Truell' }),
+    'banned-phrase',
+  );
+  assert.equal(
+    ai.hardRejectNote('generate UI from a prompt and that is the whole story here.', [
+      { name: 'V0', spoken: 'v0', description: 'generate UI from a prompt' },
+    ], [], { who: 'Guillermo Rauch' }),
+    'verbatim-desc',
+  );
   assert.ok(
     ai.hardRejectNote('v0 is the one public ship here, and that is the whole story.', [
       { name: 'V0', spoken: 'v0' },
@@ -686,6 +703,17 @@ test('personal RSS keeps dated ships and drops commentary', () => {
   const items = research.itemsFromPersonalFeed({ text: xml, url: 'https://levels.io/rss', year: 2026 });
   assert.ok(items.some((item) => /hotelist/i.test(item.name) && item.date === '2026-10-05'));
   assert.equal(items.some((item) => /bots/i.test(item.name)), false);
+  const tony = research.itemsFromPersonalFeed({
+    text: `<?xml version="1.0"?><rss><channel>
+      <item><title>I made a game with AI</title><link>https://news.tonydinh.com/p/i-made-a-game-with-ai</link><pubDate>Sat, 29 Aug 2026 12:00:00 GMT</pubDate><description>Try it at http://www.survive10waves.com</description></item>
+      <item><title>I'm on Product Hunt! + Updates Jun 2026</title><link>https://news.tonydinh.com/p/im-on-product-hunt-updates-jun-2026</link><pubDate>Wed, 10 Jun 2026 12:00:00 GMT</pubDate><content:encoded>https://pulserevenue.app/ and https://makeawebsite.app/</content:encoded></item>
+    </channel></rss>`,
+    url: 'https://news.tonydinh.com/feed',
+    year: 2026,
+  });
+  assert.ok(tony.some((item) => /survive|10 waves/i.test(item.name) && item.link?.includes('survive10waves')), JSON.stringify(tony));
+  assert.ok(tony.some((item) => /pulse/i.test(item.name)), JSON.stringify(tony));
+  assert.ok(tony.every((item) => item.link && /^https?:\/\//.test(item.link)));
 });
 
 test('public MRR and stars keep their source URL', () => {

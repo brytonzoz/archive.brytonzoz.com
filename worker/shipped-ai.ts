@@ -213,7 +213,7 @@ export function noteMisusesStats(note: string, count: number, stats: string[] = 
 }
 
 const BANNED_NOTE_SHAPE =
-  /kept \w[\w.]* busy:|(^|[.!?]\s+)\S[\w.]* first,\s+\S.+ later|spent the (rest of the )?year on |kept stacking|people will remember|\bthe sleeper\b|the loud one|slipped .+ beside|\bthe pair is\b|\bdoes one job\b|\bdoes another\b|\bopens on\b|\bopened the year\b|\byear opens\b|\bno encore\b|\bthe bio\b.{0,48}\b(talking|menu|heavy lifting)\b|\bvibes bio\b|\breceipt is just the receipt\b|\bworth a second look\b.{0,80}\bthe rest\b|\bthin (receipt|tape)\b|\bentries,\s+most of them\b|\bshowed up\b|\bis the one that stuck\b|\bkeeps coming back\b|\breceipts?, and\b|\bopens in a new window\b|\bshipped this year\b|\bis a product\b/i;
+  /kept \w[\w.]* busy:|(^|[.!?]\s+)\S[\w.]* first,\s+\S.+ later|spent the (rest of the )?year on |kept stacking|people will remember|\bthe sleeper\b|the loud one|slipped .+ beside|\bthe pair is\b|\bdoes one job\b|\bdoes another\b|\bopens on\b|\bopened the year\b|\byear opens\b|\bno encore\b|\bthe bio\b.{0,48}\b(talking|menu|heavy lifting)\b|\bvibes bio\b|\breceipt is just the receipt\b|\bworth a second look\b.{0,80}\bthe rest\b|\bthin (receipt|tape)\b|\bentries,\s+most of them\b|\bshowed up\b|\bis the one that stuck\b|\bkeeps coming back\b|\breceipts?, and\b|\bopens in a new window\b|\bshipped this year\b|\bis a product\b|\bleads\s+\d+\s+ships\b/i;
 
 const MISSING_DATA_NOTE =
   /\b(no description|without a description|with no description|lacks a description|has no description|went out with no|missing (a )?(description|date|copy)|undated|no date|without (a )?date|has no date)\b/i;
@@ -509,7 +509,34 @@ export function hardRejectNote(
   if (noteCitesOtherPerson(text, items, ctx)) return 'other-person';
   if (text.split(/\s+/).filter(Boolean).length < 8) return 'too-short';
   if (/\bthe one (public ship here|on this tape)\b/i.test(text) && items.length !== 1) return 'banned-phrase';
+  if (/[·]/.test(text)) return 'banned-phrase';
+  if (noteCopiesDescription(text, items)) return 'verbatim-desc';
+  if (noteRestatesTitle(text, items)) return 'title-restate';
   return null;
+}
+
+function foldNote(text: string): string {
+  return text.toLowerCase().replace(/[^a-z0-9]+/g, ' ').trim();
+}
+
+function noteCopiesDescription(note: string, items: DraftItem[]): boolean {
+  const hay = foldNote(note);
+  if (hay.length < 12) return false;
+  return items.some((item) => {
+    const desc = foldNote(item.description || '');
+    return desc.length >= 16 && hay.includes(desc);
+  });
+}
+
+function noteRestatesTitle(note: string, items: DraftItem[]): boolean {
+  const hay = foldNote(note);
+  return items.some((item) => {
+    const title = foldNote(item.spoken || item.name || '');
+    if (title.length < 10) return false;
+    if (!hay.startsWith(title) && !hay.includes(title)) return false;
+    const extra = hay.replace(title, '').trim();
+    return extra.split(/\s+/).filter(Boolean).length <= 4;
+  });
 }
 
 export type RankedNote = { note: string; score: number; hard: NoteRejectReason | null };
@@ -689,11 +716,12 @@ export function sentenceFallbackNote(items: DraftItem[], ctx: NoteContext = {}):
   const lead = does ? does.charAt(0).toLowerCase() + does.slice(1) : '';
   const next = items.length > 1 ? spokenOf(items.find((row) => spokenOf(row) !== spoken) || items[1]!) : '';
   const candidates = [
-    items.length > 1 && does ? `${spoken} leads ${items.length} ships: ${lead}` : '',
-    items.length > 1 && next && does ? `${spoken} then ${next}. ${does}` : '',
-    items.length === 1 && does ? `${spoken} is the one on this tape: ${does}.` : '',
-    who && does ? `${spoken} is ${who}'s ${kind}: ${lead}.` : '',
-    does ? `${spoken} does one concrete thing: ${lead}.`.replace(/does one concrete thing: does /i, '') : '',
+    items.length > 1 && next && does && foldNote(does) !== foldNote(spoken)
+      ? `${spoken} sits beside ${next}, and ${lead}`
+      : '',
+    items.length === 1 && does ? `${spoken} is the one on this tape, and ${lead}` : '',
+    who && does ? `${spoken} is ${who}'s ${kind}, and ${lead}` : '',
+    items.length > 1 && next ? `${spoken} sits next to ${next} on a crowded ${items.length}-line tape.` : '',
     items.length === 1 ? `${spoken} is the one public ship here, and that is the whole story.` : '',
   ].filter(Boolean);
   for (const note of candidates) {
@@ -704,7 +732,7 @@ export function sentenceFallbackNote(items: DraftItem[], ctx: NoteContext = {}):
   }
   return clipSentence(
     items.length > 1
-      ? `${spoken} leads ${items.length} ships${does ? `: ${lead}` : ', and the changelog is still moving.'}`
+      ? `${spoken} sits on a crowded ${items.length}-line tape, and the year is still moving.`
       : `${spoken} is the one public ship here, and that is the whole story.`,
     140,
   );
@@ -1012,7 +1040,8 @@ function noteOnlySystem(year: number, affiliation?: Affiliation | null, count = 
     'If you name a person, it must be this customer (their name or handle only). Never another person — including a name hiding inside a repo (jev-tetris is a product, not Jev).',
     'Never mention a missing description, missing date, or that something shipped without copy.',
     'Reuse a concrete detail from the item description — what the ship does. Thin tapes still get one specific line about that one ship.',
-    'Do not write "showed up", "is the one that stuck", "opens in a new window", "shipped this year", "is a product", or "N receipts, and X keeps coming back".',
+    'Do not write "showed up", "is the one that stuck", "opens in a new window", "shipped this year", "is a product", "leads N ships", or "N receipts, and X keeps coming back".',
+    'Never use a middot. Never paste the item description. Never open by restating the item title.',
     'Every note is at least 8 words. Never scrape UI chrome into the note.',
     'Do not restate two item names and a month as the whole note. Do not talk down a thin tape or say the bio does the talking.',
     desk,

@@ -3,7 +3,7 @@
 // releases, and App Store version rows. No per-company URL tables.
 import { extraResearchPaths, itemsFromProjectList } from './shipped-research';
 import { looksLikeNotAShip } from './shipped-decisions';
-import { flagshipLaunchName, flagshipProbePaths, knownFlagshipDate, logFlagshipGate, openaiProductNoteShips } from './shipped-flagship';
+import { flagshipLaunchName, flagshipProbePaths, knownFlagshipDate, logFlagshipGate } from './shipped-flagship';
 import { isPrereleaseShip, prettyBrand, versionParts } from './shipped-polish';
 import { companyOrgGuess, companyScope, companySlug, companyTokens, matchesLeadProduct, type Affiliation } from './shipped-affiliation';
 import { type XaiEnv, type XaiSpend, emptyXaiSpend } from './shipped-xai';
@@ -194,6 +194,8 @@ export function compactCompanyFound(found: Found[], cap = COMPANY_CACHE_CAP): Fo
     if (looksLikeNotAShip(item) && !flagshipLaunchName(item)) n -= 80;
     if (/\b(bug fixes?|get started|configuration details|see setup)\b/i.test(name)) n -= 60;
     if (/\b(codex|chatgpt|claude|cursor|gpt-?\d)/i.test(name) && name.length <= 72) n += 25;
+    if (/^(introducing|launching)\b/i.test(name)) n += 80;
+    if (/^(how|helping)\b/i.test(name) || /\b(cuts?|boosts?|saves?|turns?|halves?)\b.+\bwith\b/i.test(name)) n -= 90;
     if (isCompactMustKeep(item)) n += 200;
     return n;
   };
@@ -428,22 +430,6 @@ async function pagesForCompany(
   const fetched = new Set(unique.map((url) => url.replace(/\/+$/, '')));
   const pages = await mapLimit(unique, 8, (url) => readCompanyPage(url, ctx?.blocked));
   const found: Found[] = [];
-  for (const url of unique) {
-    const stubName = flagshipLaunchName({ name: '', link: url, source: 'changelog' });
-    if (!stubName) continue;
-    found.push({
-      name: stubName,
-      description: '',
-      date: knownFlagshipDate({ name: stubName, link: url, source: 'changelog' }, year),
-      link: url,
-      icon: null,
-      source: 'changelog',
-      status: 'LAUNCHED',
-      score: 9,
-      thisYear: true,
-    });
-  }
-  if (/\bopenai\b/i.test(company || '')) found.push(...openaiProductNoteShips(year));
   const feeds: string[] = [];
   const extraHosts: string[] = [];
   const follow: string[] = [];
@@ -460,20 +446,6 @@ async function pagesForCompany(
         source: item.source === 'site' ? 'changelog' : item.source,
       })),
     );
-    const stubName = flagshipLaunchName({ name: page.title || '', link: page.url, source: 'changelog' });
-    if (stubName) {
-      found.push({
-        name: stubName,
-        description: '',
-        date: knownFlagshipDate({ name: stubName, link: page.url, source: 'changelog' }, year),
-        link: publicUrl(page.url),
-        icon: null,
-        source: 'changelog',
-        status: 'LAUNCHED',
-        score: 8,
-        thisYear: true,
-      });
-    }
     for (const feed of page.feeds) if (!feeds.includes(feed)) feeds.push(feed);
     for (const link of page.links) {
       const host = hostOf(link.url);
@@ -529,6 +501,7 @@ function isIndexShipPath(url: string): boolean {
 
 export function feedPriority(url: string): number {
   if (/\/\/(www\.)?vercel\.com\/(changelog\/(rss|atom|feed)|atom)(\.xml)?$/i.test(url)) return -2;
+  if (/\/\/(www\.)?openai\.com\/(news|blog)\/rss\.xml$/i.test(url)) return -2;
   if (/\/\/(www\.)?openai\.com\/(changelog\/(rss|atom|feed)|atom)(\.xml)?$/i.test(url)) return -1;
   if (/\/changelog\/(rss|feed|atom)/i.test(url)) return 0;
   if (/\/(atom|rss)(\.xml)?$/i.test(url) && /vercel\.com/i.test(url)) return 0;
@@ -539,7 +512,7 @@ export function feedPriority(url: string): number {
 }
 
 async function harvestFeeds(urls: string[], year: number, ctx?: FetchCtx): Promise<Found[]> {
-  const preferred = urls.filter((url) => /\/(changelog\/(rss|atom|feed)|atom)(\.xml)?$/i.test(url));
+  const preferred = urls.filter((url) => /\/((changelog\/)?(rss|atom|feed)|news\/rss)(\.xml)?$/i.test(url));
   const rest = urls.filter((url) => !preferred.includes(url));
   const unique = [...new Set([...preferred, ...rest])]
     .sort((a, b) => feedPriority(a) - feedPriority(b) || a.length - b.length)
@@ -910,7 +883,7 @@ export async function harvestCompany(opts: {
   if (opts.storeOnly) {
     return { found: [], spend: emptyXaiSpend(), ran: ['company-store-miss'], cacheHit: false };
   }
-  const cacheKey = opts.deep ? `company:deep:v24:${year}:${slug}` : `company:v24:${year}:${slug}`;
+  const cacheKey = opts.deep ? `company:deep:v25:${year}:${slug}` : `company:v25:${year}:${slug}`;
   const load = async (): Promise<CompanyHarvest> => {
     const via = viaFor(affiliation);
     const ran: string[] = [];

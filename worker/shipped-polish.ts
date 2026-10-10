@@ -281,6 +281,13 @@ export function isBlogEssayTitle(title: string): boolean {
   if (/\bproduction index\b/i.test(text)) return true;
   if (/\brecap\b/i.test(text)) return true;
   if (/\b(security boundaries|credential sprawl)\b/i.test(text)) return true;
+  if (/\b(customer journeys?|global affairs|intelligence age|safety cases|youth safety|frontline defenders|false front|road ahead|view inside|epidemiology)\b/i.test(text)) return true;
+  if (/\b(helping (older adults|small businesses)|supporting the blind|big air tour|expand(?:s|ing) (access|their partnership)|academy with)\b/i.test(text)) return true;
+  if (/^(towards|disrupting|advancing|acceleration|daybreak|eternal|path to|publication)\b/i.test(text)) return true;
+  if (/^openai delivers\b/i.test(text) || /\b(at scale|in production)\s+engineering\b/i.test(text)) return true;
+  if (/\b(company|safety|research|engineering)\s+(jan|feb|mar|apr|may|jun|jul|aug|sep|oct|nov|dec)\b/i.test(text) && !/\b(gpt-?\d|sora|chatgpt images|codex app|v0)\b/i.test(text)) {
+    return true;
+  }
   return false;
 }
 
@@ -428,7 +435,7 @@ export function isNotAShipTitle(name: string): boolean {
   if (!text) return true;
   if (/^@[\w.-]+$/.test(text)) return true;
   if (CHOPPED_GATEWAY.test(text) || CUSTOMER_STORY.test(text)) return true;
-  if (/\b(removed|retired|deprecated|sunsetting|sunset|deleted|discontinued)\b/i.test(text)) return true;
+  if (/\b(removed|retired|retires|deprecated|sunsetting|sunset|deleted|discontinued)\b/i.test(text)) return true;
   if (/\b(docs?|documentation|readme|governance docs)\b/i.test(text) && /\b(update|updated|updates)\b/i.test(text)) return true;
   if (/\bmodels? for model availability\b/i.test(text) || /\bmodel availability update\b/i.test(text)) return true;
   if (/\binto the\b/i.test(text)) return true;

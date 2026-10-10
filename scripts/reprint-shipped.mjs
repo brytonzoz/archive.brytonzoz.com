@@ -51,7 +51,7 @@ const realCount = (receipt) => {
 
 /** Wall CEOs whose public bios are misleading; admin reprints attach the warm company-cache tape. */
 const AFFILIATION_BY_ID = {
-  16: { company: 'OpenAI', role: 'lead' },
+  16: { company: 'OpenAI', role: 'lead', product: 'Codex' },
   17: { company: 'Cursor', role: 'ceo' },
   13: { company: 'OpenAI', role: 'ceo' },
   7: { company: 'Vercel', role: 'ceo' },

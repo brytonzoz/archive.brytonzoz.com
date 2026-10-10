@@ -766,6 +766,15 @@ test('undated crumbs need ownership plus a description', async () => {
   assert.ok(names.some((name) => /^zod$/i.test(name)), JSON.stringify(names));
 });
 
+test('OpenAI index essays drop; named flagships stay', () => {
+  assert.equal(polish.isBlogEssayTitle('Customer journeys in the intelligence age'), true);
+  assert.equal(polish.isBlogEssayTitle('OpenAI Delivers low-latency Voice AI at Scale Engineering'), true);
+  assert.equal(polish.isBlogEssayTitle('Helping older adults use ChatGPT'), true);
+  assert.equal(polish.isBlogEssayTitle('GPT-6'), false);
+  assert.equal(polish.isBlogEssayTitle('ChatGPT Images'), false);
+  assert.equal(polish.isBlogEssayTitle('Sora'), false);
+});
+
 test('Vercel customer stories and chopped Decision-1 drop; two policy knobs roll up', () => {
   assert.equal(polish.isJunkTitle("FEATURED'S USERS MAKE 100K MEDIA PITCHES PER MONTH"), true);
   assert.equal(polish.isJunkTitle('MICROSOFT DECISION 1'), true);

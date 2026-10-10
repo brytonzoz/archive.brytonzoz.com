@@ -453,8 +453,9 @@ function notableShip(items: DraftItem[]): DraftItem | null {
   const real = items.filter((item) => item.source !== 'none' && !GENERIC_NOTE_NAME.test(item.name.trim()));
   if (!real.length) return null;
   return real.slice().sort((a, b) => {
-    const sig = (b.significance ?? 0) - (a.significance ?? 0);
-    if (sig) return sig;
+    const scoreA = (a.significance ?? 0) + (shipWhatItDoes(a) ? 8 : 0);
+    const scoreB = (b.significance ?? 0) + (shipWhatItDoes(b) ? 8 : 0);
+    if (scoreA !== scoreB) return scoreB - scoreA;
     return (a.date ?? '9999').localeCompare(b.date ?? '9999');
   })[0] ?? real[0] ?? null;
 }
@@ -548,6 +549,7 @@ export function scoreCashierNote(
   const detail = noteDescriptionOverlap(text, items);
   if (detail >= 2) score += 16;
   else if (detail === 1) score += 8;
+  if (/\bis a \w+(?:\s+\w+){0,3} that shipped this year\.?$/i.test(text)) score -= 10;
   return score;
 }
 

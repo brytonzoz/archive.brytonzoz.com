@@ -148,6 +148,19 @@ function withVia(items: Found[], via: string | null): Found[] {
 
 const COMPANY_CACHE_CAP = 200;
 
+/** Company-wide launches that must survive the 200-cap even when changelog dumps are huge. */
+function isCompactMustKeep(item: Found): boolean {
+  if (flagshipLaunchName(item)) return true;
+  const url = item.link || '';
+  const name = item.name || '';
+  if (/openai\.com\/(sora|device)(\/|$)/i.test(url)) return true;
+  if (/openai\.com\/index\/(gpt-6|chatgpt-images|chatgpt-atlas|chatgpt-health|images)\b/i.test(url)) return true;
+  if (/\bv0\b/i.test(name) && /vercel\.com\/(blog|changelog)\//i.test(url)) return true;
+  if (/\bvercel agent\b/i.test(name) || /\/changelog\/vercel-agent\b/i.test(url)) return true;
+  if (/\bcodex cloud\b/i.test(name) || /\/codex\/cloud(?:\/|$)/i.test(url)) return true;
+  return false;
+}
+
 /** Keep dated changelog cards; drop sitemap-sized dumps before D1/R2 ingest. */
 export function compactCompanyFound(found: Found[], cap = COMPANY_CACHE_CAP): Found[] {
   const ranked = found.filter((item) => item && item.name && item.thisYear !== false);
@@ -158,30 +171,42 @@ export function compactCompanyFound(found: Found[], cap = COMPANY_CACHE_CAP): Fo
     if (item.source === 'changelog') n += 80;
     if (/\/(changelog|release-notes|whats-new|docs\/changelog)/i.test(url)) n += 50;
     if (item.date && /^\d{4}-\d{2}-\d{2}$/.test(item.date)) n += 30;
-    if (/openai\.com\/(index|sora|device)\b/i.test(url)) {
-      n += 90;
-      if (item.date || /\b(gpt-?\d|chatgpt|sora|atlas|health|device|images)\b/i.test(name)) n += 50;
+    if (/openai\.com\/(sora|device)(\/|$)/i.test(url) || /openai\.com\/index\/(gpt-6|chatgpt-images|chatgpt-atlas|chatgpt-health|images)\b/i.test(url)) {
+      n += 160;
+    } else if (/openai\.com\/index\//i.test(url)) {
+      if (/\b(gpt-?\d|chatgpt images|sora|atlas|health|device)\b/i.test(name) && !/\b(journeys?|academy|partnership|incident|blueprint)\b/i.test(name)) {
+        n += 80;
+      } else {
+        n -= 50;
+      }
     }
+    if (/\bv0\b/i.test(name) || /\/(blog|changelog)\/(?:introducing-the-new-)?v0\b/i.test(url)) n += 110;
+    if (/\bvercel agent\b/i.test(name) || /\/changelog\/vercel-agent\b/i.test(url)) n += 90;
+    if (/\bcodex cloud\b/i.test(name) || /\/codex\/cloud(?:\/|$)/i.test(url)) n += 70;
     if (/\/(blog|news|research)\//i.test(url) && !/changelog|\/index\//i.test(url)) n -= 20;
     if (looksLikeNotAShip(item) && !flagshipLaunchName(item)) n -= 80;
     if (/\b(bug fixes?|get started|configuration details|see setup)\b/i.test(name)) n -= 60;
     if (/\b(codex|chatgpt|claude|cursor|gpt-?\d)/i.test(name) && name.length <= 72) n += 25;
+    if (isCompactMustKeep(item)) n += 200;
     return n;
   };
-  ranked.sort((a, b) => weight(b) - weight(a));
-  const seen = new Set<string>();
-  const out: Found[] = [];
-  for (const item of ranked) {
+  const accept = (item: Found, seen: Set<string>, out: Found[]) => {
     const key = item.name.toLowerCase().replace(/[^a-z0-9]+/g, '');
     const letters = item.name.replace(/[^a-zA-Z]/g, '').length;
-    if (key.length < 4 || letters < 3 || seen.has(key)) continue;
-    if (looksLikeNotAShip(item) && !flagshipLaunchName(item)) continue;
+    if (key.length < 4 || letters < 3 || seen.has(key) || out.length >= cap) return;
+    if (looksLikeNotAShip(item) && !flagshipLaunchName(item) && !isCompactMustKeep(item)) return;
     if (looksLikeNotAShip(item) && flagshipLaunchName(item)) logFlagshipGate(item, 'company-compact-not-a-ship', flagshipLaunchName(item));
-    if (/\b(get started with|configuration details|see setup)\b/i.test(item.name)) continue;
+    if (/\b(get started with|configuration details|see setup)\b/i.test(item.name)) return;
     seen.add(key);
     out.push(item);
-    if (out.length >= cap) break;
-  }
+  };
+  const byWeight = (a: Found, b: Found) => weight(b) - weight(a);
+  const must = ranked.filter(isCompactMustKeep).sort(byWeight);
+  const rest = ranked.filter((item) => !isCompactMustKeep(item)).sort(byWeight);
+  const seen = new Set<string>();
+  const out: Found[] = [];
+  for (const item of must) accept(item, seen, out);
+  for (const item of rest) accept(item, seen, out);
   return out;
 }
 
@@ -791,7 +816,7 @@ export async function harvestCompany(opts: {
   if (opts.storeOnly) {
     return { found: [], spend: emptyXaiSpend(), ran: ['company-store-miss'], cacheHit: false };
   }
-  const cacheKey = opts.deep ? `company:deep:v16:${year}:${slug}` : `company:v16:${year}:${slug}`;
+  const cacheKey = opts.deep ? `company:deep:v17:${year}:${slug}` : `company:v17:${year}:${slug}`;
   const load = async (): Promise<CompanyHarvest> => {
     const via = viaFor(affiliation);
     const ran: string[] = [];

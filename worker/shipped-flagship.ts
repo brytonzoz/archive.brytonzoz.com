@@ -125,6 +125,7 @@ export function flagshipLaunchName(item: FlagshipItem): string | null {
   // Exact titles only — "Codex app 26.608" must still version-roll.
   if (/^(?:introducing\s+)?codex app(?: updates)?$/i.test(name)) return 'Codex app';
   if (/^(?:introducing\s+)?gpt-?5\.3-codex$/i.test(name)) return 'GPT-5.3-Codex';
+  if (/\bcodex cloud\b/i.test(name) || /\/codex\/cloud(?:\/|$)/i.test(path)) return 'Codex Cloud';
 
   const report = name.match(/^a technical report on\s+(.+)$/i);
   if (report?.[1] && /\d/.test(report[1])) return titleCaseProduct(report[1]);
@@ -208,6 +209,17 @@ export function flagshipProbePaths(company: string | null | undefined): string[]
       '/changelog/origin',
       '/changelog/page/2',
       '/changelog/page/3',
+    ];
+  }
+  if (/\bvercel\b/.test(slug)) {
+    return [
+      '/changelog',
+      '/changelog/v0-platform-api-now-in-beta',
+      '/changelog/v0-now-reads-npm-credentials-from-shared-environment-variables',
+      '/changelog/v0-adds-one-click-integrations-for-email-auth-search-and-databases',
+      '/changelog/vercel-agent-now-in-slack',
+      '/blog/v0',
+      '/blog/v0-api',
     ];
   }
   if (/\bopenai\b/.test(slug)) {

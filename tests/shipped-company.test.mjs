@@ -311,6 +311,66 @@ test('company harvests keep dated changelog cards and drop sitemap dumps', () =>
   assert.ok(compact.findIndex((item) => /codex cli/i.test(item.name)) < 5);
 });
 
+test('compact force-keeps v0, Sora, Images, and Codex Cloud under a dump', () => {
+  const dump = Array.from({ length: 220 }, (_, i) => ({
+    name: `GLM ${i} now available on AI Gateway`,
+    description: '',
+    date: '2026-10-01',
+    link: `https://vercel.com/changelog/glm-${i}-now-available-on-ai-gateway`,
+    source: 'changelog',
+    status: 'LAUNCHED',
+    score: 7,
+    thisYear: true,
+  }));
+  const keep = [
+    {
+      name: 'v0 Platform API now in beta',
+      description: '',
+      date: '2026-10-09',
+      link: 'https://vercel.com/changelog/v0-platform-api-now-in-beta',
+      source: 'changelog',
+      status: 'LAUNCHED',
+      score: 7,
+      thisYear: true,
+    },
+    {
+      name: 'Sora',
+      description: '',
+      date: '2026-03-01',
+      link: 'https://openai.com/sora',
+      source: 'changelog',
+      status: 'LAUNCHED',
+      score: 7,
+      thisYear: true,
+    },
+    {
+      name: 'ChatGPT Images',
+      description: '',
+      date: '2026-02-01',
+      link: 'https://openai.com/index/chatgpt-images',
+      source: 'changelog',
+      status: 'LAUNCHED',
+      score: 7,
+      thisYear: true,
+    },
+    {
+      name: 'Codex Cloud',
+      description: '',
+      date: '2026-09-29',
+      link: 'https://developers.openai.com/codex/cloud',
+      source: 'changelog',
+      status: 'LAUNCHED',
+      score: 7,
+      thisYear: true,
+    },
+  ];
+  const compact = company.compactCompanyFound([...dump, ...keep], 20);
+  assert.ok(compact.some((item) => /^v0 /i.test(item.name)), JSON.stringify(compact.map((i) => i.name)));
+  assert.ok(compact.some((item) => /^sora$/i.test(item.name)), JSON.stringify(compact.map((i) => i.name)));
+  assert.ok(compact.some((item) => /chatgpt images/i.test(item.name)), JSON.stringify(compact.map((i) => i.name)));
+  assert.ok(compact.some((item) => /codex cloud/i.test(item.name)), JSON.stringify(compact.map((i) => i.name)));
+});
+
 test('off-worker cache is preferred and scoped on read', async () => {
   const storeMod = await import('../worker/shipped-company-store.ts');
   const cached = [

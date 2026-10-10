@@ -637,7 +637,10 @@ export async function assembleReceipt(subject: Subject, gathered: Gathered, year
   const gaps = gathered.gaps ?? [];
   const thin = harvested.length < SEARCH_BELOW && (inYearCount(gathered, year) < SEARCH_BELOW || gaps.length > 0);
   // xAI already searched X + web. Don't pay Claude for another search on a long tape.
-  const want = thin && !xaiRan && harvested.length < 3 ? searches : 0;
+  // A company harvest that polish thinned must stay on the tape — Claude listing
+  // was replacing 70 Cursor lines with 4 web blurbs.
+  const companyRan = gathered.ran.some((tag) => tag.startsWith('company'));
+  const want = thin && !xaiRan && harvested.length < 3 && !(companyRan && harvested.length > 0) ? searches : 0;
   const searchCap = searchBudget({ remainingMicros: Math.min(budgetMicros, RECEIPT_BUDGET_MICROS), want, searchMicros: SEARCH_MICROS });
   if (want > searchCap) gathered.coverageCapped = true;
   const toolSets: unknown[][] = searchCap ? [[{ type: 'web_search_20250305', name: 'web_search', max_uses: searchCap }], []] : [[]];

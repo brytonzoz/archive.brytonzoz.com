@@ -25,6 +25,7 @@ test('bylines, docs nav, week-of roundups, and articles about the person are jun
   assert.equal(polish.isJunkTitle('POOL'), true);
   assert.equal(polish.isJunkTitle('WEEK OF OCTOBER 6'), true);
   assert.equal(polish.isJunkTitle('MICHAEL TRUELL', { who: 'Michael Truell' }), true);
+  assert.equal(polish.isJunkTitle('MELKEY MOKSYAKOV, ESTEBAN SUÁREZ'), true);
   assert.equal(polish.isJunkTitle('Cursor 2.0'), false);
 });
 

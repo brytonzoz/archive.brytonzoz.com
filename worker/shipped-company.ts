@@ -651,16 +651,19 @@ export async function harvestCompany(opts: {
   storeOnly?: boolean;
 }): Promise<CompanyHarvest> {
   const { affiliation, year, env } = opts;
-  const slug = companySlug(affiliation.company);
+  const slugs = [...new Set([companySlug(affiliation.company), ...companyTokens(affiliation.company).map((token) => companySlug(token))].filter((s): s is string => Boolean(s)))];
+  const slug = slugs[0] ?? null;
   if (!slug || companyScope(affiliation) === 'none') {
     return { found: [], spend: emptyXaiSpend(), ran: [], cacheHit: false };
   }
   const via = viaFor(affiliation);
   // Always prefer the off-worker list. `rebuild` only skips the isolate cache so
   // Actions can harvest live; Worker reprints still need the D1/R2 tape.
+  // Try every company token (Anysphere / Cursor) so a paren name still hits the seed cache.
   if (opts.store) {
-    const off = await opts.store.get(year, slug);
-    if (off) {
+    for (const key of slugs) {
+      const off = await opts.store.get(year, key);
+      if (!off) continue;
       const scoped = scopeFilter(affiliation, stripVia(off.found));
       if (scoped.length || companyScope(affiliation) === 'all') {
         return {

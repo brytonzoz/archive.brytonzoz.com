@@ -326,6 +326,7 @@ export function itemsFromPersonalFeed(opts: { text: string; url: string; year: n
   const found: Found[] = [];
   const seen = new Set<string>();
   const pageHost = hostOf(opts.url);
+  const listedOn = `Listed on ${pageHost ?? 'their site'}`;
   const add = (name: string, date: string | null, link: string | null, desc: string) => {
     const trimmed = clean(name, 48);
     const key = loose(trimmed);
@@ -344,22 +345,31 @@ export function itemsFromPersonalFeed(opts: { text: string; url: string; year: n
       thisYear: true,
     });
   };
+  const preferProduct = (named: string, product?: { name: string; url: string } | null) => {
+    if (!product) return named;
+    if (!named) return product.name;
+    if (named.split(/\s+/).length > 3 || /^(a |an |the |game |app )/i.test(named) || /\b(with|using|from)\b/i.test(named)) {
+      return product.name;
+    }
+    return named;
+  };
   const blocks = [...opts.text.matchAll(/<item\b[\s\S]*?<\/item>|<entry\b[\s\S]*?<\/entry>/gi)];
   for (const item of itemsFromFeedXml(opts.text, opts.year)) {
     const raw = `${item.name} ${item.description || ''}`;
     const products = productUrlsFromCopy(raw, pageHost);
     if (!looksLikePersonalShip(raw) && !looksLikePersonalShip(item.name) && !products.length) continue;
     const named = journalShipName(item.name);
-    const name = products[0] && (!named || named.split(/\s+/).length > 4 || /^a |^an |^the /i.test(named)) ? products[0].name : named;
-    add(name || products[0]?.name || item.name, item.date, products[0]?.url || item.link, item.description || `Announced ${item.date} on ${pageHost ?? 'their site'}`);
+    const name = preferProduct(named, products[0]);
+    const hint = item.description ? `${listedOn}. ${item.description}` : listedOn;
+    add(name || products[0]?.name || item.name, item.date, products[0]?.url || item.link, hint);
     for (const extra of products.slice(named && name === named ? 0 : 1)) {
-      add(extra.name, item.date, extra.url, `Linked from ${item.name}`);
+      add(extra.name, item.date, extra.url, listedOn);
     }
   }
   for (const block of blocks) {
     const date = itemsFromFeedXml(block[0], opts.year)[0]?.date ?? null;
     if (!date) continue;
-    for (const extra of productUrlsFromCopy(block[0], pageHost)) add(extra.name, date, extra.url, `Linked from ${pageHost ?? 'their site'}`);
+    for (const extra of productUrlsFromCopy(block[0], pageHost)) add(extra.name, date, extra.url, listedOn);
   }
   return found.slice(0, 80);
 }

@@ -690,6 +690,8 @@ test('vague leftover headings drop; spoken names keep source casing', () => {
   assert.equal(polish.spokenShipName('TSC-RS', 'tsc-rs'), 'tsc-rs');
   assert.equal(polish.spokenShipName('BOTID', 'BotID'), 'BotID');
   assert.equal(polish.displayShipName('CODEX APP'), 'Codex app');
+  assert.equal(polish.spokenShipName('AWS DATABASES ARE NOW LIVE'), 'Aws databases are now live');
+  assert.doesNotMatch(polish.spokenShipName('AWS DATABASES ARE NOW LIVE'), /Aws Databases Are Now Live/);
   const leftover = polish.polishCandidates(
     [
       found({ name: 'CHATGPT WORK OR CODEX CHAT AND WORK', date: '2026-04-01', link: 'https://developers.openai.com/codex/or' }),

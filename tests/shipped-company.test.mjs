@@ -467,6 +467,52 @@ test('OpenAI compact keeps named Codex features when version dumps fill the rest
   assert.ok(compact.some((item) => /sandbox/i.test(item.name)), JSON.stringify(compact.map((i) => i.name)));
 });
 
+test('OpenAI compact keeps quality changelog cards over Codex fragments', () => {
+  const junk = [
+    'CODEX JOINING',
+    'INSTALLATION AND CONNECTION',
+    'MODEL SELECTION',
+    'EXPANDED AUTO-REVIEW DOCUMENTATION',
+    'WORKSPACE MODEL AVAILABILITY',
+    'PUBLIC PLUGIN CATALOG CSV EXPORT',
+    'USAGE RESETS AND BROWSER DEVELOPER MODE',
+  ].flatMap((name, i) =>
+    Array.from({ length: 12 }, (_, n) => ({
+      name,
+      description: '',
+      date: `2026-04-${String((n % 28) + 1).padStart(2, '0')}`,
+      link: `https://learn.chatgpt.com/docs/changelog#codex-junk-${i}-${n}`,
+      source: 'changelog',
+      status: 'LAUNCHED',
+      score: 7,
+      thisYear: true,
+      icon: null,
+    })),
+  );
+  const keep = [
+    { name: 'Record & Replay', date: '2026-06-11', hash: 'record-replay' },
+    { name: 'Web search', date: '2026-05-02', hash: 'web-search' },
+    { name: 'Team config', date: '2026-04-16', hash: 'team-config' },
+    { name: 'Appshots', date: '2026-07-08', hash: 'appshots' },
+    { name: 'Linux desktop preview', date: '2026-03-20', hash: 'linux-preview' },
+  ].map((row) => ({
+    name: row.name,
+    description: '',
+    date: row.date,
+    link: `https://learn.chatgpt.com/docs/changelog#${row.hash}`,
+    source: 'changelog',
+    status: 'LAUNCHED',
+    score: 6,
+    thisYear: true,
+    icon: null,
+  }));
+  const compact = company.compactCompanyFound([...junk, ...keep], 20);
+  const names = compact.map((item) => item.name);
+  assert.ok(names.some((name) => /record/i.test(name)), JSON.stringify(names));
+  assert.ok(names.some((name) => /web search/i.test(name)), JSON.stringify(names));
+  assert.ok(names.some((name) => /team config/i.test(name)), JSON.stringify(names));
+});
+
 test('OpenAI compact does not treat ChatGPT for iOS versions as company-wide', () => {
   const ios = Array.from({ length: 40 }, (_, i) => ({
     name: `ChatGPT for iOS 1.2026.${i}`,

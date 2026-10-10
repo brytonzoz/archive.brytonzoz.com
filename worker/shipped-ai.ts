@@ -531,11 +531,20 @@ function noteCopiesDescription(note: string, items: DraftItem[]): boolean {
 function noteRestatesTitle(note: string, items: DraftItem[]): boolean {
   const hay = foldNote(note);
   return items.some((item) => {
-    const title = foldNote(item.spoken || item.name || '');
-    if (title.length < 10) return false;
-    if (!hay.startsWith(title) && !hay.includes(title)) return false;
-    const extra = hay.replace(title, '').trim();
-    return extra.split(/\s+/).filter(Boolean).length <= 4;
+    const titles = [...new Set([item.spoken, item.name].filter(Boolean).map((value) => foldNote(String(value))))];
+    return titles.some((title) => {
+      if (title.length < 8) return false;
+      if (hay === title) return true;
+      if (!hay.includes(title)) return false;
+      if (hay.startsWith(title)) {
+        const extra = hay.slice(title.length).trim();
+        const extraWords = extra.split(/\s+/).filter(Boolean);
+        if (extraWords.length <= 4) return true;
+        return /^(sits|is the one|is now|are now)\b/.test(extra);
+      }
+      const extra = hay.replace(title, '').trim();
+      return extra.split(/\s+/).filter(Boolean).length <= 4;
+    });
   });
 }
 
@@ -716,13 +725,14 @@ export function sentenceFallbackNote(items: DraftItem[], ctx: NoteContext = {}):
   const lead = does ? does.charAt(0).toLowerCase() + does.slice(1) : '';
   const next = items.length > 1 ? spokenOf(items.find((row) => spokenOf(row) !== spoken) || items[1]!) : '';
   const candidates = [
-    items.length > 1 && next && does && foldNote(does) !== foldNote(spoken)
-      ? `${spoken} sits beside ${next}, and ${lead}`
-      : '',
+    does && foldNote(does) !== foldNote(spoken) ? `Keep an eye on ${spoken}, which ${lead}` : '',
     items.length === 1 && does ? `${spoken} is the one on this tape, and ${lead}` : '',
     who && does ? `${spoken} is ${who}'s ${kind}, and ${lead}` : '',
-    items.length > 1 && next ? `${spoken} sits next to ${next} on a crowded ${items.length}-line tape.` : '',
+    items.length > 1
+      ? `Keep an eye on ${spoken}; ${items.length} public ships landed this year.`
+      : '',
     items.length === 1 ? `${spoken} is the one public ship here, and that is the whole story.` : '',
+    `Keep an eye on ${spoken}; the rest of the tape is still filling in.`,
   ].filter(Boolean);
   for (const note of candidates) {
     if (hardRejectNote(note, items, [], ctx)) continue;
@@ -730,12 +740,7 @@ export function sentenceFallbackNote(items: DraftItem[], ctx: NoteContext = {}):
     if (!printable(note)) continue;
     return clipSentence(note, 140);
   }
-  return clipSentence(
-    items.length > 1
-      ? `${spoken} sits on a crowded ${items.length}-line tape, and the year is still moving.`
-      : `${spoken} is the one public ship here, and that is the whole story.`,
-    140,
-  );
+  return clipSentence(`Keep an eye on ${spoken}; the rest of the tape is still filling in.`, 140);
 }
 
 /** Last resort only: the notable ship name. No sentence costume. */

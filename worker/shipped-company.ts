@@ -4,7 +4,7 @@
 import { extraResearchPaths, itemsFromProjectList } from './shipped-research';
 import { looksLikeNotAShip } from './shipped-decisions';
 import { flagshipLaunchName, flagshipProbePaths, knownFlagshipDate, logFlagshipGate } from './shipped-flagship';
-import { isPrereleaseShip, prettyBrand, versionParts } from './shipped-polish';
+import { isBlogEssayTitle, isDocsOrReferenceTitle, isPrereleaseShip, isVagueOrCutTitle, prettyBrand, versionParts } from './shipped-polish';
 import { companyOrgGuess, companyScope, companySlug, companyTokens, matchesLeadProduct, type Affiliation } from './shipped-affiliation';
 import { type XaiEnv, type XaiSpend, emptyXaiSpend } from './shipped-xai';
 import { stripVia, type CompanyStore } from './shipped-company-store';
@@ -163,6 +163,24 @@ function isCompactMustKeep(item: Found): boolean {
   return false;
 }
 
+function isThinCodexTitle(name: string): boolean {
+  if (!name) return true;
+  if (isDocsOrReferenceTitle(name) || isVagueOrCutTitle(name) || isBlogEssayTitle(name)) return true;
+  return /^(bug|features|update|other|if|to|get|the|and|for|with|as|out)\b/i.test(name);
+}
+
+/** Named Codex launches and quality changelog cards — not docs, fragments, or CLI version dumps. */
+export function isNamedCodexCard(item: Found): boolean {
+  const name = item.name || '';
+  const url = item.link || '';
+  if (!name || versionParts(name) || isThinCodexTitle(name) || looksLikeNotAShip(item)) return false;
+  const words = name.split(/\s+/).filter(Boolean);
+  if (words.length > 14) return false;
+  if (/\bcodex\b/i.test(name) || /\/codex\b/i.test(url) || /#codex-/i.test(url)) return true;
+  if (!/learn\.chatgpt\.com\/docs\/changelog/i.test(url)) return false;
+  return words.length >= 1;
+}
+
 /** Keep dated changelog cards; drop sitemap-sized dumps before D1/R2 ingest. */
 export function compactCompanyFound(found: Found[], cap = COMPANY_CACHE_CAP): Found[] {
   const ranked = found.filter((item) => item && item.name && item.thisYear !== false);
@@ -188,12 +206,13 @@ export function compactCompanyFound(found: Found[], cap = COMPANY_CACHE_CAP): Fo
     if (/vercel\.com\/changelog\//i.test(url)) n += 90;
     if (/github\.com\/(vercel|openai)\//i.test(url)) n -= 70;
     if (item.source === 'company' && /github\.com\//i.test(url)) n -= 50;
-    if (/\bcodex\b/i.test(name) && !versionParts(name)) n += 50;
+    if (isNamedCodexCard(item)) n += 55;
+    else if (/\bcodex\b/i.test(name) && !versionParts(name)) n -= 20;
     if (versionParts(name) && !flagshipLaunchName(item) && !isCompactMustKeep(item)) n -= 45;
     if (/\/(blog|news|research)\//i.test(url) && !/changelog|\/index\//i.test(url)) n -= 90;
     if (looksLikeNotAShip(item) && !flagshipLaunchName(item)) n -= 80;
     if (/\b(bug fixes?|get started|configuration details|see setup)\b/i.test(name)) n -= 60;
-    if (/\b(codex|chatgpt|claude|cursor|gpt-?\d)/i.test(name) && name.length <= 72) n += 25;
+    if (/\b(codex|chatgpt|claude|cursor|gpt-?\d)/i.test(name) && name.length <= 72 && !isThinCodexTitle(name)) n += 25;
     if (/^(introducing|launching)\b/i.test(name)) n += 80;
     if (/^(how|helping)\b/i.test(name) || /\b(cuts?|boosts?|saves?|turns?|halves?)\b.+\bwith\b/i.test(name)) n -= 90;
     if (/^[A-Za-z][\w'’]*(?:\s+AI)?(?:'s)?\s+(brings|trusts|reviewed|ships|widens|completes|improves)\b/i.test(name)) n -= 90;
@@ -226,13 +245,7 @@ export function compactCompanyFound(found: Found[], cap = COMPANY_CACHE_CAP): Fo
     }
     return /\b(gpt-?\d|chatgpt|sora|atlas|v0)\b/i.test(name) && !/\bcodex\b/i.test(name) && !/^[A-Za-z][\w'’]*(?:\s+AI)?(?:'s)?\s+(brings|trusts|reviewed|ships|widens|completes|improves)\b/i.test(name);
   };
-  const isNamedCodex = (item: Found) => {
-    const name = item.name || '';
-    const url = item.link || '';
-    const onCodexLog = /learn\.chatgpt\.com\/docs\/changelog/i.test(url) || /developers\.openai\.com\/codex/i.test(url);
-    if (!onCodexLog && !/\bcodex\b/i.test(name) && !/\/codex\b/i.test(url)) return false;
-    return !versionParts(name);
-  };
+  const isNamedCodex = (item: Found) => isNamedCodexCard(item);
   const must = ranked.filter(isCompactMustKeep).sort(byWeight);
   const wide = ranked.filter((item) => !isCompactMustKeep(item) && isWide(item)).sort(byWeight);
   const namedCodex = ranked.filter((item) => !isCompactMustKeep(item) && !isWide(item) && isNamedCodex(item)).sort(byWeight);
@@ -891,7 +904,7 @@ export async function harvestCompany(opts: {
   if (opts.storeOnly) {
     return { found: [], spend: emptyXaiSpend(), ran: ['company-store-miss'], cacheHit: false };
   }
-  const cacheKey = opts.deep ? `company:deep:v27:${year}:${slug}` : `company:v27:${year}:${slug}`;
+  const cacheKey = opts.deep ? `company:deep:v28:${year}:${slug}` : `company:v28:${year}:${slug}`;
   const load = async (): Promise<CompanyHarvest> => {
     const via = viaFor(affiliation);
     const ran: string[] = [];

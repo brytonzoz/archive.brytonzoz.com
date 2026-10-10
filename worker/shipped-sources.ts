@@ -2040,6 +2040,27 @@ async function gatherFresh(
   }
 
   const ownPages = extraSites.filter((page): page is SiteInfo => Boolean(page));
+  const newsletterHosts: string[] = [];
+  const addNewsletterHost = (host: string | null | undefined) => {
+    if (!host || newsletterHosts.includes(host)) return;
+    if (/^(news|blog)\./i.test(host) || /substack\.com$/i.test(host)) newsletterHosts.push(host);
+  };
+  for (const hit of web) addNewsletterHost(hostOf(hit.url));
+  for (const page of ownPages) addNewsletterHost(hostOf(page.url));
+  for (const site of sitesOf(profile)) addNewsletterHost(hostOf(site));
+  addNewsletterHost(hostOf(profile.site || ''));
+  if (!newsletterHosts.length) {
+    const apex = hostOf(profile.site || '')?.replace(/^www\./, '');
+    if (apex && !/^(news|blog)\./i.test(apex) && !/\.(github|twitter|x|linkedin|producthunt)\./i.test(apex)) {
+      newsletterHosts.push(`news.${apex}`);
+    }
+  }
+  for (const host of newsletterHosts.slice(0, 3)) {
+    const feedPage = await raceTimeout(readSite(`https://${host}/feed`).catch(() => null), SOURCE_TIMEOUT_MS, null);
+    if (!feedPage) continue;
+    ownPages.push(feedPage);
+    ran.push(`personal-feed:${host}`);
+  }
   for (const extra of ownPages) {
     found.push(
       ...itemsFromWebEvidence({

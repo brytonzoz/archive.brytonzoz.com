@@ -435,6 +435,22 @@ test('cashier note and stats are specific to the items, never stock copy', () =>
   assert.equal(ai.hardRejectNote('Frizz is a product that shipped this year.', [{ name: 'FRIZZ', spoken: 'Frizz' }], [], { who: 'Colin McDonnell' }), 'banned-phrase');
   assert.equal(ai.hardRejectNote('Frizz shipped.', [{ name: 'FRIZZ', spoken: 'Frizz' }], [], { who: 'Colin McDonnell' }), 'too-short');
   assert.equal(
+    ai.hardRejectNote('Aws Databases Are Now Live sits next to Vercel Plugin on a crowded tape.', [
+      { name: 'AWS DATABASES ARE NOW LIVE', spoken: 'Aws databases are now live' },
+      { name: 'VERCEL PLUGIN FOR VSCODE', spoken: 'Vercel Plugin for VS Code' },
+    ], [], { who: 'Guillermo Rauch' }),
+    'title-restate',
+  );
+  const awsFallback = ai.sentenceFallbackNote(
+    [
+      { name: 'AWS DATABASES ARE NOW LIVE', spoken: 'Aws databases are now live', description: 'managed databases', date: '2026-10-01', status: 'LAUNCHED', link: 'https://vercel.com/changelog/aws', icon: null, source: 'changelog' },
+      { name: 'VERCEL PLUGIN', spoken: 'Vercel Plugin', description: 'editor plugin', date: '2026-09-01', status: 'LAUNCHED', link: 'https://vercel.com/changelog/plugin', icon: null, source: 'changelog' },
+    ],
+    { who: 'Guillermo Rauch' },
+  );
+  assert.doesNotMatch(awsFallback, /leads \d+ ships|Aws Databases Are Now Live sits|·/i);
+  assert.match(awsFallback, /keep an eye on/i);
+  assert.equal(
     ai.pickLeastBadNote(
       ['Frizz is a product that shipped this year.', 'Lsp4j-MCP shipped.'],
       [{ name: 'FRIZZ', spoken: 'Frizz', description: 'schema tooling' }],
@@ -714,6 +730,21 @@ test('personal RSS keeps dated ships and drops commentary', () => {
   assert.ok(tony.some((item) => /survive|10 waves/i.test(item.name) && item.link?.includes('survive10waves')), JSON.stringify(tony));
   assert.ok(tony.some((item) => /pulse/i.test(item.name)), JSON.stringify(tony));
   assert.ok(tony.every((item) => item.link && /^https?:\/\//.test(item.link)));
+  assert.ok(tony.every((item) => /listed on/i.test(item.description || '')), JSON.stringify(tony));
+});
+
+test('personal feed product URLs count as portfolio ownership', async () => {
+  const ownership = await import('../worker/shipped-ownership.ts');
+  const tony = { name: 'Tony Dinh', site: 'https://tonydinh.com', x: 'tdinh_me' };
+  const item = {
+    name: 'survive 10 waves',
+    description: 'Listed on news.tonydinh.com. Try it at http://www.survive10waves.com',
+    date: '2026-08-29',
+    source: 'site',
+    link: 'https://www.survive10waves.com/',
+  };
+  assert.equal(ownership.ownershipEvidence(item, tony), 'portfolio');
+  assert.equal(ownership.ownedByBuilder(item, tony), true);
 });
 
 test('public MRR and stars keep their source URL', () => {

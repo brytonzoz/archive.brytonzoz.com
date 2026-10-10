@@ -619,7 +619,7 @@ const PROPER_SHIP: Record<string, string> = {
 
 const SMALL_SHIP_WORD = new Set(['for', 'the', 'in', 'of', 'and', 'or', 'a', 'an', 'to', 'on', 'at', 'with', 'app']);
 
-function formatSpokenToken(word: string, index: number): string {
+function formatSpokenToken(word: string, index: number, sentenceCase = false): string {
   const key = loose(word);
   if (PROPER_SHIP[key]) return PROPER_SHIP[key];
   if (/^[a-z0-9]+(?:-[a-z0-9.]+)+$/.test(word)) return word;
@@ -628,10 +628,11 @@ function formatSpokenToken(word: string, index: number): string {
   if (word.includes('-')) {
     return word
       .split('-')
-      .map((part, partIndex) => formatSpokenToken(part, index + partIndex))
+      .map((part, partIndex) => formatSpokenToken(part, index + partIndex, sentenceCase))
       .join('-');
   }
   const lower = word.toLowerCase();
+  if (sentenceCase && index > 0 && !PROPER_SHIP[key]) return lower;
   if (SMALL_SHIP_WORD.has(lower) && index > 0) return lower;
   if (/^\d/.test(word)) return word;
   return word.charAt(0).toUpperCase() + word.slice(1).toLowerCase();
@@ -651,9 +652,10 @@ export function spokenShipName(name: string, source?: string | null): string {
     Boolean(original) &&
     ((/[a-z]/.test(original) && /[A-Z]/.test(original)) || /^[a-z0-9]+(?:-[a-z0-9.]+)+$/.test(original));
   const input = keepSource ? original : fallback;
+  const sentenceCase = !keepSource && input.split(/\s+/).filter(Boolean).length >= 4 && input === input.toUpperCase();
   let index = 0;
   return input.replace(/[A-Za-z0-9.+]+(?:-[A-Za-z0-9.+]+)*/g, (word) => {
-    const out = formatSpokenToken(word, index);
+    const out = formatSpokenToken(word, index, sentenceCase);
     index += 1;
     return out;
   });

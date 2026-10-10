@@ -66,6 +66,21 @@ export function isPriorityCompanyUrl(url: string): boolean {
   }
 }
 
+/** Changelog/release paths first so TinyFish's small batch is not spent on /blog and /news. */
+export function priorityCompanyScore(url: string): number {
+  try {
+    const path = new URL(url).pathname.replace(/\/+$/, '') || '/';
+    if (/\/changelog\b/i.test(path)) return 0;
+    if (/\/(releases?|updates?|whats-new)\b/i.test(path)) return 1;
+    if (path === '/' || path === '/index') return 2;
+    if (/\/(feed|rss|atom|sitemap)/i.test(path)) return 3;
+    if (/\/(blog|news)\b/i.test(path)) return 4;
+    return 5;
+  } catch {
+    return 9;
+  }
+}
+
 export type CompanyHarvest = { found: Found[]; spend: XaiSpend; ran: string[]; cacheHit: boolean };
 
 type CompanyPage = {
@@ -275,13 +290,15 @@ async function pagesForCompany(
   const base = publicUrl(site);
   if (!base) return { found: [], feeds: [], extraHosts: [], tinyfish: false };
   const root = base.replace(/\/+$/, '');
+  const changelogFirst = (path: string) => /changelog|releases?|updates?|whats-new/i.test(path);
   const roots = [
     `${root}/`,
-    ...COMPANY_PATHS.map((path) => `${root}${path}`),
     ...productPaths(product).map((path) => `${root}${path}`),
+    ...COMPANY_PATHS.filter(changelogFirst).map((path) => `${root}${path}`),
+    ...COMPANY_PATHS.filter((path) => !changelogFirst(path)).map((path) => `${root}${path}`),
     ...extraResearchPaths(base),
   ];
-  const unique = [...new Set(roots)].slice(0, 28);
+  const unique = [...new Set(roots)].slice(0, 36);
   const fetched = new Set(unique.map((url) => url.replace(/\/+$/, '')));
   const pages = await mapLimit(unique, 8, (url) => readCompanyPage(url));
   const found: Found[] = [];
@@ -315,7 +332,10 @@ async function pagesForCompany(
   };
   for (const page of pages) absorb(page);
   if (!found.length && !feeds.length && ctx?.tinyfish) {
-    const priority = unique.filter(isPriorityCompanyUrl).slice(0, 8);
+    const priority = unique
+      .filter(isPriorityCompanyUrl)
+      .sort((a, b) => priorityCompanyScore(a) - priorityCompanyScore(b) || a.length - b.length)
+      .slice(0, 10);
     const fallback = await fetchViaTinyfish(priority.length ? priority : unique.slice(0, 6), ctx);
     if (fallback.length) usedTinyfish = true;
     for (const page of fallback) absorb(page);
@@ -582,7 +602,7 @@ export async function harvestCompany(opts: {
   if (!slug || companyScope(affiliation) === 'none') {
     return { found: [], spend: emptyXaiSpend(), ran: [], cacheHit: false };
   }
-  const cacheKey = opts.deep ? `company:deep:v10:${year}:${slug}` : `company:v12:${year}:${slug}`;
+  const cacheKey = opts.deep ? `company:deep:v11:${year}:${slug}` : `company:v13:${year}:${slug}`;
   const harvested = await cached(
     cacheKey,
     7 * 1440 * MIN,

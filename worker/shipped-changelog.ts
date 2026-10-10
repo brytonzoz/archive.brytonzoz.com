@@ -136,6 +136,9 @@ function isNoiseTitle(text: string): boolean {
   if (/^(output:|screenshot|to get started|each dot |design \()/i.test(text)) return true;
   if (/^(launched|released|shipped|live|available)(\s+as(\s+a)?\s+\w+)?$/i.test(text)) return true;
   if (new RegExp(`^(?:${MONTH_ALT}),?\\s+20\\d\\d$`, 'i').test(text)) return true;
+  if (/\b(practical guide|approach to|progress in|text provenance|advertising for)\b/i.test(text)) return true;
+  if (/^(building|sharing|our approach)\b/i.test(text) && !/\b(launch|released?|version|cli|api|app|model)\b/i.test(text)) return true;
+  if (text.length <= 3 && !/\d/.test(text)) return true;
   return false;
 }
 

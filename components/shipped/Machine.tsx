@@ -207,9 +207,9 @@ export function Machine({ job, display, tone, onPrinted, onTorn, tearSignal = 0,
     };
     p.style.transform = '';
     const clip = (hidden: number) => {
-      const value = `inset(0 0 ${Math.max(0, hidden)}px 0)`;
+      const value = hidden <= 0 ? '' : `inset(0 0 ${hidden}px 0)`;
       el.style.clipPath = value;
-      el.style.webkitClipPath = value;
+      el.style.setProperty('-webkit-clip-path', value);
     };
     const height = Math.max(1, el.offsetHeight);
     clip(height);
@@ -243,8 +243,7 @@ export function Machine({ job, display, tone, onPrinted, onTorn, tearSignal = 0,
       }
       shiver?.cancel();
       motorOff();
-      el.style.clipPath = '';
-      el.style.webkitClipPath = '';
+      clip(0);
       setPhase('hanging');
       tell(true, false);
     };
@@ -278,9 +277,9 @@ export function Machine({ job, display, tone, onPrinted, onTorn, tearSignal = 0,
     fedHeight.current = height;
     if (phaseRef.current === 'printing' || phaseRef.current === 'tearing' || reducedMotion()) return;
     const clip = (left: number) => {
-      const value = `inset(0 0 ${Math.max(0, left)}px 0)`;
+      const value = left <= 0 ? '' : `inset(0 0 ${left}px 0)`;
       el.style.clipPath = value;
-      el.style.webkitClipPath = value;
+      el.style.setProperty('-webkit-clip-path', value);
     };
     let left = hidden;
     clip(left);
@@ -294,8 +293,7 @@ export function Machine({ job, display, tone, onPrinted, onTorn, tearSignal = 0,
         timers.push(window.setTimeout(step, 70));
         return;
       }
-      el.style.clipPath = '';
-      el.style.webkitClipPath = '';
+      clip(0);
       motorOff();
     };
     timers.push(window.setTimeout(step, 40));

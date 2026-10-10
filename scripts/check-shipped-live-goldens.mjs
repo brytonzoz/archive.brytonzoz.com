@@ -1,5 +1,6 @@
 // After a reprint, assert LIVE /api receipts against the same golden rules.
 // Fails the reprint workflow when #7 is under the floor or a required ship is missing.
+import '../tests/resolve-ts.mjs';
 import { LIVE_RECEIPT_IDS, evaluateLiveReceipt, junkKeys } from '../tests/lib/shipped-goldens.mjs';
 
 const origin = (process.argv[2] || process.env.SHIPPED_ORIGIN || 'https://shipped-staging.brytonzoz.com').replace(/\/+$/, '');

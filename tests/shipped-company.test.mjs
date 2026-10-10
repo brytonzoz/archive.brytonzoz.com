@@ -164,6 +164,9 @@ test('ship names strip launch words, skip bylines, and never cut mid-word', () =
 test('host guesses stay generic and product paths are derived from the role', () => {
   const hosts = company.hostGuesses('OpenAI');
   assert.ok(hosts.some((url) => url.includes('openai.com')));
+  const spaced = company.hostGuesses('open ai');
+  assert.ok(spaced.some((url) => url.includes('openai.com')), JSON.stringify(spaced));
+  assert.equal(affiliation.companySlug('open ai'), 'openai');
   assert.ok(changelog.productPaths('Codex').includes('/codex/changelog'));
   assert.ok(changelog.COMPANY_PATHS.includes('/changelog'));
   assert.ok(changelog.FEED_PATHS.includes('/atom'));

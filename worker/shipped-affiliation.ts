@@ -50,7 +50,7 @@ export function companyTokens(company: string | null | undefined): string[] {
   if (!company) return [];
   const parts = company
     .split(/[()[\],/|]/)
-    .map((part) => part.replace(/\b(inc|llc|ltd|corp|the|ai|labs?)\b/gi, ' ').trim())
+    .map((part) => part.replace(/\b(inc|llc|ltd|corp|the|labs?)\b/gi, ' ').trim())
     .filter((part) => part.length >= 2 && !/^(inc|llc|ltd|the)$/i.test(part));
   const out: string[] = [];
   for (const part of parts) {

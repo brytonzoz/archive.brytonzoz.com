@@ -807,3 +807,31 @@ test('Vercel customer stories and chopped Decision-1 drop; two policy knobs roll
   assert.ok(names.some((name) => /vercel platform · 2 updates in oct/i.test(name)), JSON.stringify(names));
   assert.equal(names.some((name) => /retention|request bodies|microsoft decision/i.test(name)), false, JSON.stringify(names));
 });
+
+test('prereleases, starters, and Gateway model listings are not ships', () => {
+  assert.equal(polish.isPrereleaseShip('TURBOREPO V2.11.3-CANARY.2'), true);
+  assert.equal(polish.isPrereleaseShip('v0 Platform API now in beta'), false);
+  assert.equal(polish.isNeverShipKind('NEXTJS-FOUNDATIONS-STARTER'), true);
+  assert.equal(polish.isNeverShipKind('WAIT-FOR-DEPLOYMENT-ACTION'), true);
+  assert.equal(polish.isNeverShipKind('ACADEMY-PYTHON-COURSE'), true);
+  assert.equal(polish.isGatewayModelListing("Liquid AI's d1 is available on AI Gateway"), true);
+  assert.equal(polish.isGatewayModelListing('Grok Imagine Video 1.5 Lite on AI Gateway'), true);
+  assert.equal(polish.isGatewayModelListing('Vercel Agent now in Slack'), false);
+  assert.equal(polish.cleanShipTitle('GPT-IMAGE-2-'), '');
+  assert.equal(polish.cleanShipTitle('INSTALL THE CHATGPT DESKTOP APP ON LINUX'), 'ChatGPT Desktop for Linux');
+  assert.match(polish.cleanShipTitle('BETTER PROMPT CACHING FOR GPT-6 PRODUCT SEP 22, 2026'), /better prompt caching for gpt-6/i);
+  assert.match(polish.cleanShipTitle('GPT-6.1 SOL PRODUCT SEP 29, 2026'), /gpt-6\.1 sol/i);
+  assert.match(polish.cleanShipTitle('ChatGPT Voice and multi-folder projects 26.715'), /chatgpt voice and multi-folder projects/i);
+  const items = polish.polishCandidates(
+    [
+      found({ name: "Liquid AI's d1 is available on AI Gateway", date: '2026-10-08', link: 'https://vercel.com/changelog/liquid-d1' }),
+      found({ name: 'Grok Imagine Video 1.5 Lite on AI Gateway', date: '2026-10-08', link: 'https://vercel.com/changelog/grok-imagine' }),
+      found({ name: 'v0 Platform API now in beta', date: '2026-04-01', link: 'https://vercel.com/changelog/v0-platform-api-now-in-beta' }),
+    ],
+    { year: 2026, who: 'Guillermo Rauch' },
+  );
+  const names = items.map((item) => item.name);
+  assert.ok(names.some((name) => /v0 platform api/i.test(name)), JSON.stringify(names));
+  assert.ok(names.some((name) => /new models on ai gateway/i.test(name)), JSON.stringify(names));
+  assert.equal(names.some((name) => /liquid ai|grok imagine/i.test(name)), false, JSON.stringify(names));
+});

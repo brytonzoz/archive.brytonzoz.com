@@ -215,6 +215,7 @@ export function endsWithCutOffWord(text: string): boolean {
 export function looksCutOff(text: string): boolean {
   const trimmed = text.trim();
   if (/[,;·|]\s*$/.test(trimmed)) return true;
+  if (/[A-Za-z0-9]-$/.test(trimmed)) return true;
   if (/\([^)]*$/.test(trimmed)) return true;
   if (TRAILING_PREP.test(trimmed) && trimmed.split(/\s+/).length >= 3) return true;
   if (/\b(turn on enable|enable full|at lower|on ai)$/i.test(trimmed)) return true;
@@ -260,7 +261,7 @@ function isSelfNameTitle(
 export function isDocsOrReferenceTitle(title: string): boolean {
   const text = tidy(title);
   if (!text) return true;
-  if (/^(last updated|what'?s new|deploying to)\b/i.test(text)) return true;
+  if (/^(last updated|what'?s new|deploying to|docs agent)\b/i.test(text)) return true;
   if (/\b(js\s+)?sdk\s+reference\b/i.test(text)) return true;
   if (/\breference$/i.test(text) && /\b(sdk|api|cli|js|flags|queues)\b/i.test(text)) return true;
   return false;
@@ -391,6 +392,7 @@ export function isJunkTitle(
   if (looksLikePersonName(text, opts.who) || looksLikeCodeIdentifier(text)) return true;
   if (isPricingOrMetricNote(text)) return true;
   if (isNotAShipTitle(text)) return true;
+  if (isPrereleaseShip(text) || isNeverShipKind(text)) return true;
   if (/^(the )?(guy|person|one) who made\b/i.test(text)) return true;
   const whoLast = (opts.who || '').split(/\s+/).filter((word) => word.length > 2);
   if (/^[A-Z]\s+[A-Z]{2,}$/.test(text) && whoLast.some((word) => loose(text).includes(loose(word)))) return true;
@@ -418,6 +420,47 @@ export function isPricingOrMetricNote(name: string): boolean {
   if (/\b(pricing plans?|plan pricing|teams plans?)\b/i.test(text)) return true;
   if (/^(improved|better|faster|cheaper|reduced|lower|higher)\s+[A-Za-z]+(?:\s+[A-Za-z]+)?$/i.test(text)) return true;
   return false;
+}
+
+/** Canary / alpha / beta / rc version tags. Named launches that happen to say "now in beta" stay. */
+export function isPrereleaseShip(name: string): boolean {
+  const text = tidy(name);
+  if (!text) return false;
+  if (/\bv?\d+\.\d+[\w.-]*-(canary|alpha|beta|rc)(?:\.|$)/i.test(text)) return true;
+  if (/\b(canary|alpha|rc)\.\d+\b/i.test(text)) return true;
+  if (/\b(canary|alpha|beta|rc)\s+\d/i.test(text) && /\bv?\d+\.\d+/i.test(text)) return true;
+  return false;
+}
+
+/** Starters, courses, GitHub Actions, repo rules, and examples are never ships. */
+export function isNeverShipKind(name: string): boolean {
+  const text = tidy(name);
+  if (!text) return false;
+  if (flagshipLaunchName({ name: text })) return false;
+  if (/\b(starter|foundations|academy|course|examples?|templates?|repo[- ]?rules?|global-repo-rules)\b/i.test(text)) return true;
+  if (/-(starter|course|action|example|template|rules?)$/i.test(text.replace(/\s+/g, '-'))) return true;
+  if (/\bwait-for-deployment-action\b|\bdeployment-action\b/i.test(text)) return true;
+  return false;
+}
+
+/** A model listing on AI Gateway — roll up, don't print each vendor. */
+export function isGatewayModelListing(name: string): boolean {
+  const text = tidy(name);
+  if (!text) return false;
+  if (/\b(v0|vercel agent|botid)\b/i.test(text)) return false;
+  if (/\b(adds|supports|typeSafe|http api|asynchronous|browserbase|confidence-based)\b/i.test(text)) return false;
+  if (/^liquid ai\b/i.test(text)) return true;
+  return /\b(?:now )?available on (?:the )?(?:vercel )?ai gateway\b|\bon ai gateway\b/i.test(text);
+}
+
+/** Company-org GitHub repo roots that never earned a homepage / launch post. */
+export function isUnnotableCompanyRepo(item: { name?: string; link?: string | null; source?: string | null; description?: string }): boolean {
+  const source = item.source || '';
+  if (source !== 'company') return false;
+  const link = item.link || '';
+  if (!/^https?:\/\/github\.com\/[^/]+\/[^/#?]+\/?$/i.test(link)) return false;
+  if (/\/(changelog|blog)\//i.test(link)) return false;
+  return true;
 }
 
 /** Settings, retention, and middleware knobs — roll up, don't print as ships. */
@@ -627,6 +670,7 @@ export function dateFromLabeledTitle(raw: unknown, year: number): string | null 
 }
 
 export function cleanShipTitle(raw: unknown, max = TITLE_MAX): string {
+  if (/[A-Za-z0-9]-$/.test(tidy(raw))) return '';
   let text = normalizeVersionTokens(stripDateSuffix(tidy(raw)));
   if (!text) return '';
   const labeled = text.match(LABELED_VERSION);
@@ -638,7 +682,11 @@ export function cleanShipTitle(raw: unknown, max = TITLE_MAX): string {
   const meet = text.match(/^meet the new\s+(.+)$/i);
   if (meet?.[1]) text = meet[1];
   if (/^codex,\s*our code generation cli tool$/i.test(text)) text = 'Codex CLI';
+  if (/^install the chatgpt desktop app on linux$/i.test(text) || /^chatgpt desktop app on linux$/i.test(text)) {
+    text = 'ChatGPT Desktop for Linux';
+  }
   text = text.replace(/^the new\s+/i, '').replace(/^new\s+(v\d\b)/i, '$1');
+  text = text.replace(/-+$/, '').trim();
   text = text
     .replace(/^(introducing|launching|announcing|presenting|meet|say hello to|now available[:\s]+|how to|read the|launched)\s+/i, '')
     .replace(/\s+launched as\b.*$/i, '')
@@ -988,6 +1036,20 @@ export function rollupCursorModels<T extends Polishable>(items: T[]): T[] {
   return kept;
 }
 
+/** AI Gateway model listings collapse to one line. */
+export function rollupGatewayModels<T extends Polishable>(items: T[]): T[] {
+  const models: T[] = [];
+  const kept: T[] = [];
+  for (const item of items) {
+    if (isGatewayModelListing(item.name)) models.push(item);
+    else kept.push(item);
+  }
+  if (!models.length) return items;
+  const latest = models.slice().sort((a, b) => (b.date ?? '').localeCompare(a.date ?? ''))[0]!;
+  kept.push({ ...latest, name: 'New models on AI Gateway', description: '' });
+  return kept;
+}
+
 /** Minor Vercel settings/policy cards collapse to one monthly platform line. A lone knob drops. */
 export function rollupPlatformSettings<T extends Polishable>(items: T[]): T[] {
   const minor: T[] = [];
@@ -1168,6 +1230,10 @@ export function polishCandidates<T extends Polishable>(items: T[], opts: PolishO
       drop(item, 'docs-href');
       continue;
     }
+    if (isUnnotableCompanyRepo({ ...item, name }) && !flagship) {
+      drop(item, 'company-github');
+      continue;
+    }
     if (opts.owner && !ownedByBuilder({ ...item, name }, opts.owner)) {
       if (flagship) logFlagshipGate(item, 'not-owned', flagship);
       else {
@@ -1219,7 +1285,9 @@ export function polishCandidates<T extends Polishable>(items: T[], opts: PolishO
   if (models.length < packaged.length) drop({ name: `${packaged.length - models.length} model notes` }, 'model-rollup');
   const platform = rollupPlatformSettings(models);
   if (platform.length < models.length) drop({ name: `${models.length - platform.length} platform settings` }, 'platform-rollup');
-  const inherited = inheritDates(platform);
+  const gateway = rollupGatewayModels(platform);
+  if (gateway.length < platform.length) drop({ name: `${platform.length - gateway.length} gateway models` }, 'gateway-rollup');
+  const inherited = inheritDates(gateway);
   const unique = dedupeNormalized(inherited);
   if (unique.length < inherited.length) drop({ name: `${inherited.length - unique.length} duplicate names` }, 'name-dedupe');
   const capped = capUndated(unique, drop);

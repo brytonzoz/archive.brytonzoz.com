@@ -636,9 +636,9 @@ export function itemsFromTimedHeadings(html: string, url: string, year: number):
   }));
   for (let i = 0; i < times.length; i++) {
     const start = times[i].end;
-    const end = i + 1 < times.length ? times[i + 1].index : Math.min(html.length, start + 12_000);
+    const end = i + 1 < times.length ? times[i + 1].index : Math.min(html.length, start + 40_000);
     const chunk = html.slice(start, end);
-    const headings = [...chunk.matchAll(/<h[2-4]\b[^>]*>([\s\S]*?)<\/h[2-4]>/gi)].slice(0, 24);
+    const headings = [...chunk.matchAll(/<h[2-4]\b[^>]*>([\s\S]*?)<\/h[2-4]>/gi)].slice(0, 80);
     for (const heading of headings) {
       add(times[i].date, heading[1], headingHref(chunk, heading.index ?? 0, heading[1], url));
     }

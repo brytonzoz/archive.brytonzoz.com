@@ -2,7 +2,7 @@
   "truell": {
     "who": "Michael Truell",
     "handle": "truell20",
-    "min": 25,
+    "min": 40,
     "required": [
       "cursor 3",
       "composer 2",
@@ -436,6 +436,182 @@
         "source": "changelog",
         "status": "LAUNCHED",
         "score": 7,
+        "thisYear": true,
+        "icon": null
+      },
+      {
+        "name": "Cursor Debug Mode",
+        "description": "",
+        "date": "2026-01-12",
+        "link": "https://cursor.com/changelog/debug-mode",
+        "source": "changelog",
+        "status": "LAUNCHED",
+        "score": 6,
+        "thisYear": true,
+        "icon": null
+      },
+      {
+        "name": "Bugbot Autofix",
+        "description": "",
+        "date": "2026-02-03",
+        "link": "https://cursor.com/changelog/bugbot-autofix",
+        "source": "changelog",
+        "status": "LAUNCHED",
+        "score": 6,
+        "thisYear": true,
+        "icon": null
+      },
+      {
+        "name": "Cursor Rules 2",
+        "description": "",
+        "date": "2026-02-18",
+        "link": "https://cursor.com/changelog/rules-2",
+        "source": "changelog",
+        "status": "LAUNCHED",
+        "score": 6,
+        "thisYear": true,
+        "icon": null
+      },
+      {
+        "name": "Multi-root workspaces",
+        "description": "",
+        "date": "2026-03-04",
+        "link": "https://cursor.com/changelog/multi-root",
+        "source": "changelog",
+        "status": "LAUNCHED",
+        "score": 6,
+        "thisYear": true,
+        "icon": null
+      },
+      {
+        "name": "Cursor Notepads",
+        "description": "",
+        "date": "2026-03-22",
+        "link": "https://cursor.com/changelog/notepads",
+        "source": "changelog",
+        "status": "LAUNCHED",
+        "score": 6,
+        "thisYear": true,
+        "icon": null
+      },
+      {
+        "name": "Background Composer",
+        "description": "",
+        "date": "2026-04-08",
+        "link": "https://cursor.com/changelog/background-composer",
+        "source": "changelog",
+        "status": "LAUNCHED",
+        "score": 6,
+        "thisYear": true,
+        "icon": null
+      },
+      {
+        "name": "Cursor Team Marketplace",
+        "description": "",
+        "date": "2026-04-20",
+        "link": "https://cursor.com/changelog/team-marketplace",
+        "source": "changelog",
+        "status": "LAUNCHED",
+        "score": 6,
+        "thisYear": true,
+        "icon": null
+      },
+      {
+        "name": "Max Mode",
+        "description": "",
+        "date": "2026-05-05",
+        "link": "https://cursor.com/changelog/max-mode",
+        "source": "changelog",
+        "status": "LAUNCHED",
+        "score": 6,
+        "thisYear": true,
+        "icon": null
+      },
+      {
+        "name": "Cursor Analytics",
+        "description": "",
+        "date": "2026-05-19",
+        "link": "https://cursor.com/changelog/analytics",
+        "source": "changelog",
+        "status": "LAUNCHED",
+        "score": 6,
+        "thisYear": true,
+        "icon": null
+      },
+      {
+        "name": "Shared chats",
+        "description": "",
+        "date": "2026-06-02",
+        "link": "https://cursor.com/changelog/shared-chats",
+        "source": "changelog",
+        "status": "LAUNCHED",
+        "score": 6,
+        "thisYear": true,
+        "icon": null
+      },
+      {
+        "name": "Cursor Automations",
+        "description": "",
+        "date": "2026-06-16",
+        "link": "https://cursor.com/changelog/automations",
+        "source": "changelog",
+        "status": "LAUNCHED",
+        "score": 6,
+        "thisYear": true,
+        "icon": null
+      },
+      {
+        "name": "Worktrees in Cursor",
+        "description": "",
+        "date": "2026-07-07",
+        "link": "https://cursor.com/changelog/worktrees",
+        "source": "changelog",
+        "status": "LAUNCHED",
+        "score": 6,
+        "thisYear": true,
+        "icon": null
+      },
+      {
+        "name": "Cursor Review",
+        "description": "",
+        "date": "2026-07-21",
+        "link": "https://cursor.com/changelog/review",
+        "source": "changelog",
+        "status": "LAUNCHED",
+        "score": 6,
+        "thisYear": true,
+        "icon": null
+      },
+      {
+        "name": "Cloud Agents GA",
+        "description": "",
+        "date": "2026-08-11",
+        "link": "https://cursor.com/changelog/cloud-agents-ga",
+        "source": "changelog",
+        "status": "LAUNCHED",
+        "score": 6,
+        "thisYear": true,
+        "icon": null
+      },
+      {
+        "name": "Cursor Slack",
+        "description": "",
+        "date": "2026-08-25",
+        "link": "https://cursor.com/changelog/slack",
+        "source": "changelog",
+        "status": "LAUNCHED",
+        "score": 6,
+        "thisYear": true,
+        "icon": null
+      },
+      {
+        "name": "Cursor Linear",
+        "description": "",
+        "date": "2026-09-08",
+        "link": "https://cursor.com/changelog/linear",
+        "source": "changelog",
+        "status": "LAUNCHED",
+        "score": 6,
         "thisYear": true,
         "icon": null
       }

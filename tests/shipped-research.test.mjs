@@ -191,7 +191,7 @@ test('cashier note and stats are specific to the items, never stock copy', () =>
   const punch = ai.pickBestNote(
     [
       'The pair is PhotoAI and InteriorAI.',
-      'SuperLevels is sitting at 553 GitHub stars.',
+      'SuperLevels is sitting at 553 GitHub stars after the April push.',
       'Pieter launched PhotoAI and two more .coms. The receipt looks like a weekend.',
     ],
     items,
@@ -248,14 +248,20 @@ test('cashier note and stats are specific to the items, never stock copy', () =>
     null,
   );
   assert.equal(
-    ai.hardRejectNote('Codex app took the desktop.', ceoItems, [], {
+    ai.hardRejectNote('Codex app took the desktop and then the browser.', ceoItems, [], {
       who: 'Sam Altman',
       company: 'OpenAI',
       usedNotes: ['Codex app took the desktop and then a longer stored sentence.'],
     }),
     null,
   );
-  assert.equal(ai.hardRejectNote('Codex app took the desktop.', ceoItems, [], { who: 'Sam', usedNotes: ['Codex app took the desktop.'] }), 'duplicate');
+  assert.equal(
+    ai.hardRejectNote('Codex app took the desktop and then the browser.', ceoItems, [], {
+      who: 'Sam',
+      usedNotes: ['Codex app took the desktop and then the browser.'],
+    }),
+    'duplicate',
+  );
   assert.equal(ai.hardRejectNote('The pair is Codex app and Sora.', ceoItems, [], { who: 'Sam Altman' }), 'banned-phrase');
   assert.equal(
     ai.hardRejectNote(
@@ -268,7 +274,7 @@ test('cashier note and stats are specific to the items, never stock copy', () =>
   );
   assert.equal(
     ai.hardRejectNote(
-      'Tony shipped youtube-sponsor-detection and kept going.',
+      'Tony shipped youtube-sponsor-detection and kept the rest of the year moving.',
       [{ name: 'YOUTUBE-SPONSOR-DETECTION', spoken: 'youtube-sponsor-detection' }],
       [],
       { who: 'Tony Dinh', handle: 'tdinh' },
@@ -392,7 +398,10 @@ test('cashier note and stats are specific to the items, never stock copy', () =>
     { who: 'Stephanj' },
   );
   assert.match(fallback, /language servers|MCP/i);
-  assert.doesNotMatch(fallback, /showed up|stuck/i);
+  assert.doesNotMatch(fallback, /showed up|stuck|shipped this year|is a product/i);
+  assert.equal(ai.hardRejectNote('ChatGPT for Education opens in a new window.', [{ name: 'CHATGPT FOR EDUCATION', spoken: 'ChatGPT for Education' }], [], { who: 'Sam Altman' }), 'banned-phrase');
+  assert.equal(ai.hardRejectNote('Frizz is a product that shipped this year.', [{ name: 'FRIZZ', spoken: 'Frizz' }], [], { who: 'Colin McDonnell' }), 'banned-phrase');
+  assert.equal(ai.hardRejectNote('Frizz shipped.', [{ name: 'FRIZZ', spoken: 'Frizz' }], [], { who: 'Colin McDonnell' }), 'too-short');
   const sealed = ai.finish(
     [{ name: 'PHOTOAI', spoken: 'PhotoAI', description: 'headshots', date: '2026-01-20', status: 'LAUNCHED', link: 'https://photoai.com', icon: null, source: 'site' }],
     '',
@@ -417,7 +426,7 @@ test('cashier note and stats are specific to the items, never stock copy', () =>
   const draft = ai.validateDraft(
     {
       items: items.map((item) => ({ name: item.name, description: item.description, date: item.date, status: item.status, link: item.link })),
-      note: 'SuperLevels is sitting at 553 GitHub stars.',
+      note: 'SuperLevels is sitting at 553 GitHub stars after the April push.',
       stats: ['553 GitHub stars SuperLevels · github.com/levelsio/superlevels'],
     },
     {

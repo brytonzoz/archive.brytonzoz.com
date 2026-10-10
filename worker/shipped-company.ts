@@ -4,7 +4,7 @@
 import { extraResearchPaths, itemsFromProjectList } from './shipped-research';
 import { looksLikeNotAShip } from './shipped-decisions';
 import { flagshipLaunchName, flagshipProbePaths, knownFlagshipDate, logFlagshipGate } from './shipped-flagship';
-import { prettyBrand } from './shipped-polish';
+import { isPrereleaseShip, prettyBrand, versionParts } from './shipped-polish';
 import { companyOrgGuess, companyScope, companySlug, companyTokens, leadProductTokens, type Affiliation } from './shipped-affiliation';
 import { type XaiEnv, type XaiSpend, emptyXaiSpend } from './shipped-xai';
 import { stripVia, type CompanyStore } from './shipped-company-store';
@@ -183,6 +183,11 @@ export function compactCompanyFound(found: Found[], cap = COMPANY_CACHE_CAP): Fo
     if (/\bv0\b/i.test(name) || /\/(blog|changelog)\/(?:introducing-the-new-)?v0\b/i.test(url)) n += 110;
     if (/\bvercel agent\b/i.test(name) || /\/changelog\/vercel-agent\b/i.test(url)) n += 90;
     if (/\bcodex cloud\b/i.test(name) || /\/codex\/cloud(?:\/|$)/i.test(url)) n += 70;
+    if (/vercel\.com\/changelog\//i.test(url)) n += 90;
+    if (/github\.com\/(vercel|openai)\//i.test(url)) n -= 70;
+    if (item.source === 'company' && /github\.com\//i.test(url)) n -= 50;
+    if (/\bcodex\b/i.test(name) && !versionParts(name)) n += 50;
+    if (versionParts(name) && !flagshipLaunchName(item) && !isCompactMustKeep(item)) n -= 45;
     if (/\/(blog|news|research)\//i.test(url) && !/changelog|\/index\//i.test(url)) n -= 20;
     if (looksLikeNotAShip(item) && !flagshipLaunchName(item)) n -= 80;
     if (/\b(bug fixes?|get started|configuration details|see setup)\b/i.test(name)) n -= 60;
@@ -208,15 +213,26 @@ export function compactCompanyFound(found: Found[], cap = COMPANY_CACHE_CAP): Fo
     if (/openai\.com\/(sora|device|index)\b/i.test(url) && !/\bcodex\b/i.test(name)) return true;
     return /\b(gpt-?\d|chatgpt|sora|atlas|v0)\b/i.test(name) && !/\bcodex\b/i.test(name);
   };
+  const isNamedCodex = (item: Found) => {
+    const name = item.name || '';
+    const url = item.link || '';
+    if (!/\bcodex\b/i.test(name) && !/\/codex\b/i.test(url)) return false;
+    return !versionParts(name);
+  };
   const must = ranked.filter(isCompactMustKeep).sort(byWeight);
   const wide = ranked.filter((item) => !isCompactMustKeep(item) && isWide(item)).sort(byWeight);
-  const rest = ranked.filter((item) => !isCompactMustKeep(item) && !isWide(item)).sort(byWeight);
+  const namedCodex = ranked.filter((item) => !isCompactMustKeep(item) && !isWide(item) && isNamedCodex(item)).sort(byWeight);
+  const rest = ranked.filter((item) => !isCompactMustKeep(item) && !isWide(item) && !isNamedCodex(item)).sort(byWeight);
   const seen = new Set<string>();
   const out: Found[] = [];
-  const wideCap = Math.min(80, Math.max(40, Math.floor(cap * 0.4)));
+  const sliceCap = Math.min(80, Math.max(8, Math.floor(cap * 0.4)));
   for (const item of must) accept(item, seen, out);
   for (const item of wide) {
-    if (out.filter(isWide).length >= wideCap) break;
+    if (out.filter(isWide).length >= sliceCap) break;
+    accept(item, seen, out);
+  }
+  for (const item of namedCodex) {
+    if (out.filter(isNamedCodex).length >= sliceCap) break;
     accept(item, seen, out);
   }
   for (const item of rest) accept(item, seen, out);
@@ -480,7 +496,7 @@ async function pagesForCompany(
     }
   }
   if (changelogFollow.length) {
-    const more = await mapLimit(changelogFollow.slice(0, 28), 6, (url) => readCompanyPage(url, ctx?.blocked));
+    const more = await mapLimit(changelogFollow.slice(0, 60), 6, (url) => readCompanyPage(url, ctx?.blocked));
     for (const page of more) absorb(page);
   }
   return { found, feeds, extraHosts, tinyfish: usedTinyfish };
@@ -567,7 +583,7 @@ async function hydrateChangelogEntryDates(found: Found[], year: number, ctx?: Fe
     if (seen.has(url)) return false;
     seen.add(url);
     return true;
-  }).slice(0, 28);
+  }).slice(0, 48);
   if (!unique.length) return found;
   const pages = await mapLimit(unique, 6, (item) => fetchText(item.link as string, 160_000, undefined, ctx?.blocked));
   const byUrl = new Map(unique.map((item, i) => [item.link, pages[i]]));
@@ -630,6 +646,7 @@ async function githubOrgShips(org: string, env: SourceEnv, year: number): Promis
     name?: string;
     html_url?: string;
     description?: string;
+    homepage?: string | null;
     pushed_at?: string;
     created_at?: string;
     stargazers_count?: number;
@@ -637,18 +654,28 @@ async function githubOrgShips(org: string, env: SourceEnv, year: number): Promis
   }[];
   if (!Array.isArray(repos)) return [];
   const own = repos.filter((repo) => !repo.fork);
-  const createdThisYear = own.filter((repo) => typeof repo.created_at === 'string' && repo.created_at.startsWith(String(year)));
+  const notable = own.filter((repo) => {
+    if (typeof repo.created_at !== 'string' || !repo.created_at.startsWith(String(year))) return false;
+    if ((repo.stargazers_count ?? 0) < 200) return false;
+    const home = String(repo.homepage || '').trim();
+    if (!home || /github\.com/i.test(home)) return false;
+    const name = clean(repo.name, 60);
+    if (isPrereleaseShip(name) || /\b(starter|course|action|example|template|foundations|academy|rules?)\b/i.test(name)) {
+      return false;
+    }
+    return true;
+  });
   const releaseItems = await githubOrgReleases(login, own, env, year).catch(() => []);
-  const repoItems = createdThisYear
-    .slice(0, 40)
+  const repoItems = notable
+    .slice(0, 20)
     .map((repo): Found => {
-      const created = typeof repo.created_at === 'string' && repo.created_at.startsWith(String(year));
+      const home = publicUrl(String(repo.homepage || '').trim());
       return {
         name: clean(repo.name, 60),
         description: clean(repo.description, 140),
-        date: created && repo.created_at ? repo.created_at.slice(0, 10) : repo.pushed_at ? repo.pushed_at.slice(0, 10) : null,
-        dateConfidence: created ? 'exact' : 'inferred',
-        link: publicUrl(repo.html_url),
+        date: repo.created_at ? repo.created_at.slice(0, 10) : null,
+        dateConfidence: 'exact',
+        link: home || publicUrl(repo.html_url),
         icon: null,
         source: 'company',
         status: 'SHIPPED',
@@ -682,9 +709,11 @@ async function githubOrgReleases(
         signal: AbortSignal.timeout(7000),
       })
         .then(async (response) =>
-          response.ok ? ((await response.json()) as { name?: string; tag_name?: string; html_url?: string; published_at?: string; body?: string }[]) : [],
+          response.ok
+            ? ((await response.json()) as { name?: string; tag_name?: string; html_url?: string; published_at?: string; body?: string; prerelease?: boolean }[])
+            : [],
         )
-        .catch(() => [] as { name?: string; tag_name?: string; html_url?: string; published_at?: string; body?: string }[]),
+        .catch(() => [] as { name?: string; tag_name?: string; html_url?: string; published_at?: string; body?: string; prerelease?: boolean }[]),
     ),
   );
   const found: Found[] = [];
@@ -696,6 +725,7 @@ async function githubOrgReleases(
       const name = clean(release.name || release.tag_name, 60);
       const link = publicUrl(release.html_url);
       if (!name || !link) continue;
+      if (isPrereleaseShip(name) || (release as { prerelease?: boolean }).prerelease) continue;
       found.push({
         name,
         description: clean(release.body, 140),
@@ -858,7 +888,7 @@ export async function harvestCompany(opts: {
   if (opts.storeOnly) {
     return { found: [], spend: emptyXaiSpend(), ran: ['company-store-miss'], cacheHit: false };
   }
-  const cacheKey = opts.deep ? `company:deep:v18:${year}:${slug}` : `company:v18:${year}:${slug}`;
+  const cacheKey = opts.deep ? `company:deep:v19:${year}:${slug}` : `company:v19:${year}:${slug}`;
   const load = async (): Promise<CompanyHarvest> => {
     const via = viaFor(affiliation);
     const ran: string[] = [];

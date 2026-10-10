@@ -8,7 +8,7 @@
     },
     { "company": "Anthropic", "products": ["Claude"], "sites": ["https://www.anthropic.com/", "https://docs.anthropic.com/"] },
     { "company": "Cursor", "products": ["Cursor"], "sites": ["https://cursor.com/", "https://docs.cursor.com/"] },
-    { "company": "Vercel", "sites": ["https://vercel.com/"] },
+    { "company": "Vercel", "sites": ["https://vercel.com/", "https://vercel.com/changelog"] },
     { "company": "Replit", "sites": ["https://replit.com/", "https://blog.replit.com/"] },
     { "company": "Higgsfield", "sites": ["https://higgsfield.ai/"] },
     { "company": "xAI", "products": ["Grok"], "sites": ["https://x.ai/"] },

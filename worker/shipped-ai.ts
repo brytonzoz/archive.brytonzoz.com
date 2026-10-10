@@ -6,7 +6,7 @@ import type { ItemStatus, Subject } from '../lib/shipped-year';
 import { ITEM_STATUSES } from '../lib/shipped-year';
 import { hasBlockedWord } from '../lib/shipped-sponsors';
 import { REQUIRED_MODULES, sanitizeLayout, type ModuleId } from '../lib/shipped-modules';
-import { clean, hostOf, inYearCount, publicUrl, type Found, type Gathered } from './shipped-sources';
+import { clean, hostOf, inYearCount, publicUrl, readSite, type Found, type Gathered } from './shipped-sources';
 import { shipName } from './shipped-changelog';
 import { shareKeywords } from './shipped-decisions';
 import { ownerFromProfile, type OwnerContext } from './shipped-ownership';
@@ -213,7 +213,7 @@ export function noteMisusesStats(note: string, count: number, stats: string[] = 
 }
 
 const BANNED_NOTE_SHAPE =
-  /kept \w[\w.]* busy:|(^|[.!?]\s+)\S[\w.]* first,\s+\S.+ later|spent the (rest of the )?year on |kept stacking|people will remember|\bthe sleeper\b|the loud one|slipped .+ beside|\bthe pair is\b|\bdoes one job\b|\bdoes another\b|\bopens on\b|\bopened the year\b|\byear opens\b|\bno encore\b|\bthe bio\b.{0,48}\b(talking|menu|heavy lifting)\b|\bvibes bio\b|\breceipt is just the receipt\b|\bworth a second look\b.{0,80}\bthe rest\b|\bthin (receipt|tape)\b|\bentries,\s+most of them\b|\bshowed up\b|\bis the one that stuck\b|\bkeeps coming back\b|\breceipts?, and\b/i;
+  /kept \w[\w.]* busy:|(^|[.!?]\s+)\S[\w.]* first,\s+\S.+ later|spent the (rest of the )?year on |kept stacking|people will remember|\bthe sleeper\b|the loud one|slipped .+ beside|\bthe pair is\b|\bdoes one job\b|\bdoes another\b|\bopens on\b|\bopened the year\b|\byear opens\b|\bno encore\b|\bthe bio\b.{0,48}\b(talking|menu|heavy lifting)\b|\bvibes bio\b|\breceipt is just the receipt\b|\bworth a second look\b.{0,80}\bthe rest\b|\bthin (receipt|tape)\b|\bentries,\s+most of them\b|\bshowed up\b|\bis the one that stuck\b|\bkeeps coming back\b|\breceipts?, and\b|\bopens in a new window\b|\bshipped this year\b|\bis a product\b/i;
 
 const MISSING_DATA_NOTE =
   /\b(no description|without a description|with no description|lacks a description|has no description|went out with no|missing (a )?(description|date|copy)|undated|no date|without (a )?date|has no date)\b/i;
@@ -507,6 +507,7 @@ export function hardRejectNote(
   if (noteAlreadyUsed(text, ctx.usedNotes ?? [])) return 'duplicate';
   if (noteCitesUnknownShip(text, items, ctx)) return 'unknown-ship';
   if (noteCitesOtherPerson(text, items, ctx)) return 'other-person';
+  if (text.split(/\s+/).filter(Boolean).length < 8) return 'too-short';
   return null;
 }
 
@@ -549,7 +550,8 @@ export function scoreCashierNote(
   const detail = noteDescriptionOverlap(text, items);
   if (detail >= 2) score += 16;
   else if (detail === 1) score += 8;
-  if (/\bis a \w+(?:\s+\w+){0,3} that shipped this year\.?$/i.test(text)) score -= 10;
+  if (/\bis a \w+(?:\s+\w+){0,3} that shipped this year\.?$/i.test(text)) score -= 24;
+  if (/\bopens in a new window\b|\bis a product\b/i.test(text)) score -= 24;
   return score;
 }
 
@@ -690,7 +692,7 @@ export function sentenceFallbackNote(items: DraftItem[], ctx: NoteContext = {}):
     does ? `${spoken} ${lead}.`.replace(/\.\.$/, '.') : '',
     does ? `${spoken} is the one on this tape: ${does}.` : '',
     who && does ? `${spoken} is ${who}'s ${kind}: ${lead}.` : '',
-    `${spoken} is a ${kind} that shipped this year.`,
+    does ? `${spoken} does one concrete thing: ${lead}.`.replace(/does one concrete thing: does /i, '') : '',
   ].filter(Boolean);
   for (const note of candidates) {
     if (hardRejectNote(note, items, [], ctx)) continue;
@@ -698,7 +700,8 @@ export function sentenceFallbackNote(items: DraftItem[], ctx: NoteContext = {}):
     if (!printable(note)) continue;
     return clipSentence(note, 140);
   }
-  return clipSentence(`${spoken} is a ${kind} that shipped this year.`, 140);
+  if (does) return clipSentence(`${spoken} ${lead}.`.replace(/\.\.$/, '.'), 140);
+  return clipSentence(`${spoken} is the one public ship here, and that is the whole story.`, 140);
 }
 
 /** Last resort only: the notable ship name. No sentence costume. */
@@ -820,6 +823,28 @@ function affiliationFromCtx(ctx: NoteContext): Affiliation | null {
 }
 
 /** Harvest already verified the lines. Date order, significance already on each item. */
+/** Fill empty item descriptions from the page title / meta description before notes. */
+export async function hydrateItemDescriptions<T extends { name?: string; description?: string; link?: string | null }>(
+  items: T[],
+): Promise<T[]> {
+  const need = items
+    .map((item, index) => ({ item, index }))
+    .filter(({ item }) => !cleanDescription(item.description) && item.link)
+    .slice(0, 8);
+  if (!need.length) return items;
+  const out = items.slice();
+  await Promise.all(
+    need.map(async ({ item, index }) => {
+      const page = await readSite(item.link as string).catch(() => null);
+      const desc = cleanDescription(page?.description || page?.title || '');
+      if (!desc) return;
+      if (loose(desc) === loose(item.name || '')) return;
+      out[index] = { ...item, description: desc };
+    }),
+  );
+  return out;
+}
+
 export function harvestItems(gathered: Gathered, year: number): DraftItem[] {
   const seen = new Set<string>();
   const items: DraftItem[] = [];
@@ -980,7 +1005,8 @@ function noteOnlySystem(year: number, affiliation?: Affiliation | null, count = 
     'If you name a person, it must be this customer (their name or handle only). Never another person — including a name hiding inside a repo (jev-tetris is a product, not Jev).',
     'Never mention a missing description, missing date, or that something shipped without copy.',
     'Reuse a concrete detail from the item description — what the ship does. Thin tapes still get one specific line about that one ship.',
-    'Do not write "showed up", "is the one that stuck", or "N receipts, and X keeps coming back".',
+    'Do not write "showed up", "is the one that stuck", "opens in a new window", "shipped this year", "is a product", or "N receipts, and X keeps coming back".',
+    'Every note is at least 8 words. Never scrape UI chrome into the note.',
     'Do not restate two item names and a month as the whole note. Do not talk down a thin tape or say the bio does the talking.',
     desk,
     'The bar (do not copy these, and never write about these invented people):',
@@ -1235,7 +1261,7 @@ export async function assembleReceipt(
 ): Promise<AiResult> {
   const model = env.SHIPPED_MODEL || DEFAULT_MODEL;
   const searches = maxSearches(env);
-  const harvested = harvestItems(gathered, year);
+  const harvested = await hydrateItemDescriptions(harvestItems(gathered, year));
   const xaiRan = gathered.ran.some((tag) => tag.startsWith('xai-') && !tag.startsWith('xai-skipped'));
   const allowed = new Allowed();
   for (const item of gathered.found) allowed.add(item.link);

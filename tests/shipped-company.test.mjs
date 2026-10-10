@@ -374,6 +374,42 @@ test('compact force-keeps v0, Sora, Images, and Codex Cloud under a dump', () =>
   assert.ok(compact.some((item) => /codex cloud/i.test(item.name)), JSON.stringify(compact.map((i) => i.name)));
 });
 
+test('OpenAI compact keeps named Codex features when version dumps fill the rest', () => {
+  const dump = Array.from({ length: 160 }, (_, i) => ({
+    name: `Codex CLI 0.${i}.0`,
+    description: '',
+    date: '2026-07-21',
+    link: `https://developers.openai.com/codex/changelog#v0-${i}`,
+    source: 'changelog',
+    status: 'LAUNCHED',
+    score: 7,
+    thisYear: true,
+  }));
+  const named = [
+    {
+      name: 'Codex worktrees',
+      date: '2026-05-18',
+      link: 'https://developers.openai.com/codex/worktrees',
+      source: 'changelog',
+      status: 'LAUNCHED',
+      score: 6,
+      thisYear: true,
+    },
+    {
+      name: 'Codex sandbox',
+      date: '2026-09-06',
+      link: 'https://developers.openai.com/codex/sandbox',
+      source: 'changelog',
+      status: 'LAUNCHED',
+      score: 6,
+      thisYear: true,
+    },
+  ].map((row) => ({ description: '', icon: null, ...row }));
+  const compact = company.compactCompanyFound([...dump, ...named], 20);
+  assert.ok(compact.some((item) => /worktrees/i.test(item.name)), JSON.stringify(compact.map((i) => i.name)));
+  assert.ok(compact.some((item) => /sandbox/i.test(item.name)), JSON.stringify(compact.map((i) => i.name)));
+});
+
 test('OpenAI compact reserves company-wide launches beside a Codex dump', () => {
   const dump = Array.from({ length: 180 }, (_, i) => ({
     name: `Codex CLI 0.${i}.0`,

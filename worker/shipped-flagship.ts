@@ -67,11 +67,17 @@ function titleCaseProduct(raw: string): string {
 
 const DATE_SUFFIX =
   /\s*[·|,]\s*(?:jan(?:uary)?|feb(?:ruary)?|mar(?:ch)?|apr(?:il)?|may|jun(?:e)?|jul(?:y)?|aug(?:ust)?|sep(?:t(?:ember)?)?|oct(?:ober)?|nov(?:ember)?|dec(?:ember)?)\s+\d{1,2}(?:st|nd|rd|th)?(?:,?\s+20\d{2})?\s*$/i;
+const PRODUCT_DATE_SUFFIX =
+  /\s+product\s+(?:jan(?:uary)?|feb(?:ruary)?|mar(?:ch)?|apr(?:il)?|may|jun(?:e)?|jul(?:y)?|aug(?:ust)?|sep(?:t(?:ember)?)?|oct(?:ober)?|nov(?:ember)?|dec(?:ember)?)\s+\d{1,2}(?:st|nd|rd|th)?(?:,?\s+20\d{2})?\s*$/i;
+const BUILD_SUFFIX = /\s+\d{2}\.\d{2,4}\s*$/;
 
-/** `ORIGIN · SEP 14, 2026` / `CURSOR WEB · CLOUD AGENTS · SEP 14` → the product name. */
+/** `ORIGIN · SEP 14, 2026` / `GPT-6.1 SOL PRODUCT SEP 29, 2026` → the product name. */
 export function stripDateSuffix(text: string): string {
   let out = tidy(text);
-  out = out.replace(DATE_SUFFIX, '').replace(/\s*[·|]\s+\d{4}-\d{2}-\d{2}\s*$/, '');
+  out = out.replace(DATE_SUFFIX, '').replace(PRODUCT_DATE_SUFFIX, '');
+  out = out.replace(/\s+product\s*$/i, '');
+  if (out.split(/\s+/).filter(Boolean).length >= 5) out = out.replace(BUILD_SUFFIX, '');
+  out = out.replace(/\s*[·|]\s+\d{4}-\d{2}-\d{2}\s*$/, '');
   out = out.replace(/\s*[·|]\s*$/, '').trim();
   return out;
 }

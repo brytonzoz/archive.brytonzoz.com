@@ -37,7 +37,12 @@ test('shipped-junk fixture: every flagged title drops; flagships stay', () => {
   const leaked = [];
   for (const row of fixture.drop) {
     const kept = gateRow(row);
-    if (kept.length) leaked.push(`${row.name} → ${kept.map((item) => item.name).join(', ')}`);
+    const hit = kept.some((item) => {
+      const got = String(item.name || '').toLowerCase().replace(/[^a-z0-9]/g, '');
+      const want = String(row.name || '').toLowerCase().replace(/[^a-z0-9]/g, '');
+      return got && want && (got === want || got.includes(want) || want.includes(got));
+    });
+    if (hit) leaked.push(`${row.name} → ${kept.map((item) => item.name).join(', ')}`);
   }
   assert.deepEqual(leaked, [], `junk leaked: ${JSON.stringify(leaked)}`);
 

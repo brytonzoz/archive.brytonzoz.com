@@ -19,12 +19,8 @@ export const LIVE_RECEIPT_SPECS = {
 
 export const LIVE_RECEIPT_IDS = [6, 7, 13, 16, 17, 18, 19, 20, 21, 22];
 
-/** Live tapes roll versions and scope leads; fixture mins stay fat for cached E2E. */
-export const LIVE_SPEC_OVERRIDE = {
-  tibo: { min: 15 },
-  sam: { min: 15 },
-  rauch: { min: 25 },
-};
+/** Floors are the fixture mins. Do not lower them for live reprints. */
+export const LIVE_SPEC_OVERRIDE = {};
 
 const THIN_NOTE =
   /\bshowed up\b|\bis the one that stuck\b|\bkeeps coming back\b|\breceipts?, and\b/i;

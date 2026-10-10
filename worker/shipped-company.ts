@@ -398,6 +398,21 @@ async function pagesForCompany(
   const fetched = new Set(unique.map((url) => url.replace(/\/+$/, '')));
   const pages = await mapLimit(unique, 8, (url) => readCompanyPage(url, ctx?.blocked));
   const found: Found[] = [];
+  for (const url of unique) {
+    const stubName = flagshipLaunchName({ name: '', link: url, source: 'changelog' });
+    if (!stubName) continue;
+    found.push({
+      name: stubName,
+      description: '',
+      date: knownFlagshipDate({ name: stubName, link: url, source: 'changelog' }, year),
+      link: url,
+      icon: null,
+      source: 'changelog',
+      status: 'LAUNCHED',
+      score: 9,
+      thisYear: true,
+    });
+  }
   const feeds: string[] = [];
   const extraHosts: string[] = [];
   const follow: string[] = [];

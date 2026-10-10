@@ -131,6 +131,9 @@ test('Cursor flagship probe paths cover Cursor 3 / Bugbot / Origin', async () =>
   assert.ok(openai.some((path) => /\/index\/gpt-6/.test(path)));
   assert.ok(openai.some((path) => /\/sora/.test(path)));
   assert.ok(openai.some((path) => /\/device/.test(path)));
+  assert.equal(flagship.flagshipLaunchName({ name: '', link: 'https://openai.com/sora', source: 'changelog' }), 'Sora');
+  assert.equal(flagship.flagshipLaunchName({ name: '', link: 'https://openai.com/index/chatgpt-images', source: 'changelog' }), 'ChatGPT Images');
+  assert.equal(flagship.flagshipLaunchName({ name: '', link: 'https://openai.com/device', source: 'changelog' }), 'OpenAI Device');
 });
 
 test('Vercel day headings plus bullets assume the harvest year', () => {

@@ -3,7 +3,7 @@
 // releases, and App Store version rows. No per-company URL tables.
 import { extraResearchPaths, itemsFromProjectList } from './shipped-research';
 import { looksLikeNotAShip } from './shipped-decisions';
-import { flagshipLaunchName, knownFlagshipDate, logFlagshipGate } from './shipped-flagship';
+import { flagshipLaunchName, flagshipProbePaths, knownFlagshipDate, logFlagshipGate } from './shipped-flagship';
 import { prettyBrand } from './shipped-polish';
 import { companyOrgGuess, companyScope, companySlug, companyTokens, leadProductTokens, type Affiliation } from './shipped-affiliation';
 import { type XaiEnv, type XaiSpend, emptyXaiSpend } from './shipped-xai';
@@ -335,6 +335,7 @@ async function pagesForCompany(
   year: number,
   product: string | null,
   ctx?: FetchCtx,
+  company?: string | null,
 ): Promise<{ found: Found[]; feeds: string[]; extraHosts: string[]; tinyfish: boolean }> {
   const base = publicUrl(site);
   if (!base) return { found: [], feeds: [], extraHosts: [], tinyfish: false };
@@ -344,6 +345,7 @@ async function pagesForCompany(
     `${root}/`,
     ...productPaths(product).map((path) => `${root}${path}`),
     ...COMPANY_PATHS.filter(changelogFirst).map((path) => `${root}${path}`),
+    ...flagshipProbePaths(company || product).map((path) => `${root}${path}`),
     ...COMPANY_PATHS.filter((path) => !changelogFirst(path)).map((path) => `${root}${path}`),
     ...extraResearchPaths(base),
   ];
@@ -411,9 +413,16 @@ function isIndexShipPath(url: string): boolean {
   }
 }
 
+function feedPriority(url: string): number {
+  if (/\/changelog\/(rss|feed|atom)/i.test(url)) return 0;
+  if (/changelog/i.test(url)) return 1;
+  if (/\.(xml)$/i.test(url)) return 2;
+  return 3;
+}
+
 async function harvestFeeds(urls: string[], year: number, ctx?: FetchCtx): Promise<Found[]> {
-  const unique = [...new Set(urls)].slice(0, 10);
-  const pages = await mapLimit(unique, 4, (url) => fetchText(url, 4_000_000, undefined, ctx?.blocked));
+  const unique = [...new Set(urls)].sort((a, b) => feedPriority(a) - feedPriority(b) || a.length - b.length).slice(0, 14);
+  const pages = await mapLimit(unique, 4, (url) => fetchText(url, 8_000_000, undefined, ctx?.blocked));
   const found: Found[] = [];
   const absorb = (text: string) => found.push(...itemsFromFeedXml(text, year).map(asFound));
   for (const page of pages) {
@@ -743,7 +752,7 @@ export async function harvestCompany(opts: {
     const takePages = async (site: string, tag: string) => {
       const host = hostOf(site);
       if (!host || seenHost.has(host)) return false;
-      const pageItems = await pagesForCompany(site, year, affiliation.product, ctx);
+      const pageItems = await pagesForCompany(site, year, affiliation.product, ctx, affiliation.company);
       if (!pageItems.found.length && !pageItems.feeds.length && !pageItems.extraHosts.length) return false;
       seenHost.add(host);
       liveOrigins.push(site);

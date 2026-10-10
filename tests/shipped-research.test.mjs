@@ -285,6 +285,45 @@ test('cashier note and stats are specific to the items, never stock copy', () =>
     'missing-data',
   );
   assert.equal(ai.noteCitesOtherPerson('Marc Lou already shipped Ship or Die.', [{ name: 'POST BRIDGE', spoken: 'Post Bridge' }], { who: 'Jack Friks', handle: 'jackfriks' }), true);
+  assert.equal(
+    ai.noteCitesOtherPerson(
+      'Eight printed items, and the strangest is jev-tetris, where Jev plays Tetris against other models.',
+      [{ name: 'JEV-TETRIS', spoken: 'jev-tetris' }],
+      { who: 'Tony Dinh', handle: 'tdinh_me' },
+    ),
+    true,
+  );
+  assert.equal(
+    ai.noteCitesOtherPerson(
+      'jev-tetris is the oddest repo on the pile.',
+      [{ name: 'JEV-TETRIS', spoken: 'jev-tetris' }],
+      { who: 'Tony Dinh', handle: 'tdinh_me' },
+    ),
+    false,
+  );
+  const thin = ai.scoreCashierNote(
+    'Levels is the one on this tape worth a second look. The rest are short and the bio does most of the talking.',
+    [{ name: 'PHOTOAI', spoken: 'PhotoAI', source: 'site' }],
+    [],
+    { who: 'Pieter Levels', handle: 'levelsio' },
+  );
+  const flat = ai.scoreCashierNote(
+    'Privacy Center and Security History both printed in September.',
+    [
+      { name: 'PRIVACY CENTER IN CHATGPT', spoken: 'Privacy Center in ChatGPT', source: 'changelog' },
+      { name: 'SECURITY HISTORY IN CHATGPT', spoken: 'Security History in ChatGPT', source: 'changelog' },
+    ],
+    [],
+    { who: 'Sam Altman', handle: 'sama' },
+  );
+  const punchy = ai.scoreCashierNote(
+    'PhotoAI is still the one people open first.',
+    [{ name: 'PHOTOAI', spoken: 'PhotoAI', source: 'site' }],
+    [],
+    { who: 'Pieter Levels', handle: 'levelsio' },
+  );
+  assert.ok(punchy > thin, `${punchy} vs ${thin}`);
+  assert.ok(punchy > flat, `${punchy} vs ${flat}`);
   const softOnly = ai.pickBestNote(
     [
       'Harbor is the whole receipt. The CLI is just the grip.',

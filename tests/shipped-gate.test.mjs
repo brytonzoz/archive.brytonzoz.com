@@ -76,6 +76,36 @@ test('print-time gate collapses OpenAI CEO Codex crumbs to company-wide ships', 
   assert.equal(names.filter((name) => /codex/i.test(name)).length, 1, JSON.stringify(names));
 });
 
+test('docs-href keeps changelog cards and drops docs nav / blog categories', () => {
+  assert.equal(polish.isDocsOrCategoryHref('https://vercel.com/docs/frameworks'), true);
+  assert.equal(polish.isDocsOrCategoryHref('https://vercel.com/blog/category/security'), true);
+  assert.equal(polish.isDocsOrCategoryHref('https://vercel.com/changelog/vercel-agent-now-in-slack'), false);
+  assert.equal(polish.isDocsOrCategoryHref('https://developers.openai.com/api/docs/changelog'), false);
+  assert.equal(polish.isChangelogEntryHref('https://vercel.com/changelog/v0-platform-api-now-in-beta'), true);
+  assert.equal(polish.isChangelogEntryHref('https://vercel.com/changelog'), false);
+});
+
+test('Codex app updates rescues to Codex app; GPT-5.3-Codex stays a named model', () => {
+  const aff = {
+    ...affiliation.emptyAffiliation(),
+    name: 'Tibo',
+    company: 'OpenAI',
+    role: 'lead',
+    product: 'Codex',
+    typedCompany: true,
+  };
+  const items = polish.gateReceiptItems(
+    [
+      asItem({ name: 'Codex app updates', date: '2026-08-04', link: 'https://developers.openai.com/codex/app' }),
+      asItem({ name: 'GPT-5.3-Codex', date: '2026-03-12', link: 'https://developers.openai.com/codex/changelog#gpt-5-3-codex' }),
+    ],
+    { year: 2026, who: 'Tibo', handle: 'tibo_maker', affiliation: aff },
+  );
+  const names = items.map((item) => item.name);
+  assert.ok(names.some((name) => /^codex app$/i.test(name)), JSON.stringify(names));
+  assert.ok(names.some((name) => /gpt-?5\.3-codex/i.test(name)), JSON.stringify(names));
+});
+
 test('lead tapes still keep the Codex changelog; harvestItems uses the print gate', () => {
   const aff = {
     ...affiliation.emptyAffiliation(),

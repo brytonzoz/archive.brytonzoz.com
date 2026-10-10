@@ -439,7 +439,7 @@ export function itemsFromFeedXml(xml: string, year: number): ChangelogFound[] {
   ];
   for (const block of blocks) {
     const chunk = block[0];
-    const title = clean(decodeXml(chunk.match(/<title\b[^>]*>([\s\S]*?)<\/title>/i)?.[1] ?? ''), 80);
+    const title = clean(decodeXml(chunk.match(/<title\b[^>]*>([\s\S]*?)<\/title>/i)?.[1] ?? ''), 120);
     const link =
       publicUrl(decodeXml(chunk.match(/<link\b[^>]*href=["']([^"']+)["']/i)?.[1] ?? '')) ??
       publicUrl(decodeXml(chunk.match(/<link\b[^>]*>([^<]+)<\/link>/i)?.[1] ?? '')) ??
@@ -451,6 +451,11 @@ export function itemsFromFeedXml(xml: string, year: number): ChangelogFound[] {
     const date = parseFlexibleDate(datedRaw, year);
     if (!date || !title || !link) continue;
     if (!date.startsWith(String(year))) continue;
+    if (/\/blog\//i.test(link) && !/changelog/i.test(link)) {
+      if (ARTICLE_TITLE.test(title) || CUSTOMER_STORY.test(title) || /^how\s+/i.test(title) || /^state of\b/i.test(title) || /\brecap\b/i.test(title)) {
+        continue;
+      }
+    }
     const key = loose(title);
     if (seen.has(key)) continue;
     seen.add(key);
@@ -550,6 +555,16 @@ export function itemsFromNewsLinks(
     const dated = hay.includes(String(year)) || Boolean(parseFlexibleDate(link.text, year));
     if (!dated && !isShipPath(link.url)) continue;
     if (/\/(about|careers?|jobs|login|privacy|terms|legal|pricing|signup)\b/i.test(link.url)) continue;
+    try {
+      const path = new URL(link.url).pathname.replace(/\/+$/, '').toLowerCase();
+      if (/\/blog\/category(?:\/|$)/.test(path)) continue;
+      if (/^\/docs(?:\/|$)/.test(path) && !/changelog|release-notes/i.test(path)) continue;
+      if (/\/(changelog|releases?|whats-new|updates?)\b/i.test(pageUrl) && !/\/(changelog|releases?|whats-new|updates?|release-notes)\//i.test(path)) {
+        continue;
+      }
+    } catch {
+      /* keep */
+    }
     const name = cleanTitle(link.text) || titleFromSlug(link.url);
     const key = loose(name);
     if (!name || key.length < 3 || seen.has(key)) continue;

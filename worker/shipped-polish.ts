@@ -264,13 +264,29 @@ export function isBlogEssayTitle(title: string): boolean {
   return false;
 }
 
-/** Docs pages and blog category indexes are not ships, whatever the heading says. */
+/** A dated /changelog/slug or /products/release-notes#id card — not the index and not /docs. */
+export function isChangelogEntryHref(url: string | null | undefined): boolean {
+  if (!url) return false;
+  try {
+    const parsed = new URL(url);
+    const path = parsed.pathname.replace(/\/+$/, '').toLowerCase();
+    if (/\/(changelog|docs\/changelog|whats-new|what-s-new|releases|updates|release-notes)$/i.test(path)) {
+      return Boolean(parsed.hash && parsed.hash.length > 2);
+    }
+    return /\/(changelog|docs\/changelog|whats-new|what-s-new|release-notes)\/[^/]+/i.test(path);
+  } catch {
+    return false;
+  }
+}
+
+/** Docs nav and blog category indexes are not ships. Changelog cards keep their own URLs. */
 export function isDocsOrCategoryHref(url: string | null | undefined): boolean {
   if (!url) return false;
   try {
     const path = new URL(url).pathname.replace(/\/+$/, '').toLowerCase();
-    if (/^\/docs(?:\/|$)/.test(path)) return true;
+    if (/\/(changelog|release-notes)\b/i.test(path)) return false;
     if (/\/blog\/category(?:\/|$)/.test(path)) return true;
+    if (/^\/docs(?:\/|$)/.test(path)) return true;
     return false;
   } catch {
     return false;
@@ -371,7 +387,8 @@ function normalizeVersionTokens(text: string): string {
 
 export function isPricingOrMetricNote(name: string): boolean {
   const text = tidy(name);
-  if (/\b(pric(e|ing|es)|plans?|billing|skus?)\b/i.test(text) && !/\b(app|cli|sdk|api|model)\b/i.test(text)) return true;
+  if (/\b(pric(e|ing|es)|billing|skus?)\b/i.test(text) && !/\b(app|cli|sdk|api|model)\b/i.test(text)) return true;
+  if (/\b(pricing plans?|plan pricing|teams plans?)\b/i.test(text)) return true;
   if (/^(improved|better|faster|cheaper|reduced|lower|higher)\s+[A-Za-z]+(?:\s+[A-Za-z]+)?$/i.test(text)) return true;
   return false;
 }
@@ -559,6 +576,9 @@ export function cleanShipTitle(raw: unknown, max = TITLE_MAX): string {
   const meet = text.match(/^meet the new\s+(.+)$/i);
   if (meet?.[1]) text = meet[1];
   if (/^codex,\s*our code generation cli tool$/i.test(text)) text = 'Codex CLI';
+  text = text.replace(/^the new\s+/i, '').replace(/^new\s+(v\d\b)/i, '$1');
+  const nowLead = text.match(/^((?:v\d|[A-Z][\w.+-]*)(?:\s+(?:v\d|[A-Z][\w.+-]*)){0,3})\s+now\b/);
+  if (nowLead?.[1] && nowLead[1].length >= 2) text = nowLead[1];
   text = text
     .replace(/^(introducing|launching|announcing|presenting|meet|say hello to|now available[:\s]+|how to|read the|launched)\s+/i, '')
     .replace(/\s+launched as\b.*$/i, '')
@@ -1003,7 +1023,7 @@ export function polishCandidates<T extends Polishable>(items: T[], opts: PolishO
       drop(item, 'legacy-family');
       continue;
     }
-    if (isDocsOrCategoryHref(item.link)) {
+    if (isDocsOrCategoryHref(item.link) && !flagship && !isChangelogEntryHref(item.link)) {
       drop(item, 'docs-href');
       continue;
     }

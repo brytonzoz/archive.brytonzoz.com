@@ -11,7 +11,7 @@ import { shipName } from './shipped-changelog';
 import { shareKeywords } from './shipped-decisions';
 import { ownerFromProfile, type OwnerContext } from './shipped-ownership';
 import { flagshipLaunchName, isFlagshipYearKeep, isJoinOrAcquire, isPriorYearJoin, logFlagshipGate } from './shipped-flagship';
-import { cleanDescription, cleanShipTitle, cleanStatus, gateReceiptItems, noteCountMismatch, spokenShipName } from './shipped-polish';
+import { cleanDescription, cleanShipTitle, cleanStatus, gateReceiptItems, isChangelogEntryHref, noteCountMismatch, spokenShipName } from './shipped-polish';
 import { emptyAffiliation, type Affiliation } from './shipped-affiliation';
 import { looksLikePersonName } from './shipped-repos';
 import { RECEIPT_BUDGET_MICROS, formatReceiptStats, searchBudget, type SourcedStat } from './shipped-research';
@@ -360,6 +360,26 @@ function noteNameAllowed(span: string, items: { name: string; spoken?: string }[
   return false;
 }
 
+const PRODUCT_KEBAB_WORD =
+  /^(app|cli|sdk|api|bot|kit|web|ios|mac|linux|server|client|core|mini|max|pro|ai|gpt|ui|mcp|lsp|rss|cli|js|ts|rs|py|go|io|com)$/i;
+
+/** Given-name tokens hiding inside kebab product names (`jev-tetris` → Jev). */
+export function personTokensInProductNames(items: { name?: string; spoken?: string }[] = []): string[] {
+  const out = new Set<string>();
+  for (const item of items) {
+    for (const raw of [item.name, item.spoken]) {
+      const text = String(raw || '');
+      if (!/[-_]/.test(text)) continue;
+      const token = text.split(/[-_\s]+/)[0]?.replace(/[^A-Za-z]/g, '') ?? '';
+      if (token.length < 3 || token.length > 8) continue;
+      if (PRODUCT_KEBAB_WORD.test(token) || NOTE_NAME_OK.test(token) || NOTE_MONTH.test(token)) continue;
+      if (!/^[A-Za-z][a-z]+$/.test(token) && !/^[A-Z]+$/.test(token)) continue;
+      out.add(token[0].toUpperCase() + token.slice(1).toLowerCase());
+    }
+  }
+  return [...out];
+}
+
 /** Any capitalized person-like name in the note must be the customer (name or handle). */
 export function noteCitesOtherPerson(
   note: string,
@@ -373,11 +393,22 @@ export function noteCitesOtherPerson(
     if (looksLikePersonName(span) && !noteNameAllowed(span, items, ctx)) return true;
   }
   const subjects = [
-    ...text.matchAll(/\b([A-Z][a-z]{2,14})(?:'s|\s+(?:had|shipped|launched|wrote|built|made|kept))\b/g),
+    ...text.matchAll(/\b([A-Z][a-z]{2,14})(?:'s|\s+(?:had|shipped|launched|wrote|built|made|kept|plays|played))\b/g),
   ].map((row) => row[1]);
   for (const span of subjects) {
     if (!span || NOTE_NAME_OK.test(span) || NOTE_MONTH.test(span)) continue;
     if (!noteNameAllowed(span, items, ctx)) return true;
+  }
+  const embedded = personTokensInProductNames(items);
+  if (embedded.length) {
+    const customer = customerNameKeys(ctx);
+    for (const token of embedded) {
+      const key = loose(token);
+      if (customer.has(key) || [...customer].some((part) => part.length >= 3 && (key.includes(part) || part.includes(key)))) {
+        continue;
+      }
+      if (new RegExp(`\\b${token.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}\\b(?![-_])`, 'i').test(text)) return true;
+    }
   }
   return false;
 }
@@ -503,6 +534,12 @@ export function scoreCashierNote(
   if (text.length >= 48 && text.length <= 132) score += 8;
   const who = (ctx.who || '').split(/\s+/).filter(Boolean)[0];
   if (who && who.length >= 3 && new RegExp(who.replace(/[.*+?^${}()|[\]\\]/g, '\\$&'), 'i').test(text)) score += 4;
+  if (/\bboth printed\b|\bprinted in\s+(jan(?:uary)?|feb(?:ruary)?|mar(?:ch)?|apr(?:il)?|may|jun(?:e)?|jul(?:y)?|aug(?:ust)?|sep(?:t(?:ember)?)?|oct(?:ober)?|nov(?:ember)?|dec(?:ember)?)\b/i.test(text)) {
+    score -= 18;
+  }
+  if (/\bbio does most of the talking\b|\bthin (receipt|tape)\b|\bworth a second look\b[\s\S]{0,80}\bthe rest\b|\bthe rest are short\b/i.test(text)) {
+    score -= 20;
+  }
   return score;
 }
 
@@ -617,7 +654,7 @@ function toDraftItem(item: Found, year: number): DraftItem | null {
     return null;
   }
   if (dated === null && (item.source === 'changelog' || item.source === 'company') && !flagship) {
-    return null;
+    if (!isChangelogEntryHref(item.link)) return null;
   }
   const description = cleanDescription(item.description);
   const printed = name.toUpperCase();
@@ -817,8 +854,9 @@ function noteOnlySystem(year: number, affiliation?: Affiliation | null, count = 
     'Mention the single most notable ship from the item list. Keep that product\'s original casing (tsc-rs, BotID, Post Bridge). Never ALL CAPS.',
     'At most one number, and only if it is copied from <found>.stats (stars or downloads). Prefer no number.',
     'Never invent a plugin, extension, extra product, or fact that is not in the item list or bio.',
-    'If you name a person, it must be this customer (their name or handle only). Never another person.',
+    'If you name a person, it must be this customer (their name or handle only). Never another person — including a name hiding inside a repo (jev-tetris is a product, not Jev).',
     'Never mention a missing description, missing date, or that something shipped without copy.',
+    'Do not restate two item names and a month as the whole note. Do not talk down a thin tape or say the bio does the talking.',
     desk,
     'The bar (do not copy these, and never write about these invented people):',
     '"Northline shipped a radio, then a weather kite. The kite is the one people will steal."',

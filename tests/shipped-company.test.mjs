@@ -103,6 +103,32 @@ test('Codex ISO date then ### heading extracts many CLI ships', () => {
   assert.ok(items.every((item) => item.link.includes('/codex/')));
 });
 
+test('Vercel RSS keeps changelog cards and drops customer-story blog posts', () => {
+  const atom = `<?xml version="1.0"?><feed xmlns="http://www.w3.org/2005/Atom">
+    <entry><title>Vercel Agent now installs private packages</title>
+    <link href="https://vercel.com/changelog/vercel-agent-now-installs-private-packages"/>
+    <updated>2026-08-12T00:00:00.000Z</updated></entry>
+    <entry><title>How Rillet ships 3× faster with AI agents on Vercel</title>
+    <link href="https://vercel.com/blog/how-rillet-ships-faster"/>
+    <updated>2026-08-11T00:00:00.000Z</updated></entry>
+    <entry><title>Introducing the new v0 API</title>
+    <link href="https://vercel.com/changelog/introducing-the-new-v0-api"/>
+    <updated>2026-04-01T00:00:00.000Z</updated></entry>
+  </feed>`;
+  const items = changelog.itemsFromFeedXml(atom, 2026);
+  assert.ok(items.some((item) => /vercel agent/i.test(item.name)), JSON.stringify(items.map((i) => i.name)));
+  assert.ok(items.some((item) => /v0/i.test(item.name)), JSON.stringify(items.map((i) => i.name)));
+  assert.equal(items.some((item) => /rillet/i.test(item.name)), false);
+});
+
+test('Cursor flagship probe paths cover Cursor 3 / Bugbot / Origin', async () => {
+  const flagship = await import('../worker/shipped-flagship.ts');
+  const paths = flagship.flagshipProbePaths('Cursor');
+  assert.ok(paths.some((path) => /cursor-3/.test(path)));
+  assert.ok(paths.some((path) => /bugbot/.test(path)));
+  assert.ok(paths.some((path) => /origin/.test(path)));
+});
+
 test('Vercel day headings plus bullets assume the harvest year', () => {
   const text = `9 October\n\n- New Pro teams now default to 30-day deployment retention\n- Liquid AI's d1 is available on AI Gateway\n\n8 October\n\n- Skip sending request bodies to Routing Middleware`;
   const items = changelog.itemsFromMonthHeadings(text, 'https://vercel.com/changelog', 2026);

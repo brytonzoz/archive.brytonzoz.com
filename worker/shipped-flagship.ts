@@ -116,6 +116,9 @@ export function flagshipLaunchName(item: FlagshipItem): string | null {
   if (/\bbugbot\b/i.test(hay) || /\/(blog|changelog)\/bugbot/i.test(path)) return 'Bugbot';
   if (/\bagents window\b/i.test(name) || /\/agents-window\b/i.test(path)) return 'Agents Window';
   if (/^origin$/i.test(name) || /\/(blog|changelog)\/origin$/i.test(path)) return 'Origin';
+  // Exact titles only — "Codex app 26.608" must still version-roll.
+  if (/^(?:introducing\s+)?codex app(?: updates)?$/i.test(name)) return 'Codex app';
+  if (/^(?:introducing\s+)?gpt-?5\.3-codex$/i.test(name)) return 'GPT-5.3-Codex';
 
   const report = name.match(/^a technical report on\s+(.+)$/i);
   if (report?.[1] && /\d/.test(report[1])) return titleCaseProduct(report[1]);
@@ -179,6 +182,23 @@ const FLAGSHIP_LAUNCH_DAY: Record<string, string> = {
   bugbot: '2026-06-01',
   origin: '2026-09-14',
 };
+
+/** First-party posts the sitemap often misses (older Cursor launches live on /blog, not the latest changelog page). */
+export function flagshipProbePaths(company: string | null | undefined): string[] {
+  const slug = (company ?? '').toLowerCase();
+  if (/\bcursor\b|\banysphere\b/.test(slug)) {
+    return [
+      '/blog/cursor-3',
+      '/blog/composer-2',
+      '/blog/origin',
+      '/changelog/bugbot-updates-june-2026',
+      '/changelog/origin',
+      '/changelog/page/2',
+      '/changelog/page/3',
+    ];
+  }
+  return [];
+}
 
 /** Public launch day when we know it; otherwise the changelog slug's month. */
 export function knownFlagshipDate(item: FlagshipItem, year: number): string | null {

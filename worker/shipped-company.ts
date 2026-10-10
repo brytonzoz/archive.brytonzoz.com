@@ -952,8 +952,8 @@ export async function harvestCompany(opts: {
 
     const firstSeeds = seeds.slice(0, 6);
     const prefixed = firstSeeds[0] ? prefixHosts(firstSeeds[0]) : [];
-    await Promise.all([...prefixed, ...firstSeeds].map((site) => takePages(site, 'company-site')));
-    await Promise.all(discoveredHosts.map((extra) => takePages(extra, 'company-site')));
+    await Promise.all(firstSeeds.map((site) => takePages(site, 'company-site')));
+    await Promise.all([...prefixed, ...discoveredHosts].map((extra) => takePages(extra, 'company-site')));
 
     const feedOrigins = [...new Set([firstSeeds[0], affiliation.companySite, ...liveOrigins].filter(Boolean))] as string[];
     await Promise.all(

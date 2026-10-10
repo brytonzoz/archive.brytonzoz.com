@@ -838,6 +838,9 @@ test('prereleases, starters, and Gateway model listings are not ships', () => {
   assert.match(polish.cleanShipTitle('GPT-6.1 SOL PRODUCT SEP 29, 2026'), /gpt-6\.1 sol/i);
   assert.match(polish.cleanShipTitle('ChatGPT Voice and multi-folder projects 26.715'), /chatgpt voice and multi-folder projects/i);
   assert.match(polish.cleanShipTitle('Agents can now buy domains with the Vercel CLI'), /agents can now buy domains/i);
+  assert.match(polish.cleanShipTitle('Use Codex with Amazon Bedrock'), /codex with amazon bedrock|use codex with amazon bedrock/i);
+  assert.match(polish.cleanShipTitle('Build and install plugins in Codex'), /plugins in codex|build and install plugins/i);
+  assert.equal(polish.cleanShipTitle('Use a random leftover'), '');
   const items = polish.polishCandidates(
     [
       found({ name: "Liquid AI's d1 is available on AI Gateway", date: '2026-10-08', link: 'https://vercel.com/changelog/liquid-d1' }),

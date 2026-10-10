@@ -454,7 +454,8 @@ export function isGatewayModelListing(name: string, link?: string | null, descri
   const hay = `${text} ${link || ''} ${description || ''}`;
   if (!text && !link) return false;
   if (/\b(v0|vercel agent|botid)\b/i.test(text)) return false;
-  if (/\b(adds|supports|typeSafe|http api|asynchronous|browserbase|confidence-based)\b/i.test(text)) return false;
+  if (/\b(adds|supports|http api|asynchronous|browserbase|confidence-based)\b/i.test(text)) return false;
+  if (/\btypesafe\b/i.test(text) && /\b(http|api|sdk)\b/i.test(text) && !/\btypesafe ai\b/i.test(text)) return false;
   if (/^liquid ai\b/i.test(text)) return true;
   if (/[-/](?:on-)?ai-gateway|available-on-ai-gateway|\/ai-gateway/i.test(link || '')) {
     if (/\b(adds|tools|fallback|browserbase|confidence)\b/i.test(text)) return false;
@@ -730,10 +731,14 @@ export function cleanShipTitle(raw: unknown, max = TITLE_MAX): string {
 }
 
 /** Product / feature / model noun phrase. Sentence fragments and dangling preps fail. */
+const NAMED_PRODUCT = /\b(codex|chatgpt|cursor|v0|gpt-?\d|sora|atlas)\b/i;
+const SOFT_TITLE_START = /^(use|build|building|work|more)\b/i;
+
 export function isProductNounPhrase(title: string): boolean {
   const text = tidy(title);
   if (!text) return false;
-  if (TITLE_START_BAD.test(text) || TITLE_END_BAD.test(text)) return false;
+  if (TITLE_START_BAD.test(text) && !(SOFT_TITLE_START.test(text) && NAMED_PRODUCT.test(text))) return false;
+  if (TITLE_END_BAD.test(text) && !NAMED_PRODUCT.test(text)) return false;
   if (BARE_MODEL.test(text.replace(/\s+/g, ''))) return false;
   const words = text.split(/\s+/);
   if (words.length >= 2 && TITLE_VERB.test(words[1] || '')) return false;
@@ -752,7 +757,11 @@ export function gateShipTitle(raw: string, cleaned = ''): string {
   text = text.replace(/\s+\b(of|a|an|the|with|and|or|security|controlled|trusted|general|advanced|remote|task|chat)\s*$/i, '').trim();
   if (!text) return '';
   if (BARE_MODEL.test(text.replace(/\s+/g, ''))) return '';
-  if (/^use\b/i.test(tidy(raw)) || /^use\b/i.test(text)) return '';
+  if (/^use\b/i.test(tidy(raw)) || /^use\b/i.test(text)) {
+    if (!/^use\s+(codex|chatgpt|cursor|v0|gpt-?\d)\b/i.test(text) && !/^use\s+(codex|chatgpt|cursor|v0|gpt-?\d)\b/i.test(tidy(raw))) {
+      return '';
+    }
+  }
   if (SENTENCE_VERB.test(text) || CODE_TITLE.test(text)) {
     const phrase = nounPhraseFromSentence(raw);
     return phrase && isProductNounPhrase(phrase) && !SENTENCE_VERB.test(phrase) ? phrase : '';

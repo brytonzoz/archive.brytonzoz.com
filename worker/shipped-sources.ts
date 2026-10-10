@@ -1163,6 +1163,11 @@ export async function readSite(siteUrl: string): Promise<SiteInfo | null> {
     if (href && text && !links.some((l) => l.url === href)) links.push({ text, url: href });
     if (links.length >= 80) break;
   }
+  for (const match of html.matchAll(/https?:\/\/[a-z0-9][-a-z0-9.]*\.[a-z]{2,}[^\\s"'<>]*/gi)) {
+    const href = abs(match[0].replace(/[),.;]+$/g, ''));
+    if (href && !links.some((l) => l.url === href)) links.push({ text: '', url: href });
+    if (links.length >= 120) break;
+  }
   const embedded = (html.match(/<script\b[^>]*id=["']__NEXT_DATA__["'][^>]*>[\s\S]*?<\/script>/i) ?? [])[0] || '';
   const rawText = linedText(html, 48_000);
   const dated = (rawText.match(/(?:^|\n).{0,20}20\d\d[-/.]\d{1,2}.{0,80}/g) ?? []).join('\n');

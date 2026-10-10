@@ -19,6 +19,9 @@ on:
       - worker/shipped-identity.ts
       - worker/shipped-ownership.ts
       - worker/shipped-decisions.ts
+      - worker/shipped-flagship.ts
+      - worker/shipped-repos.ts
+      - worker/shipped-dates.ts
   workflow_dispatch:
     inputs:
       ids:

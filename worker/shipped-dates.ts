@@ -18,7 +18,8 @@ export type PinDateVerdict = {
   reason: string | null;
 };
 
-const GENERIC_HOST = /^(github\.com|gitlab\.com|npmjs\.com|producthunt\.com|apps\.apple\.com|x\.com|twitter\.com|linkedin\.com)$/i;
+const PROFILE_HOST = /^(gitlab\.com|npmjs\.com|x\.com|twitter\.com|linkedin\.com)$/i;
+const STORE_HOST = /^(github\.com|apps\.apple\.com|producthunt\.com)$/i;
 
 function hostOf(url: string | null | undefined): string | null {
   try {
@@ -56,6 +57,40 @@ export function parseRdapRegistration(body: unknown): string | null {
   return match ? match[1] : null;
 }
 
+export function parseAppStoreDate(text: string): string | null {
+  const json = text.match(/"(?:datePublished|releaseDate)"\s*:\s*"(20\d{2}-\d{2}-\d{2})/i);
+  if (json) return json[1];
+  const iso = text.match(/\b(20\d{2}-\d{2}-\d{2})T/);
+  const released = text.match(/Released\s+((?:Jan|Feb|Mar|Apr|May|Jun|Jul|Aug|Sep|Oct|Nov|Dec)[a-z]*\.?\s+\d{1,2},?\s+20\d{2})/i);
+  if (released) {
+    const day = new Date(`${released[1]} UTC`);
+    if (!Number.isNaN(day.getTime())) return day.toISOString().slice(0, 10);
+  }
+  return iso ? iso[1] : null;
+}
+
+export function parseProductHuntDate(text: string): string | null {
+  const json = text.match(/"(?:launchedAt|featuredAt|created_at|featured_at)"\s*:\s*"(20\d{2}-\d{2}-\d{2})/i);
+  if (json) return json[1];
+  const launched = text.match(/Launched\s+on\s+((?:Jan|Feb|Mar|Apr|May|Jun|Jul|Aug|Sep|Oct|Nov|Dec)[a-z]*\.?\s+\d{1,2},?\s+20\d{2})/i);
+  if (launched) {
+    const day = new Date(`${launched[1]} UTC`);
+    if (!Number.isNaN(day.getTime())) return day.toISOString().slice(0, 10);
+  }
+  return null;
+}
+
+export function parseGithubCreated(body: unknown): string | null {
+  if (!body || typeof body !== 'object') {
+    const raw = String(body ?? '');
+    const match = raw.match(/"(?:created_at|createdAt)"\s*:\s*"(20\d{2}-\d{2}-\d{2})/);
+    return match ? match[1] : null;
+  }
+  const created = (body as { created_at?: string; createdAt?: string }).created_at ?? (body as { createdAt?: string }).createdAt;
+  const match = String(created || '').match(/^(20\d{2}-\d{2}-\d{2})/);
+  return match ? match[1] : null;
+}
+
 export function parseCopyrightYear(text: string): number | null {
   const years = [...text.matchAll(/(?:©|&copy;|copyright|\(c\))\s*(?:20\d{2}\s*[-–—]\s*)?(20\d{2})\b/gi)].map((m) => Number(m[1]));
   if (!years.length) {
@@ -90,25 +125,50 @@ export function verdictFromEvidence(year: number, evidence: LaunchEvidence[]): P
   };
 }
 
+/** http(s) URLs in HTML, RSC payloads, or visible copy — Next sites often hide pins in script tags. */
+export function urlsFromPageText(text: string): string[] {
+  const out: string[] = [];
+  for (const match of String(text || '').matchAll(/https?:\/\/[a-z0-9][-a-z0-9.]*\.[a-z]{2,}[^\\s"'<>]*/gi)) {
+    const raw = match[0].replace(/[),.;]+$/g, '').replace(/\\+$/g, '');
+    try {
+      const url = new URL(raw);
+      if (!/^https?:$/i.test(url.protocol)) continue;
+      const href = url.toString();
+      if (!out.includes(href)) out.push(href);
+    } catch {
+      /* skip */
+    }
+    if (out.length >= 80) break;
+  }
+  return out;
+}
+
 export function productUrlsForPin(
   item: { name: string; link?: string | null },
-  opts: { owner?: OwnerContext | null; links?: { text: string; url: string }[] },
+  opts: { owner?: OwnerContext | null; links?: { text: string; url: string }[]; pageText?: string },
 ): string[] {
   const out: string[] = [];
   const own = ownHosts(opts.owner);
+  const want = loose(item.name);
   const add = (url: string | null | undefined) => {
     const host = hostOf(url);
-    if (!url || !host || own.has(host) || GENERIC_HOST.test(host)) return;
+    if (!url || !host || own.has(host) || PROFILE_HOST.test(host)) return;
     if (!out.includes(url)) out.push(url);
   };
   const itemHost = hostOf(item.link);
   if (item.link && itemHost && !own.has(itemHost)) add(item.link);
-  const want = loose(item.name);
   for (const link of opts.links ?? []) {
+    if (!want) break;
     if (loose(link.text).includes(want) || loose(link.url).includes(want)) add(link.url);
   }
-  for (const guess of productHostGuesses(item.name).slice(0, 3)) add(guess);
-  return out.slice(0, 6);
+  for (const url of urlsFromPageText(opts.pageText ?? '')) {
+    if (want && want.length >= 4 && loose(url).includes(want)) add(url);
+  }
+  // Short names ("doof", "wacko") collide with other people's domains — only guess long slugs.
+  if (want.length >= 8) {
+    for (const guess of productHostGuesses(item.name).slice(0, 3)) add(guess);
+  }
+  return out.slice(0, 8);
 }
 
 async function readText(url: string, types?: string[]): Promise<string | null> {
@@ -145,6 +205,35 @@ async function evidenceForHost(host: string): Promise<LaunchEvidence[]> {
   return out;
 }
 
+async function evidenceForUrl(url: string): Promise<LaunchEvidence[]> {
+  const host = hostOf(url);
+  if (!host) return [];
+  if (/^github\.com$/i.test(host)) {
+    const repo = url.match(/github\.com\/([A-Za-z0-9_.-]+\/[A-Za-z0-9_.-]+)/i)?.[1];
+    if (!repo || /\/(issues|pull|commit|actions|wiki)\b/i.test(url)) return [];
+    const body = await readText(`https://api.github.com/repos/${repo}`, ['application/json', 'text/']);
+    if (!body) return [];
+    try {
+      const day = parseGithubCreated(JSON.parse(body));
+      return day ? [{ source: 'github', date: day }] : [];
+    } catch {
+      const day = parseGithubCreated(body);
+      return day ? [{ source: 'github', date: day }] : [];
+    }
+  }
+  if (/^apps\.apple\.com$/i.test(host)) {
+    const page = await readText(url, ['text/html', 'text/', 'application/json']);
+    const day = page ? parseAppStoreDate(page) : null;
+    return day ? [{ source: 'appstore', date: day }] : [];
+  }
+  if (/^producthunt\.com$/i.test(host)) {
+    const page = await readText(url, ['text/html', 'text/', 'application/json']);
+    const day = page ? parseProductHuntDate(page) : null;
+    return day ? [{ source: 'producthunt', date: day }] : [];
+  }
+  return evidenceForHost(host);
+}
+
 function isOwnedPin(
   item: { name?: string; date?: string | null; link?: string | null; source?: string; description?: string },
   owner?: OwnerContext | null,
@@ -171,20 +260,23 @@ export async function dateOwnedPins<T extends { name: string; date: string | nul
     if (isOwnedPin(item, opts.owner)) pending.push(item);
     else kept.push(item);
   }
-  const copyrightYear = opts.pageText ? parseCopyrightYear(opts.pageText) : null;
   const batch = pending.slice(0, 12);
   const leftover = pending.slice(12);
   const resolved = await Promise.all(
     batch.map(async (item) => {
       const evidence: LaunchEvidence[] = [];
-      const urls = productUrlsForPin(item, { owner: opts.owner, links: opts.links });
+      const urls = productUrlsForPin(item, { owner: opts.owner, links: opts.links, pageText: opts.pageText });
       for (const url of urls.slice(0, 3)) {
-        const host = hostOf(url);
-        if (!host) continue;
-        evidence.push(...(await evidenceForHost(host)));
-        if (evidence.some((row) => row.source === 'archive.org')) break;
+        evidence.push(...(await evidenceForUrl(url)));
+        if (evidence.some((row) => row.source === 'archive.org' || row.source === 'appstore' || row.source === 'producthunt' || row.source === 'github')) break;
       }
-      if (copyrightYear) evidence.push({ source: 'copyright', date: `${copyrightYear}-01-01` });
+      // Copyright only from the product page, never the maker's portfolio footer.
+      const productPage = urls.find((url) => !STORE_HOST.test(hostOf(url) ?? ''));
+      if (productPage && !evidence.some((row) => row.source === 'archive.org')) {
+        const page = await readText(productPage, ['text/html', 'text/']);
+        const yearOnPage = page ? parseCopyrightYear(page) : null;
+        if (yearOnPage) evidence.push({ source: 'copyright', date: `${yearOnPage}-01-01` });
+      }
       const verdict = verdictFromEvidence(year, evidence);
       console.log(
         JSON.stringify({

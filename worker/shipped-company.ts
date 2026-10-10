@@ -25,7 +25,9 @@ import {
   extractAlternateFeeds,
   isShipPath,
   itemsFromCompanyPage,
+  itemsFromDatedCards,
   itemsFromFeedXml,
+  itemsFromJsonLd,
   itemsFromSitemap,
   mergeChangelog,
   productPaths,
@@ -438,6 +440,31 @@ async function harvestSitemaps(origin: string, year: number, ctx?: FetchCtx): Pr
   return mergeChangelog([...xmls, ...more.filter(Boolean)].map((page) => itemsFromSitemap(page!.text, year))).map(asFound);
 }
 
+/** Sitemap rows have no lastmod-as-date. Fetch the flagship posts so Cursor 3 / Composer 2 keep a day. */
+async function hydrateFlagshipDates(found: Found[], year: number, ctx?: FetchCtx): Promise<Found[]> {
+  const need = found.filter((item) => !item.date && flagshipLaunchName(item) && item.link);
+  const seen = new Set<string>();
+  const unique = need.filter((item) => {
+    const url = item.link as string;
+    if (seen.has(url)) return false;
+    seen.add(url);
+    return true;
+  }).slice(0, 12);
+  if (!unique.length) return found;
+  const pages = await mapLimit(unique, 4, (item) => fetchText(item.link as string, 160_000, undefined, ctx?.blocked));
+  const byUrl = new Map(unique.map((item, i) => [item.link, pages[i]]));
+  return found.map((item) => {
+    const flagship = flagshipLaunchName(item);
+    if (item.date || !flagship || !item.link) return item;
+    const page = byUrl.get(item.link);
+    if (!page) return item;
+    const fromPage = [...itemsFromJsonLd(page.text, year), ...itemsFromDatedCards(page.text, item.link, year)].find((row) => row.date);
+    if (!fromPage?.date) return item;
+    logFlagshipGate(item, 'sitemap-undated', flagship);
+    return { ...item, date: fromPage.date, thisYear: true, dateConfidence: 'exact' as const };
+  });
+}
+
 async function githubOrgShips(org: string, env: SourceEnv, year: number): Promise<Found[]> {
   const login = org.replace(/^@/, '');
   if (!/^[A-Za-z0-9-]{1,39}$/.test(login)) return [];
@@ -732,7 +759,8 @@ export async function harvestCompany(opts: {
         for (const path of FEED_PATHS) feeds.push(`${origin.replace(/\/+$/, '')}${path}`);
         const sitemapItems = await harvestSitemaps(origin, year, ctx).catch(() => []);
         if (sitemapItems.length) {
-          found.push(...withVia(sitemapItems, via));
+          const dated = await hydrateFlagshipDates(sitemapItems, year, ctx).catch(() => sitemapItems);
+          found.push(...withVia(dated, via));
           ran.push(`company-sitemap:${hostOf(origin)}`);
         }
       }),

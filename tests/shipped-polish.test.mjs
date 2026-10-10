@@ -371,15 +371,47 @@ test('owned pin dates keep 2026 first launches and drop pre-2026 evidence', () =
   assert.equal(dates.parseRdapRegistration({ events: [{ eventAction: 'registration', eventDate: '2026-02-01T00:00:00Z' }] }), '2026-02-01');
   assert.equal(dates.parseCopyrightYear('© 2024 Jack Friks'), 2024);
   assert.equal(dates.parseCopyrightYear('Copyright 2026'), 2026);
+  assert.equal(dates.parseAppStoreDate('"datePublished":"2026-03-11T00:00:00Z"'), '2026-03-11');
+  assert.equal(dates.parseProductHuntDate('"launchedAt":"2026-05-09T12:00:00Z"'), '2026-05-09');
+  assert.equal(dates.parseGithubCreated({ created_at: '2026-02-01T00:00:00Z' }), '2026-02-01');
   const keep = dates.verdictFromEvidence(2026, [{ source: 'archive.org', date: '2026-04-12' }]);
   assert.equal(keep.drop, false);
   assert.equal(keep.date, '2026-04-12');
-  const drop = dates.verdictFromEvidence(2026, [{ source: 'archive.org', date: '2024-01-08' }, { source: 'rdap', date: '2023-11-01' }]);
+  const drop = dates.verdictFromEvidence(2026, [{ source: 'archive.org', date: '2024-09-11' }, { source: 'rdap', date: '2024-09-08' }]);
   assert.equal(drop.drop, true);
   assert.equal(drop.reason, 'pre-2026');
   const unknown = dates.verdictFromEvidence(2026, []);
   assert.equal(unknown.drop, false);
   assert.equal(unknown.date, null);
+  const html = 'https://www.lovelee-app.com/ https://ship-or-die.com https://post-bridge.com';
+  assert.ok(dates.urlsFromPageText(html).some((url) => /lovelee-app/.test(url)));
+  const lovelee = dates.productUrlsForPin({ name: 'lovelee' }, { pageText: html });
+  assert.ok(lovelee.some((url) => /lovelee-app/.test(url)), JSON.stringify(lovelee));
+  const wacko = dates.productUrlsForPin({ name: 'wacko' }, { pageText: 'no product url here' });
+  assert.equal(wacko.some((url) => /wacko\.com/.test(url)), false);
+});
+
+test('undated sitemap flagships survive harvest (the gate that dropped Cursor 3)', () => {
+  const gathered = {
+    found: [
+      found({ name: 'cursor 3', date: null, link: 'https://cursor.com/blog/cursor-3', thisYear: true }),
+      found({ name: 'composer 2', date: null, link: 'https://cursor.com/blog/composer-2', thisYear: true }),
+      found({ name: 'graphite', date: null, link: 'https://cursor.com/blog/graphite', thisYear: true }),
+      found({ name: 'bugbot updates june 2026', date: null, link: 'https://cursor.com/blog/bugbot-updates-june-2026', thisYear: true }),
+    ],
+    web: [],
+    pages: [],
+    site: null,
+    profile: { name: 'Michael Truell', bio: '', site: null, x: null, github: 'truell20', affiliation: { name: 'Michael Truell', company: 'Cursor', role: 'ceo', product: null, companyX: null, companyGithub: null, companySite: 'https://cursor.com', typedCompany: false } },
+    ran: [],
+    failed: [],
+    stats: [],
+  };
+  const tape = ai.harvestItems(gathered, 2026).map((item) => item.name);
+  assert.ok(tape.some((name) => /CURSOR 3/i.test(name)), JSON.stringify(tape));
+  assert.ok(tape.some((name) => /COMPOSER 2/i.test(name)), JSON.stringify(tape));
+  assert.ok(tape.some((name) => /GRAPHITE/i.test(name)), JSON.stringify(tape));
+  assert.ok(tape.some((name) => /BUGBOT/i.test(name)), JSON.stringify(tape));
 });
 
 test('sitemap slugs become flagship names and june-2026 slugs get a day', () => {

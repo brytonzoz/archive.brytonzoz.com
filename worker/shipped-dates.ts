@@ -145,7 +145,7 @@ export function urlsFromPageText(text: string): string[] {
 
 export function productUrlsForPin(
   item: { name: string; link?: string | null },
-  opts: { owner?: OwnerContext | null; links?: { text: string; url: string }[]; pageText?: string },
+  opts: { owner?: OwnerContext | null; links?: { text: string; url: string }[]; pageText?: string; metrics?: string[] },
 ): string[] {
   const out: string[] = [];
   const own = ownHosts(opts.owner);
@@ -164,11 +164,29 @@ export function productUrlsForPin(
   for (const url of urlsFromPageText(opts.pageText ?? '')) {
     if (want && want.length >= 4 && loose(url).includes(want)) add(url);
   }
+  for (const metric of opts.metrics ?? []) add(metric);
   // Short names ("doof", "wacko") collide with other people's domains — only guess long slugs.
+  // Multi-word names must use the hyphenated host (ship-or-die.com), never the smashed one (shipordie.com).
   if (want.length >= 8) {
-    for (const guess of productHostGuesses(item.name).slice(0, 3)) add(guess);
+    for (const guess of datingHostGuesses(item.name)) add(guess);
   }
   return out.slice(0, 8);
+}
+
+/** Hyphenated hosts first. Multi-word products never guess the concatenated .com. */
+export function datingHostGuesses(name: string): string[] {
+  const guesses = productHostGuesses(name);
+  const words = name.trim().split(/[^A-Za-z0-9]+/).filter((part) => part.length > 0);
+  const hyphen = name.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '');
+  const hyphenated = guesses.filter((url) => {
+    try {
+      return new URL(url).hostname.replace(/^www\./, '').startsWith(`${hyphen}.`);
+    } catch {
+      return false;
+    }
+  });
+  if (words.length >= 2 && hyphenated.length) return hyphenated.slice(0, 4);
+  return [...hyphenated, ...guesses.filter((url) => !hyphenated.includes(url))].slice(0, 4);
 }
 
 async function readText(url: string, types?: string[]): Promise<string | null> {
@@ -259,7 +277,7 @@ export function dropSameNameLeftovers<T extends { name: string; source?: string 
   return { items: kept, drops };
 }
 
-export async function dateOwnedPins<T extends { name: string; date: string | null; link?: string | null; source?: string; description?: string; thisYear?: boolean }>(
+export async function dateOwnedPins<T extends { name: string; date: string | null; link?: string | null; source?: string; description?: string; thisYear?: boolean; metrics?: { url?: string | null }[] }>(
   items: T[],
   opts: {
     year: number;
@@ -276,12 +294,17 @@ export async function dateOwnedPins<T extends { name: string; date: string | nul
     if (isOwnedPin(item, opts.owner)) pending.push(item);
     else kept.push(item);
   }
-  const batch = pending.slice(0, 12);
-  const leftover = pending.slice(12);
+  const batch = pending.slice(0, 24);
+  const leftover = pending.slice(24);
   const resolved = await Promise.all(
     batch.map(async (item) => {
       const evidence: LaunchEvidence[] = [];
-      const urls = productUrlsForPin(item, { owner: opts.owner, links: opts.links, pageText: opts.pageText });
+      const urls = productUrlsForPin(item, {
+        owner: opts.owner,
+        links: opts.links,
+        pageText: opts.pageText,
+        metrics: (item.metrics ?? []).map((row) => row.url).filter((url): url is string => Boolean(url)),
+      });
       for (const url of urls.slice(0, 3)) {
         evidence.push(...(await evidenceForUrl(url)));
         if (evidence.some((row) => row.source === 'archive.org' || row.source === 'appstore' || row.source === 'producthunt' || row.source === 'github')) break;
@@ -313,7 +336,9 @@ export async function dateOwnedPins<T extends { name: string; date: string | nul
     if (verdict.date) {
       kept.push({ ...item, date: verdict.date, thisYear: true });
     } else {
-      kept.push(item);
+      const host = hostOf(item.link);
+      const own = host ? ownHosts(opts.owner).has(host) : false;
+      kept.push(own && item.date ? { ...item, date: null, thisYear: true } : item);
     }
   }
   kept.push(...leftover);

@@ -393,6 +393,15 @@ test('owned pin dates keep 2026 first launches and drop pre-2026 evidence', () =
   assert.ok(lovelee.some((url) => /lovelee-app/.test(url)), JSON.stringify(lovelee));
   const wacko = dates.productUrlsForPin({ name: 'wacko' }, { pageText: 'no product url here' });
   assert.equal(wacko.some((url) => /wacko\.com/.test(url)), false);
+  const shipGuesses = dates.datingHostGuesses('SHIP OR DIE');
+  assert.ok(shipGuesses.some((url) => /ship-or-die\.com/.test(url)), JSON.stringify(shipGuesses));
+  assert.equal(shipGuesses.some((url) => /shipordie\.com/.test(url)), false);
+  const bridgeGuesses = dates.datingHostGuesses('POST BRIDGE');
+  assert.ok(bridgeGuesses.some((url) => /post-bridge\.com/.test(url)), JSON.stringify(bridgeGuesses));
+  assert.equal(bridgeGuesses.some((url) => /postbridge\.com/.test(url)), false);
+  const shipUrls = dates.productUrlsForPin({ name: 'SHIP OR DIE' }, {});
+  assert.ok(shipUrls.some((url) => /ship-or-die\.com/.test(url)), JSON.stringify(shipUrls));
+  assert.equal(shipUrls.some((url) => /shipordie\.com/.test(url)), false);
   const leftover = dates.dropSameNameLeftovers(
     [
       { name: 'POST BRIDGE', source: 'npm', date: '2026-09-09' },

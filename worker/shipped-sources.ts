@@ -1069,12 +1069,37 @@ export async function brandIcon(siteUrl: string, env: SourceEnv): Promise<string
 }
 
 /** Homepage title, description, icon, a text sample and its links (for Claude to read, never to obey). */
+function linedText(html: string, max: number): string {
+  return decode(
+    html
+      .replace(/<(script|style|noscript|svg)[\s\S]*?<\/\1>/gi, ' ')
+      .replace(/<(br|hr)\b[^>]*>/gi, '\n')
+      .replace(/<\/(p|div|li|h[1-6]|tr|section|article|blockquote)>/gi, '\n'),
+  )
+    .replace(/<[^>]+>/g, ' ')
+    .replace(/[ \t]+\n/g, '\n')
+    .replace(/\n[ \t]+/g, '\n')
+    .replace(/[ \t]{2,}/g, ' ')
+    .replace(/\n{3,}/g, '\n\n')
+    .trim()
+    .slice(0, max);
+}
+
 export async function readSite(siteUrl: string): Promise<SiteInfo | null> {
   const url = publicUrl(siteUrl);
   if (!url) return null;
-  const page = await safeFetch(url, { accept: 'text/html', maxBytes: 600_000, timeoutMs: TIMEOUT, types: ['text/html', 'application/xhtml'], userAgent: UA }).catch(() => null);
+  const feed = /\/(rss|feed|atom)(\.xml)?$/i.test(url);
+  const page = await safeFetch(url, {
+    accept: feed ? 'application/rss+xml, application/atom+xml, application/xml, text/xml, text/html' : 'text/html',
+    maxBytes: 800_000,
+    timeoutMs: TIMEOUT,
+    types: feed
+      ? ['application/rss+xml', 'application/atom+xml', 'application/xml', 'text/xml', 'text/html', 'application/xhtml']
+      : ['text/html', 'application/xhtml'],
+    userAgent: UA,
+  }).catch(() => null);
   if (!page) return null;
-  const html = new TextDecoder().decode(page.bytes).slice(0, 400_000);
+  const html = new TextDecoder().decode(page.bytes).slice(0, 600_000);
   const base = page.url || url;
   const abs = (href: string | null) => {
     try {
@@ -1098,9 +1123,9 @@ export async function readSite(siteUrl: string): Promise<SiteInfo | null> {
     if (href && text && !links.some((l) => l.url === href)) links.push({ text, url: href });
     if (links.length >= 40) break;
   }
-  const rawText = decode(html.replace(/<(script|style|noscript|svg)[\s\S]*?<\/\1>/gi, ' ').replace(/<[^>]+>/g, ' '));
+  const rawText = linedText(html, 48_000);
   const dated = (rawText.match(/(?:^|\n).{0,20}20\d\d[-/.]\d{1,2}.{0,80}/g) ?? []).join('\n');
-  const text = clean(`${dated}\n${rawText}`, 12_000);
+  const text = `${dated}\n${rawText}`.trim().slice(0, 48_000);
   return {
     url: base,
     title: clean(decode(html.match(/<title[^>]*>([\s\S]*?)<\/title>/i)?.[1] ?? ''), 100) || clean(meta('og:title'), 100),
@@ -1123,12 +1148,18 @@ const result = (title: unknown, url: unknown, snippet: unknown, date: unknown): 
 const SKIP_PAGES = /(^|\.)(x\.com|twitter\.com|linkedin\.com|facebook\.com|instagram\.com|tiktok\.com|youtube\.com|reddit\.com|threads\.net)$/;
 
 const markdownText = (text: string, max: number) =>
-  clean(text.replace(/!\[[^\]]*\]\([^)]*\)/g, ' ').replace(/\[([^\]]*)\]\([^)]*\)/g, '$1').replace(/[#*_>|]+/g, ' '), max);
+  text
+    .replace(/!\[[^\]]*\]\([^)]*\)/g, ' ')
+    .replace(/\[([^\]]*)\]\([^)]*\)/g, '$1')
+    .replace(/[ \t]+/g, ' ')
+    .replace(/\n{3,}/g, '\n\n')
+    .trim()
+    .slice(0, max);
 
 function toPage(page: TinyfishPage): PageInfo | null {
   const url = publicUrl(page.url);
   if (!url) return null;
-  return { url, title: clean(page.title, 120), description: clean(page.description, 240), published: day(page.published), text: markdownText(page.text, 1400) };
+  return { url, title: clean(page.title, 120), description: clean(page.description, 240), published: day(page.published), text: markdownText(page.text, 24_000) };
 }
 
 // ---- Who is this? --------------------------------------------------------------------------------
@@ -1632,7 +1663,7 @@ export async function gather(
     gatherFresh(subject, resolved.profile, env, year, meter, tinyfish, resolved.notes, mode, opts?.onPartial);
   if (opts?.rebuild && !opts.onPartial) return load();
   if (opts?.rebuild) return load();
-  const key = mode === 'full' ? `gather:full:v24:${year}:${resolved.cacheKey}` : `gather:v33:${year}:${resolved.cacheKey}`;
+  const key = mode === 'full' ? `gather:full:v25:${year}:${resolved.cacheKey}` : `gather:v34:${year}:${resolved.cacheKey}`;
   return cached(
     key,
     1440 * MIN,

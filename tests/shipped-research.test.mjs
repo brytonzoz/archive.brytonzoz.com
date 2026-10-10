@@ -284,6 +284,12 @@ August 2026
   assert.equal(items.some((item) => /apple store/i.test(item.name)), false);
   assert.ok(items.every((item) => item.date && item.date.startsWith('2026-')));
   assert.ok(items.find((item) => /hotelist/i.test(item.name))?.date === '2026-10-05');
+  const flat = research.itemsFromDatedJournal({
+    text: 'October 2026 - 5 Oct I made hotelist.com to fix Airbnb ratings - 8 Oct I discovered bots September 2026 - 23 Sep I passed $10M/y in revenue',
+    url: 'https://levels.io/',
+    year: 2026,
+  });
+  assert.ok(flat.some((item) => /hotelist/i.test(item.name)), flat.map((item) => item.name).join(' | '));
   assert.ok(research.looksLikePersonalShip('I made hotelist.com to fix ratings'));
   assert.equal(research.looksLikePersonalShip('I discovered that thousands of bots monitor X'), false);
   assert.ok(research.extraResearchPaths('https://levels.io').some((url) => /\/blog$/.test(url)));

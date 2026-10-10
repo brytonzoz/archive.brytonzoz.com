@@ -256,12 +256,12 @@ export function itemsFromDatedJournal(opts: { text: string; url: string; year: n
     const end = i + 1 < marks.length ? (marks[i + 1].index ?? text.length) : Math.min(text.length, start + 8000);
     const chunk = text.slice(start, end);
     const bulletRe = new RegExp(
-      `(?:^|\\n)\\s*(?:[-*•●]|\\d+[.)])?\\s*(\\d{1,2})\\s+(${MONTH_NAME})(?:\\s+'?\\d{2,4})?\\s+(.+?)(?=\\n|$)`,
+      `(?:^|[\\n•●\\-]|\\s)\\s*(\\d{1,2})\\s+(${MONTH_NAME})(?:\\s+'?\\d{2,4})?\\s+(.+?)(?=(?:\\s+[\\-*•●]?\\s*\\d{1,2}\\s+(?:${MONTH_NAME}))|\\s+(?:${MONTH_NAME})\\s+${year}\\b|\\n|$)`,
       'gi',
     );
     for (const match of chunk.matchAll(bulletRe)) {
       const day = match[1].padStart(2, '0');
-      const raw = match[3].replace(/𝕏/g, '').trim();
+      const raw = match[3].replace(/𝕏/g, '').replace(/\s+/g, ' ').trim();
       if (!looksLikePersonalShip(raw)) continue;
       add(raw, `${year}-${month}-${day}`, `Announced ${year}-${month}-${day} on ${hostOf(url) ?? 'their site'}`);
     }

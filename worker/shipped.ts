@@ -49,7 +49,19 @@ import {
   upgradeOffer,
   type SaleKind,
 } from '../lib/shipped-upgrade';
-import { brandIcon, candidatesFromIdentity, clean, faviconUrl, gather, hostOf, readSite, resolveIdentity, tinyfishAccess, type SourceEnv } from './shipped-sources';
+import {
+  brandIcon,
+  candidatesFromIdentity,
+  clean,
+  faviconUrl,
+  gather,
+  hostOf,
+  readSite,
+  resolveIdentity,
+  tinyfishAccess,
+  type Gathered,
+  type SourceEnv,
+} from './shipped-sources';
 import { makeCompanyStore, parseOffworkerCache, putOffworkerCache } from './shipped-company-store';
 import { TINYFISH_DAILY, type TinyfishKind, type TinyfishMeter } from './shipped-tinyfish';
 import { checkFetchUrl, finalUrl } from './shipped-fetch';
@@ -2115,6 +2127,50 @@ function subjectFromReceipt(data: YearReceipt): Subject | null {
   return { kind: subject.kind, id: subject.id, display: typeof subject.display === 'string' && subject.display ? subject.display : subject.id, x: subject.x };
 }
 
+/** Admin reprints: merge the off-worker company tape when a CEO hint is supplied. */
+async function enrichReprintCompanyCache(
+  env: ShippedEnv,
+  db: D1Database,
+  year: number,
+  hint: Partial<import('./shipped-affiliation').Affiliation> | undefined,
+  gathered: Gathered,
+): Promise<Gathered> {
+  if (!hint?.company) return gathered;
+  const { emptyAffiliation, mergeAffiliation } = await import('./shipped-affiliation');
+  const { harvestCompany } = await import('./shipped-company');
+  const role =
+    hint.role === 'ceo' || hint.role === 'founder' || hint.role === 'lead' || hint.role === 'employee' ? hint.role : 'ceo';
+  const affiliation = mergeAffiliation(emptyAffiliation(), {
+    ...emptyAffiliation(),
+    ...hint,
+    company: hint.company,
+    role,
+    typedCompany: true,
+    name: gathered.profile.name || hint.name || '',
+  });
+  const company = await harvestCompany({
+    affiliation,
+    year,
+    env,
+    store: makeCompanyStore(env, db),
+    storeOnly: true,
+    rebuild: true,
+  });
+  if (!company.found.length) return gathered;
+  gathered.profile.affiliation = mergeAffiliation(gathered.profile.affiliation ?? emptyAffiliation(), affiliation);
+  const seen = new Set(gathered.found.map((item) => (item.name ?? '').toLowerCase()).filter(Boolean));
+  for (const item of company.found) {
+    const key = (item.name ?? '').toLowerCase();
+    if (!key || seen.has(key)) continue;
+    seen.add(key);
+    gathered.found.push(item);
+  }
+  for (const tag of company.ran) {
+    if (!gathered.ran.includes(tag)) gathered.ran.push(tag);
+  }
+  return gathered;
+}
+
 /** Re-run gather + assemble for an existing row. Same id; listed/hidden stay as they are. */
 async function reprintReceipt(
   env: ShippedEnv,
@@ -2142,13 +2198,14 @@ async function reprintReceipt(
   if (!slot) return json({ error: 'busy' }, 503);
   let reserved = 0;
   try {
-    const gathered = await gather(
+    let gathered = await gather(
       subject,
       gatherEnv(env, db, { xaiMeter: denyXaiMeter(), xaiMode: 'off', SHIPPED_XAI_OFF: '1' }),
       year,
       tinyfishMeter(db),
       { rebuild: true, affiliation: affiliationHint },
     );
+    gathered = await enrichReprintCompanyCache(env, db, year, affiliationHint, gathered);
     if (subject.kind === 'github' && gathered.profile.name && !hasBlockedWord(gathered.profile.name)) subject.display = clean(gathered.profile.name, 60);
     let model: string | null = null;
     let usage = { input: 0, output: 0, searches: 0, cost: 0 };

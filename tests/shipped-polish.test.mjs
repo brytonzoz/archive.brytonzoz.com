@@ -857,6 +857,9 @@ test('prereleases, starters, and Gateway model listings are not ships', () => {
   assert.match(polish.cleanShipTitle('Agents can now buy domains with the Vercel CLI'), /agents can now buy domains/i);
   assert.match(polish.cleanShipTitle('Use Codex with Amazon Bedrock'), /codex with amazon bedrock|use codex with amazon bedrock/i);
   assert.match(polish.cleanShipTitle('Build and install plugins in Codex'), /plugins in codex|build and install plugins/i);
+  assert.match(polish.cleanShipTitle('Share an app window'), /share an app window/i);
+  assert.match(polish.cleanShipTitle('Sites'), /sites/i);
+  assert.match(polish.cleanShipTitle('Appshots'), /appshots/i);
   assert.equal(polish.cleanShipTitle('Use a random leftover'), '');
   assert.match(polish.cleanShipTitle('GPT-6 Astra: A new generation of intelligence'), /gpt-6 astra$/i);
   assert.match(polish.cleanShipTitle('Deploy from Claude Design to Vercel'), /claude design deploys/i);

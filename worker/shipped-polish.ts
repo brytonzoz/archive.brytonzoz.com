@@ -831,13 +831,18 @@ export function cleanShipTitle(raw: unknown, max = TITLE_MAX): string {
 }
 
 /** Product / feature / model noun phrase. Sentence fragments and dangling preps fail. */
-const NAMED_PRODUCT = /\b(codex|chatgpt|cursor|v0|gpt-?\d|sora|atlas)\b/i;
-const SOFT_TITLE_START = /^(use|build|building|work|more)\b/i;
+const NAMED_PRODUCT = /\b(codex|chatgpt|cursor|v0|gpt-?\d|sora|atlas|appshots|sites)\b/i;
+const SOFT_NAMED_START = /^(use|build|building|work|more)\b/i;
+const SOFT_CONCRETE_START = /^(share|pin|open)\b/i;
 
 export function isProductNounPhrase(title: string): boolean {
   const text = tidy(title);
   if (!text) return false;
-  if (TITLE_START_BAD.test(text) && !(SOFT_TITLE_START.test(text) && NAMED_PRODUCT.test(text))) return false;
+  if (TITLE_START_BAD.test(text)) {
+    const namedOk = SOFT_NAMED_START.test(text) && NAMED_PRODUCT.test(text);
+    const concreteOk = SOFT_CONCRETE_START.test(text) && text.split(/\s+/).length >= 3;
+    if (!namedOk && !concreteOk) return false;
+  }
   if (TITLE_END_BAD.test(text) && !NAMED_PRODUCT.test(text)) return false;
   if (BARE_MODEL.test(text.replace(/\s+/g, ''))) return false;
   const words = text.split(/\s+/);

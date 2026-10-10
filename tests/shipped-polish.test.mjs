@@ -777,6 +777,8 @@ test('OpenAI index essays drop; named flagships stay', () => {
   assert.equal(polish.isBlogEssayTitle('OpenAI Delivers low-latency Voice AI at Scale Engineering'), true);
   assert.equal(polish.isBlogEssayTitle('Helping older adults use ChatGPT'), true);
   assert.equal(polish.isBlogEssayTitle('GPT-6'), false);
+  assert.equal(polish.isBlogEssayTitle('Delphi ships 100 times a day with its Python backend'), true);
+  assert.equal(polish.isBlogEssayTitle('Jev is the fastest-adopted model in AI Gateway history'), true);
   assert.equal(polish.isBlogEssayTitle('ChatGPT Images'), false);
   assert.equal(polish.isBlogEssayTitle('Sora'), false);
 });

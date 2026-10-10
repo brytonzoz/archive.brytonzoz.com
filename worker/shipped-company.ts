@@ -189,7 +189,7 @@ export function compactCompanyFound(found: Found[], cap = COMPANY_CACHE_CAP): Fo
     if (item.source === 'company' && /github\.com\//i.test(url)) n -= 50;
     if (/\bcodex\b/i.test(name) && !versionParts(name)) n += 50;
     if (versionParts(name) && !flagshipLaunchName(item) && !isCompactMustKeep(item)) n -= 45;
-    if (/\/(blog|news|research)\//i.test(url) && !/changelog|\/index\//i.test(url)) n -= 20;
+    if (/\/(blog|news|research)\//i.test(url) && !/changelog|\/index\//i.test(url)) n -= 90;
     if (looksLikeNotAShip(item) && !flagshipLaunchName(item)) n -= 80;
     if (/\b(bug fixes?|get started|configuration details|see setup)\b/i.test(name)) n -= 60;
     if (/\b(codex|chatgpt|claude|cursor|gpt-?\d)/i.test(name) && name.length <= 72) n += 25;
@@ -533,19 +533,25 @@ function feedPriority(url: string): number {
 }
 
 async function harvestFeeds(urls: string[], year: number, ctx?: FetchCtx): Promise<Found[]> {
-  const unique = [...new Set(urls)].sort((a, b) => feedPriority(a) - feedPriority(b) || a.length - b.length).slice(0, 8);
-  const pages = await mapLimit(unique, 3, (url) =>
-    fetchText(url, 8_000_000, ['application/rss+xml', 'application/atom+xml', 'application/xml', 'text/xml', 'text/html'], ctx?.blocked, 25_000),
-  );
+  const preferred = urls.filter((url) => /\/(changelog\/(rss|atom|feed)|atom)(\.xml)?$/i.test(url));
+  const rest = urls.filter((url) => !preferred.includes(url));
+  const unique = [...new Set([...preferred, ...rest])]
+    .sort((a, b) => feedPriority(a) - feedPriority(b) || a.length - b.length)
+    .slice(0, 10);
+  const pages = await mapLimit(unique, 3, (url) => fetchText(url, 12_000_000, undefined, ctx?.blocked, 25_000));
   const found: Found[] = [];
   const absorb = (text: string) => found.push(...itemsFromFeedXml(text, year).map(asFound));
+  let fetched = 0;
   for (const page of pages) {
-    if (page) absorb(page.text);
+    if (!page?.text) continue;
+    fetched += 1;
+    absorb(page.text);
   }
   if (!found.length && ctx?.tinyfish) {
     const fallback = await fetchViaTinyfish(unique.filter(isPriorityCompanyUrl).slice(0, 4), ctx);
     for (const page of fallback) absorb(page.text);
   }
+  console.log(JSON.stringify({ shipped: 'company-feeds', tried: unique.slice(0, 8), fetched, n: found.length }));
   return found;
 }
 
@@ -903,7 +909,7 @@ export async function harvestCompany(opts: {
   if (opts.storeOnly) {
     return { found: [], spend: emptyXaiSpend(), ran: ['company-store-miss'], cacheHit: false };
   }
-  const cacheKey = opts.deep ? `company:deep:v20:${year}:${slug}` : `company:v20:${year}:${slug}`;
+  const cacheKey = opts.deep ? `company:deep:v21:${year}:${slug}` : `company:v21:${year}:${slug}`;
   const load = async (): Promise<CompanyHarvest> => {
     const via = viaFor(affiliation);
     const ran: string[] = [];
@@ -950,7 +956,9 @@ export async function harvestCompany(opts: {
 
     await Promise.all(
       liveOrigins.slice(0, 4).map(async (origin) => {
-        for (const path of FEED_PATHS) feeds.push(`${origin.replace(/\/+$/, '')}${path}`);
+        const root = origin.replace(/\/+$/, '');
+        feeds.unshift(`${root}/atom`, `${root}/changelog/rss`, `${root}/changelog/atom`);
+        for (const path of FEED_PATHS) feeds.push(`${root}${path}`);
         const sitemapItems = await harvestSitemaps(origin, year, ctx).catch(() => []);
         if (sitemapItems.length) {
           const dated = await hydrateFlagshipDates(sitemapItems, year, ctx).catch(() => sitemapItems);

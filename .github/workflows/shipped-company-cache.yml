@@ -59,4 +59,8 @@ jobs:
             echo "::error::ADMIN_PASSWORD is required to write the company cache through the Worker."
             exit 1
           fi
+          if [ "${{ github.event_name }}" = "push" ]; then
+            echo "Push harvest of Vercel/OpenAI is handled by the reprint workflow."
+            exit 0
+          fi
           node --experimental-transform-types --no-warnings scripts/cache-shipped-companies.mjs

@@ -281,8 +281,10 @@ export function isBlogEssayTitle(title: string): boolean {
   if (/\bfor (python |javascript |js |typescript )?engineers\b/i.test(text)) return true;
   if (/\bproduction index\b/i.test(text)) return true;
   if (/\brecap\b/i.test(text)) return true;
-  if (/\b(security boundaries|credential sprawl)\b/i.test(text)) return true;
+  if (/\b(security boundaries|credential sprawl|security release|we disabled)\b/i.test(text)) return true;
   if (/\b(customer journeys?|global affairs|intelligence age|safety cases|youth safety|frontline defenders|false front|road ahead|view inside|epidemiology)\b/i.test(text)) return true;
+  if (/\bships\s+\d+\s+times?\s+a\s+day\b/i.test(text) || /\bfastest-adopted\b/i.test(text)) return true;
+  if (/\bships agent-written code\b|\bbug bounty program\b/i.test(text)) return true;
   if (/\b(helping (older adults|small businesses)|supporting the blind|big air tour|expand(?:s|ing) (access|their partnership)|academy with)\b/i.test(text)) return true;
   if (/^(towards|disrupting|advancing|acceleration|daybreak|eternal|path to|publication)\b/i.test(text)) return true;
   if (/^openai delivers\b/i.test(text) || /\b(at scale|in production)\s+engineering\b/i.test(text)) return true;
@@ -1258,6 +1260,15 @@ export function polishCandidates<T extends Polishable>(items: T[], opts: PolishO
     }
     if (isDocsOrCategoryHref(item.link) && !flagship && !isChangelogEntryHref(item.link)) {
       drop(item, 'docs-href');
+      continue;
+    }
+    if (
+      !flagship &&
+      /\/blog\//i.test(item.link || '') &&
+      !/changelog/i.test(item.link || '') &&
+      (isBlogEssayTitle(name) || /\bships\b/i.test(name) || /\b(engineers?|customers?|teams?)\b/i.test(name))
+    ) {
+      drop(item, 'blog-essay');
       continue;
     }
     if (isUnnotableCompanyRepo({ ...item, name }) && !flagship) {

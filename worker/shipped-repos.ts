@@ -95,7 +95,10 @@ export function looksLikeCodeIdentifier(name: string): boolean {
 
 /** A person's name is never a ship (`Mattia Astorino`). Products like Agents Window stay. */
 export function looksLikePersonName(name: string, who?: string | null): boolean {
-  const text = name.replace(/\s+/g, ' ').trim();
+  const text = name
+    .replace(/@[\w.-]+/g, ' ')
+    .replace(/\s+/g, ' ')
+    .trim();
   if (!text) return false;
   if (who) {
     const a = text.toLowerCase().replace(/[^a-z]/g, '');
@@ -104,7 +107,7 @@ export function looksLikePersonName(name: string, who?: string | null): boolean 
   }
   const words = text.split(/\s+/);
   if (words.length < 2 || words.length > 3) return false;
-  if (/[\d@/]/.test(text)) return false;
+  if (/[\d/]/.test(text)) return false;
   const norm = words.map((word) => word.replace(/^[^A-Za-z]+|[^A-Za-z]+$/g, ''));
   if (norm.some((word) => word.length < 2 || word.length > 14)) return false;
   if (norm.some((word) => NOT_A_PERSON_WORD.has(word.toLowerCase()))) return false;

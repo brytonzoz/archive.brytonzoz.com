@@ -257,6 +257,34 @@ test('cashier note and stats are specific to the items, never stock copy', () =>
   );
   assert.equal(ai.hardRejectNote('Codex app took the desktop.', ceoItems, [], { who: 'Sam', usedNotes: ['Codex app took the desktop.'] }), 'duplicate');
   assert.equal(ai.hardRejectNote('The pair is Codex app and Sora.', ceoItems, [], { who: 'Sam Altman' }), 'banned-phrase');
+  assert.equal(
+    ai.hardRejectNote(
+      'Jev had a busy year. youtube-sponsor-detection is the one that matters.',
+      [{ name: 'YOUTUBE-SPONSOR-DETECTION', spoken: 'youtube-sponsor-detection' }],
+      [],
+      { who: 'Tony Dinh', handle: 'tdinh' },
+    ),
+    'other-person',
+  );
+  assert.equal(
+    ai.hardRejectNote(
+      'Tony shipped youtube-sponsor-detection and kept going.',
+      [{ name: 'YOUTUBE-SPONSOR-DETECTION', spoken: 'youtube-sponsor-detection' }],
+      [],
+      { who: 'Tony Dinh', handle: 'tdinh' },
+    ),
+    null,
+  );
+  assert.equal(
+    ai.hardRejectNote(
+      'Zshy went out with no description and Pullfrog did the same.',
+      [{ name: 'ZSHY', spoken: 'Zshy' }, { name: 'PULLFROG', spoken: 'Pullfrog' }],
+      [],
+      { who: 'Colin McDonnell', handle: 'colinhacks' },
+    ),
+    'missing-data',
+  );
+  assert.equal(ai.noteCitesOtherPerson('Marc Lou already shipped Ship or Die.', [{ name: 'POST BRIDGE', spoken: 'Post Bridge' }], { who: 'Jack Friks', handle: 'jackfriks' }), true);
   const softOnly = ai.pickBestNote(
     [
       'Harbor is the whole receipt. The CLI is just the grip.',
@@ -283,7 +311,14 @@ test('cashier note and stats are specific to the items, never stock copy', () =>
       web: [],
       pages: [],
       site: null,
-      profile: { name: 'levelsio', bio: '', site: 'https://levels.io/', x: 'levelsio', github: 'levelsio' },
+      profile: {
+        name: 'levelsio',
+        bio: '',
+        site: 'https://levels.io/',
+        sites: ['https://photoai.com/', 'https://interiorai.com/'],
+        x: 'levelsio',
+        github: 'levelsio',
+      },
       ran: [],
       failed: [],
       stats: [],

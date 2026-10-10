@@ -21,7 +21,7 @@ import { ITEM_STATUSES } from '../lib/shipped-year';
 export const TITLE_MAX = 38;
 
 const DOCS_NAV =
-  /^(overview|prompting|pool|security|browser|search|terminal|settings|plugins?|hooks?|cli|api|faq|guides?|reference|getting started|quickstart|quick start|installation|install|usage|examples?|changelog|release notes|acting as users|builds|context|rules|modes?|models?|indexing|privacy|enterprise|teams|billing|account|authentication|auth|docs|home|index|support|repositories|ideas|pull requests)$/i;
+  /^(overview|prompting|pool|security|browser|search|terminal|settings|plugins?|hooks?|cli|api|faq|guides?|reference|getting started|quickstart|quick start|installation|install|usage|examples?|changelog|release notes|acting as users|builds|context|rules|modes?|models?|indexing|privacy|enterprise|teams|billing|account|authentication|auth|docs|home|index|support|repositories|ideas|pull requests|last updated|what'?s new|agents)$/i;
 const BYLINE = /^(authors?\s*[:\-–—]|written by\b|posted by\b|byline\s*:)/i;
 const NAME_LIST =
   /^[A-Z][A-Za-z.'-]+(?:\s+[A-Z][A-Za-z.'-]+){1,3}(?:,| and )\s+[A-Z][A-Za-z.'-]+/;
@@ -29,11 +29,12 @@ const ROUNDUP =
   /^(week of|this week in|monthly roundup|what we shipped (this|the) week)\b|updates?\s+(jan(?:uary)?|feb(?:ruary)?|mar(?:ch)?|apr(?:il)?|may|jun(?:e)?|jul(?:y)?|aug(?:ust)?|sep(?:t(?:ember)?)?|oct(?:ober)?|nov(?:ember)?|dec(?:ember)?)\s+20\d\d/i;
 const READ_THE = /^(read the|see the|check out the|learn more|if you\b|those\b|your agent can\b|prepare for\b|choose \w+ for complex)\b/i;
 const INSTRUCTIONAL = /^(if you|those |your agent can|you can|you don|use a |use the |use \w[\w.-]* for complex)\b/i;
-const RESEARCH_GERUND = /^(improving|bootstrapping|deprecating|continually|reward hacking|evaluating)\b/i;
+const RESEARCH_GERUND =
+  /^(improving|bootstrapping|deprecating|continually|reward hacking|evaluating|keeping|reproducing|disclosing|migrating|deploying)\b/i;
 const ACQUISITION = /\b(is now a part of|acquired by|has been acquired)\b/i;
 const CUSTOMER_STORY = /\bships\s+[\d.,]+[×x]\s+faster\b|·\s*\d+[kmb]\s*$/i;
 const TRAILING_PREP =
-  /\b(of|in|to|for|and|or|the|a|an|with|on|as|by|from|into|longer|kind|new|our|your|through|their|its|vs|lower|higher|more|less|day|days|managed|security|controlled|trusted|general|advanced|remote|task|chat)$/i;
+  /\b(of|in|to|for|and|or|the|a|an|with|on|as|by|from|into|longer|kind|new|our|your|through|their|its|vs|lower|higher|more|less|day|days|every|managed|security|controlled|trusted|general|advanced|remote|task|chat)$/i;
 const TITLE_START_BAD =
   /^(in|on|at|for|with|from|to|of|by|as|a|an|the|and|or|use|using|start|starting|lines|line|built|build|building|run|running|join|joining|announce|announces|announcing|added|add|fixed|fix|connect|review|share|more|ways|preview|control|give|let|take|work|choose|scan|create|organize|talk|try|visit|explore|download|get|see|read|learn|follow|watch|make|making|how|when|while|after|before|without|inside|beyond|under|over|my|our|your|quitting)\b/i;
 const TITLE_END_BAD = /\b(of|a|an|the|with|and|or|security|controlled|trusted|general|advanced|remote|task|chat)\s*$/i;
@@ -41,7 +42,7 @@ const TITLE_VERB =
   /^(announces|announce|announced|connects|connect|built|builds|building|works|working|uses|using|used|launched|ships|shipped|released|added|adds|created|makes|made|lets|can|will|is|are|was|were|gives|reaches|joins|keeps|combines|deprecated)$/i;
 const SENTENCE_VERB =
   /\b(announces|announce|announced|connects|gives|reaches|joins|keeps|combines|deprecated|also added|is now|now keeps)\b/i;
-const BARE_MODEL = /^gpt-\d+$/i;
+const BARE_MODEL = /^gpt-[3-5]$/i;
 const CODE_TITLE = /^[a-z][\w-]*\.[a-z][\w-]*\.[a-z]/i;
 const MID_WORD =
   /^(ontrol|elease|pdate|ettings|vailable|olling|espectively|ead|nounced|ntroducing|aunched|hipped)\b/i;
@@ -198,17 +199,102 @@ export function looksCutOff(text: string): boolean {
 }
 
 export function isAboutPerson(title: string, who: string | null | undefined): boolean {
-  const name = tidy(who);
-  if (!name || name.length < 5) return false;
+  const name = tidy(who).replace(/^@/, '');
+  if (!name || name.length < 4) return false;
   const a = loose(title);
   const b = loose(name);
-  if (!b || b.length < 8) return false;
+  if (!b || b.length < 5) return false;
   if (a === b || a === `${b}s`) return true;
+  if (b.length >= 5 && a.includes(b) && /@[\w.-]+/.test(title)) return true;
   const words = name.split(/\s+/).filter((word) => word.length > 2);
   if (words.length < 2) return false;
   const hay = title.toLowerCase();
   if (!words.every((word) => hay.includes(word.toLowerCase()))) return false;
-  return title.split(/\s+/).length <= words.length + 2;
+  return title.split(/\s+/).length <= words.length + 3;
+}
+
+const JOB_TITLE =
+  /\b(software engineer|staff engineer|engineering manager|developer advocate|engineer at|python engineers?)\b/i;
+
+function isSelfNameTitle(title: string, opts: { who?: string | null; handle?: string | null } = {}): boolean {
+  const text = tidy(title);
+  if (isAboutPerson(text, opts.who) || isAboutPerson(text, opts.handle)) return true;
+  const stripped = text.replace(/@[\w.-]+/g, ' ').replace(/\s+/g, ' ').trim();
+  if (looksLikePersonName(stripped, opts.who) || looksLikePersonName(text, opts.who)) return true;
+  const handle = (opts.handle || '').replace(/^@/, '');
+  if (handle.length >= 4 && new RegExp(`@${handle}\\b`, 'i').test(text)) return true;
+  if (JOB_TITLE.test(text) && looksLikePersonName(stripped.replace(JOB_TITLE, '').trim(), opts.who)) return true;
+  if (JOB_TITLE.test(text) && stripped.split(/\s+/).length <= 6) return true;
+  return false;
+}
+
+/** Docs nav, SDK references, and "Deploying to X" pages are not ships. */
+export function isDocsOrReferenceTitle(title: string): boolean {
+  const text = tidy(title);
+  if (!text) return true;
+  if (/^(last updated|what'?s new|deploying to)\b/i.test(text)) return true;
+  if (/\b(js\s+)?sdk\s+reference\b/i.test(text)) return true;
+  if (/\breference$/i.test(text) && /\b(sdk|api|cli|js|flags|queues)\b/i.test(text)) return true;
+  return false;
+}
+
+/** Blog essays, reports, and cut-off thought-pieces. */
+export function isBlogEssayTitle(title: string): boolean {
+  const text = tidy(title);
+  if (!text) return true;
+  if (/\bkeeping\b.+\bwhile\b/i.test(text)) return true;
+  if (/^(we\s+)?migrated\b/i.test(text)) return true;
+  if (/^reproducing\b/i.test(text)) return true;
+  if (/\beverything\b.+\bwill (get|be) hacked\b/i.test(text)) return true;
+  if (/\btake\s+\d+\s*%/i.test(text)) return true;
+  if (/^state of\b/i.test(text)) return true;
+  if (/^open-weight\b/i.test(text)) return true;
+  if (/\bfor (python |javascript |js |typescript )?engineers\b/i.test(text)) return true;
+  if (/\bproduction index\b/i.test(text)) return true;
+  return false;
+}
+
+const TITLE_MONTH: Record<string, string> = {
+  jan: '01',
+  january: '01',
+  feb: '02',
+  february: '02',
+  mar: '03',
+  march: '03',
+  apr: '04',
+  april: '04',
+  may: '05',
+  jun: '06',
+  june: '06',
+  jul: '07',
+  july: '07',
+  aug: '08',
+  august: '08',
+  sep: '09',
+  sept: '09',
+  september: '09',
+  oct: '10',
+  october: '10',
+  nov: '11',
+  november: '11',
+  dec: '12',
+  december: '12',
+};
+
+/** "… SEPTEMBER" dated January 1 is a scrape/index date, not a launch day. */
+export function isMismatchedMonthDate(title: string, date?: string | null): boolean {
+  if (!date) return false;
+  const match = String(date).match(/^(\d{4})-(\d{2})(?:-(\d{2}))?/);
+  if (!match) return false;
+  const titled = tidy(title).match(
+    /\b(jan(?:uary)?|feb(?:ruary)?|mar(?:ch)?|apr(?:il)?|may|jun(?:e)?|jul(?:y)?|aug(?:ust)?|sep(?:t(?:ember)?)?|oct(?:ober)?|nov(?:ember)?|dec(?:ember)?)\b/i,
+  );
+  if (!titled) return false;
+  const want = TITLE_MONTH[titled[1].toLowerCase().replace(/\.$/, '')];
+  if (!want) return false;
+  if (match[2] === want) return false;
+  if (match[2] === '01' && (match[3] === '01' || !match[3])) return true;
+  return match[2] !== want;
 }
 
 function isAcquisitionNews(title: string): boolean {
@@ -217,9 +303,13 @@ function isAcquisitionNews(title: string): boolean {
   return true;
 }
 
-export function isJunkTitle(title: string, opts: { who?: string | null; company?: string | null } = {}): boolean {
+export function isJunkTitle(
+  title: string,
+  opts: { who?: string | null; handle?: string | null; company?: string | null; date?: string | null } = {},
+): boolean {
   const text = tidy(title);
-  if (!text || text.length < 3) return true;
+  if (!text) return true;
+  if (text.length < 3 && !/^v\d$/i.test(text)) return true;
   if (BYLINE.test(text) || NAME_LIST.test(text) || ROUNDUP.test(text) || READ_THE.test(text) || INSTRUCTIONAL.test(text)) return true;
   if (RESEARCH_GERUND.test(text) || CUSTOMER_STORY.test(text) || isAcquisitionNews(text)) return true;
   if (CTA_NAV.test(text) || CTA_TRAIL.test(text)) return true;
@@ -229,7 +319,9 @@ export function isJunkTitle(title: string, opts: { who?: string | null; company?
   if (/\bgithub stars\b|\bweekly downloads\b/i.test(text) && !/\b(zod|nub|tsc|cli|app)\b/i.test(text)) return true;
   if (/^respectively\.?$/i.test(text)) return true;
   if (DOCS_NAV.test(text) || /^(recent highlights|cursor support|under:|blog\s*\/\s*research|blog|research)$/i.test(text)) return true;
-  if (isAboutPerson(text, opts.who)) return true;
+  if (isDocsOrReferenceTitle(text) || isBlogEssayTitle(text)) return true;
+  if (isMismatchedMonthDate(text, opts.date)) return true;
+  if (isSelfNameTitle(text, opts)) return true;
   if (looksLikePersonName(text, opts.who) || looksLikeCodeIdentifier(text)) return true;
   if (isPricingOrMetricNote(text)) return true;
   if (isNotAShipTitle(text)) return true;
@@ -237,7 +329,7 @@ export function isJunkTitle(title: string, opts: { who?: string | null; company?
   const whoLast = (opts.who || '').split(/\s+/).filter((word) => word.length > 2);
   if (/^[A-Z]\s+[A-Z]{2,}$/.test(text) && whoLast.some((word) => loose(text).includes(loose(word)))) return true;
   if (looksFragment(text) || looksMidWord(text) || looksCutOff(text)) return true;
-  if ((text.replace(/[^a-zA-Z]/g, '').length < 3) && /\d/.test(text)) return true;
+  if ((text.replace(/[^a-zA-Z]/g, '').length < 3) && /\d/.test(text) && !/^v\d\b/i.test(text)) return true;
   return false;
 }
 
@@ -280,7 +372,7 @@ export function isNotAShipTitle(name: string): boolean {
 export function isVagueOrCutTitle(name: string): boolean {
   const text = tidy(name);
   if (!text) return true;
-  if (/\b or \b/i.test(text)) return true;
+  if (/\b or \b/i.test(text) && !/\b(ship or die|marketing or die)\b/i.test(text)) return true;
   if (/^cloud work$/i.test(text) || /^new controls\b/i.test(text) || /^all\s+[a-z]+$/i.test(text)) return true;
   if (/\bin the chatgpt desktop$/i.test(text)) return true;
   if (/^(pets|cloud|new)\s+[a-z]+$/i.test(text) && !/\b(cli|app|sdk|api|gpt|codex|cursor|chatgpt)\b/i.test(text)) return true;
@@ -717,7 +809,7 @@ function versionFamily(item: Polishable): { product: string; count: number } | n
   if (rolled) return { product: rolled[1].trim(), count: Number(rolled[2]) || 1 };
   const parts = versionParts(item.name);
   if (!parts) return null;
-  if (flagshipLaunchName({ ...item, name: parts.product }) || flagshipLaunchName(item)) return null;
+  if (flagshipLaunchName(item)) return null;
   if (/^(grok|claude|gemini)$/i.test(parts.product)) return null;
   return { product: parts.product, count: versionCount(item) };
 }
@@ -861,16 +953,17 @@ export function polishCandidates<T extends Polishable>(items: T[], opts: PolishO
         continue;
       }
     }
+    const junkOpts = { who, handle: opts.handle, company: opts.affiliation?.company, date: item.date };
     let name = cleanShipTitle(item.name);
     if (flagship && !isCursorModelNote(item) && (!name || name.split(/\s+/).length <= 1 || /^the new\b/i.test(name))) {
-      if (!name) logFlagshipGate(item, isJunkTitle(item.name, { who }) ? 'junk-title' : 'title-empty', flagship);
+      if (!name) logFlagshipGate(item, isJunkTitle(item.name, junkOpts) ? 'junk-title' : 'title-empty', flagship);
       name = flagship;
     }
     if (!name) {
-      drop(item, isJunkTitle(item.name, { who, company: opts.affiliation?.company }) ? 'junk-title' : 'title-empty');
+      drop(item, isJunkTitle(item.name, junkOpts) ? 'junk-title' : 'title-empty');
       continue;
     }
-    if (isJunkTitle(name, { who, company: opts.affiliation?.company })) {
+    if (isJunkTitle(name, junkOpts)) {
       if (flagship) {
         logFlagshipGate(item, 'junk-title', flagship);
         name = flagship;
@@ -899,6 +992,10 @@ export function polishCandidates<T extends Polishable>(items: T[], opts: PolishO
       (isFlagshipYearKeep(item, year) && item.date ? String(item.date).slice(0, 10) : inYearDate(item.date, year));
     if (isChangelogPhrase(name, date)) {
       drop(item, 'changelog-phrase');
+      continue;
+    }
+    if (isMismatchedMonthDate(name, date)) {
+      drop(item, 'date-mismatch');
       continue;
     }
     if (opts.owner && !undatedPassesGate({ ...item, name, date }, opts.owner)) {
@@ -938,7 +1035,43 @@ export function polishCandidates<T extends Polishable>(items: T[], opts: PolishO
   if (drops.length) {
     console.log(JSON.stringify({ shipped: 'polish-drops', who, handle: opts.handle || null, kept: capped.length, drops: drops.slice(0, 80) }));
   }
-  return capped
+  const rolled = rollupCeoLeadCrumbs(capped, opts.affiliation);
+  if (rolled.length < capped.length) drop({ name: `${capped.length - rolled.length} ceo-lead crumbs` }, 'ceo-rollup');
+  return rolled
     .map((item) => ({ ...item, name: versionParts(item.name) ? item.name : wordClamp(item.name, TITLE_MAX) }))
     .sort((a, b) => (a.date ?? '9999').localeCompare(b.date ?? '9999'));
+}
+
+function isOpenAiCompanyWide(name: string): boolean {
+  return /\b(gpt-?\d|chatgpt|sora|(openai|chatgpt)\s+(device|computer|phone|hardware)|atlas)\b/i.test(name);
+}
+
+/** CEO tapes keep company-wide flagships; a product-lead changelog (Codex) collapses to one line. */
+export function rollupCeoLeadCrumbs<T extends Polishable>(items: T[], affiliation?: Affiliation | null): T[] {
+  const role = affiliation?.role;
+  if (role !== 'ceo' && role !== 'founder') return items;
+  const company = loose(affiliation?.company || '');
+  if (company !== 'openai' && !company.includes('openai')) return items;
+  const wide: T[] = [];
+  const lead: T[] = [];
+  const other: T[] = [];
+  for (const item of items) {
+    if (isOpenAiCompanyWide(item.name) || (flagshipLaunchName(item) && !/\bcodex\b/i.test(item.name))) wide.push(item);
+    else if (/\bcodex\b/i.test(item.name)) lead.push(item);
+    else other.push(item);
+  }
+  if (wide.length < 1 || lead.length <= 1) return items;
+  const app =
+    lead.find((item) => /^codex app\b/i.test(item.name)) ??
+    lead.slice().sort((a, b) => (b.significance ?? 0) - (a.significance ?? 0) || (a.date ?? '').localeCompare(b.date ?? ''))[0];
+  return [...wide, ...other, ...(app ? [app] : [])];
+}
+
+/**
+ * The one print-time gate. Every receipt line — company cache, npm, GitHub, site,
+ * xAI, changelog — passes through here right before the tape is written.
+ * Company caches store raw rows; this is what applies today's filters to old caches.
+ */
+export function gateReceiptItems<T extends Polishable>(items: T[], opts: PolishOpts): T[] {
+  return polishCandidates(items, opts);
 }

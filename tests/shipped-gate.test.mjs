@@ -1,0 +1,104 @@
+import './resolve-ts.mjs';
+import assert from 'node:assert/strict';
+import { readFileSync } from 'node:fs';
+import { dirname, join } from 'node:path';
+import { fileURLToPath } from 'node:url';
+import { test } from 'node:test';
+
+const polish = await import('../worker/shipped-polish.ts');
+const ai = await import('../worker/shipped-ai.ts');
+const affiliation = await import('../worker/shipped-affiliation.ts');
+
+const fixture = JSON.parse(readFileSync(join(dirname(fileURLToPath(import.meta.url)), 'fixtures/shipped-junk.json'), 'utf8'));
+
+function asItem(row) {
+  return {
+    description: row.description || '',
+    date: row.date ?? null,
+    link: row.link || 'https://example.com/ship',
+    source: row.source || 'changelog',
+    status: 'LAUNCHED',
+    score: 7,
+    thisYear: true,
+    name: row.name,
+  };
+}
+
+function gateRow(row) {
+  return polish.gateReceiptItems([asItem(row)], {
+    year: 2026,
+    who: row.who || null,
+    handle: row.handle || null,
+    owner: row.owner || null,
+  });
+}
+
+test('shipped-junk fixture: every flagged title drops; flagships stay', () => {
+  const leaked = [];
+  for (const row of fixture.drop) {
+    const kept = gateRow(row);
+    if (kept.length) leaked.push(`${row.name} → ${kept.map((item) => item.name).join(', ')}`);
+  }
+  assert.deepEqual(leaked, [], `junk leaked: ${JSON.stringify(leaked)}`);
+
+  const missing = [];
+  for (const row of fixture.keep) {
+    const kept = gateRow(row);
+    if (!kept.length) missing.push(row.name);
+  }
+  assert.deepEqual(missing, [], `flagships dropped: ${JSON.stringify(missing)}`);
+});
+
+test('print-time gate collapses OpenAI CEO Codex crumbs to company-wide ships', () => {
+  const aff = {
+    ...affiliation.emptyAffiliation(),
+    name: 'Sam Altman',
+    company: 'OpenAI',
+    role: 'ceo',
+    typedCompany: true,
+  };
+  const items = polish.gateReceiptItems(
+    [
+      asItem({ name: 'GPT-6', date: '2026-05-01', link: 'https://openai.com/index/gpt-6' }),
+      asItem({ name: 'ChatGPT Images', date: '2026-02-01', link: 'https://openai.com/index/images' }),
+      asItem({ name: 'Sora', date: '2026-03-01', link: 'https://openai.com/sora' }),
+      asItem({ name: 'Codex app', date: '2026-02-14', link: 'https://openai.com/codex' }),
+      asItem({ name: 'Codex CLI 0.145.0', date: '2026-07-21', link: 'https://developers.openai.com/codex/cli' }),
+      asItem({ name: 'Codex long-running work', date: '2026-04-01', link: 'https://developers.openai.com/codex/long' }),
+      asItem({ name: 'GitLab support in Codex', date: '2026-08-20', link: 'https://developers.openai.com/codex/gitlab' }),
+    ],
+    { year: 2026, who: 'Sam Altman', affiliation: aff },
+  );
+  const names = items.map((item) => item.name);
+  assert.ok(names.some((name) => /gpt[-\s]?6/i.test(name)), JSON.stringify(names));
+  assert.ok(names.some((name) => /chatgpt images/i.test(name)), JSON.stringify(names));
+  assert.ok(names.some((name) => /sora/i.test(name)), JSON.stringify(names));
+  assert.equal(names.filter((name) => /codex/i.test(name)).length, 1, JSON.stringify(names));
+});
+
+test('lead tapes still keep the Codex changelog; harvestItems uses the print gate', () => {
+  const aff = {
+    ...affiliation.emptyAffiliation(),
+    name: 'Tibo',
+    company: 'OpenAI',
+    role: 'lead',
+    product: 'Codex',
+    typedCompany: true,
+  };
+  const gathered = {
+    found: [
+      asItem({ name: 'Codex app', date: '2026-02-14', link: 'https://openai.com/codex' }),
+      asItem({ name: 'Codex CLI', date: '2026-02-20', link: 'https://openai.com/codex-cli' }),
+      asItem({ name: 'GPT-6', date: '2026-05-01', link: 'https://openai.com/index/gpt-6' }),
+    ],
+    web: [],
+    pages: [],
+    site: null,
+    profile: { name: 'Tibo', bio: '', site: null, x: 'tibo_maker', github: null, affiliation: aff },
+    ran: [],
+    failed: [],
+    stats: [],
+  };
+  const tape = ai.harvestItems(gathered, 2026).map((item) => item.name);
+  assert.ok(tape.filter((name) => /codex/i.test(name)).length >= 2, JSON.stringify(tape));
+});

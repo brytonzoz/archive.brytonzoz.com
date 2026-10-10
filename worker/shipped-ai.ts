@@ -9,10 +9,11 @@ import { REQUIRED_MODULES, sanitizeLayout, type ModuleId } from '../lib/shipped-
 import { clean, hostOf, inYearCount, publicUrl, type Found, type Gathered } from './shipped-sources';
 import { shipName } from './shipped-changelog';
 import { shareKeywords } from './shipped-decisions';
-import { ownerFromProfile } from './shipped-ownership';
+import { ownerFromProfile, type OwnerContext } from './shipped-ownership';
 import { flagshipLaunchName, isFlagshipYearKeep, isJoinOrAcquire, isPriorYearJoin, logFlagshipGate } from './shipped-flagship';
-import { cleanDescription, cleanShipTitle, cleanStatus, noteCountMismatch, polishCandidates, spokenShipName } from './shipped-polish';
-import type { Affiliation } from './shipped-affiliation';
+import { cleanDescription, cleanShipTitle, cleanStatus, gateReceiptItems, noteCountMismatch, spokenShipName } from './shipped-polish';
+import { emptyAffiliation, type Affiliation } from './shipped-affiliation';
+import { looksLikePersonName } from './shipped-repos';
 import { RECEIPT_BUDGET_MICROS, formatReceiptStats, searchBudget, type SourcedStat } from './shipped-research';
 
 export interface AiEnv {
@@ -214,6 +215,12 @@ export function noteMisusesStats(note: string, count: number, stats: string[] = 
 const BANNED_NOTE_SHAPE =
   /kept \w[\w.]* busy:|(^|[.!?]\s+)\S[\w.]* first,\s+\S.+ later|spent the (rest of the )?year on |kept stacking|people will remember|\bthe sleeper\b|the loud one|slipped .+ beside|\bthe pair is\b|\bdoes one job\b|\bdoes another\b|\bopens on\b|\bopened the year\b|\byear opens\b|\bno encore\b/i;
 
+const MISSING_DATA_NOTE =
+  /\b(no description|without a description|with no description|lacks a description|has no description|went out with no|missing (a )?(description|date|copy)|undated|no date|without (a )?date|has no date)\b/i;
+
+const NOTE_MONTH =
+  /^(jan(?:uary)?|feb(?:ruary)?|mar(?:ch)?|apr(?:il)?|may|jun(?:e)?|jul(?:y)?|aug(?:ust)?|sep(?:t(?:ember)?)?|oct(?:ober)?|nov(?:ember)?|dec(?:ember)?)$/i;
+
 /** URLs, raw stat dumps, ALL-CAPS tape names, or the word "lines" — a human note never does this. */
 export function noteFailsVoice(note: string): boolean {
   const text = note.replace(/\s+/g, ' ').trim();
@@ -320,6 +327,61 @@ export function noteCitesUnknownShip(
   return false;
 }
 
+function customerNameKeys(ctx: NoteContext): Set<string> {
+  const keys = new Set<string>();
+  for (const raw of [ctx.who, ctx.handle, ctx.company]) {
+    const text = (raw || '').replace(/^@/, '').trim();
+    if (!text) continue;
+    const compact = loose(text);
+    if (compact.length >= 3) keys.add(compact);
+    for (const part of text.split(/[\s._-]+/)) {
+      const token = loose(part);
+      if (token.length >= 3) keys.add(token);
+    }
+  }
+  return keys;
+}
+
+function noteNameAllowed(span: string, items: { name: string; spoken?: string }[], ctx: NoteContext): boolean {
+  const key = loose(span);
+  if (!key) return true;
+  if (NOTE_NAME_OK.test(span) || NOTE_MONTH.test(span)) return true;
+  const customer = customerNameKeys(ctx);
+  if (customer.has(key)) return true;
+  if ([...customer].some((token) => token.length >= 3 && (key.includes(token) || token.includes(key)))) return true;
+  for (const item of items) {
+    const spoken = spokenOf(item);
+    if (loose(item.name) === key || loose(spoken) === key) return true;
+    if (loose(item.name).includes(key) || loose(spoken).includes(key)) return true;
+    for (const part of `${item.name} ${spoken}`.split(/\s+/)) {
+      if (loose(part) === key) return true;
+    }
+  }
+  return false;
+}
+
+/** Any capitalized person-like name in the note must be the customer (name or handle). */
+export function noteCitesOtherPerson(
+  note: string,
+  items: { name: string; spoken?: string }[] = [],
+  ctx: NoteContext = {},
+): boolean {
+  const text = note.replace(/\s+/g, ' ').trim();
+  if (!text) return false;
+  const pairs = [...text.matchAll(/\b[A-Z][a-z]{2,14}(?:\s+[A-Z][a-z]{2,14})+\b/g)].map((row) => row[0]);
+  for (const span of pairs) {
+    if (looksLikePersonName(span) && !noteNameAllowed(span, items, ctx)) return true;
+  }
+  const subjects = [
+    ...text.matchAll(/\b([A-Z][a-z]{2,14})(?:'s|\s+(?:had|shipped|launched|wrote|built|made|kept))\b/g),
+  ].map((row) => row[1]);
+  for (const span of subjects) {
+    if (!span || NOTE_NAME_OK.test(span) || NOTE_MONTH.test(span)) continue;
+    if (!noteNameAllowed(span, items, ctx)) return true;
+  }
+  return false;
+}
+
 /** Notes that read like a leftover slogan, a fallback stat line, or the same cashier bit. */
 export function cashierNoteLooksCanned(note: string): boolean {
   const text = note.trim();
@@ -350,6 +412,9 @@ export type NoteContext = {
   handle?: string | null;
   bio?: string | null;
   usedNotes?: string[];
+  year?: number;
+  affiliation?: Affiliation | null;
+  owner?: OwnerContext | null;
 };
 
 function notableShip(items: DraftItem[]): DraftItem | null {
@@ -379,7 +444,16 @@ function noteAlreadyUsed(note: string, used: string[]): boolean {
   return used.some((other) => loose(other) === key);
 }
 
-export type NoteRejectReason = 'empty' | 'banned-phrase' | 'url' | 'unsourced-number' | 'duplicate' | 'unknown-ship' | 'unsafe';
+export type NoteRejectReason =
+  | 'empty'
+  | 'banned-phrase'
+  | 'url'
+  | 'unsourced-number'
+  | 'duplicate'
+  | 'unknown-ship'
+  | 'unsafe'
+  | 'other-person'
+  | 'missing-data';
 
 const NOTE_HAS_URL = /https?:\/\/|\bwww\.|\b(npmjs|github|producthunt|twitter)\.com\b/i;
 
@@ -395,9 +469,11 @@ export function hardRejectNote(
   if (!ok(text)) return 'unsafe';
   if (NOTE_HAS_URL.test(text)) return 'url';
   if (BANNED_NOTE_SHAPE.test(text)) return 'banned-phrase';
+  if (MISSING_DATA_NOTE.test(text)) return 'missing-data';
   if (noteMisusesStats(text, items.length, stats) || noteCountMismatch(text, items.length)) return 'unsourced-number';
   if (noteAlreadyUsed(text, ctx.usedNotes ?? [])) return 'duplicate';
   if (noteCitesUnknownShip(text, items, ctx)) return 'unknown-ship';
+  if (noteCitesOtherPerson(text, items, ctx)) return 'other-person';
   return null;
 }
 
@@ -569,17 +645,32 @@ function toDraftItem(item: Found, year: number): DraftItem | null {
   };
 }
 
-/** Harvest already verified the lines. Date order, significance already on each item. */
-export function harvestItems(gathered: Gathered, year: number): DraftItem[] {
-  const seen = new Set<string>();
-  const items: DraftItem[] = [];
-  const polished = polishCandidates(gathered.found, {
+function printGateOpts(gathered: Gathered, year: number) {
+  return {
     year,
     who: gathered.profile.name || gathered.profile.affiliation?.name,
     handle: gathered.profile.x,
     affiliation: gathered.profile.affiliation,
     owner: ownerFromProfile(gathered.profile, gathered.profile.affiliation),
-  });
+  };
+}
+
+function affiliationFromCtx(ctx: NoteContext): Affiliation | null {
+  if (ctx.affiliation) return ctx.affiliation;
+  if (!ctx.role && !ctx.company) return null;
+  return {
+    ...emptyAffiliation(),
+    name: ctx.who || '',
+    company: ctx.company || null,
+    role: (ctx.role as Affiliation['role']) || 'unknown',
+  };
+}
+
+/** Harvest already verified the lines. Date order, significance already on each item. */
+export function harvestItems(gathered: Gathered, year: number): DraftItem[] {
+  const seen = new Set<string>();
+  const items: DraftItem[] = [];
+  const polished = gateReceiptItems(gathered.found, printGateOpts(gathered, year));
   for (const item of polished) {
     const draft = toDraftItem(item, year);
     if (!draft) continue;
@@ -606,12 +697,44 @@ export function harvestItems(gathered: Gathered, year: number): DraftItem[] {
   return items;
 }
 
+function usableOwner(owner?: OwnerContext | null): OwnerContext | null {
+  if (!owner) return null;
+  if (owner.github || owner.site || (owner.name && owner.name.trim().length >= 3)) return owner;
+  return null;
+}
+
+function asPrintedItem(item: DraftItem): DraftItem {
+  return {
+    name: item.name.toUpperCase(),
+    spoken: item.spoken || spokenShipName(item.name),
+    description: item.description || '',
+    date: item.date,
+    status: cleanStatus(item.status),
+    link: item.link,
+    icon: item.icon ?? null,
+    source: item.source,
+    via: item.via ?? null,
+    confidence: item.confidence,
+    isRealShip: item.isRealShip,
+    inYear: item.inYear,
+    significance: item.significance,
+  };
+}
+
 function finish(items: DraftItem[], note: string, seed: number, modulesRaw?: unknown, statsRaw?: unknown, ctx: NoteContext = {}): Draft {
   const layout = sanitizeLayout(modulesRaw, seed);
-  if (!items.length) {
+  const year = ctx.year || new Date().getUTCFullYear();
+  const gated = gateReceiptItems(items, {
+    year,
+    who: ctx.who,
+    handle: ctx.handle,
+    affiliation: affiliationFromCtx(ctx),
+    owner: usableOwner(ctx.owner),
+  }).map(asPrintedItem);
+  if (!gated.length) {
     return { items: [potentialItem()], note: POTENTIAL_NOTES[seed % POTENTIAL_NOTES.length], stats: [], potential: true, layout };
   }
-  const sorted = items.slice(0, MAX_ITEMS).sort(byDate);
+  const sorted = gated.slice(0, MAX_ITEMS).sort(byDate);
   const stats = Array.isArray(statsRaw)
     ? statsRaw
         .filter((line): line is string => typeof line === 'string' && !hasBlockedWord(line) && !/[<>{}`\\]/.test(line))
@@ -637,17 +760,22 @@ function printNote(note: string, _stats: string[]): string {
 export function demoReceipt(gathered: Gathered, year: number, seed: number): Draft {
   const items = harvestItems(gathered, year);
   const affiliation = gathered.profile.affiliation;
+  const noteCtx: NoteContext = {
+    role: affiliation?.role,
+    company: affiliation?.company,
+    who: gathered.profile.name,
+    handle: gathered.profile.x,
+    year,
+    affiliation,
+    owner: ownerFromProfile(gathered.profile, affiliation),
+  };
   return finish(
     items,
-    groundedNote(items, seed, gathered.profile.name, formatStats(items, gathered.stats ?? []), {
-      role: affiliation?.role,
-      company: affiliation?.company,
-      who: gathered.profile.name,
-    }),
+    groundedNote(items, seed, gathered.profile.name, formatStats(items, gathered.stats ?? []), noteCtx),
     seed,
     undefined,
     formatStats(items, gathered.stats ?? []),
-    { role: affiliation?.role, company: affiliation?.company, who: gathered.profile.name },
+    noteCtx,
   );
 }
 
@@ -675,9 +803,12 @@ function noteOnlyPrompt(
 }
 
 function noteOnlySystem(year: number, affiliation?: Affiliation | null, count = 0) {
+  const company = affiliation?.company || 'the company';
   const desk =
     affiliation && (affiliation.role === 'ceo' || affiliation.role === 'founder')
-      ? `This person is the ${affiliation.role} of ${affiliation.company || 'the company'}. The note can nod at that, but still name one real ship from the list.`
+      ? /openai/i.test(company)
+        ? `This person is the ${affiliation.role} of ${company}. Write about a company-wide flagship (GPT-6, ChatGPT launches, Sora, devices) — not a Codex changelog.`
+        : `This person is the ${affiliation.role} of ${company}. The note can nod at that, but still name one real company-wide ship from the list.`
       : '';
   return [
     `You are the cashier on a SHIPPED IN ${year} receipt. You have read their year. Write the punchline people will screenshot.`,
@@ -686,6 +817,8 @@ function noteOnlySystem(year: number, affiliation?: Affiliation | null, count = 
     'Mention the single most notable ship from the item list. Keep that product\'s original casing (tsc-rs, BotID, Post Bridge). Never ALL CAPS.',
     'At most one number, and only if it is copied from <found>.stats (stars or downloads). Prefer no number.',
     'Never invent a plugin, extension, extra product, or fact that is not in the item list or bio.',
+    'If you name a person, it must be this customer (their name or handle only). Never another person.',
+    'Never mention a missing description, missing date, or that something shipped without copy.',
     desk,
     'The bar (do not copy these, and never write about these invented people):',
     '"Northline shipped a radio, then a weather kite. The kite is the one people will steal."',
@@ -853,6 +986,10 @@ function normalize(raw: unknown, gathered: Gathered, allowed: Allowed, year: num
     role: gathered.profile.affiliation?.role,
     company: gathered.profile.affiliation?.company,
     who: gathered.profile.name,
+    handle: gathered.profile.x,
+    year,
+    affiliation: gathered.profile.affiliation,
+    owner: ownerFromProfile(gathered.profile, gathered.profile.affiliation),
   });
 }
 
@@ -1005,6 +1142,9 @@ export async function assembleReceipt(
       handle: gathered.profile.x,
       bio: gathered.profile.bio,
       usedNotes,
+      year,
+      affiliation,
+      owner: ownerFromProfile(gathered.profile, affiliation),
     };
     let note = '';
     let apiDown = false;

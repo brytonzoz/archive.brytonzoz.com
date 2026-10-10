@@ -131,6 +131,18 @@ export function flagshipLaunchName(item: FlagshipItem): string | null {
   const joining = name.match(/^([A-Za-z][\w.-]{1,32})\s+(?:is joining|joins)\s+([A-Za-z][\w.-]{1,32})/i);
   if (joining && isCompanyShip(item)) return `${titleCaseProduct(joining[1])} joining ${titleCaseProduct(joining[2])}`;
 
+  const gpt6 = name.match(/^(?:introducing\s+)?(gpt-?6(?:\.\d+)?(?:\s+sol(?:\s+\w+)*)?)$/i);
+  if (gpt6 && isCompanyShip(item)) return gpt6[1].replace(/^gpt-?/i, 'GPT-').replace(/\b([a-z])/g, (letter) => letter.toUpperCase());
+
+  const chatgpt = name.match(/^(?:introducing\s+)?(chatgpt\s+(?:images(?:\s+[\d.]+)?|voice|atlas|health))$/i);
+  if (chatgpt && isCompanyShip(item)) return titleCaseProduct(chatgpt[1]);
+
+  const sora = name.match(/^(?:introducing\s+)?(sora(?:\s+\d)?)$/i);
+  if (sora && isCompanyShip(item)) return titleCaseProduct(sora[1]);
+
+  const device = name.match(/^(?:introducing\s+)?((?:openai|chatgpt)\s+(?:device|computer|phone|hardware))$/i);
+  if (device && isCompanyShip(item)) return titleCaseProduct(device[1]);
+
   return null;
 }
 

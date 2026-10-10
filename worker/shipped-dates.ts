@@ -262,6 +262,50 @@ function isOwnedPin(
   return ownedByBuilder(item, owner);
 }
 
+/** registry.npmjs.org packument URL. Scoped names use %2f. */
+export function npmRegistryUrl(name: string): string {
+  const trimmed = name.trim();
+  if (!trimmed) return '';
+  const encoded = trimmed.startsWith('@') ? trimmed.replace('/', '%2f') : encodeURIComponent(trimmed);
+  return `https://registry.npmjs.org/${encoded}`;
+}
+
+/** First-publish year from a packument (`time.created`) or raw JSON text. */
+export function parseNpmCreatedYear(body: unknown): number | null {
+  if (typeof body === 'string') {
+    const match = body.match(/"created"\s*:\s*"(20\d{2})-\d{2}-\d{2}/);
+    return match ? Number(match[1]) : null;
+  }
+  if (!body || typeof body !== 'object') return null;
+  const created = (body as { time?: { created?: string } }).time?.created;
+  if (!created) return null;
+  const year = Number(String(created).slice(0, 4));
+  return year >= 1990 && year <= 2100 ? year : null;
+}
+
+export function isFirstPublishBeforeYear(createdYear: number | null | undefined, year: number): boolean {
+  return createdYear != null && createdYear < year;
+}
+
+/** Last-publish in the search index is not a 2026 ship. First publish year is. */
+export async function npmCreatedYear(name: string): Promise<number | null> {
+  const url = npmRegistryUrl(name);
+  if (!url) return null;
+  const res = await safeFetch(url, {
+    accept: 'application/vnd.npm.install-v1+json, application/json',
+    timeoutMs: 8000,
+    maxBytes: 400_000,
+    types: ['application/json', 'application/vnd.npm.install-v1+json', 'text/'],
+  }).catch(() => null);
+  if (!res || res.status >= 400) return null;
+  const text = new TextDecoder('utf-8', { fatal: false }).decode(res.bytes);
+  try {
+    return parseNpmCreatedYear(JSON.parse(text)) ?? parseNpmCreatedYear(text);
+  } catch {
+    return parseNpmCreatedYear(text);
+  }
+}
+
 /** socket.io / engine.io and their -client/-adapter packages: first launched years ago. */
 export function isLegacyNpmFamily(name: string): boolean {
   const n = name.replace(/^@[^/]+\//, '').trim().toLowerCase();
@@ -392,7 +436,20 @@ export async function dateOwnedPins<T extends { name: string; date: string | nul
   kept.length = 0;
   kept.push(...still);
   const npmRows = kept.filter((item) => item.source === 'npm');
-  const npmBatch = npmRows.slice(0, 12);
+  const created = await Promise.all(
+    npmRows.map(async (item) => {
+      const yearCreated = await npmCreatedYear(item.name).catch(() => null);
+      return { item, yearCreated };
+    }),
+  );
+  for (const { item, yearCreated } of created) {
+    if (!isFirstPublishBeforeYear(yearCreated, year)) continue;
+    const at = kept.indexOf(item);
+    if (at >= 0) kept.splice(at, 1);
+    drops.push({ name: item.name, reason: 'first-publish-year', source: 'npm' });
+    console.log(JSON.stringify({ shipped: 'npm-first-publish', name: item.name, created: yearCreated, drop: true }));
+  }
+  const npmBatch = kept.filter((item) => item.source === 'npm').slice(0, 12);
   const npmVerdicts = await Promise.all(
     npmBatch.map(async (item) => {
       const urls = productLaunchUrlsForNpm(item, {

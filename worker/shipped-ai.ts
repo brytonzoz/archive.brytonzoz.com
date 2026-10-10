@@ -229,13 +229,24 @@ export function noteFailsVoice(note: string): boolean {
 }
 
 const NOTE_NAME_OK =
-  /^(jan(?:uary)?|feb(?:uary)?|mar(?:ch)?|apr(?:il)?|may|jun(?:e)?|jul(?:y)?|aug(?:ust)?|sep(?:t(?:ember)?)?|oct(?:ober)?|nov(?:ember)?|dec(?:ember)?|monday|tuesday|wednesday|thursday|friday|saturday|sunday|openai|vercel|anthropic|github|chatgpt|gpt|they|them|this|that|year|just|just|same|weekly|public|nothing|everything|someone|anyone|cursor)$/i;
+  /^(jan(?:uary)?|feb(?:uary)?|mar(?:ch)?|apr(?:il)?|may|jun(?:e)?|jul(?:y)?|aug(?:ust)?|sep(?:t(?:ember)?)?|oct(?:ober)?|nov(?:ember)?|dec(?:ember)?|monday|tuesday|wednesday|thursday|friday|saturday|sunday|openai|vercel|anthropic|github|chatgpt|gpt|cursor|they|them|this|that|year|just|same|weekly|public|nothing|everything|someone|anyone|desktop|spotlight|honest|receipt|launch|launches|ship|ships|update|updates|app|cli|sdk|api)$/i;
 
 function spokenOf(item: { name: string; spoken?: string }): string {
   return item.spoken || spokenShipName(item.name);
 }
 
-function tapeKeys(items: { name: string; description?: string; spoken?: string }[]): Set<string> {
+function addIdentityKeys(keys: Set<string>, raw: string | null | undefined) {
+  const text = (raw || '').replace(/^@/, '').trim();
+  if (!text) return;
+  const compact = loose(text);
+  if (compact.length >= 3) keys.add(compact);
+  for (const part of text.split(/[\s._-]+/)) {
+    const token = loose(part);
+    if (token.length >= 3) keys.add(token);
+  }
+}
+
+function tapeKeys(items: { name: string; description?: string; spoken?: string }[], ctx: NoteContext = {}): Set<string> {
   const keys = new Set<string>();
   for (const item of items) {
     const spoken = spokenOf(item);
@@ -248,19 +259,22 @@ function tapeKeys(items: { name: string; description?: string; spoken?: string }
       if (token.length >= 4) keys.add(token);
     }
   }
+  addIdentityKeys(keys, ctx.who);
+  addIdentityKeys(keys, ctx.handle);
+  addIdentityKeys(keys, ctx.company);
   return keys;
 }
 
+/** Product-like spans only. Single Title-Case English words are not ships. */
 function claimedNoteNames(note: string): string[] {
   const out: string[] = [];
   for (const match of note.matchAll(/\b[a-z][a-z0-9]*(?:-[a-z0-9]+)+\b/g)) out.push(match[0]);
   for (const match of note.matchAll(/\b[A-Za-z][A-Za-z0-9]*[A-Z][A-Za-z0-9]*\b/g)) out.push(match[0]);
   for (const match of note.matchAll(/\b[A-Z][a-z0-9]+(?:\s+(?:[A-Z][a-z0-9]+|app|cli|sdk|api))+\b/g)) out.push(match[0]);
-  for (const match of note.matchAll(/\b[A-Z][a-z]{3,}\b/g)) out.push(match[0]);
   return [...new Set(out)];
 }
 
-function onTape(claim: string, keys: Set<string>): boolean {
+function tokenOnTape(claim: string, keys: Set<string>): boolean {
   const key = loose(claim);
   if (key.length < 3) return true;
   if (NOTE_NAME_OK.test(claim) || NOTE_NAME_OK.test(key)) return true;
@@ -273,23 +287,31 @@ function onTape(claim: string, keys: Set<string>): boolean {
   return false;
 }
 
+function onTape(claim: string, keys: Set<string>): boolean {
+  if (tokenOnTape(claim, keys)) return true;
+  const words = claim.split(/\s+/).filter(Boolean);
+  return words.length > 1 && words.every((word) => tokenOnTape(word, keys));
+}
+
+function asNoteContext(whoOrCtx: string | NoteContext = ''): NoteContext {
+  return typeof whoOrCtx === 'string' ? { who: whoOrCtx } : whoOrCtx;
+}
+
 /** Plugin / extra-product claims must appear on the final tape. */
 export function noteCitesUnknownShip(
   note: string,
   items: { name: string; description?: string; spoken?: string }[],
-  who = '',
+  whoOrCtx: string | NoteContext = '',
 ): boolean {
   const text = note.replace(/\s+/g, ' ').trim();
   if (!text) return false;
+  const ctx = asNoteContext(whoOrCtx);
   const blob = items.map((item) => `${item.name} ${item.description || ''} ${item.spoken || ''}`).join(' ');
   if (/\bplugin\b/i.test(text) && !/\bplugin\b|in chatgpt/i.test(blob)) return true;
   if (/\bextensions?\b/i.test(text) && !/\bextensions?\b/i.test(blob)) return true;
   if (/\bwidgets?\b/i.test(text) && !/\bwidgets?\b/i.test(blob)) return true;
-  const keys = tapeKeys(items);
-  for (const part of who.split(/\s+/)) {
-    const token = loose(part);
-    if (token.length >= 3) keys.add(token);
-  }
+  const keys = tapeKeys(items, ctx);
+  const who = ctx.who || '';
   for (const claim of claimedNoteNames(text)) {
     if (onTape(claim, keys)) continue;
     if (who && loose(claim) && loose(who).includes(loose(claim))) continue;
@@ -354,14 +376,34 @@ function noteMentionsShip(note: string, items: { name: string; spoken?: string }
 function noteAlreadyUsed(note: string, used: string[]): boolean {
   const key = loose(note);
   if (!key) return false;
-  return used.some((other) => {
-    const theirs = loose(other);
-    if (!theirs) return false;
-    return theirs === key || (theirs.length > 24 && (theirs.includes(key) || key.includes(theirs)));
-  });
+  return used.some((other) => loose(other) === key);
 }
 
-/** Higher is better. Negative means reject. */
+export type NoteRejectReason = 'empty' | 'banned-phrase' | 'url' | 'unsourced-number' | 'duplicate' | 'unknown-ship' | 'unsafe';
+
+const NOTE_HAS_URL = /https?:\/\/|\bwww\.|\b(npmjs|github|producthunt|twitter)\.com\b/i;
+
+/** Hard rejects only. Everything else is soft scoring. */
+export function hardRejectNote(
+  note: string,
+  items: DraftItem[],
+  stats: string[] = [],
+  ctx: NoteContext = {},
+): NoteRejectReason | null {
+  const text = note.replace(/\s+/g, ' ').trim();
+  if (!text) return 'empty';
+  if (!ok(text)) return 'unsafe';
+  if (NOTE_HAS_URL.test(text)) return 'url';
+  if (BANNED_NOTE_SHAPE.test(text)) return 'banned-phrase';
+  if (noteMisusesStats(text, items.length, stats) || noteCountMismatch(text, items.length)) return 'unsourced-number';
+  if (noteAlreadyUsed(text, ctx.usedNotes ?? [])) return 'duplicate';
+  if (noteCitesUnknownShip(text, items, ctx)) return 'unknown-ship';
+  return null;
+}
+
+export type RankedNote = { note: string; score: number; hard: NoteRejectReason | null };
+
+/** Soft score only. Hard rejects are decided separately; a negative score still survives. */
 export function scoreCashierNote(
   note: string,
   items: DraftItem[],
@@ -369,13 +411,13 @@ export function scoreCashierNote(
   ctx: NoteContext = {},
 ): number {
   const text = note.replace(/\s+/g, ' ').trim();
-  if (!text || text.length > 140) return -100;
-  if (noteFailsVoice(text) || cashierNoteLooksCanned(text)) return -100;
-  if (noteCitesUnknownShip(text, items, ctx.who || '')) return -40;
-  if (noteMisusesStats(text, items.length, stats)) return -40;
-  if (noteAlreadyUsed(text, ctx.usedNotes ?? [])) return -80;
-  const ships = noteMentionsShip(text, items);
+  if (!text) return -50;
   let score = 12;
+  if (TEMPLATE_NOTE.test(text) || AI_VOICE.test(text)) score -= 16;
+  if (/\blines\b/i.test(text)) score -= 8;
+  if (/\b[A-Z]{3,}(?:\s+[A-Z0-9][A-Z0-9.+-]*){1,}\b/.test(text)) score -= 10;
+  if (text.length > 140) score -= 6;
+  const ships = noteMentionsShip(text, items);
   if (ships === 1) score += 24;
   else if (ships === 0) score -= 12;
   else if (ships > 2) score -= 6;
@@ -388,19 +430,62 @@ export function scoreCashierNote(
   return score;
 }
 
+export function rankCashierNotes(
+  candidates: string[],
+  items: DraftItem[],
+  stats: string[] = [],
+  ctx: NoteContext = {},
+): RankedNote[] {
+  return candidates
+    .map((raw) => clipSentence(String(raw || '').replace(/\s*[\u2014\u2013]\s*/g, '. ').replace(/!+/g, '.').replace(/\s+/g, ' ').trim(), 140))
+    .filter(Boolean)
+    .map((note) => ({
+      note,
+      score: scoreCashierNote(note, items, stats, ctx),
+      hard: hardRejectNote(note, items, stats, ctx),
+    }))
+    .sort((a, b) => {
+      if (Boolean(a.hard) !== Boolean(b.hard)) return a.hard ? 1 : -1;
+      return b.score - a.score;
+    });
+}
+
+function logNoteReject(ctx: NoteContext, ranked: RankedNote[], retry: boolean | 'exhausted') {
+  const rejected = ranked.filter((row) => row.hard);
+  if (!rejected.length && retry !== 'exhausted') return;
+  console.log(
+    JSON.stringify({
+      shipped: 'note-reject',
+      who: ctx.who || null,
+      handle: ctx.handle || null,
+      reasons: rejected.map((row) => ({ note: row.note, reason: row.hard, score: row.score })),
+      candidates: ranked.map((row) => ({ note: row.note, reason: row.hard, score: row.score })),
+      retry,
+    }),
+  );
+}
+
 export function pickBestNote(
   candidates: string[],
   items: DraftItem[],
   stats: string[] = [],
   ctx: NoteContext = {},
 ): string {
-  const ranked = candidates
-    .map((raw) => clipSentence(String(raw || '').replace(/\s*[\u2014\u2013]\s*/g, '. ').replace(/!+/g, '.').replace(/\s+/g, ' ').trim(), 140))
-    .filter((note) => note && ok(note))
-    .map((note) => ({ note, score: scoreCashierNote(note, items, stats, ctx) }))
-    .sort((a, b) => b.score - a.score);
-  const best = ranked.find((row) => row.score >= 0);
-  return best?.note ?? '';
+  const survivor = rankCashierNotes(candidates, items, stats, ctx).find((row) => !row.hard);
+  return survivor?.note ?? '';
+}
+
+/** After a failed retry: best printable note, even if it still has a leftover mark. */
+export function pickLeastBadNote(
+  candidates: string[],
+  items: DraftItem[],
+  stats: string[] = [],
+  ctx: NoteContext = {},
+): string {
+  const ranked = rankCashierNotes(candidates, items, stats, ctx).filter(
+    (row) => row.hard !== 'url' && row.hard !== 'unsafe' && row.hard !== 'empty' && ok(row.note),
+  );
+  return ranked[0]?.note ?? '';
 }
 
 /** Last resort only: the notable ship name. No sentence costume. */
@@ -534,16 +619,12 @@ function finish(items: DraftItem[], note: string, seed: number, modulesRaw?: unk
         .filter(Boolean)
         .slice(0, 4)
     : formatStats(sorted);
-  const whoNote =
-    ok(note) &&
-    !cashierNoteLooksCanned(note) &&
-    !noteFailsVoice(note) &&
-    !noteAlreadyUsed(note, ctx.usedNotes ?? []) &&
-    !noteCountMismatch(note, sorted.length) &&
-    !noteMisusesStats(note, sorted.length, Array.isArray(statsRaw) ? statsRaw : stats) &&
-    !noteCitesUnknownShip(note, sorted, ctx.who || '')
-      ? note
-      : groundedNote(sorted, seed, ctx.who || ctx.company || '', stats, ctx);
+  const text = note.replace(/\s+/g, ' ').trim();
+  const hard = hardRejectNote(text, sorted, Array.isArray(statsRaw) ? (statsRaw as string[]) : stats, ctx);
+  // Bare-name fallback is only for an empty/unprintable note (API down). Soft marks stay.
+  const whoNote = !text || !ok(text) || hard === 'url' || hard === 'unsafe' || hard === 'empty'
+    ? groundedNote(sorted, seed, ctx.who || ctx.company || '', stats, ctx)
+    : text;
   const printed = printNote(whoNote, stats);
   return { items: sorted, note: printed, stats, potential: false, layout };
 }
@@ -926,12 +1007,13 @@ export async function assembleReceipt(
       usedNotes,
     };
     let note = '';
-    try {
+    let apiDown = false;
+    const ask = async (userContent: string): Promise<string[] | null> => {
       const request = {
         model,
         max_tokens: 400,
         system: noteOnlySystem(year, affiliation, harvested.length),
-        messages: [{ role: 'user', content: noteOnlyPrompt(subject, harvested, stats, year, affiliation, noteCtx) }],
+        messages: [{ role: 'user', content: userContent }],
         thinking: { type: 'disabled' },
       };
       let response = await call(request);
@@ -946,14 +1028,50 @@ export async function assembleReceipt(
         const u = message.usage ?? {};
         usage.input += (u.input_tokens ?? 0) + (u.cache_creation_input_tokens ?? 0) + (u.cache_read_input_tokens ?? 0);
         usage.output += u.output_tokens ?? 0;
-        const parsed = parseJson(message.content ?? []);
-        note = pickBestNote(parseNoteCandidates(parsed), harvested, stats, noteCtx);
-      } else if (isCreditError(response.status, await response.text())) {
-        throw fail('out-of-credit');
+        return parseNoteCandidates(parseJson(message.content ?? []));
+      }
+      if (isCreditError(response.status, await response.text())) throw fail('out-of-credit');
+      return null;
+    };
+    try {
+      const prompt = noteOnlyPrompt(subject, harvested, stats, year, affiliation, noteCtx);
+      const first = await ask(prompt);
+      if (!first) {
+        apiDown = true;
+      } else {
+        const ranked = rankCashierNotes(first, harvested, stats, noteCtx);
+        logNoteReject(noteCtx, ranked, false);
+        note = ranked.find((row) => !row.hard)?.note ?? '';
+        if (!note) {
+          const reasons = ranked
+            .filter((row) => row.hard)
+            .map((row) => `- "${row.note}" (${row.hard})`)
+            .join('\n');
+          const retryUser = `${prompt}\n\nThose notes were rejected:\n${reasons}\nWrite 3 new notes that avoid those exact problems. JSON only: {"notes":["","",""]}`;
+          if (spent() < RECEIPT_BUDGET_MICROS - 2_000) {
+            const second = await ask(retryUser);
+            if (!second) {
+              apiDown = true;
+            } else {
+              const ranked2 = rankCashierNotes(second, harvested, stats, noteCtx);
+              logNoteReject(noteCtx, ranked2, true);
+              note = ranked2.find((row) => !row.hard)?.note ?? '';
+              if (!note) {
+                note = pickLeastBadNote([...first, ...second], harvested, stats, noteCtx);
+                logNoteReject(noteCtx, ranked2, 'exhausted');
+              }
+            }
+          } else {
+            note = pickLeastBadNote(first, harvested, stats, noteCtx);
+            logNoteReject(noteCtx, ranked, 'exhausted');
+          }
+        }
       }
     } catch (error) {
       if (error instanceof PrintError && error.code === 'out-of-credit') throw error;
+      apiDown = true;
     }
+    if (apiDown) note = '';
     const draft = finish(harvested, note, seed, undefined, stats, noteCtx);
     const cost = spent();
     console.log(JSON.stringify({ shipped: 'ai', model, mode: 'note-only', items: harvested.length, inputTokens: usage.input, outputTokens: usage.output, costMicros: cost }));

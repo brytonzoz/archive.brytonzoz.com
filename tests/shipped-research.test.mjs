@@ -223,14 +223,60 @@ test('cashier note and stats are specific to the items, never stock copy', () =>
     false,
   );
   assert.equal(ai.noteCitesUnknownShip('Jack shipped DataFast this year.', [{ name: 'POSTBRIDGE-CLI', description: 'CLI' }], 'Jack'), true);
+  assert.equal(
+    ai.noteCitesUnknownShip(
+      'Origin took the September spotlight and kept the receipt honest.',
+      [{ name: 'ORIGIN', description: 'Cursor launch', spoken: 'Origin' }],
+      { who: 'Michael Truell', company: 'Cursor' },
+    ),
+    false,
+  );
+  assert.equal(
+    ai.noteCitesUnknownShip('Sam shipped GPT-5 at OpenAI.', [{ name: 'GPT-5', description: 'Model', spoken: 'GPT-5' }], {
+      who: 'Sam Altman',
+      company: 'OpenAI',
+    }),
+    false,
+  );
+  assert.equal(
+    ai.hardRejectNote(
+      'Origin took the September spotlight and kept the receipt honest.',
+      [{ name: 'ORIGIN', description: 'Cursor launch', date: '2026-09-14', status: 'LAUNCHED', link: 'https://cursor.com/blog/origin', icon: null, source: 'changelog', spoken: 'Origin' }],
+      [],
+      { who: 'Michael Truell', company: 'Cursor' },
+    ),
+    null,
+  );
+  assert.equal(
+    ai.hardRejectNote('Codex app took the desktop.', ceoItems, [], {
+      who: 'Sam Altman',
+      company: 'OpenAI',
+      usedNotes: ['Codex app took the desktop and then a longer stored sentence.'],
+    }),
+    null,
+  );
+  assert.equal(ai.hardRejectNote('Codex app took the desktop.', ceoItems, [], { who: 'Sam', usedNotes: ['Codex app took the desktop.'] }), 'duplicate');
+  assert.equal(ai.hardRejectNote('The pair is Codex app and Sora.', ceoItems, [], { who: 'Sam Altman' }), 'banned-phrase');
+  const softOnly = ai.pickBestNote(
+    [
+      'Harbor is the whole receipt. The CLI is just the grip.',
+      'Relay is the quiet one. The announcement posts are doing too much.',
+      'Northline shipped a radio, then a weather kite.',
+    ],
+    items,
+    [],
+    { who: 'Pieter Levels', handle: 'levelsio' },
+  );
+  assert.ok(softOnly.length > 8, softOnly);
+  assert.doesNotMatch(softOnly, /^(PhotoAI|InteriorAI|SuperLevels)$/i);
   assert.doesNotMatch(note, /\blines\b|https?:\/\/|CODEX APP/i);
   assert.doesNotMatch(one, /\blines\b|https?:\/\/|www\./i);
   assert.doesNotMatch(ceo, /\blines\b|https?:\/\/|\b\d+\s+public\s+ships\b/i);
   const draft = ai.validateDraft(
     {
       items: items.map((item) => ({ name: item.name, description: item.description, date: item.date, status: item.status, link: item.link })),
-      note: 'workbench at 450 stars is the crowd favorite, and the night shift has counted a lot of publish buttons since April.',
-      stats: ['450 GitHub stars workbench · github.com/pontusab/workbench'],
+      note: 'SuperLevels is sitting at 553 GitHub stars.',
+      stats: ['553 GitHub stars SuperLevels · github.com/levelsio/superlevels'],
     },
     {
       found: items.map((item) => ({ ...item, name: item.name.toLowerCase(), score: 4, thisYear: !item.date })),
@@ -248,8 +294,8 @@ test('cashier note and stats are specific to the items, never stock copy', () =>
   );
   assert.ok(draft.items.length >= 3);
   assert.ok(draft.stats[0]);
-  assert.doesNotMatch(draft.note, /night shift|publish button/i);
-  assert.match(draft.note, /PHOTOAI|INTERIORAI|SUPERLEVELS|553|450/i);
+  assert.doesNotMatch(draft.note, /night shift|publish button|the pair is/i);
+  assert.match(draft.note, /SuperLevels/i);
   const okNote = ai.validateDraft(
     {
       items: [{ name: 'SuperX', description: 'Growth', date: '2026-02-09', status: 'LAUNCHED', link: 'https://www.producthunt.com/posts/superx' }],
@@ -303,6 +349,17 @@ test('paid search still runs when harvest is gappy, not only when the tape is em
     failed: [],
   };
   assert.ok(sources.inYearCount(gathered, 2026) < ai.SEARCH_BELOW);
+});
+
+test('changelog/company beat npm on the same loose name, and old first-publish years drop', () => {
+  assert.ok(sources.sourcePriority('changelog') > sources.sourcePriority('npm'));
+  assert.ok(sources.sourcePriority('company') > sources.sourcePriority('npm'));
+  const kept = sources.dedupeFound([
+    { name: 'Serve', description: 'old npm', date: '2026-04-01', link: 'https://www.npmjs.com/package/serve', icon: null, source: 'npm', status: 'RELEASED', score: 9 },
+    { name: 'Serve', description: 'Vercel changelog', date: '2026-03-03', link: 'https://vercel.com/changelog/serve', icon: null, source: 'changelog', status: 'LAUNCHED', score: 4 },
+  ]);
+  assert.equal(kept[0].source, 'changelog');
+  assert.equal(kept.some((item) => item.source === 'npm'), false);
 });
 
 test('identity tables are not an eval cheat sheet', () => {

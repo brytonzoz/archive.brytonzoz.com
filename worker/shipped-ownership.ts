@@ -105,7 +105,7 @@ export function ownedByBuilder(
   return ownershipEvidence(item, owner) !== 'none';
 }
 
-/** Undated crumbs need real ownership plus a description (or an own-host / own-repo link). */
+/** Undated crumbs need real ownership. Named/portfolio site crumbs also need a description. */
 export function undatedPassesGate(
   item: { name?: string; description?: string; link?: string | null; source?: string; date?: string | null },
   owner?: OwnerContext | null,
@@ -126,7 +126,7 @@ export function undatedPassesGate(
     return hasDesc && hostNamesOwner(host, owner);
   }
   if (kind === 'named' || kind === 'portfolio') {
-    return hasDesc || hostNamesOwner(hostOf(item.link), owner);
+    return hasDesc;
   }
   return false;
 }

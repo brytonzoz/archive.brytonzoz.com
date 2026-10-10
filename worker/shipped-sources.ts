@@ -39,6 +39,7 @@ import {
   type XProfile,
 } from './shipped-identity';
 import { hostNamesOwner, ownerFromProfile, ownerTokens } from './shipped-ownership';
+import { isFirstPublishBeforeYear, npmCreatedYear } from './shipped-dates';
 import { isJunkProductName, isJunkRepoName, isKnownPackageFamily, isShipRepo, looksLikeCodeIdentifier, looksLikePersonName, looksLikeProductReadme } from './shipped-repos';
 import {
   compactNumber,
@@ -824,12 +825,14 @@ const npm: SourceProvider = {
       })
       .sort((a, b) => (b.score?.final ?? 0) - (a.score?.final ?? 0))
       .slice(0, 80);
+    const createdYears = await Promise.all(recent.map(({ package: pkg }) => npmCreatedYear(String(pkg.name ?? '')).catch(() => null)));
+    const fresh = recent.filter((_, i) => !isFirstPublishBeforeYear(createdYears[i], year));
     const downloads = await Promise.all(
-      recent.map(({ package: pkg }) =>
+      fresh.map(({ package: pkg }) =>
         getJson<{ downloads?: number }>(`https://api.npmjs.org/downloads/point/last-week/${encodeURIComponent(String(pkg.name))}`).catch(() => null),
       ),
     );
-    return recent
+    return fresh
       .map(({ package: pkg, score }, i): Found | null => {
       const links = (pkg.links as Record<string, unknown> | undefined) ?? {};
       const link = publicUrl(links.npm);
@@ -1692,18 +1695,31 @@ export function itemsFromWebEvidence(opts: {
   return found;
 }
 
-function dedupeFound(found: Found[]): Found[] {
+export function sourcePriority(source: string): number {
+  if (source === 'changelog' || source === 'company') return 4;
+  if (source === 'github' || source === 'x') return 2;
+  if (source === 'npm') return 0;
+  return 1;
+}
+
+export function dedupeFound(found: Found[]): Found[] {
   const seen = new Set<string>();
   return found
     .filter((item) => item.name && !hasBlockedWord(item.name))
-    .sort((a, b) => b.score - a.score)
+    .sort((a, b) => {
+      const rank = sourcePriority(b.source) - sourcePriority(a.source);
+      if (rank) return rank;
+      return b.score - a.score;
+    })
     .filter((item) => {
       const base = loose(item.name.replace(/\s+v?\d+(\.\d+)*$/, ''));
       const key = item.date && (item.source === 'changelog' || item.source === 'company' || item.source === 'x')
         ? `${base}|${item.date}|${loose(item.name)}`
         : base;
       if (!key || seen.has(key)) return false;
+      if (seen.has(base) && (item.source === 'npm' || item.source === 'web')) return false;
       seen.add(key);
+      if (item.source === 'changelog' || item.source === 'company') seen.add(base);
       return true;
     })
     .slice(0, 200);
@@ -1737,7 +1753,7 @@ export async function gather(
     gatherFresh(subject, resolved.profile, env, year, meter, tinyfish, resolved.notes, mode, opts?.onPartial, opts?.affiliation);
   if (opts?.rebuild && !opts.onPartial) return load();
   if (opts?.rebuild) return load();
-  const key = mode === 'full' ? `gather:full:v27:${year}:${resolved.cacheKey}` : `gather:v36:${year}:${resolved.cacheKey}`;
+  const key = mode === 'full' ? `gather:full:v28:${year}:${resolved.cacheKey}` : `gather:v37:${year}:${resolved.cacheKey}`;
   return cached(
     key,
     1440 * MIN,

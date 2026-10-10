@@ -620,6 +620,12 @@ test('archive.org/RDAP product hosts beat an npm publish day for the product its
   assert.equal(dates.isLegacyNpmFamily('Engine.io-Client'), true);
   assert.equal(dates.isLegacyNpmFamily('socket.io-adapter'), true);
   assert.equal(dates.isLegacyNpmFamily('@zod/mini'), false);
+  assert.equal(dates.parseNpmCreatedYear({ time: { created: '2016-01-16T00:00:00.000Z' } }), 2016);
+  assert.equal(dates.parseNpmCreatedYear('{"time":{"created":"2026-03-01T00:00:00.000Z"}}'), 2026);
+  assert.equal(dates.isFirstPublishBeforeYear(2016, 2026), true);
+  assert.equal(dates.isFirstPublishBeforeYear(2026, 2026), false);
+  assert.equal(dates.isFirstPublishBeforeYear(null, 2026), false);
+  assert.match(dates.npmRegistryUrl('@zod/mini'), /@zod%2fmini/);
   const socketTape = polish.polishCandidates(
     [
       found({ name: 'Serve', date: '2026-03-03', source: 'changelog', link: 'https://vercel.com/blog/serve' }),
@@ -655,6 +661,8 @@ test('vague leftover headings drop; spoken names keep source casing', () => {
   assert.equal(polish.isVagueOrCutTitle('PETS CONTROLS IN THE CHATGPT DESKTOP'), true);
   assert.equal(polish.isVagueOrCutTitle('CLOUD WORK'), true);
   assert.equal(polish.isVagueOrCutTitle('NEW CONTROLS FOR LONG-RUNNING WORK'), true);
+  assert.equal(polish.isVagueOrCutTitle('ALL CHECKS'), true);
+  assert.equal(polish.isJunkTitle('ALL CHECKS'), true);
   assert.equal(polish.isJunkTitle('NUMBER'), true);
   assert.equal(polish.spokenShipName('TSC-RS'), 'tsc-rs');
   assert.equal(polish.spokenShipName('BOTID'), 'BotID');
@@ -700,9 +708,25 @@ test('undated crumbs need ownership plus a description', async () => {
     ),
     true,
   );
+  assert.equal(
+    ownership.undatedPassesGate(
+      { name: 'TRPC', description: '', date: null, source: 'site', link: 'https://colinhacks.com/' },
+      { name: 'Colin McDonnell', github: 'colinhacks', site: 'https://colinhacks.com/' },
+    ),
+    false,
+  );
+  assert.equal(
+    ownership.undatedPassesGate(
+      { name: 'ALL CHECKS', description: '', date: null, source: 'site', link: 'https://colinhacks.com/' },
+      { name: 'Colin McDonnell', github: 'colinhacks', site: 'https://colinhacks.com/' },
+    ),
+    false,
+  );
   const items = polish.polishCandidates(
     [
       found({ name: 'TRPC', date: null, source: 'npm', link: 'https://www.npmjs.com/package/@trpc/server', description: '' }),
+      found({ name: 'TRPC', date: null, source: 'site', link: 'https://colinhacks.com/', description: '' }),
+      found({ name: 'ALL CHECKS', date: null, source: 'site', link: 'https://colinhacks.com/', description: '' }),
       found({ name: 'NUMBER', date: null, source: 'npm', link: 'https://www.npmjs.com/package/number', description: '' }),
       found({ name: 'Zod', date: '2026-01-15', source: 'npm', link: 'https://www.npmjs.com/package/zod', description: 'Schema' }),
       found({ name: 'Boron', date: '2026-02-01', source: 'github', link: 'https://github.com/colinhacks/boron', description: 'Schema core' }),
@@ -712,6 +736,6 @@ test('undated crumbs need ownership plus a description', async () => {
     { year: 2026, who: 'Colin McDonnell', handle: 'colinhacks', owner: colin },
   );
   const names = items.map((item) => item.name);
-  assert.equal(names.some((name) => /trpc|number/i.test(name)), false, JSON.stringify(names));
+  assert.equal(names.some((name) => /trpc|number|all checks/i.test(name)), false, JSON.stringify(names));
   assert.ok(names.some((name) => /^zod$/i.test(name)), JSON.stringify(names));
 });

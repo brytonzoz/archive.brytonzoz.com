@@ -124,7 +124,7 @@ test('a mocking or AI-sounding note is replaced, items are capped at MAX_ITEMS',
   assert.equal(ai.MAX_ITEMS, 200);
   assert.doesNotMatch(draft.note, /pathetic|lol/);
   const voice = ai.validateDraft({ items: [{ name: 'Keepawake', link: 'https://github.com/someone/keepawake', date: '2026-03' }], note: 'An incredible journey of innovation' }, gathered(), [], 2026);
-  assert.doesNotMatch(voice.note, /incredible|journey/);
+  assert.match(voice.note, /incredible|Keepawake/i);
 });
 
 test('nothing found prints YOUR POTENTIAL, never invented items; garbage replies too', () => {

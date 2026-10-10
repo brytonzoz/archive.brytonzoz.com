@@ -281,7 +281,7 @@ export function isVagueOrCutTitle(name: string): boolean {
   const text = tidy(name);
   if (!text) return true;
   if (/\b or \b/i.test(text)) return true;
-  if (/^cloud work$/i.test(text) || /^new controls\b/i.test(text)) return true;
+  if (/^cloud work$/i.test(text) || /^new controls\b/i.test(text) || /^all\s+[a-z]+$/i.test(text)) return true;
   if (/\bin the chatgpt desktop$/i.test(text)) return true;
   if (/^(pets|cloud|new)\s+[a-z]+$/i.test(text) && !/\b(cli|app|sdk|api|gpt|codex|cursor|chatgpt)\b/i.test(text)) return true;
   return false;

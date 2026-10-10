@@ -220,6 +220,8 @@ test('host guesses stay generic and product paths are derived from the role', ()
   assert.ok(changelog.productPaths('Codex').includes('/codex/changelog'));
   assert.ok(changelog.COMPANY_PATHS.includes('/changelog'));
   assert.ok(changelog.FEED_PATHS.includes('/atom'));
+  assert.ok(company.feedPriority('https://vercel.com/atom') < company.feedPriority('https://news.vercel.com/rss'));
+  assert.ok(company.feedPriority('https://vercel.com/changelog/rss') < company.feedPriority('https://platform.vercel.com/atom'));
 });
 
 test('time-plus-heading changelog cards become dated ships; month-only titles drop', () => {

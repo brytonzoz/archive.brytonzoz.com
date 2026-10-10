@@ -523,7 +523,9 @@ function isIndexShipPath(url: string): boolean {
   }
 }
 
-function feedPriority(url: string): number {
+export function feedPriority(url: string): number {
+  if (/\/\/(www\.)?vercel\.com\/(changelog\/(rss|atom|feed)|atom)(\.xml)?$/i.test(url)) return -2;
+  if (/\/\/(www\.)?openai\.com\/(changelog\/(rss|atom|feed)|atom)(\.xml)?$/i.test(url)) return -1;
   if (/\/changelog\/(rss|feed|atom)/i.test(url)) return 0;
   if (/\/(atom|rss)(\.xml)?$/i.test(url) && /vercel\.com/i.test(url)) return 0;
   if (/changelog/i.test(url)) return 1;
@@ -909,7 +911,7 @@ export async function harvestCompany(opts: {
   if (opts.storeOnly) {
     return { found: [], spend: emptyXaiSpend(), ran: ['company-store-miss'], cacheHit: false };
   }
-  const cacheKey = opts.deep ? `company:deep:v21:${year}:${slug}` : `company:v21:${year}:${slug}`;
+  const cacheKey = opts.deep ? `company:deep:v22:${year}:${slug}` : `company:v22:${year}:${slug}`;
   const load = async (): Promise<CompanyHarvest> => {
     const via = viaFor(affiliation);
     const ran: string[] = [];
@@ -954,10 +956,11 @@ export async function harvestCompany(opts: {
     await Promise.all([...prefixed, ...firstSeeds].map((site) => takePages(site, 'company-site')));
     await Promise.all(discoveredHosts.map((extra) => takePages(extra, 'company-site')));
 
+    const feedOrigins = [...new Set([firstSeeds[0], affiliation.companySite, ...liveOrigins].filter(Boolean))] as string[];
     await Promise.all(
-      liveOrigins.slice(0, 4).map(async (origin) => {
+      feedOrigins.slice(0, 6).map(async (origin) => {
         const root = origin.replace(/\/+$/, '');
-        feeds.unshift(`${root}/atom`, `${root}/changelog/rss`, `${root}/changelog/atom`);
+        feeds.unshift(`${root}/atom`, `${root}/rss`, `${root}/changelog/rss`, `${root}/changelog/atom`);
         for (const path of FEED_PATHS) feeds.push(`${root}${path}`);
         const sitemapItems = await harvestSitemaps(origin, year, ctx).catch(() => []);
         if (sitemapItems.length) {

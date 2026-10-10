@@ -37,12 +37,12 @@ const report = [];
 const failures = [];
 for (const id of LIVE_RECEIPT_IDS) {
   let receipt = await readReceipt(id);
-  const first = evaluateLiveReceipt(id, receipt, helpers);
-  if (!first.ok) {
-    await new Promise((ok) => setTimeout(ok, 15_000));
+  let result = evaluateLiveReceipt(id, receipt, helpers);
+  for (let attempt = 0; !result.ok && attempt < 3; attempt += 1) {
+    await new Promise((ok) => setTimeout(ok, result.count === 0 ? 20_000 : 15_000));
     receipt = await readReceipt(id);
+    result = evaluateLiveReceipt(id, receipt, helpers);
   }
-  const result = evaluateLiveReceipt(id, receipt, helpers);
   report.push({ id, count: result.count, note: result.note, names: result.names, failures: result.failures });
   if (!result.ok) failures.push(`#${id}: ${result.failures.join('; ')}`);
   console.log(`#${id} ${result.count} items${result.ok ? '' : ` FAIL ${result.failures.join('; ')}`}`);

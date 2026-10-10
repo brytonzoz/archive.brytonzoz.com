@@ -62,6 +62,7 @@ jobs:
       - run: npm ci
 
       - name: Refresh Vercel and OpenAI caches
+        if: ${{ github.event_name == 'workflow_dispatch' || !contains(github.event.head_commit.message, '[shipped-skip-cache]') }}
         env:
           ADMIN_PASSWORD: ${{ secrets.ADMIN_PASSWORD }}
           SHIPPED_GITHUB_TOKEN: ${{ secrets.SHIPPED_GITHUB_TOKEN }}
@@ -83,7 +84,7 @@ jobs:
           ADMIN_PASSWORD: ${{ secrets.ADMIN_PASSWORD }}
           SHIPPED_ORIGIN: ${{ github.event_name == 'workflow_dispatch' && inputs.origin || 'https://shipped-staging.brytonzoz.com' }}
           SHIPPED_REPRINT_FORCE: '1'
-          SHIPPED_REPRINT_FORCE_IDS: ${{ github.event_name == 'workflow_dispatch' && inputs.ids || '6,7,13,16,17,18,19,20,21,22' }}
+          SHIPPED_REPRINT_FORCE_IDS: ${{ github.event_name == 'workflow_dispatch' && inputs.ids || (contains(github.event.head_commit.message, '[shipped-skip-cache]') && '18,19,20,21,22' || '6,7,13,16,17,18,19,20,21,22') }}
           SHIPPED_PRINT_SUBJECTS: ''
         run: |
           if [ -z "$ADMIN_PASSWORD" ]; then

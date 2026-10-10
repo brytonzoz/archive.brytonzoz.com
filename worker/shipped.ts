@@ -2265,6 +2265,12 @@ async function reprintReceipt(
       }
     }
     const x = (gathered.profile.x && isXHandle(gathered.profile.x) ? gathered.profile.x : subject.kind === 'x' ? subject.id : null) || null;
+    const realNew = (draft.items || []).filter((item) => item?.name && item.name !== 'YOUR POTENTIAL' && item.source !== 'none');
+    const realOld = (current.items || []).filter((item) => item?.name && item.name !== 'YOUR POTENTIAL' && item.source !== 'none');
+    if (!realNew.length && realOld.length) {
+      console.log(JSON.stringify({ shipped: 'reprint-keep', id: row.id, kept: realOld.length, why: 'empty-harvest' }));
+      draft = { ...draft, items: current.items, note: current.note, potential: current.potential };
+    }
     const receipt: YearReceipt = {
       ...current,
       id: row.id,

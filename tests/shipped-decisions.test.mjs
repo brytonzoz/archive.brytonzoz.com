@@ -186,6 +186,13 @@ test('same_ship pairs share keywords; weaker duplicate is dropped', async () => 
     decisions.shareKeywords(found({ name: 'Origin CLI', link: 'https://replit.com/origin' }), found({ name: 'Origin CLI', link: 'https://blog.replit.com/origin-cli' })),
     true,
   );
+  assert.equal(
+    decisions.shareKeywords(
+      found({ name: 'Codex CLI 0.145.0', link: 'https://learn.chatgpt.com/docs/changelog' }),
+      found({ name: 'GPT-6.1 Sol Ultrafast', link: 'https://learn.chatgpt.com/docs/changelog' }),
+    ),
+    false,
+  );
   assert.equal(decisions.looksLikeNotAShip({ name: 'Ramp engineers accelerate code review', link: 'https://openai.com/index/ramp' }), true);
   assert.equal(decisions.looksLikeNotAShip({ name: 'Frontier firms are pulling ahead' }), true);
   const same = await decisions.dedupeSameShips({

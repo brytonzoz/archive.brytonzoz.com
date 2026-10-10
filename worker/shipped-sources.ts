@@ -1601,16 +1601,18 @@ export async function gather(
   env: SourceEnv,
   year: number,
   meter: TinyfishMeter | null = null,
-  opts?: { mode?: GatherMode },
+  opts?: { mode?: GatherMode; rebuild?: boolean },
 ): Promise<Gathered> {
   const tinyfish = tinyfishAccess(env, meter);
   const resolved = await resolveIdentity(subject, env, tinyfish);
   const mode: GatherMode = opts?.mode === 'full' ? 'full' : 'free';
-  const key = mode === 'full' ? `gather:full:v18:${year}:${resolved.cacheKey}` : `gather:v27:${year}:${resolved.cacheKey}`;
+  const load = () => gatherFresh(subject, resolved.profile, env, year, meter, tinyfish, resolved.notes, mode);
+  if (opts?.rebuild) return load();
+  const key = mode === 'full' ? `gather:full:v19:${year}:${resolved.cacheKey}` : `gather:v28:${year}:${resolved.cacheKey}`;
   return cached(
     key,
     1440 * MIN,
-    () => gatherFresh(subject, resolved.profile, env, year, meter, tinyfish, resolved.notes, mode),
+    load,
     (gathered) => gathered.found.length > 0,
   );
 }

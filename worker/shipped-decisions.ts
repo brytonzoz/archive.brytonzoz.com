@@ -394,7 +394,13 @@ export function shareKeywords(a: { name: string; link?: string | null }, b: { na
   };
   const pa = pathOf(a.link);
   const pb = pathOf(b.link);
-  if (a.link && b.link && host(a.link) && host(a.link) === host(b.link) && pa && pb && pa !== '/' && (pa === pb || pa.startsWith(`${pb}/`) || pb.startsWith(`${pa}/`))) return true;
+  const changelogIndex = (path: string) =>
+    /\/(changelog|release-notes|whats-new|updates|docs\/changelog|docs\/whats-new)(\/|$)/i.test(path);
+  if (a.link && b.link && host(a.link) && host(a.link) === host(b.link) && pa && pb && pa !== '/') {
+    // One changelog index lists many ships; sharing that URL is not the same launch.
+    if (changelogIndex(pa) || changelogIndex(pb)) return false;
+    if (pa === pb || pa.startsWith(`${pb}/`) || pb.startsWith(`${pa}/`)) return true;
+  }
   return false;
 }
 

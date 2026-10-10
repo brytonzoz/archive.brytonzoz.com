@@ -2020,7 +2020,7 @@ async function reprintReceipt(env: ShippedEnv, db: D1Database, id: number): Prom
   if (!slot) return json({ error: 'busy' }, 503);
   let reserved = 0;
   try {
-    const gathered = await gather(subject, gatherEnv(env, db), year, tinyfishMeter(db));
+    const gathered = await gather(subject, gatherEnv(env, db), year, tinyfishMeter(db), { rebuild: true });
     if (subject.kind === 'github' && gathered.profile.name && !hasBlockedWord(gathered.profile.name)) subject.display = clean(gathered.profile.name, 60);
     let model: string | null = null;
     let usage = { input: 0, output: 0, searches: 0, cost: 0 };

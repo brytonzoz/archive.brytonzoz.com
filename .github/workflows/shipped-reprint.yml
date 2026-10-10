@@ -50,13 +50,33 @@ jobs:
     name: Reprint receipts (no xAI)
     if: github.event_name == 'workflow_dispatch' || contains(github.event.head_commit.message, '[shipped-reprint]')
     runs-on: ubuntu-latest
-    timeout-minutes: 30
+    timeout-minutes: 45
     steps:
       - uses: actions/checkout@v5
 
       - uses: actions/setup-node@v5
         with:
           node-version: 22
+          cache: npm
+
+      - run: npm ci
+
+      - name: Refresh Vercel and OpenAI caches
+        env:
+          ADMIN_PASSWORD: ${{ secrets.ADMIN_PASSWORD }}
+          SHIPPED_GITHUB_TOKEN: ${{ secrets.SHIPPED_GITHUB_TOKEN }}
+          TINYFISH: ${{ secrets.TINYFISH }}
+          TINYFISH_API_KEY: ${{ secrets.TINYFISH_API_KEY }}
+          SHIPPED_XAI_OFF: '1'
+          SHIPPED_YEAR: '2026'
+          SHIPPED_CACHE_TARGET: staging
+        run: |
+          if [ -z "$ADMIN_PASSWORD" ]; then
+            echo "::error::ADMIN_PASSWORD is required to write the company cache."
+            exit 1
+          fi
+          SHIPPED_CACHE_ONLY=vercel node --experimental-transform-types --no-warnings scripts/cache-shipped-companies.mjs
+          SHIPPED_CACHE_ONLY=openai node --experimental-transform-types --no-warnings scripts/cache-shipped-companies.mjs
 
       - name: Reprint
         env:

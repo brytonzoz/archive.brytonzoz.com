@@ -637,16 +637,14 @@ export function pickBestNote(
   return survivor?.note ?? '';
 }
 
-/** After a failed retry: best printable note, even if it still has a leftover mark. */
+/** After a failed retry: best printable note that still clears the hard rejects. */
 export function pickLeastBadNote(
   candidates: string[],
   items: DraftItem[],
   stats: string[] = [],
   ctx: NoteContext = {},
 ): string {
-  const ranked = rankCashierNotes(candidates, items, stats, ctx).filter(
-    (row) => row.hard !== 'url' && row.hard !== 'unsafe' && row.hard !== 'empty' && ok(row.note),
-  );
+  const ranked = rankCashierNotes(candidates, items, stats, ctx).filter((row) => !row.hard && ok(row.note));
   return ranked[0]?.note ?? '';
 }
 
@@ -689,10 +687,10 @@ export function sentenceFallbackNote(items: DraftItem[], ctx: NoteContext = {}):
   const who = (ctx.who || '').replace(/^@/, '').split(/\s+/).filter(Boolean)[0] || '';
   const lead = does ? does.charAt(0).toLowerCase() + does.slice(1) : '';
   const candidates = [
-    does ? `${spoken} ${lead}.`.replace(/\.\.$/, '.') : '',
     does ? `${spoken} is the one on this tape: ${does}.` : '',
     who && does ? `${spoken} is ${who}'s ${kind}: ${lead}.` : '',
     does ? `${spoken} does one concrete thing: ${lead}.`.replace(/does one concrete thing: does /i, '') : '',
+    `${spoken} is the one public ship here, and that is the whole story.`,
   ].filter(Boolean);
   for (const note of candidates) {
     if (hardRejectNote(note, items, [], ctx)) continue;
@@ -700,7 +698,6 @@ export function sentenceFallbackNote(items: DraftItem[], ctx: NoteContext = {}):
     if (!printable(note)) continue;
     return clipSentence(note, 140);
   }
-  if (does) return clipSentence(`${spoken} ${lead}.`.replace(/\.\.$/, '.'), 140);
   return clipSentence(`${spoken} is the one public ship here, and that is the whole story.`, 140);
 }
 
@@ -838,6 +835,7 @@ export async function hydrateItemDescriptions<T extends { name?: string; descrip
       const page = await readSite(item.link as string).catch(() => null);
       const desc = cleanDescription(page?.description || page?.title || '');
       if (!desc) return;
+      if (/\bopens in a new window\b|\bshipped this year\b|\bis a product\b/i.test(desc)) return;
       if (loose(desc) === loose(item.name || '')) return;
       out[index] = { ...item, description: desc };
     }),

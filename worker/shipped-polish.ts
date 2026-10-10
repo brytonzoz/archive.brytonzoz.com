@@ -708,8 +708,8 @@ export function cleanShipTitle(raw: unknown, max = TITLE_MAX): string {
   const sentence = /\b(released|lets?|can also|can now|in the api|use a |with site)\b/i.test(text);
   if (sentence) {
     const phrase = nounPhraseFromSentence(text);
-    if (!phrase || phrase.split(/\s+/).length > 6) return '';
-    text = phrase;
+    const words = phrase ? phrase.split(/\s+/).filter(Boolean) : [];
+    if (phrase && words.length >= 2 && words.length <= 6 && !isJunkTitle(phrase)) text = phrase;
   }
   if (!text) return '';
   if (isJunkTitle(text)) return '';
@@ -747,9 +747,21 @@ export function gateShipTitle(raw: string, cleaned = ''): string {
     const phrase = nounPhraseFromSentence(raw);
     return phrase && isProductNounPhrase(phrase) && !SENTENCE_VERB.test(phrase) ? phrase : '';
   }
-  if (isProductNounPhrase(text)) return text;
+  if (isProductNounPhrase(text) && (text.split(/\s+/).length >= 2 || !DOCS_NAV.test(text))) return text;
   const phrase = nounPhraseFromSentence(raw);
-  if (phrase && isProductNounPhrase(phrase) && !/^use\b/i.test(tidy(raw))) return phrase;
+  if (
+    phrase &&
+    isProductNounPhrase(phrase) &&
+    phrase.split(/\s+/).length >= 2 &&
+    !DOCS_NAV.test(phrase) &&
+    !/^use\b/i.test(tidy(raw))
+  ) {
+    return phrase;
+  }
+  const words = text.split(/\s+/).filter(Boolean);
+  if (words.length >= 4 && !looksCutOff(text) && !looksMidWord(text) && !looksFragment(text) && !TITLE_START_BAD.test(words[0] || '')) {
+    return wordClamp(text, TITLE_MAX);
+  }
   return '';
 }
 
@@ -816,7 +828,11 @@ const DESC_MAX = 90;
 export function cleanDescription(value: unknown): string {
   let text = tidy(value);
   if (!text || META_DESC.test(text) || HOST_ONLY.test(text)) return '';
+  if (/\bopens in a new window\b|\bcopy link to\b/i.test(text) && text.split(/\s+/).length <= 14) return '';
   text = text
+    .replace(/\s*\(opens in a new window\)\.?/gi, '')
+    .replace(/\bopens in a new window\b/gi, '')
+    .replace(/\bcopy link to\b[\s\S]*/gi, '')
     .replace(/<\/?[a-z][^>]*>/gi, ' ')
     .replace(/\b(p|h[1-6]|div|span|img|a|ul|ol|li|br)\s+(align|class|src|href|style)=["'][^"']*["']/gi, ' ')
     .replace(/\b(p|h[1-6])\s+align=["']?center["']?/gi, ' ')
@@ -1201,6 +1217,20 @@ export function polishCandidates<T extends Polishable>(items: T[], opts: PolishO
       date: item.date,
     };
     let name = cleanShipTitle(item.name);
+    if (!name && (item.source === 'changelog' || isChangelogEntryHref(item.link))) {
+      const fallback = wordClamp(stripDateSuffix(tidy(item.name).replace(/\bcopy link to\b[\s\S]*/i, '')), TITLE_MAX);
+      const keepCard =
+        fallback &&
+        fallback.split(/\s+/).length >= 3 &&
+        !looksCutOff(fallback) &&
+        !looksMidWord(fallback) &&
+        !isPrereleaseShip(fallback) &&
+        !isNeverShipKind(fallback) &&
+        !isDocsOrReferenceTitle(fallback) &&
+        !isBlogEssayTitle(fallback) &&
+        !isNotAShipTitle(fallback);
+      if (keepCard) name = fallback;
+    }
     if (flagship && !isCursorModelNote(item) && (!name || name.split(/\s+/).length <= 1 || /^the new\b/i.test(name))) {
       if (!name) logFlagshipGate(item, isJunkTitle(item.name, junkOpts) ? 'junk-title' : 'title-empty', flagship);
       name = flagship;

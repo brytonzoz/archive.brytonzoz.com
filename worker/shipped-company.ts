@@ -22,6 +22,7 @@ import { safeFetch } from './shipped-fetch';
 import {
   COMPANY_PATHS,
   FEED_PATHS,
+  changelogEntryHrefs,
   extractAlternateFeeds,
   isShipPath,
   itemsFromCompanyPage,
@@ -262,13 +263,19 @@ async function mapLimit<T, R>(items: T[], n: number, fn: (item: T) => Promise<R>
   return out;
 }
 
-async function fetchText(url: string, maxBytes: number, types?: string[], blocked?: string[]): Promise<{ url: string; text: string } | null> {
+async function fetchText(
+  url: string,
+  maxBytes: number,
+  types?: string[],
+  blocked?: string[],
+  timeoutMs = 8000,
+): Promise<{ url: string; text: string } | null> {
   const safe = publicUrl(url);
   if (!safe) return null;
   const page = await safeFetch(safe, {
     accept: 'text/html, application/xhtml+xml, application/xml, application/rss+xml, application/atom+xml, text/xml, */*',
     maxBytes,
-    timeoutMs: 8000,
+    timeoutMs,
     types,
     userAgent: UA,
   }).catch(() => null);
@@ -359,6 +366,10 @@ export async function readCompanyPage(siteUrl: string, blocked?: string[]): Prom
     const href = abs(/href=["']([^"']+)["']/i.exec(match[1])?.[1] ?? null);
     const text = clean(match[2].replace(/<[^>]+>/g, ' '), 80);
     if (href && text && !links.some((l) => l.url === href)) links.push({ text, url: href });
+    if (links.length >= 400) break;
+  }
+  for (const extra of changelogEntryHrefs(html, base)) {
+    if (!links.some((l) => l.url === extra.url)) links.push(extra);
     if (links.length >= 400) break;
   }
   const headings = (html.match(/<h[1-3][^>]*>[\s\S]*?<\/h[1-3]>/gi) ?? [])
@@ -487,7 +498,7 @@ async function pagesForCompany(
     for (const page of fallback) absorb(page);
   }
   if (follow.length) {
-    const more = await mapLimit(follow.slice(0, 10), 6, (url) => readCompanyPage(url, ctx?.blocked));
+    const more = await mapLimit(follow.slice(0, 28), 6, (url) => readCompanyPage(url, ctx?.blocked));
     for (const page of more) absorb(page);
     if (!found.length && ctx?.tinyfish) {
       const extra = await fetchViaTinyfish(follow.filter(isPriorityCompanyUrl).slice(0, 4), ctx);
@@ -496,7 +507,7 @@ async function pagesForCompany(
     }
   }
   if (changelogFollow.length) {
-    const more = await mapLimit(changelogFollow.slice(0, 60), 6, (url) => readCompanyPage(url, ctx?.blocked));
+    const more = await mapLimit(changelogFollow.slice(0, 80), 6, (url) => readCompanyPage(url, ctx?.blocked));
     for (const page of more) absorb(page);
   }
   return { found, feeds, extraHosts, tinyfish: usedTinyfish };
@@ -514,14 +525,18 @@ function isIndexShipPath(url: string): boolean {
 
 function feedPriority(url: string): number {
   if (/\/changelog\/(rss|feed|atom)/i.test(url)) return 0;
+  if (/\/(atom|rss)(\.xml)?$/i.test(url) && /vercel\.com/i.test(url)) return 0;
   if (/changelog/i.test(url)) return 1;
-  if (/\.(xml)$/i.test(url)) return 2;
-  return 3;
+  if (/\/(atom|rss|feed)(\.xml)?$/i.test(url)) return 2;
+  if (/\.(xml)$/i.test(url)) return 3;
+  return 4;
 }
 
 async function harvestFeeds(urls: string[], year: number, ctx?: FetchCtx): Promise<Found[]> {
-  const unique = [...new Set(urls)].sort((a, b) => feedPriority(a) - feedPriority(b) || a.length - b.length).slice(0, 14);
-  const pages = await mapLimit(unique, 4, (url) => fetchText(url, 8_000_000, undefined, ctx?.blocked));
+  const unique = [...new Set(urls)].sort((a, b) => feedPriority(a) - feedPriority(b) || a.length - b.length).slice(0, 8);
+  const pages = await mapLimit(unique, 3, (url) =>
+    fetchText(url, 8_000_000, ['application/rss+xml', 'application/atom+xml', 'application/xml', 'text/xml', 'text/html'], ctx?.blocked, 25_000),
+  );
   const found: Found[] = [];
   const absorb = (text: string) => found.push(...itemsFromFeedXml(text, year).map(asFound));
   for (const page of pages) {
@@ -583,7 +598,7 @@ async function hydrateChangelogEntryDates(found: Found[], year: number, ctx?: Fe
     if (seen.has(url)) return false;
     seen.add(url);
     return true;
-  }).slice(0, 48);
+  }).slice(0, 80);
   if (!unique.length) return found;
   const pages = await mapLimit(unique, 6, (item) => fetchText(item.link as string, 160_000, undefined, ctx?.blocked));
   const byUrl = new Map(unique.map((item, i) => [item.link, pages[i]]));
@@ -888,7 +903,7 @@ export async function harvestCompany(opts: {
   if (opts.storeOnly) {
     return { found: [], spend: emptyXaiSpend(), ran: ['company-store-miss'], cacheHit: false };
   }
-  const cacheKey = opts.deep ? `company:deep:v19:${year}:${slug}` : `company:v19:${year}:${slug}`;
+  const cacheKey = opts.deep ? `company:deep:v20:${year}:${slug}` : `company:v20:${year}:${slug}`;
   const load = async (): Promise<CompanyHarvest> => {
     const via = viaFor(affiliation);
     const ran: string[] = [];

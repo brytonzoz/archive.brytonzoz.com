@@ -159,6 +159,7 @@ function isNoiseTitle(text: string): boolean {
 /** Headline verbs → a short product name. Never cut mid-word. */
 export function shipName(value: unknown, max = 60): string {
   let text = stripDateSuffix(tidy(value))
+    .replace(/\bcopy link to\b[\s\S]*/i, '')
     .replace(/^(guides?|editorials?|listicles?|news|product|safety|research|company|inside\s+\w+)\s+/i, '')
     .replace(/\s+\d+\s*min(?:ute)?s?\s*$/i, '')
     .replace(/^\d+\s*min(?:ute)?s?\s*·\s*/i, '')
@@ -171,8 +172,10 @@ export function shipName(value: unknown, max = 60): string {
       /^(?:released|added|announced|launched)\s+([A-Z0-9@][\w. +-]{1,36}?)(?:\s+in\s+the\b.*)?$/i,
     );
     const lets = first.match(/^([A-Za-z][\w. -]{1,32}?)\s+(lets?|can also|can now)\b/i);
-    const product = named?.[1] || lets?.[1] || '';
-    text = tidy(product) || '';
+    const product = tidy(named?.[1] || lets?.[1] || '');
+    const words = product.split(/\s+/).filter(Boolean);
+    // "Agents can now buy domains…" is the ship. Collapsing it to "Agents" junks the card.
+    if (product && (words.length >= 2 || /\d/.test(product))) text = product;
     if (!text) return '';
   }
   text = text
@@ -370,7 +373,10 @@ export function itemsFromDatedCards(text: string, url: string, year: number): Ch
 export function itemsFromIsoDateHeadings(text: string, url: string, year: number): ChangelogFound[] {
   const found: ChangelogFound[] = [];
   const seen = new Set<string>();
-  const re = new RegExp(`(?:^|\\n)\\s*(${year}-\\d{2}-\\d{2})\\s*(?:\\n+\\s*#{0,3}\\s*|\\s+#{0,3}\\s*)([A-Za-z0-9][^\\n]{2,80})`, 'g');
+  const re = new RegExp(
+    `(?:^|\\n)\\s*(?:[-*•●]\\s+)?(${year}-\\d{2}-\\d{2})\\s*(?:\\n+\\s*#{0,3}\\s*|\\s+#{0,3}\\s*)([A-Za-z0-9][^\\n]{2,80})`,
+    'g',
+  );
   for (const match of text.matchAll(re)) {
     const name = cleanTitle(match[2]);
     const key = loose(name);
@@ -543,6 +549,33 @@ export function itemsFromJsonLd(html: string, year: number): ChangelogFound[] {
   return found;
 }
 
+/** `/changelog/slug` hrefs from HTML, markdown, or Next.js RSC (`self.__next_f`) payloads. */
+export function changelogEntryHrefs(html: string, base: string): { text: string; url: string }[] {
+  const out: { text: string; url: string }[] = [];
+  const seen = new Set<string>();
+  const add = (href: string) => {
+    const cleaned = href.replace(/\\+\//g, '/').replace(/\\u002f/gi, '/');
+    try {
+      const url = publicUrl(new URL(cleaned, base).toString());
+      if (!url || !/\/changelog\/[a-z0-9][a-z0-9-]{3,}/i.test(url)) return;
+      if (/\/(rss|feed|atom|page\/\d+)(\/|$)/i.test(url)) return;
+      const key = url.replace(/[?#].*$/, '').replace(/\/+$/, '');
+      if (seen.has(key)) return;
+      seen.add(key);
+      out.push({ text: titleFromSlug(key), url: key });
+    } catch {
+      /* skip */
+    }
+  };
+  for (const match of html.matchAll(/https?:\\?\/\\?\/[^\s"'\\]+\/changelog\/[a-z0-9][a-z0-9-]{3,}/gi)) {
+    add(match[0]);
+  }
+  for (const match of html.matchAll(/(?:href=["']|["'])(\/changelog\/[a-z0-9][a-z0-9-]{3,})["']/gi)) {
+    add(match[1]);
+  }
+  return out.slice(0, 160);
+}
+
 export function itemsFromNewsLinks(
   links: { text: string; url: string }[],
   year: number,
@@ -676,5 +709,6 @@ export function itemsFromCompanyPage(opts: {
     opts.html ? itemsFromTimedHeadings(opts.html, opts.url, opts.year) : [],
     opts.html ? itemsFromJsonLd(opts.html, opts.year) : [],
     itemsFromNewsLinks(opts.links ?? [], opts.year, opts.url),
+    opts.html ? itemsFromNewsLinks(changelogEntryHrefs(opts.html, opts.url), opts.year, opts.url) : [],
   ]);
 }

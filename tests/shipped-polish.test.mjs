@@ -210,6 +210,7 @@ test('source lines are via Brand · host with no sitemap metadata', () => {
   assert.equal(polish.prettyBrand('open ai'), 'OpenAI');
   assert.equal(polish.cleanStatus('LAUNCHED~'), 'LAUNCHED');
   assert.equal(polish.cleanDescription('learn.chatgpt.com'), '');
+  assert.equal(polish.cleanDescription('ChatGPT for Education opens in a new window.'), '');
   assert.equal(polish.cleanDescription('p align="center" h1 TypeScript loader'), '');
   assert.equal(polish.cleanDescription('picture source media="(prefers-color-scheme: dark)" srcset=" 25px" alt="G'), '');
   const clipped = polish.cleanDescription('Standalone TypeScript loader for Node.js from the Nub project — TypeScript, JSX, tsconfig paths, and data-format imports through a native transform');
@@ -822,6 +823,7 @@ test('prereleases, starters, and Gateway model listings are not ships', () => {
   assert.match(polish.cleanShipTitle('BETTER PROMPT CACHING FOR GPT-6 PRODUCT SEP 22, 2026'), /better prompt caching for gpt-6/i);
   assert.match(polish.cleanShipTitle('GPT-6.1 SOL PRODUCT SEP 29, 2026'), /gpt-6\.1 sol/i);
   assert.match(polish.cleanShipTitle('ChatGPT Voice and multi-folder projects 26.715'), /chatgpt voice and multi-folder projects/i);
+  assert.match(polish.cleanShipTitle('Agents can now buy domains with the Vercel CLI'), /agents can now buy domains/i);
   const items = polish.polishCandidates(
     [
       found({ name: "Liquid AI's d1 is available on AI Gateway", date: '2026-10-08', link: 'https://vercel.com/changelog/liquid-d1' }),

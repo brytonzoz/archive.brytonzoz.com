@@ -24,6 +24,7 @@
 // After 1c92c1e: E2E goldens on cached tapes; changelog cards keep /changelog/ hrefs.
 // After floors restore: Truell ≥40, Tibo ≥35, Rauch ≥25, Sam ≥20. Live uses fixture mins.
 // After f325d85: named Codex reserve, Vercel changelog harvest, prerelease/org-repo junk, note rejects.
+// After this pass: Atom/RSC changelog cards, keep "can now" titles, no cache-time leader reprints, canned notes die.
 // After 04668b7: 60-char wrap, date-or-drop changelog, OpenAI /index, no bare notes, drop Ship or Die for Jack.
 // After note/self-name pass: word-number counts, bio/thin-tape notes, LEGAL/TRUELL20.
 // After f063801: reprint #6, #7, #13, #16–#22 on the leftover-nav / weak-note gate.

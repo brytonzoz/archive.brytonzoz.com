@@ -4,14 +4,12 @@
 //
 //   ADMIN_PASSWORD=… node --experimental-transform-types scripts/cache-shipped-companies.mjs
 import '../tests/resolve-ts.mjs';
-import { spawnSync } from 'node:child_process';
 import { readFileSync } from 'node:fs';
 
 const ORIGINS = {
   staging: 'https://shipped-staging.brytonzoz.com',
   production: 'https://shipped.brytonzoz.com',
 };
-const REPRINT_IDS = '16,17,13,11,7,6,14';
 
 const pick = (...names) => names.map((n) => process.env[n]).find((v) => typeof v === 'string' && v.trim()) || '';
 const slugOf = (company) => String(company || '').toLowerCase().replace(/[^a-z0-9]+/g, '');
@@ -171,19 +169,6 @@ async function waitForWorkerCache(origin, timeoutMs = 8 * 60 * 1000) {
   return false;
 }
 
-function reprintLeaders(origin) {
-  const script = new URL('./reprint-shipped.mjs', import.meta.url).pathname;
-  const result = spawnSync(process.execPath, ['--no-warnings', script], {
-    env: {
-      ...process.env,
-      SHIPPED_ORIGIN: origin,
-      SHIPPED_REPRINT_FORCE_IDS: REPRINT_IDS,
-    },
-    stdio: 'inherit',
-  });
-  return result.status === 0;
-}
-
 const queued = [];
 for (const target of targets) queued.push(...(await queuedCompanies(ORIGINS[target])));
 const companies = mergeSeeds([...(seeds.companies || []), ...queued]);
@@ -203,8 +188,7 @@ for (const seed of companies) {
   if (payload.slug === 'openai' && targets.includes('staging')) {
     openaiWritten = true;
     const ready = await waitForWorkerCache(ORIGINS.staging);
-    console.log(ready ? 'staging Worker sees company-cache' : 'staging Worker did not list company-cache yet; reprinting anyway');
-    reprintLeaders(ORIGINS.staging);
+    console.log(ready ? 'staging Worker sees company-cache' : 'staging Worker did not list company-cache yet');
   }
 }
 

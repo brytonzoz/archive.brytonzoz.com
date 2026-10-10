@@ -402,6 +402,25 @@ test('cashier note and stats are specific to the items, never stock copy', () =>
   assert.equal(ai.hardRejectNote('ChatGPT for Education opens in a new window.', [{ name: 'CHATGPT FOR EDUCATION', spoken: 'ChatGPT for Education' }], [], { who: 'Sam Altman' }), 'banned-phrase');
   assert.equal(ai.hardRejectNote('Frizz is a product that shipped this year.', [{ name: 'FRIZZ', spoken: 'Frizz' }], [], { who: 'Colin McDonnell' }), 'banned-phrase');
   assert.equal(ai.hardRejectNote('Frizz shipped.', [{ name: 'FRIZZ', spoken: 'Frizz' }], [], { who: 'Colin McDonnell' }), 'too-short');
+  assert.equal(
+    ai.pickLeastBadNote(
+      ['Frizz is a product that shipped this year.', 'Lsp4j-MCP shipped.'],
+      [{ name: 'FRIZZ', spoken: 'Frizz', description: 'schema tooling' }],
+      [],
+      { who: 'Colin McDonnell' },
+    ),
+    '',
+  );
+  const sealedCanned = ai.finish(
+    [{ name: 'FRIZZ', spoken: 'Frizz', description: 'schema tooling for TypeScript', date: '2026-03-01', status: 'LAUNCHED', link: 'https://frizz.dev', icon: null, source: 'github' }],
+    'Frizz is a product that shipped this year.',
+    2,
+    undefined,
+    [],
+    { who: 'Colin McDonnell', handle: 'colinhacks', apiDown: false, year: 2026 },
+  );
+  assert.doesNotMatch(sealedCanned.note, /opens in a new window|shipped this year|is a product/i);
+  assert.ok(sealedCanned.note.split(/\s+/).length >= 8, sealedCanned.note);
   const sealed = ai.finish(
     [{ name: 'PHOTOAI', spoken: 'PhotoAI', description: 'headshots', date: '2026-01-20', status: 'LAUNCHED', link: 'https://photoai.com', icon: null, source: 'site' }],
     '',

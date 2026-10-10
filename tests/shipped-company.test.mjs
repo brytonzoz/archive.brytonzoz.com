@@ -185,6 +185,11 @@ test('ship names strip launch words, skip bylines, and never cut mid-word', () =
   assert.equal(changelog.shipName('How to make realistic VFX shots'), '');
   assert.equal(changelog.shipName('BY MARIAM BAROVA, CREATIVE DIRECTOR'), '');
   assert.equal(changelog.shipName('The Codex app launches on macOS'), 'Codex app for macOS');
+  assert.match(changelog.shipName('Agents can now buy domains with the Vercel CLI'), /agents can now buy domains/i);
+  assert.equal(
+    changelog.shipName('GPT-6.1 Sol Ultrafast in Codex and ChatGPT Work Copy link to GPT-6.1 Sol Ultrafast in Codex and ChatGPT Work'),
+    'GPT-6.1 Sol Ultrafast in Codex and ChatGPT Work',
+  );
   assert.equal(changelog.shipName('Replit introduces Free Mode'), 'Replit Free Mode');
   assert.equal(changelog.shipName('NEW INSTANT ROLLBACK FLOW'), 'INSTANT ROLLBACK');
   assert.equal(changelog.shipName('Replit Agent v0.213.1'), 'Replit Agent v0.213.1');
@@ -235,6 +240,12 @@ test('time-plus-heading changelog cards become dated ships; month-only titles dr
   assert.ok(items.some((item) => /0\.145\.0/.test(item.name) && item.date === '2026-07-21'), JSON.stringify(items));
   const sameLine = changelog.itemsFromIsoDateHeadings('2026-07-21 Codex CLI 0.145.0\n', 'https://developers.openai.com/codex/changelog', 2026);
   assert.ok(sameLine.some((item) => /0\.145\.0/.test(item.name)), JSON.stringify(sameLine));
+  const listed = changelog.itemsFromIsoDateHeadings(
+    '- 2026-10-08\n\n### GPT-6.1 Sol Ultrafast in Codex and ChatGPT Work\n',
+    'https://developers.openai.com/codex/changelog',
+    2026,
+  );
+  assert.ok(listed.some((item) => /sol ultrafast/i.test(item.name) && item.date === '2026-10-08'), JSON.stringify(listed));
 });
 
 test('Vercel changelog dates every card under a day <time datetime>', () => {
@@ -251,6 +262,30 @@ test('Vercel changelog dates every card under a day <time datetime>', () => {
   assert.ok(items.some((item) => /v0 platform api/i.test(item.name) && item.date === '2026-10-09'), JSON.stringify(items));
   assert.ok(items.some((item) => /vercel agent/i.test(item.name) && item.date === '2026-10-09'), JSON.stringify(items));
   assert.ok(items.some((item) => /grok imagine/i.test(item.name) && item.date === '2026-10-08'), JSON.stringify(items));
+});
+
+test('Vercel atom changelog entries keep the full dated title', () => {
+  const xml = `<?xml version="1.0" encoding="utf-8"?>
+    <feed xmlns="http://www.w3.org/2005/Atom">
+      <entry>
+        <title>Agents can now buy domains with the Vercel CLI</title>
+        <link href="https://vercel.com/changelog/agents-can-now-buy-domains-with-the-vercel-cli"/>
+        <updated>2026-10-09T20:24:00.000Z</updated>
+      </entry>
+      <entry>
+        <title>v0 Platform API now in beta</title>
+        <link href="https://vercel.com/changelog/v0-platform-api-now-in-beta"/>
+        <updated>2026-09-18T12:00:00.000Z</updated>
+      </entry>
+    </feed>`;
+  const items = changelog.itemsFromFeedXml(xml, 2026);
+  assert.ok(items.some((item) => /agents can now buy domains/i.test(item.name) && item.date === '2026-10-09'), JSON.stringify(items));
+  assert.ok(items.some((item) => /v0 platform api/i.test(item.name)), JSON.stringify(items));
+  const hrefs = changelog.changelogEntryHrefs(
+    `self.__next_f.push(["/changelog/vercel-agent-now-in-slack","/changelog/v0-platform-api-now-in-beta"])`,
+    'https://vercel.com/changelog',
+  );
+  assert.ok(hrefs.some((row) => /vercel-agent-now-in-slack/.test(row.url)), JSON.stringify(hrefs));
 });
 
 test('blocked challenge pages are dropped; TinyFish markdown still extracts dated ships', () => {

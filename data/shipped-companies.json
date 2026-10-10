@@ -4,11 +4,11 @@
     {
       "company": "OpenAI",
       "products": ["Codex", "ChatGPT"],
-      "sites": ["https://openai.com/", "https://openai.com/index", "https://developers.openai.com/", "https://learn.chatgpt.com/"]
+      "sites": ["https://openai.com/", "https://openai.com/index", "https://developers.openai.com/", "https://developers.openai.com/codex/changelog", "https://learn.chatgpt.com/", "https://learn.chatgpt.com/docs/changelog"]
     },
     { "company": "Anthropic", "products": ["Claude"], "sites": ["https://www.anthropic.com/", "https://docs.anthropic.com/"] },
     { "company": "Cursor", "products": ["Cursor"], "sites": ["https://cursor.com/", "https://docs.cursor.com/"] },
-    { "company": "Vercel", "sites": ["https://vercel.com/", "https://vercel.com/changelog"] },
+    { "company": "Vercel", "sites": ["https://vercel.com/", "https://vercel.com/changelog", "https://vercel.com/atom"] },
     { "company": "Replit", "sites": ["https://replit.com/", "https://blog.replit.com/"] },
     { "company": "Higgsfield", "sites": ["https://higgsfield.ai/"] },
     { "company": "xAI", "products": ["Grok"], "sites": ["https://x.ai/"] },

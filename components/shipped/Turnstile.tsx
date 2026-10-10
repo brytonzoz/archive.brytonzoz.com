@@ -53,15 +53,18 @@ export const Turnstile = forwardRef<TurnstileHandle, TurnstileProps>(function Tu
   const widget = useRef<string | null>(null);
   const api = useRef<TurnstileApi | null>(null);
   const token = useRef<string | null>(null);
+  const spent = useRef(false);
   const waiters = useRef<((value: string | null) => void)[]>([]);
   const callback = useRef(onToken);
   callback.current = onToken;
   const [challenge, setChallenge] = useState(appearance === 'always');
   const visible = appearance === 'always' || challenge;
   const [round, setRound] = useState(0);
+  const [failed, setFailed] = useState(false);
 
   function emit(value: string | null) {
     token.current = value;
+    spent.current = false;
     callback.current(value);
     const pending = waiters.current.splice(0);
     pending.forEach((resolve) => resolve(value));
@@ -69,27 +72,49 @@ export const Turnstile = forwardRef<TurnstileHandle, TurnstileProps>(function Tu
 
   function askToVerify() {
     setChallenge(true);
+    setFailed(true);
     emit(null);
+  }
+
+  function resetWidget() {
+    token.current = null;
+    spent.current = false;
+    callback.current(null);
+    if (widget.current && api.current) {
+      try {
+        api.current.reset(widget.current);
+      } catch {
+        setRound((n) => n + 1);
+      }
+    }
   }
 
   useImperativeHandle(ref, () => ({
     reset: () => {
-      token.current = null;
-      callback.current(null);
-      if (widget.current && window.turnstile) window.turnstile.reset(widget.current);
+      resetWidget();
     },
     execute: () => {
-      if (token.current) return Promise.resolve(token.current);
+      // A Turnstile token is single-use. Never hand the last one back.
+      if (token.current && !spent.current) {
+        spent.current = true;
+        const value = token.current;
+        token.current = null;
+        return Promise.resolve(value);
+      }
+      token.current = null;
+      spent.current = false;
+      resetWidget();
       return new Promise((resolve) => {
         waiters.current.push(resolve);
         const start = Date.now();
         let kicked = false;
         const run = () => {
           if (token.current) return;
-          if (!visible && widget.current && api.current && !kicked) {
+          if (widget.current && api.current && !kicked) {
             kicked = true;
             try {
-              api.current.execute(widget.current);
+              if (visible) api.current.reset(widget.current);
+              else api.current.execute(widget.current);
             } catch {
               askToVerify();
               return;
@@ -121,11 +146,16 @@ export const Turnstile = forwardRef<TurnstileHandle, TurnstileProps>(function Tu
           execution: visible ? 'render' : 'execute',
           size: visible ? 'flexible' : 'compact',
           callback: (value: string) => queueMicrotask(() => emit(value)),
-          'expired-callback': () => queueMicrotask(() => emit(null)),
+          'expired-callback': () =>
+            queueMicrotask(() => {
+              spent.current = false;
+              emit(null);
+            }),
           'error-callback': () =>
             queueMicrotask(() => {
               if (!visible) {
                 setChallenge(true);
+                setFailed(true);
                 setRound((n) => n + 1);
               }
               emit(null);
@@ -133,17 +163,20 @@ export const Turnstile = forwardRef<TurnstileHandle, TurnstileProps>(function Tu
           'timeout-callback': () =>
             queueMicrotask(() => {
               setChallenge(true);
+              setFailed(true);
               emit(null);
             }),
         });
       })
       .catch(() => {
         setChallenge(true);
+        setFailed(true);
         emit(null);
       });
+    const pending = waiters.current;
     return () => {
       cancelled = true;
-      waiters.current.splice(0).forEach((resolve) => resolve(null));
+      pending.splice(0).forEach((resolve) => resolve(null));
       if (widget.current && window.turnstile) window.turnstile.remove(widget.current);
       widget.current = null;
       api.current = null;
@@ -154,12 +187,20 @@ export const Turnstile = forwardRef<TurnstileHandle, TurnstileProps>(function Tu
     <div className={`shipped-turnstile${visible ? ' is-on' : ''}${challenge ? ' is-challenge' : ''}`}>
       {challenge ? (
         <p className="shipped-turnstile-label">
-          <button type="button" className="shipped-turnstile-hit" onClick={() => setRound((n) => n + 1)}>
-            Tap to verify
+          <button
+            type="button"
+            className="shipped-turnstile-hit"
+            onClick={() => {
+              setFailed(false);
+              resetWidget();
+              setRound((n) => n + 1);
+            }}
+          >
+            {failed ? 'Tap to verify' : 'Checking you’re human'}
           </button>
         </p>
       ) : null}
-      <div ref={box} />
+      <div ref={box} className="shipped-turnstile-box" />
     </div>
   );
 });

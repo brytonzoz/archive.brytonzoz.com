@@ -143,9 +143,18 @@ function ItemRow({ item, compact }: { item: ViewItem; compact?: boolean }) {
       </div>
       {!compact && (item.date || item.description || item.via) ? (
         <p className="mt-0.5 text-[11.5px] leading-[1.45] opacity-80">
-          {item.via ? <span className="mr-1.5 opacity-60">{item.via}</span> : null}
-          {item.description}
-          {item.date ? <span className="whitespace-nowrap opacity-75">{item.description || item.via ? '  ' : ''}{item.date}</span> : null}
+          {item.via ? <span className="block opacity-60">{item.via}</span> : null}
+          {item.description || item.date ? (
+            <span className={item.via ? 'mt-0.5 block' : undefined}>
+              {item.description}
+              {item.date ? (
+                <span className="whitespace-nowrap opacity-75">
+                  {item.description ? '  ' : ''}
+                  {item.date}
+                </span>
+              ) : null}
+            </span>
+          ) : null}
         </p>
       ) : null}
     </li>
@@ -175,10 +184,13 @@ function ItemList({ props }: { props: YearReceiptProps }) {
       <Rule heavy />
       <div className="shipped-lead items-end py-1 text-[13px] font-semibold">
         <span>
-          ITEMS SHIPPED
           {typeof props.shipScore === 'number' ? (
-            <span className="ml-1.5 text-[11px] font-medium opacity-70">· SCORE {props.shipScore}</span>
-          ) : null}
+            <>
+              ITEMS SHIPPED <span className="text-[11px] font-medium opacity-70">· SCORE {props.shipScore}</span>
+            </>
+          ) : (
+            'ITEMS SHIPPED'
+          )}
         </span>
         <span className="shipped-lead-fill" aria-hidden="true" />
         <Tall className="text-[18px] tabular-nums">{String(props.count)}</Tall>

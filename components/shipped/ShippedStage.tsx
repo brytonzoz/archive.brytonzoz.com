@@ -152,7 +152,6 @@ export function ShippedStage({ opening, title }: { opening: Opening; title: Reac
   const generator = state?.generator;
   const [query, setQuery] = useState('');
   const [listed, setListed] = useState(true);
-  const [token, setToken] = useState<string | null>(null);
   const [step, setStep] = useState<Step>({ name: 'idle' });
   const [error, setError] = useState<string | null>(null);
   const [job, setJob] = useState<Job>(() => openingJob(opening));
@@ -268,7 +267,8 @@ export function ShippedStage({ opening, title }: { opening: Opening; title: Reac
   }
 
   async function print(candidate: Candidate, gen = run.current) {
-    const humanToken = token ?? (await human.current?.execute()) ?? null;
+    human.current?.reset();
+    const humanToken = (await human.current?.execute()) ?? null;
     if (run.current !== gen) return;
     if (!humanToken) {
       setStep({ name: 'retry' });
@@ -325,6 +325,7 @@ export function ShippedStage({ opening, title }: { opening: Opening; title: Reac
         }, watching);
       }
     } catch (failure) {
+      human.current?.reset();
       const code = failure instanceof Error ? failure.message : 'ai-error';
       if (code === 'out-of-paper' || code === 'closed') {
         setStep({ name: 'idle' });
@@ -392,11 +393,20 @@ export function ShippedStage({ opening, title }: { opening: Opening; title: Reac
     if (focus && current) rememberTorn(current.receipt.id);
   }, [focus, current]);
 
-  // Stripe / bfcache: put the torn receipt back so Back doesn't drop the visitor on the house slip.
+  // / is always the house slip. Stripe Back lands on /r/<id>/, which opens as `loaded`.
   useEffect(() => {
+    if (opening.kind === 'house') {
+      forgetTorn();
+      if (!touched.current) {
+        setCurrent(null);
+        setPaper('printing');
+        setJob(openingJob(opening));
+      }
+      return;
+    }
     const restore = () => {
       if (currentRef.current && paperRef.current === 'torn') return;
-      if (opening.kind === 'loaded') return;
+      if (opening.kind !== 'loaded') return;
       const id = readTorn();
       if (!id) return;
       void fetchReceipt(id).then((loaded) => {
@@ -405,11 +415,26 @@ export function ShippedStage({ opening, title }: { opening: Opening; title: Reac
         showReceipt(loaded);
       });
     };
-    restore();
-    const onShow = () => restore();
+    const onShow = (event: PageTransitionEvent) => {
+      if (event.persisted) restore();
+    };
     window.addEventListener('pageshow', onShow);
     return () => window.removeEventListener('pageshow', onShow);
     // opening is the first-screen house slip or /r/<id>/; restore only needs that once.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [opening.kind]);
+
+  useEffect(() => {
+    const onHome = () => {
+      if (opening.kind !== 'house') {
+        window.location.assign('/');
+        return;
+      }
+      printAnother();
+    };
+    window.addEventListener('shipped:home', onHome);
+    return () => window.removeEventListener('shipped:home', onHome);
+    // printAnother closes over opening; re-bind when the first screen changes.
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [opening.kind]);
 
@@ -487,7 +512,7 @@ export function ShippedStage({ opening, title }: { opening: Opening; title: Reac
           }
         />
 
-        <HumanCheck ref={human} check={generator?.enabled ? generator.human : null} onToken={setToken} theme="dark" appearance="execute" />
+        <HumanCheck ref={human} check={generator?.enabled ? generator.human : null} onToken={() => undefined} theme="dark" appearance="execute" />
 
         {error ? (
           <p id="shipped-print-error" className="shipped-desk-error" role="alert">

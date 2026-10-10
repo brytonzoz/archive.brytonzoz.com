@@ -30,10 +30,14 @@ function idFromPath(): number | null {
 }
 
 function PrintedReceiptLive() {
-  const [loaded, setLoaded] = useState<Loaded | null | undefined>(() => readInjected() ?? undefined);
+  const [loaded, setLoaded] = useState<Loaded | null | undefined>(undefined);
 
   useEffect(() => {
-    if (loaded !== undefined) return;
+    const injected = readInjected();
+    if (injected) {
+      setLoaded(injected);
+      return;
+    }
     let cancelled = false;
     const id = idFromPath();
     if (!id) {
@@ -51,7 +55,7 @@ function PrintedReceiptLive() {
     return () => {
       cancelled = true;
     };
-  }, [loaded]);
+  }, []);
 
   useEffect(() => {
     if (!loaded?.receipt) return;

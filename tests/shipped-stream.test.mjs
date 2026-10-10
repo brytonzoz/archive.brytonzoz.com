@@ -87,7 +87,8 @@ test('the tape and the DOM copy keep ITEMS SHIPPED · SCORE and drop the status 
   assert.doesNotMatch(doc.text, /LAUNCHED ~/);
 
   const year = fs.readFileSync(new URL('../components/shipped/YearReceipt.tsx', import.meta.url), 'utf8');
-  assert.match(year, /· SCORE/);
+  assert.match(year, /ITEMS SHIPPED <span className="text-\[11px\] font-medium opacity-70">· SCORE/);
+  assert.match(year, /block opacity-60/);
   assert.equal(year.includes('opacity-40">'), false);
   assert.doesNotMatch(year, /sr-only">: /);
 });
@@ -140,4 +141,19 @@ test('after a print the stage auto-tears; sponsors stay collapsed; Turnstile has
   const turnstile = fs.readFileSync(new URL('../components/shipped/Turnstile.tsx', import.meta.url), 'utf8');
   assert.match(turnstile, /Tap to verify/);
   assert.match(turnstile, /askToVerify|setChallenge\(true\)/);
+  assert.match(turnstile, /api\.current\.reset/);
+  assert.match(turnstile, /spent/);
+
+  assert.match(stage, /forgetTorn\(\)/);
+  assert.match(stage, /human\.current\?\.reset\(\)/);
+  assert.doesNotMatch(stage, /token \?\? \(await human/);
+
+  assert.match(css, /\.shipped-out \{[\s\S]*pointer-events: none;/);
+  const wall = fs.readFileSync(new URL('../components/shipped/wall/ReceiptWall.tsx', import.meta.url), 'utf8');
+  assert.match(wall, /useState\(320\)/);
+  assert.doesNotMatch(wall, /typeof window === 'undefined' \? 320/);
+
+  const machine = fs.readFileSync(new URL('../components/shipped/Machine.tsx', import.meta.url), 'utf8');
+  assert.match(machine, /printed \+ line/);
+  assert.match(machine, /stepMs/);
 });

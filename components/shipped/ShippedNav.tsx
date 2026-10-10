@@ -14,7 +14,16 @@ export function ShippedNav() {
   return (
     <nav className="shipped-nav" aria-label="Shipped">
       {LINKS.map((link) => (
-        <a key={link.href} href={link.href} aria-current={link.match(path) ? 'page' : undefined}>
+        <a
+          key={link.href}
+          href={link.href}
+          aria-current={link.match(path) ? 'page' : undefined}
+          onClick={(event) => {
+            if (link.href !== '/' || !link.match(path)) return;
+            event.preventDefault();
+            window.dispatchEvent(new Event('shipped:home'));
+          }}
+        >
           {link.label}
         </a>
       ))}

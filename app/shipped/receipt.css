@@ -1255,6 +1255,14 @@ html.shipped-focus .shipped-board {
   margin-top: -2px;
   clip-path: inset(0 -100vw -100000px -100vw);
   -webkit-clip-path: inset(0 -100vw -100000px -100vw);
+  pointer-events: none;
+}
+
+.shipped-out .shipped-feed,
+.shipped-out .shipped-lead-paper,
+.shipped-out .shipped-leaving,
+.shipped-out .shipped-stub.is-on {
+  pointer-events: auto;
 }
 
 .shipped-out .shipped-ticket {
@@ -1435,15 +1443,22 @@ html.shipped-focus .shipped-board {
   left: auto;
   bottom: auto;
   z-index: 6;
-  width: min(18.5rem, 100%);
+  width: min(19rem, 100%);
   height: auto;
-  min-height: 0;
+  min-height: 65px;
   margin: 4px auto 0;
   padding: 8px 10px 10px;
   border: 1px solid rgba(243, 234, 216, 0.16);
   border-radius: 12px;
   background: rgba(26, 22, 18, 0.92);
   box-shadow: 0 10px 24px rgba(0, 0, 0, 0.35);
+}
+
+.shipped-turnstile-box {
+  width: 300px;
+  max-width: 100%;
+  min-height: 65px;
+  margin: 0 auto;
 }
 
 .shipped-turnstile-label {

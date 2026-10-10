@@ -645,6 +645,8 @@ export async function harvestCompany(opts: {
   rebuild?: boolean;
   /** Extra first-party hosts from the seed list (docs/learn/developers). */
   extraSites?: string[];
+  /** First-paint path: D1/R2 only, never a live crawl. */
+  storeOnly?: boolean;
 }): Promise<CompanyHarvest> {
   const { affiliation, year, env } = opts;
   const slug = companySlug(affiliation.company);
@@ -667,6 +669,9 @@ export async function harvestCompany(opts: {
         };
       }
     }
+  }
+  if (opts.storeOnly) {
+    return { found: [], spend: emptyXaiSpend(), ran: ['company-store-miss'], cacheHit: false };
   }
   const cacheKey = opts.deep ? `company:deep:v13:${year}:${slug}` : `company:v15:${year}:${slug}`;
   const load = async (): Promise<CompanyHarvest> => {
@@ -709,27 +714,20 @@ export async function harvestCompany(opts: {
     };
 
     const firstSeeds = seeds.slice(0, 6);
-    // Docs/changelog subdomains first: many apex sites block Worker IPs while developers.example.com does not.
-    if (firstSeeds[0]) {
-      for (const prefixed of prefixHosts(firstSeeds[0])) {
-        await takePages(prefixed, 'company-site');
-      }
-    }
-    for (const site of firstSeeds) {
-      await takePages(site, 'company-site');
-    }
-    for (const extra of discoveredHosts) {
-      await takePages(extra, 'company-site');
-    }
+    const prefixed = firstSeeds[0] ? prefixHosts(firstSeeds[0]) : [];
+    await Promise.all([...prefixed, ...firstSeeds].map((site) => takePages(site, 'company-site')));
+    await Promise.all(discoveredHosts.map((extra) => takePages(extra, 'company-site')));
 
-    for (const origin of liveOrigins.slice(0, 4)) {
-      for (const path of FEED_PATHS) feeds.push(`${origin.replace(/\/+$/, '')}${path}`);
-      const sitemapItems = await harvestSitemaps(origin, year, ctx).catch(() => []);
-      if (sitemapItems.length) {
-        found.push(...withVia(sitemapItems, via));
-        ran.push(`company-sitemap:${hostOf(origin)}`);
-      }
-    }
+    await Promise.all(
+      liveOrigins.slice(0, 4).map(async (origin) => {
+        for (const path of FEED_PATHS) feeds.push(`${origin.replace(/\/+$/, '')}${path}`);
+        const sitemapItems = await harvestSitemaps(origin, year, ctx).catch(() => []);
+        if (sitemapItems.length) {
+          found.push(...withVia(sitemapItems, via));
+          ran.push(`company-sitemap:${hostOf(origin)}`);
+        }
+      }),
+    );
     const feedItems = await harvestFeeds(feeds, year, ctx).catch(() => []);
     if (feedItems.length) {
       found.push(...withVia(feedItems, via));

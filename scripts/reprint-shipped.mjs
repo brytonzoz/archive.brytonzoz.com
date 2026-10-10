@@ -20,6 +20,7 @@ const realCount = (receipt) => {
 
 const TARGETS = [
   { id: 16, who: 'Tibo from OpenAI' },
+  { id: 17, who: 'Michael Truell' },
   { id: 11, who: '@thsottiaux' },
   { id: 13, who: 'Sam Altman' },
   { id: 14, who: 'Marc Lou' },

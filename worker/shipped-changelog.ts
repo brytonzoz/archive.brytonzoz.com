@@ -126,6 +126,8 @@ function clean(value: unknown, max: number): string {
 
 function isNoiseTitle(text: string): boolean {
   if (!text || text.length < 3 || SKIP_TITLE.test(text)) return true;
+  if (/^authors?\s*[:\-–—]/i.test(text) || /^week of\b/i.test(text) || /^respectively\.?$/i.test(text)) return true;
+  if (/^(overview|prompting|pool|security|browser|search|terminal|settings|acting as users|builds)$/i.test(text)) return true;
   if (BARE_YEAR.test(text) || BARE_VERSION.test(text) || BARE_ID_SLUG.test(text)) return true;
   if ((text.replace(/[^a-zA-Z]/g, '').length < 3) && /\d/.test(text)) return true;
   if (/^by\s+\S/i.test(text)) return true;
@@ -244,6 +246,12 @@ export function isShipPath(url: string): boolean {
   return /\/(changelog|blog|news|releases?|updates?|whats-new|what-s-new|index|research|product|codex|docs)(\/|$)/i.test(url);
 }
 
+/** Sitemap lastmod is not a ship. Only changelog/blog/news/release URLs, never docs nav. */
+export function isSitemapShipPath(url: string): boolean {
+  if (/\/docs\/(?!changelog|release)/i.test(url)) return false;
+  return /\/(changelog|blog|news|releases?|updates?|whats-new|what-s-new|release-notes)(\/|$)/i.test(url);
+}
+
 export function productPaths(product: string | null | undefined): string[] {
   const slug = (product ?? '').toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '');
   if (slug.length < 2) return [];
@@ -281,21 +289,21 @@ function cleanTitle(name: string): string {
   return trimmed;
 }
 
-function row(name: string, date: string | null, url: string, year: number, hint?: string): ChangelogFound | null {
+function row(name: string, date: string | null, url: string, year: number, _hint?: string): ChangelogFound | null {
   const title = cleanTitle(name);
   if (!title) return null;
   const dated = Boolean(date && date.startsWith(String(year)));
   return {
     name: title,
-    description: clean(hint || `${title} on ${hostOf(url) ?? 'their site'}`, 140),
-    date,
-    dateConfidence: dated ? 'exact' : date ? 'year' : 'unknown',
+    description: hostOf(url) ?? '',
+    date: dated ? date : null,
+    dateConfidence: dated ? 'exact' : 'unknown',
     link: publicUrl(url),
     icon: null,
     source: 'changelog',
     status: 'LAUNCHED',
     score: dated ? 7 : 5,
-    thisYear: dated || Boolean(date),
+    thisYear: dated,
   };
 }
 
@@ -448,12 +456,12 @@ export function itemsFromSitemap(xml: string, year: number): ChangelogFound[] {
   for (const block of xml.matchAll(/<url\b[\s\S]*?<\/url>/gi)) {
     const loc = publicUrl(decodeXml(block[0].match(/<loc>\s*([^<]+)\s*<\/loc>/i)?.[1] ?? ''));
     const lastmod = parseFlexibleDate(block[0].match(/<lastmod>\s*([^<]+)\s*<\/lastmod>/i)?.[1] ?? '', year);
-    if (!loc || !lastmod || !isShipPath(loc)) continue;
+    if (!loc || !lastmod || !isSitemapShipPath(loc)) continue;
     const name = titleFromSlug(loc);
     const key = loose(name) || loc;
     if (!name || seen.has(key)) continue;
     seen.add(key);
-    const item = row(name, lastmod, loc, year, `Sitemap lastmod ${lastmod}`);
+    const item = row(name, lastmod, loc, year);
     if (item) found.push(item);
     if (found.length >= 160) break;
   }

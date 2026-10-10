@@ -181,7 +181,22 @@ export interface SourceProvider {
 }
 
 const UA = 'brytonzoz.com-shipped (+https://shipped.brytonzoz.com/)';
-const TIMEOUT = 7000;
+export const SOURCE_TIMEOUT_MS = 6000;
+const TIMEOUT = SOURCE_TIMEOUT_MS;
+
+export async function raceTimeout<T>(work: Promise<T>, ms: number, fallback: T): Promise<T> {
+  let timer: ReturnType<typeof setTimeout> | undefined;
+  try {
+    return await Promise.race([
+      work,
+      new Promise<T>((resolve) => {
+        timer = setTimeout(() => resolve(fallback), ms);
+      }),
+    ]);
+  } finally {
+    if (timer) clearTimeout(timer);
+  }
+}
 
 export class SourceError extends Error {
   constructor(public code: string) {
@@ -1601,14 +1616,21 @@ export async function gather(
   env: SourceEnv,
   year: number,
   meter: TinyfishMeter | null = null,
-  opts?: { mode?: GatherMode; rebuild?: boolean },
+  opts?: { mode?: GatherMode; rebuild?: boolean; onPartial?: (gathered: Gathered) => void },
 ): Promise<Gathered> {
   const tinyfish = tinyfishAccess(env, meter);
-  const resolved = await resolveIdentity(subject, env, tinyfish);
+  const resolved = await raceTimeout(
+    resolveIdentity(subject, env, tinyfish),
+    SOURCE_TIMEOUT_MS,
+    { profile: emptyProfile(), cacheKey: `name:${subject.id}`, notes: ['identity:timeout'] },
+  );
+  if (!resolved.profile.name) resolved.profile.name = subject.display || subject.id;
   const mode: GatherMode = opts?.mode === 'full' ? 'full' : 'free';
-  const load = () => gatherFresh(subject, resolved.profile, env, year, meter, tinyfish, resolved.notes, mode);
+  const load = () =>
+    gatherFresh(subject, resolved.profile, env, year, meter, tinyfish, resolved.notes, mode, opts?.onPartial);
+  if (opts?.rebuild && !opts.onPartial) return load();
   if (opts?.rebuild) return load();
-  const key = mode === 'full' ? `gather:full:v19:${year}:${resolved.cacheKey}` : `gather:v28:${year}:${resolved.cacheKey}`;
+  const key = mode === 'full' ? `gather:full:v20:${year}:${resolved.cacheKey}` : `gather:v29:${year}:${resolved.cacheKey}`;
   return cached(
     key,
     1440 * MIN,
@@ -1626,6 +1648,7 @@ async function gatherFresh(
   tinyfish: TinyfishAccess,
   notes: string[],
   mode: GatherMode = 'free',
+  onPartial?: (gathered: Gathered) => void,
 ): Promise<Gathered> {
   const ran: string[] = [...notes.filter((n) => n.startsWith('x-profile:') || n.startsWith('github:'))];
   const failed: string[] = notes.filter((n) => n.endsWith(':miss') || n.endsWith(':unresolved'));
@@ -1647,138 +1670,6 @@ async function gatherFresh(
       ].filter(Boolean)
     : [];
 
-  const homepage = profile.site;
-  const extraHomes = [
-    ...sitesOf(profile).filter((url) => hostOf(url) !== hostOf(homepage)),
-    ...(homepage ? extraResearchPaths(homepage) : []),
-    ...trustmrrUrls(profile),
-  ]
-    .filter((url, i, all) => all.findIndex((u) => u.replace(/\/+$/, '') === url.replace(/\/+$/, '')) === i)
-    .slice(0, 10);
-  const [results, site, extraSites, searched] = await Promise.all([
-    Promise.allSettled(SOURCES.filter((source) => source.enabled(ctx)).map(async (source) => ({ id: source.id, found: await source.run(ctx) }))),
-    homepage ? readSite(homepage).catch(() => null) : Promise.resolve(null),
-    Promise.all(extraHomes.map((url) => readSite(url).catch(() => null))),
-    Promise.all(
-      queries.map((query) =>
-        tinyfishSearch(query, year, key!, meter!).catch((error) => {
-          failed.push(`tinyfish-search:${(error as Error).message}`);
-          return [];
-        }),
-      ),
-    ),
-  ]);
-  if (site) ran.push('site');
-  if (extraSites.some(Boolean)) ran.push('sites');
-  ran.push('research-pass:harvest');
-
-  const web: WebResult[] = [];
-  for (const row of searched.flat()) {
-    const hit = result(row.title, row.url, row.snippet, row.date);
-    if (hit && !web.some((w) => w.url === hit.url)) web.push(hit);
-  }
-  if (queries.length) ran.push('tinyfish-search');
-
-  let pages: PageInfo[] = [];
-  const crawlTargets = [
-    homepage,
-    ...sitesOf(profile),
-    ...(homepage ? extraSitePaths(homepage).slice(1, 4) : []),
-    ...web.map((w) => w.url),
-  ]
-    .map((url) => publicUrl(url))
-    .filter((url): url is string => Boolean(url) && !SKIP_PAGES.test(hostOf(url) ?? ''))
-    .filter((url, i, all) => all.findIndex((u) => hostOf(u) === hostOf(url) && u.replace(/\/+$/, '') === url.replace(/\/+$/, '')) === i);
-
-  if (key) {
-    try {
-      pages = (await tinyfishFetch(crawlTargets.slice(0, 8), key, meter!)).map(toPage).filter((page): page is PageInfo => Boolean(page));
-      if (crawlTargets.length) ran.push('tinyfish-fetch');
-    } catch (error) {
-      failed.push(`tinyfish-fetch:${(error as Error).message}`);
-    }
-  }
-
-  const found: Found[] = [];
-  for (const settled of results) {
-    if (settled.status === 'fulfilled') {
-      ran.push(settled.value.id);
-      found.push(...settled.value.found);
-    } else failed.push(settled.reason instanceof SourceError ? settled.reason.code : 'error');
-  }
-
-  const ownPages = extraSites.filter((page): page is SiteInfo => Boolean(page));
-  for (const extra of ownPages) {
-    found.push(
-      ...itemsFromWebEvidence({
-        profile,
-        site: extra,
-        pages: [],
-        web: [],
-        year,
-      }),
-    );
-  }
-  found.push(...itemsFromWebEvidence({ profile, site, pages, web, year }));
-
-  const projectPages = [site, ...ownPages].filter((page): page is SiteInfo => Boolean(page));
-  for (const page of projectPages) {
-    found.push(...itemsFromProjectList({ text: `${page.title}\n${page.description}\n${page.text}`, url: page.url, year }));
-  }
-  for (const page of pages) {
-    found.push(...itemsFromProjectList({ text: `${page.title}\n${page.text}`, url: page.url, year }));
-  }
-
-  const pageStats = mergeStats([
-    profile.bio ? extractPublicStats(profile.bio, profile.x ? `https://x.com/${profile.x}` : profile.site || 'https://x.com/', profile.name) : [],
-    ...projectPages.map((page) => extractPublicStats(`${page.title}\n${page.description}\n${page.text}`, page.url)),
-    ...pages.map((page) => extractPublicStats(`${page.title}\n${page.text}`, page.url)),
-    found.flatMap((item) => item.metrics ?? []),
-  ]);
-
-  if (profile.github) {
-    try {
-      const [html, user] = await Promise.all([githubPage(`/${profile.github}`), githubUser(profile.github, env, tinyfish).catch(() => null)]);
-      const contrib = html ? githubContributions(html, year) : null;
-      if (contrib) {
-        pageStats.push(sourcedStat('contributions', `${contrib.toLocaleString('en-US')} GitHub contributions in ${year}`, contrib, `${GH}/${profile.github}`, profile.github)!);
-      }
-      if (user?.repos) {
-        pageStats.push(sourcedStat('repos', `${user.repos} public GitHub repos`, user.repos, `${GH}/${profile.github}`, user.name || profile.github)!);
-      }
-      if (user?.company) profile.company ||= user.company;
-      ran.push('github-overview');
-    } catch {
-      failed.push('github-overview');
-    }
-  }
-
-  let deduped = dedupeFound(found).map((item) => ({ ...item, description: describeWithStat(item) }));
-  let stats = mergeStats([pageStats, deduped.flatMap((item) => item.metrics ?? [])]);
-  let draft: Gathered = { found: deduped, web: web.slice(0, 12), pages, site, profile, ran, failed, stats };
-  const gaps = detectGaps(draft);
-  ran.push(`research-pass:gaps:${gaps.join(',') || 'none'}`);
-
-  // Pass 3 — gap-fill from already-fetched pages first (free). Paid TinyFish/Claude only if still thin.
-  if (gaps.includes('thin-for-prolific') || gaps.includes('own-site')) ran.push('research-pass:gap-fill');
-  if (gaps.includes('producthunt') && productHunt.enabled(ctx)) {
-    try {
-      const extra = deduped.map((item) => item.link).filter((url): url is string => Boolean(url));
-      const more = await productHunt.run({ ...ctx, extraUrls: extra });
-      if (more.length) {
-        found.push(...more);
-        ran.push('producthunt-sites');
-      }
-    } catch {
-      failed.push('producthunt-sites');
-    }
-    deduped = dedupeFound(found).map((item) => ({ ...item, description: describeWithStat(item) }));
-    stats = mergeStats([pageStats, deduped.flatMap((item) => item.metrics ?? [])]);
-    draft = { ...draft, found: deduped, stats };
-  }
-
-  // Person → role → company. Resolve a missing handle/name BEFORE the company harvest so
-  // "Tibo from OpenAI" becomes Thibault Sottiaux / Codex lead and the tape is scoped right.
   const {
     parseAffiliationQuery,
     affiliationFromBio,
@@ -1896,17 +1787,215 @@ async function gatherFresh(
     bio: profile.bio,
     site: profile.site,
   });
-  if (xaiConfigured(env) && (wantPerson || wantCompany || wantRetry || wantEnrich)) {
+  const identityP =
+    xaiConfigured(env) && (wantPerson || wantCompany || wantRetry || wantEnrich)
+      ? (async () => {
+          try {
+            await applyResolved(affiliation.name || who);
+            if (!profile.x && affiliation.name && affiliation.name !== who) {
+              await applyResolved(affiliation.name);
+            }
+          } catch {
+            failed.push('xai-identity');
+          }
+        })()
+      : Promise.resolve();
+
+  const companyStoreP = (async () => {
+    await raceTimeout(identityP, SOURCE_TIMEOUT_MS, undefined);
+    applyCompanyHints();
+    profile.affiliation = affiliation;
+    if (!affiliation.company) return { found: [] as Found[], ran: [] as string[] };
     try {
-      await applyResolved(affiliation.name || who);
-      // Legal name landed without a handle (CEO of Higgsfield → Alex Mashrabov).
-      if (!profile.x && affiliation.name && affiliation.name !== who) {
-        await applyResolved(affiliation.name);
-      }
+      const { harvestCompany } = await import('./shipped-company');
+      const company = await harvestCompany({
+        affiliation,
+        year,
+        env,
+        store: env.companyStore,
+        storeOnly: true,
+        gapFillX: false,
+      });
+      return { found: company.found, ran: company.ran };
     } catch {
-      failed.push('xai-identity');
+      return { found: [] as Found[], ran: [] as string[] };
+    }
+  })();
+
+  const githubOverviewP = profile.github
+    ? (async () => {
+        try {
+          const [html, user] = await Promise.all([githubPage(`/${profile.github}`), githubUser(profile.github, env, tinyfish).catch(() => null)]);
+          return { html, user };
+        } catch {
+          return null;
+        }
+      })()
+    : Promise.resolve(null);
+
+  const homepage = profile.site;
+  const extraHomes = [
+    ...sitesOf(profile).filter((url) => hostOf(url) !== hostOf(homepage)),
+    ...(homepage ? extraResearchPaths(homepage) : []),
+    ...trustmrrUrls(profile),
+  ]
+    .filter((url, i, all) => all.findIndex((u) => u.replace(/\/+$/, '') === url.replace(/\/+$/, '')) === i)
+    .slice(0, 10);
+  const [results, site, extraSites, searched, storeHarvest, githubOverview] = await Promise.all([
+    Promise.allSettled(SOURCES.filter((source) => source.enabled(ctx)).map(async (source) => ({ id: source.id, found: await raceTimeout(source.run(ctx), SOURCE_TIMEOUT_MS, []) }))),
+    homepage ? raceTimeout(readSite(homepage).catch(() => null), SOURCE_TIMEOUT_MS, null) : Promise.resolve(null),
+    Promise.all(extraHomes.map((url) => raceTimeout(readSite(url).catch(() => null), SOURCE_TIMEOUT_MS, null))),
+    Promise.all(
+      queries.map((query) =>
+        raceTimeout(
+          tinyfishSearch(query, year, key!, meter!).catch((error) => {
+            failed.push(`tinyfish-search:${(error as Error).message}`);
+            return [];
+          }),
+          SOURCE_TIMEOUT_MS,
+          [],
+        ),
+      ),
+    ),
+    companyStoreP,
+    raceTimeout(githubOverviewP, SOURCE_TIMEOUT_MS, null),
+    raceTimeout(identityP, SOURCE_TIMEOUT_MS, undefined),
+  ]);
+  if (site) ran.push('site');
+  if (extraSites.some(Boolean)) ran.push('sites');
+  ran.push('research-pass:harvest');
+
+  const web: WebResult[] = [];
+  for (const row of searched.flat()) {
+    const hit = result(row.title, row.url, row.snippet, row.date);
+    if (hit && !web.some((w) => w.url === hit.url)) web.push(hit);
+  }
+  if (queries.length) ran.push('tinyfish-search');
+
+  let pages: PageInfo[] = [];
+  const crawlTargets = [
+    homepage,
+    ...sitesOf(profile),
+    ...(homepage ? extraSitePaths(homepage).slice(1, 4) : []),
+    ...web.map((w) => w.url),
+  ]
+    .map((url) => publicUrl(url))
+    .filter((url): url is string => Boolean(url) && !SKIP_PAGES.test(hostOf(url) ?? ''))
+    .filter((url, i, all) => all.findIndex((u) => hostOf(u) === hostOf(url) && u.replace(/\/+$/, '') === url.replace(/\/+$/, '')) === i);
+
+  const found: Found[] = [];
+  for (const settled of results) {
+    if (settled.status === 'fulfilled') {
+      ran.push(settled.value.id);
+      found.push(...settled.value.found);
+    } else failed.push(settled.reason instanceof SourceError ? settled.reason.code : 'error');
+  }
+
+  const ownPages = extraSites.filter((page): page is SiteInfo => Boolean(page));
+  for (const extra of ownPages) {
+    found.push(
+      ...itemsFromWebEvidence({
+        profile,
+        site: extra,
+        pages: [],
+        web: [],
+        year,
+      }),
+    );
+  }
+  found.push(...itemsFromWebEvidence({ profile, site, pages: [], web, year }));
+
+  const projectPages = [site, ...ownPages].filter((page): page is SiteInfo => Boolean(page));
+  for (const page of projectPages) {
+    found.push(...itemsFromProjectList({ text: `${page.title}\n${page.description}\n${page.text}`, url: page.url, year }));
+  }
+  if (storeHarvest.found.length) {
+    found.push(...storeHarvest.found);
+    ran.push(...storeHarvest.ran);
+  }
+
+  const pageStats = mergeStats([
+    profile.bio ? extractPublicStats(profile.bio, profile.x ? `https://x.com/${profile.x}` : profile.site || 'https://x.com/', profile.name) : [],
+    ...projectPages.map((page) => extractPublicStats(`${page.title}\n${page.description}\n${page.text}`, page.url)),
+    found.flatMap((item) => item.metrics ?? []),
+  ]);
+
+  if (githubOverview) {
+    const contrib = githubOverview.html ? githubContributions(githubOverview.html, year) : null;
+    if (contrib && profile.github) {
+      pageStats.push(sourcedStat('contributions', `${contrib.toLocaleString('en-US')} GitHub contributions in ${year}`, contrib, `${GH}/${profile.github}`, profile.github)!);
+    }
+    if (githubOverview.user?.repos && profile.github) {
+      pageStats.push(sourcedStat('repos', `${githubOverview.user.repos} public GitHub repos`, githubOverview.user.repos, `${GH}/${profile.github}`, githubOverview.user.name || profile.github)!);
+    }
+    if (githubOverview.user?.company) profile.company ||= githubOverview.user.company;
+    ran.push('github-overview');
+  } else if (profile.github) {
+    failed.push('github-overview');
+  }
+
+  applyCompanyHints();
+  profile.affiliation = affiliation;
+  const viaNow = viaLabel(affiliation, defaultAttribution(affiliation.role, affiliation.typedCompany));
+  const { polishCandidates } = await import('./shipped-polish');
+  const { heuristicVerify } = await import('./shipped-decisions');
+  const emitPartial = (items: Found[], tag: string) => {
+    const polished = polishCandidates(items, { year, who, affiliation });
+    const verified = heuristicVerify(polished, year, affiliation, viaNow);
+    const snap: Gathered = {
+      found: verified,
+      web: web.slice(0, 12),
+      pages,
+      site,
+      profile,
+      ran: [...ran, tag],
+      failed,
+      stats: mergeStats([pageStats, verified.flatMap((item) => item.metrics ?? [])]),
+    };
+    if (verified.length) onPartial?.(snap);
+    return snap;
+  };
+  emitPartial(found, 'partial:first-wave');
+
+  if (key) {
+    try {
+      pages = (await tinyfishFetch(crawlTargets.slice(0, 8), key, meter!)).map(toPage).filter((page): page is PageInfo => Boolean(page));
+      if (crawlTargets.length) ran.push('tinyfish-fetch');
+    } catch (error) {
+      failed.push(`tinyfish-fetch:${(error as Error).message}`);
     }
   }
+  found.push(...itemsFromWebEvidence({ profile, site, pages, web, year }));
+  for (const page of pages) {
+    found.push(...itemsFromProjectList({ text: `${page.title}\n${page.text}`, url: page.url, year }));
+    pageStats.push(...extractPublicStats(`${page.title}\n${page.text}`, page.url));
+  }
+
+  let deduped = dedupeFound(found).map((item) => ({ ...item, description: describeWithStat(item) }));
+  let stats = mergeStats([pageStats, deduped.flatMap((item) => item.metrics ?? [])]);
+  let draft: Gathered = { found: deduped, web: web.slice(0, 12), pages, site, profile, ran, failed, stats };
+  const gaps = detectGaps(draft);
+  ran.push(`research-pass:gaps:${gaps.join(',') || 'none'}`);
+
+  // Pass 3 — gap-fill from already-fetched pages first (free). Paid TinyFish/Claude only if still thin.
+  if (gaps.includes('thin-for-prolific') || gaps.includes('own-site')) ran.push('research-pass:gap-fill');
+  if (gaps.includes('producthunt') && productHunt.enabled(ctx)) {
+    try {
+      const extra = deduped.map((item) => item.link).filter((url): url is string => Boolean(url));
+      const more = await productHunt.run({ ...ctx, extraUrls: extra });
+      if (more.length) {
+        found.push(...more);
+        ran.push('producthunt-sites');
+      }
+    } catch {
+      failed.push('producthunt-sites');
+    }
+    deduped = dedupeFound(found).map((item) => ({ ...item, description: describeWithStat(item) }));
+    stats = mergeStats([pageStats, deduped.flatMap((item) => item.metrics ?? [])]);
+    draft = { ...draft, found: deduped, stats };
+  }
+
+  await identityP;
   applyCompanyHints();
   profile.affiliation = affiliation;
 
@@ -1931,19 +2020,24 @@ async function gatherFresh(
     failed.push('company-harvest');
   }
 
-  deduped = dedupeFound(found).map((item) => ({ ...item, description: describeWithStat(item) }));
+  deduped = polishCandidates(
+    dedupeFound(found).map((item) => ({ ...item, description: describeWithStat(item) })),
+    { year, who, affiliation },
+  );
+  emitPartial(deduped, 'partial:company');
   const via = viaLabel(affiliation, defaultAttribution(affiliation.role, affiliation.typedCompany));
   try {
-    const { verifyCandidates, dedupeSameShips, sortBySignificance } = await import('./shipped-decisions');
+    const { verifyCandidates, dedupeSameShips, sortByDate } = await import('./shipped-decisions');
     const verified = await verifyCandidates({ env, items: deduped, year, who, affiliation, via });
     decisionsMicros += verified.spend.costMicros;
     ran.push(verified.usedDecisions ? 'decisions' : 'decisions:heuristic');
     const same = await dedupeSameShips({ env, items: verified.items });
     decisionsMicros += same.spend.costMicros;
-    deduped = sortBySignificance(same.items);
+    deduped = polishCandidates(sortByDate(same.items), { year, who, affiliation });
   } catch {
     failed.push('decisions');
     ran.push('decisions:heuristic');
+    deduped = polishCandidates(deduped, { year, who, affiliation });
   }
 
   const prolific = Boolean(profile.github || profile.site || affiliation.company || (profile.bio && profile.bio.length > 20));
@@ -1978,12 +2072,19 @@ async function gatherFresh(
       }
       if (web.found.length) found.push(...web.found);
       if (sweep.found.length || web.found.length) {
-        const { verifyCandidates, dedupeSameShips, sortBySignificance } = await import('./shipped-decisions');
-        const extra = await verifyCandidates({ env, items: [...sweep.found, ...web.found], year, who, affiliation, via });
+        const { verifyCandidates, dedupeSameShips, sortByDate } = await import('./shipped-decisions');
+        const extra = await verifyCandidates({
+          env,
+          items: polishCandidates([...sweep.found, ...web.found], { year, who, affiliation }),
+          year,
+          who,
+          affiliation,
+          via,
+        });
         decisionsMicros += extra.spend.costMicros;
         const same = await dedupeSameShips({ env, items: [...deduped, ...extra.items] });
         decisionsMicros += same.spend.costMicros;
-        deduped = sortBySignificance(same.items);
+        deduped = polishCandidates(sortByDate(same.items), { year, who, affiliation });
       }
       const cap = xaiDeepMaxPosts(env);
       if (xaiPosts >= cap && cap > 0) ran.push('xai-capped:deep');
@@ -2005,12 +2106,19 @@ async function gatherFresh(
       }
       if (personX.found.length) {
         found.push(...personX.found);
-        const { verifyCandidates, dedupeSameShips, sortBySignificance } = await import('./shipped-decisions');
-        const extra = await verifyCandidates({ env, items: personX.found, year, who, affiliation, via });
+        const { verifyCandidates, dedupeSameShips, sortByDate } = await import('./shipped-decisions');
+        const extra = await verifyCandidates({
+          env,
+          items: polishCandidates(personX.found, { year, who, affiliation }),
+          year,
+          who,
+          affiliation,
+          via,
+        });
         decisionsMicros += extra.spend.costMicros;
         const same = await dedupeSameShips({ env, items: [...deduped, ...extra.items] });
         decisionsMicros += same.spend.costMicros;
-        deduped = sortBySignificance(same.items);
+        deduped = polishCandidates(sortByDate(same.items), { year, who, affiliation });
       }
       const cap = xaiMaxPosts(env);
       if (xaiPosts >= cap && cap > 0) ran.push('xai-capped:free');
@@ -2023,6 +2131,7 @@ async function gatherFresh(
     failed.push(deep ? 'xai-deep' : 'xai-gapfill');
   }
 
+  deduped = polishCandidates(deduped, { year, who, affiliation });
   stats = mergeStats([pageStats, deduped.flatMap((item) => item.metrics ?? [])]);
   const finalGaps = detectGaps({ ...draft, found: deduped, stats, profile });
   // Never invent a leftover count. A number only when we sliced a unique list past MAX_ITEMS.

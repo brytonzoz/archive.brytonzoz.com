@@ -83,6 +83,8 @@ export type YearReceipt = {
   pending?: boolean;
   /** Honest upsell from the free pass. Absent or offer:false when complete or already full. */
   upgrade?: { offer: boolean; teaser: string | null };
+  /** First lines are on the tape; more verified items are still appending. */
+  growing?: boolean;
 };
 
 export type Candidate = Subject & { detail: string };

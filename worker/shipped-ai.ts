@@ -9,6 +9,7 @@ import { REQUIRED_MODULES, sanitizeLayout, type ModuleId } from '../lib/shipped-
 import { clean, hostOf, inYearCount, publicUrl, type Found, type Gathered } from './shipped-sources';
 import { shipName } from './shipped-changelog';
 import { shareKeywords } from './shipped-decisions';
+import { cleanShipTitle, cleanStatus, noteCountMismatch, polishCandidates } from './shipped-polish';
 import type { Affiliation } from './shipped-affiliation';
 import { RECEIPT_BUDGET_MICROS, formatReceiptStats, searchBudget, type SourcedStat } from './shipped-research';
 
@@ -293,13 +294,16 @@ export const potentialItem = (): DraftItem => ({
 });
 
 function toDraftItem(item: Found, year: number): DraftItem | null {
-  if (!ok(item.name) || !publicUrl(item.link)) return null;
+  const name = cleanShipTitle(item.name) || shipName(item.name, 38);
+  if (!name || !ok(name) || !publicUrl(item.link)) return null;
   if (yearDate(item.date, year) === false) return null;
+  const dated = yearDate(item.date, year);
+  if (dated === null && (item.source === 'changelog' || item.source === 'company')) return null;
   return {
-    name: upper(item.name, 40),
+    name: name.toUpperCase(),
     description: ok(item.description) ? item.description : '',
-    date: (yearDate(item.date, year) as string | null) ?? item.date ?? null,
-    status: item.status,
+    date: (dated as string | null) ?? (item.source === 'changelog' || item.source === 'company' ? null : item.date),
+    status: cleanStatus(item.status),
     link: item.link,
     icon: item.icon,
     source: item.source,
@@ -315,7 +319,12 @@ function toDraftItem(item: Found, year: number): DraftItem | null {
 export function harvestItems(gathered: Gathered, year: number): DraftItem[] {
   const seen = new Set<string>();
   const items: DraftItem[] = [];
-  for (const item of gathered.found) {
+  const polished = polishCandidates(gathered.found, {
+    year,
+    who: gathered.profile.name || gathered.profile.affiliation?.name,
+    affiliation: gathered.profile.affiliation,
+  });
+  for (const item of polished) {
     const draft = toDraftItem(item, year);
     if (!draft) continue;
     const key = loose(draft.name);
@@ -333,7 +342,7 @@ function finish(items: DraftItem[], note: string, seed: number, modulesRaw?: unk
   if (!items.length) {
     return { items: [potentialItem()], note: POTENTIAL_NOTES[seed % POTENTIAL_NOTES.length], stats: [], potential: true, layout };
   }
-  const sorted = items.slice(0, MAX_ITEMS).sort((a, b) => (b.significance ?? 0) - (a.significance ?? 0) || byDate(a, b));
+  const sorted = items.slice(0, MAX_ITEMS).sort(byDate);
   const stats = Array.isArray(statsRaw)
     ? statsRaw
         .filter((line): line is string => typeof line === 'string' && !hasBlockedWord(line) && !/[<>{}`\\]/.test(line))
@@ -342,7 +351,7 @@ function finish(items: DraftItem[], note: string, seed: number, modulesRaw?: unk
         .slice(0, 4)
     : formatStats(sorted);
   const whoNote =
-    ok(note) && !cashierNoteLooksCanned(note) && /\d/.test(note)
+    ok(note) && !cashierNoteLooksCanned(note) && /\d/.test(note) && !noteCountMismatch(note, sorted.length)
       ? note
       : groundedNote(sorted, seed, ctx.company || '', stats, ctx);
   const printed = printNote(whoNote, stats);

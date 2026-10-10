@@ -175,6 +175,8 @@ const NOT_A_SHIP =
 export function looksLikeNotAShip(item: { name?: string; description?: string; link?: string | null }): boolean {
   const name = (item.name ?? '').trim();
   const hay = `${item.name ?? ''} ${item.description ?? ''} ${item.link ?? ''}`;
+  if (/^authors?\s*[:\-–—]/i.test(name)) return true;
+  if (/^week of\b/i.test(name)) return true;
   if (/^by\s+\S/i.test(name)) return true;
   if (NOT_A_SHIP.test(hay)) return true;
   if (/^how\s+\w+\s+is\b/i.test(name)) return true;
@@ -468,6 +470,20 @@ export async function dedupeSameShips(opts: { env: DecisionsEnv; items: Found[] 
 
 export function sortBySignificance(items: Found[]): Found[] {
   return [...items].sort((a, b) => (b.significance ?? 0) - (a.significance ?? 0) || (b.score ?? 0) - (a.score ?? 0) || (a.date ?? '9999').localeCompare(b.date ?? '9999'));
+}
+
+export function sortByDate(items: Found[]): Found[] {
+  return [...items].sort((a, b) => (a.date ?? '9999').localeCompare(b.date ?? '9999') || (b.significance ?? 0) - (a.significance ?? 0));
+}
+
+/** Fast verify for the first-paint tape. Decisions still run on the full pass. */
+export function heuristicVerify(items: Found[], year: number, affiliation: Affiliation, via: string | null): Found[] {
+  return items
+    .map((item) => {
+      const mark = heuristicMark(item, year, affiliation);
+      return shouldKeep(mark, item) ? applyMark(item, mark, via) : null;
+    })
+    .filter((item): item is Found => Boolean(item));
 }
 
 /** Confirm a cheap name→handle guess before we treat it as the person. */

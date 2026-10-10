@@ -11,7 +11,7 @@ const ORIGINS = {
   staging: 'https://shipped-staging.brytonzoz.com',
   production: 'https://shipped.brytonzoz.com',
 };
-const REPRINT_IDS = '16,11,13';
+const REPRINT_IDS = '16,17,13,11,7,6,14';
 
 const pick = (...names) => names.map((n) => process.env[n]).find((v) => typeof v === 'string' && v.trim()) || '';
 const slugOf = (company) => String(company || '').toLowerCase().replace(/[^a-z0-9]+/g, '');

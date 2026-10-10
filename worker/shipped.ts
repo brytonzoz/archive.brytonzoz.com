@@ -570,11 +570,12 @@ async function print(request: Request, env: ShippedEnv, ctx: ExecutionContext): 
   if (cached) {
     const prior = (() => {
       try {
-        return JSON.parse(cached.data) as { potential?: boolean };
+        return JSON.parse(cached.data) as { potential?: boolean; growing?: boolean };
       } catch {
         return null;
       }
     })();
+    if (prior?.growing) return json({ id: cached.id, cached: true, growing: true, pile: await pileToken(env, cached.id) });
     if (!prior?.potential) return json({ id: cached.id, cached: true, pile: await pileToken(env, cached.id) });
   }
   const recentFailure = await db.prepare('SELECT 1 AS x FROM shipped_locks WHERE key = ? AND until > ?').bind(`failed:${key}`, Date.now()).first();
@@ -620,7 +621,120 @@ async function generate(
 ): Promise<Response> {
   const seed = seedOf(key);
   try {
-    const gathered = await gather(subject, gatherEnv(env, db, { xaiMeter: d1XaiMeter(db, env) }), year, tinyfishMeter(db));
+    let full: Awaited<ReturnType<typeof gather>> | null = null;
+    let first: Awaited<ReturnType<typeof gather>> | null = null;
+    const fullP = gather(subject, gatherEnv(env, db, { xaiMeter: d1XaiMeter(db, env) }), year, tinyfishMeter(db), {
+      onPartial: (partial) => {
+        if (!first && partial.found.length) first = partial;
+      },
+    }).then((gathered) => {
+      full = gathered;
+      return gathered;
+    });
+    const pause = (ms: number) => new Promise((ok) => setTimeout(ok, ms));
+    const deadline = Date.now() + 18_000;
+    while (!full && !first && Date.now() < deadline) await pause(40);
+    if (first && !full) await pause(80);
+
+    const persist = async (
+      gathered: Awaited<ReturnType<typeof gather>>,
+      next: { items: DraftItem[]; note: string; stats?: string[]; potential: boolean; layout?: string[] },
+      extra: { growing: boolean; model: string | null; usage: { input: number; output: number; searches: number; cost: number }; id?: number },
+    ) => {
+      if (gathered.profile.name && !hasBlockedWord(gathered.profile.name)) subject.display = clean(gathered.profile.name, 60);
+      const x = (gathered.profile.x && isXHandle(gathered.profile.x) ? gathered.profile.x : subject.kind === 'x' ? subject.id : null) || null;
+      const receipt: Omit<YearReceipt, 'id'> = {
+        version: 2,
+        year,
+        subject: { ...subject, x },
+        printedAt: new Date().toISOString(),
+        items: await withLogos(next.items, env),
+        note: next.note,
+        stats: next.stats,
+        potential: next.potential,
+        demo: state.demo,
+        listed,
+        layout: next.layout,
+        shipScore: shipScore({ items: next.items, potential: next.potential }),
+        full: false,
+        upgrading: false,
+        growing: extra.growing,
+        upgrade: upgradeOffer({
+          leftover: gathered.leftover ?? 0,
+          leftoverKnown: Boolean(gathered.leftoverKnown),
+          capped: Boolean(gathered.coverageCapped),
+          incomplete: Boolean(gathered.incomplete),
+        }),
+      };
+      if (extra.id) {
+        await db
+          .prepare(
+            `UPDATE shipped_receipts SET login = ?, data = ?, demo = ?, model = ?, input_tokens = ?, output_tokens = ?, searches = ?, cost_micros = ? WHERE id = ? AND hidden != 1`,
+          )
+          .bind(subjectLabel(subject), JSON.stringify(receipt), state.demo ? 1 : 0, extra.model, extra.usage.input, extra.usage.output, extra.usage.searches, extra.usage.cost, extra.id)
+          .run();
+        return { id: extra.id };
+      }
+      const day = today();
+      const replaces = await db.prepare('SELECT 1 AS x FROM shipped_receipts WHERE login_key = ? AND day = ? AND mode = ?').bind(key, day, mode).first();
+      const inserted = await db
+        .prepare(
+          `INSERT INTO shipped_receipts (login, login_key, day, mode, data, demo, model, input_tokens, output_tokens, searches, cost_micros, listed, created_at)
+         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+         ON CONFLICT(login_key, day, mode) DO UPDATE SET data = excluded.data, demo = excluded.demo, model = excluded.model,
+           input_tokens = excluded.input_tokens, output_tokens = excluded.output_tokens, searches = excluded.searches,
+           cost_micros = excluded.cost_micros, listed = excluded.listed, created_at = excluded.created_at
+         WHERE shipped_receipts.hidden != 1 RETURNING id`,
+        )
+        .bind(subjectLabel(subject), key, day, mode, JSON.stringify(receipt), state.demo ? 1 : 0, extra.model, extra.usage.input, extra.usage.output, extra.usage.searches, extra.usage.cost, listed ? 1 : 0, Date.now())
+        .first<{ id: number }>();
+      if (!inserted) return null;
+      await db.prepare('UPDATE shipped_receipts SET hidden = 0 WHERE id = ? AND hidden = 2').bind(inserted.id).run();
+      if (!replaces) await bump(db, 'printed');
+      return inserted;
+    };
+
+    if (!full && first) {
+      const draft = demoReceipt(first, year, seed);
+      const inserted = await persist(first, draft, { growing: true, model: null, usage: { input: 0, output: 0, searches: 0, cost: 0 } });
+      if (!inserted) return json({ error: 'taken-down' }, 410);
+      ctx.waitUntil(
+        (async () => {
+          try {
+            const gathered = await fullP;
+            let model: string | null = null;
+            let usage = { input: 0, output: 0, searches: 0, cost: 0 };
+            let grown = demoReceipt(gathered, year, seed);
+            if (!state.demo) {
+              model = env.SHIPPED_MODEL || DEFAULT_MODEL;
+              const worst = costMicros(model, 4_000, 256, 0);
+              const cap = await cycleBudgetCap(db, env);
+              if (cap !== null && (await reserveBudget(db, cap, worst, budgetKey()))) {
+                try {
+                  const result = await assembleReceipt(subject, gathered, year, seed, env, worst);
+                  grown = result;
+                  usage = { input: result.inputTokens, output: result.outputTokens, searches: result.searches, cost: result.costMicros };
+                  await settleBudget(db, worst, usage.cost, budgetKey());
+                } catch (error) {
+                  const spent = error as { costMicros?: number };
+                  await settleBudget(db, worst, spent.costMicros && spent.costMicros > 0 ? spent.costMicros : worst, budgetKey());
+                  grown = demoReceipt(gathered, year, seed);
+                }
+              }
+            }
+            await persist(gathered, grown, { growing: false, model, usage, id: inserted.id });
+            if (!state.demo) await recordSpend(db, true, usage.input, usage.output, usage.searches);
+            console.log(JSON.stringify({ shipped: 'print-grown', id: inserted.id, items: grown.items.length, ran: gathered.ran }));
+          } catch (error) {
+            console.error('shipped: grow failed', error instanceof Error ? error.message : 'unknown');
+          }
+        })(),
+      );
+      console.log(JSON.stringify({ shipped: 'print-partial', id: inserted.id, items: draft.items.length, ran: first.ran }));
+      return json({ id: inserted.id, growing: true, pile: await pileToken(env, inserted.id) });
+    }
+
+    const gathered = full ?? (await fullP);
     if (gathered.profile.name && !hasBlockedWord(gathered.profile.name)) subject.display = clean(gathered.profile.name, 60);
     let model: string | null = null;
     let usage = { input: 0, output: 0, searches: 0, cost: 0 };
@@ -682,6 +796,7 @@ async function generate(
       shipScore: shipScore({ items: draft.items, potential: draft.potential }),
       full: false,
       upgrading: false,
+      growing: false,
       upgrade: upgradeOffer({
         leftover: gathered.leftover ?? 0,
         leftoverKnown: Boolean(gathered.leftoverKnown),
@@ -1464,6 +1579,7 @@ async function rerunFullReceipt(db: D1Database, env: ShippedEnv, id: number): Pr
       shipScore: shipScore({ items: draft.items, potential: draft.potential }),
       full: true,
       upgrading: false,
+      growing: false,
       upgrade: { offer: false, teaser: null },
     };
     await db
@@ -2067,6 +2183,7 @@ async function reprintReceipt(env: ShippedEnv, db: D1Database, id: number): Prom
       listed: row.listed === 1,
       layout: draft.layout,
       shipScore: shipScore({ items: draft.items, potential: draft.potential }),
+      growing: false,
     };
     await db
       .prepare(

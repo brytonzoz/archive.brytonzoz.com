@@ -1953,10 +1953,11 @@ async function gatherFresh(
     })
     .filter((url, i, all) => all.findIndex((u) => hostOf(u) === hostOf(url)) === i)
     .slice(0, 8);
+  const productPages: SiteInfo[] = [];
   if (productHomes.length) {
     const more = await Promise.all(productHomes.map((url) => raceTimeout(readSite(url).catch(() => null), SOURCE_TIMEOUT_MS, null)));
-    extraSites.push(...more);
-    if (more.some(Boolean)) ran.push('product-sites');
+    productPages.push(...more.filter((page): page is SiteInfo => Boolean(page)));
+    if (productPages.length) ran.push('product-sites');
   }
 
   const web: WebResult[] = [];
@@ -1987,7 +1988,7 @@ async function gatherFresh(
   }
 
   const ownPages = extraSites.filter((page): page is SiteInfo => Boolean(page));
-  for (const extra of ownPages) {
+  for (const extra of [...ownPages, ...productPages]) {
     found.push(
       ...itemsFromWebEvidence({
         profile,

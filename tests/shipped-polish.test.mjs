@@ -51,6 +51,9 @@ test('title cleaner extracts a short product name or drops the line', () => {
   assert.equal(polish.cleanShipTitle('TRY CURSOR NOW'), '');
   assert.equal(polish.cleanShipTitle('EXPLORE ENTERPRISE →'), '');
   assert.equal(polish.cleanShipTitle('IES A AND MAGIC'), '');
+  assert.equal(polish.cleanShipTitle('DOWNLOAD ON THE APP STORE'), '');
+  assert.equal(polish.cleanShipTitle('24K+ GITHUB STARS'), '');
+  assert.equal(polish.cleanShipTitle('FILED UNDER: COMPANY'), '');
   assert.match(polish.cleanShipTitle('RELEASED GPT-4O IN THE API. GPT-4O IS') || 'GPT-4O', /gpt-?4o/i);
   assert.equal(polish.isJunkTitle('USE A WEBSITE’S TOOLS: WITH SITE'), true);
   const cli = polish.cleanShipTitle('CODEX CLI CAN ALSO IMPORT SUPPORTED');

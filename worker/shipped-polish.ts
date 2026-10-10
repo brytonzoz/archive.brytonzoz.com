@@ -199,6 +199,8 @@ export function isJunkTitle(title: string, opts: { who?: string | null; company?
   if (BYLINE.test(text) || NAME_LIST.test(text) || ROUNDUP.test(text) || READ_THE.test(text) || INSTRUCTIONAL.test(text)) return true;
   if (RESEARCH_GERUND.test(text) || CUSTOMER_STORY.test(text) || isAcquisitionNews(text)) return true;
   if (CTA_NAV.test(text) || CTA_TRAIL.test(text)) return true;
+  if (/^(download on the|get it on|get the app|affiliates|analytics|available on|filed under)\b/i.test(text)) return true;
+  if (/\bgithub stars\b|\bweekly downloads\b/i.test(text) && !/\b(zod|nub|tsc|cli|app)\b/i.test(text)) return true;
   if (/^respectively\.?$/i.test(text)) return true;
   if (DOCS_NAV.test(text) || /^(recent highlights|cursor support|under:)/i.test(text)) return true;
   if (isAboutPerson(text, opts.who)) return true;

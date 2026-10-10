@@ -153,7 +153,10 @@ export function itemsFromProjectList(opts: { text: string; url: string; year: nu
 
   const pins = text.matchAll(/([A-Za-z][A-Za-z0-9 .'-]{1,32})\s*\(([^)]{3,80})\)/g);
   for (const match of pins) {
-    add(match[1], null, clean(match[2], 80) || `Listed on ${hostOf(url) ?? 'their site'}`);
+    const name = match[1].trim();
+    if (name.split(/\s+/).length > 4) continue;
+    if (/^(you |from the |get |download |how i |available )/i.test(name)) continue;
+    add(name, null, clean(match[2], 80) || `Listed on ${hostOf(url) ?? 'their site'}`);
   }
 
   for (const match of text.matchAll(/📌\s*([A-Za-z][A-Za-z0-9 .'-]{1,32})(?:\s*\(([^)]{3,80})\))?/g)) {

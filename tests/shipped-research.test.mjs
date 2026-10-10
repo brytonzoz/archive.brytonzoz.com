@@ -275,12 +275,13 @@ test('a /projects page dated 2026 becomes found items', () => {
   assert.ok(pins.some((item) => /lovelee/i.test(item.name)));
   assert.ok(pins.some((item) => /curiosity quench/i.test(item.name)));
   const tight = research.itemsFromProjectList({
-    text: '📌 post bridge(social media scheduler)→📌 lovelee(couples app)→ curiosity quench(quit scrolling app)→ deep work depot(deep work timer)→',
+    text: '📌 post bridge(social media scheduler)→📌 lovelee(couples app)→ curiosity quench(quit scrolling app)→ deep work depot(deep work timer)→ you talk to jack (the founder)',
     url: 'https://jackfriks.com/',
     year: 2026,
   });
   assert.ok(tight.some((item) => /post bridge/i.test(item.name)), JSON.stringify(tight.map((i) => i.name)));
   assert.ok(tight.some((item) => /deep work depot/i.test(item.name)));
+  assert.equal(tight.some((item) => /you talk to/i.test(item.name)), false);
   assert.equal(identity.guessHandleDotCom('jackfriks'), 'https://jackfriks.com/');
   assert.equal(identity.guessHandleDotCom('www'), null);
 });

@@ -56,7 +56,7 @@ if (!password) {
 const headers = { authorization: `Bearer ${password}`, 'content-type': 'application/json' };
 
 async function readReceipt(id) {
-  const res = await fetch(`${origin}/api/shipped/receipts/${id}`, { cache: 'no-store' });
+  const res = await fetch(`${origin}/api/shipped/receipts/${id}?t=${Date.now()}`, { cache: 'no-store', headers: { 'cache-control': 'no-cache' } });
   if (!res.ok) return null;
   const body = await res.json();
   return body.receipt ?? body;

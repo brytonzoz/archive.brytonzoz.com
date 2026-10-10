@@ -56,15 +56,20 @@ export const Turnstile = forwardRef<TurnstileHandle, TurnstileProps>(function Tu
   const waiters = useRef<((value: string | null) => void)[]>([]);
   const callback = useRef(onToken);
   callback.current = onToken;
-  const [needed, setNeeded] = useState(appearance === 'always');
-  const visible = appearance === 'always';
+  const [challenge, setChallenge] = useState(appearance === 'always');
+  const visible = appearance === 'always' || challenge;
+  const [round, setRound] = useState(0);
 
   function emit(value: string | null) {
     token.current = value;
     callback.current(value);
     const pending = waiters.current.splice(0);
     pending.forEach((resolve) => resolve(value));
-    if (appearance !== 'always') setNeeded(false);
+  }
+
+  function askToVerify() {
+    setChallenge(true);
+    emit(null);
   }
 
   useImperativeHandle(ref, () => ({
@@ -72,7 +77,6 @@ export const Turnstile = forwardRef<TurnstileHandle, TurnstileProps>(function Tu
       token.current = null;
       callback.current(null);
       if (widget.current && window.turnstile) window.turnstile.reset(widget.current);
-      if (appearance !== 'always') setNeeded(false);
     },
     execute: () => {
       if (token.current) return Promise.resolve(token.current);
@@ -87,12 +91,12 @@ export const Turnstile = forwardRef<TurnstileHandle, TurnstileProps>(function Tu
             try {
               api.current.execute(widget.current);
             } catch {
-              emit(null);
+              askToVerify();
               return;
             }
           }
           if (Date.now() - start > EXECUTE_MS) {
-            emit(null);
+            askToVerify();
             return;
           }
           if (!token.current) window.setTimeout(run, 50);
@@ -110,8 +114,6 @@ export const Turnstile = forwardRef<TurnstileHandle, TurnstileProps>(function Tu
       .then((loaded) => {
         if (cancelled || widget.current) return;
         api.current = loaded;
-        // Turnstile has no size "invisible". Invisible behavior is the widget mode in the
-        // dashboard; here we use compact/flexible in a tiny container and execute() on Print.
         widget.current = loaded.render(el, {
           sitekey: siteKey,
           theme,
@@ -122,12 +124,23 @@ export const Turnstile = forwardRef<TurnstileHandle, TurnstileProps>(function Tu
           'expired-callback': () => queueMicrotask(() => emit(null)),
           'error-callback': () =>
             queueMicrotask(() => {
-              if (appearance !== 'always') setNeeded(true);
+              if (!visible) {
+                setChallenge(true);
+                setRound((n) => n + 1);
+              }
+              emit(null);
+            }),
+          'timeout-callback': () =>
+            queueMicrotask(() => {
+              setChallenge(true);
               emit(null);
             }),
         });
       })
-      .catch(() => emit(null));
+      .catch(() => {
+        setChallenge(true);
+        emit(null);
+      });
     return () => {
       cancelled = true;
       waiters.current.splice(0).forEach((resolve) => resolve(null));
@@ -135,7 +148,18 @@ export const Turnstile = forwardRef<TurnstileHandle, TurnstileProps>(function Tu
       widget.current = null;
       api.current = null;
     };
-  }, [siteKey, theme, appearance, visible]);
+  }, [siteKey, theme, appearance, visible, round]);
 
-  return <div ref={box} className={visible ? 'min-h-[65px]' : `shipped-turnstile${needed ? ' is-on' : ''}`} />;
+  return (
+    <div className={`shipped-turnstile${visible ? ' is-on' : ''}${challenge ? ' is-challenge' : ''}`}>
+      {challenge ? (
+        <p className="shipped-turnstile-label">
+          <button type="button" className="shipped-turnstile-hit" onClick={() => setRound((n) => n + 1)}>
+            Tap to verify
+          </button>
+        </p>
+      ) : null}
+      <div ref={box} />
+    </div>
+  );
 });

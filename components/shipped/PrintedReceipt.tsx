@@ -2,6 +2,7 @@
 
 import React, { useEffect, useMemo, useState } from 'react';
 import { receiptPageTitle } from '../../lib/shipped-year';
+import { followReceipt, isReceiptOpen } from './print-stream';
 import { ShippedStage, type Opening } from './ShippedStage';
 import { OrderNotice, type Loaded } from './visitor';
 
@@ -56,6 +57,23 @@ function PrintedReceiptLive() {
     if (!loaded?.receipt) return;
     document.title = receiptPageTitle(loaded.receipt);
   }, [loaded]);
+
+  const receiptId = loaded?.receipt.id;
+  const waiting = Boolean(loaded && isReceiptOpen(loaded));
+  useEffect(() => {
+    if (!receiptId || !waiting) return;
+    const watching = { cancelled: false };
+    void followReceipt(
+      receiptId,
+      (next) => {
+        if (!watching.cancelled) setLoaded(next);
+      },
+      watching,
+    );
+    return () => {
+      watching.cancelled = true;
+    };
+  }, [receiptId, waiting]);
 
   const opening = useMemo<Opening>(() => (loaded === undefined ? { kind: 'loading' } : loaded ? { kind: 'loaded', loaded } : { kind: 'missing' }), [loaded]);
   const stageKey = opening.kind === 'loaded' ? `r${opening.loaded.receipt.id}` : opening.kind;

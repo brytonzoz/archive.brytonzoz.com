@@ -13,6 +13,7 @@ import { Machine, type Job, type Tone } from './Machine';
 import { Line, Rule, Tall } from './paper';
 import { Ticker } from './Ticker';
 import { refreshShippedState, useShippedClock, useShippedState } from './state';
+import { applyPrintChunk, fetchReceipt, followReceipt, forgetTorn, isReceiptOpen, readPrintResponse, readTorn, rememberTorn, type PrintChunk } from './print-stream';
 import { SharePill, VisitorReceipt, rememberPile, type Loaded } from './visitor';
 
 const ERRORS: Record<string, string> = {
@@ -97,6 +98,7 @@ function openingJob(opening: Opening): Job {
       fast: true,
       label: `Shipped receipt #${receiptNumber(opening.loaded.receipt.id)}`,
       content: <VisitorReceipt {...opening.loaded} />,
+      revision: opening.loaded.receipt.items.length,
     };
   }
   if (opening.kind === 'missing') {
@@ -163,6 +165,12 @@ export function ShippedStage({ opening, title }: { opening: Opening; title: Reac
   const human = useRef<HumanCheckHandle>(null);
   const prints = useRef(0);
   const run = useRef(0);
+  const printKey = useRef<string | null>(null);
+  const follow = useRef<{ cancelled: boolean } | null>(null);
+  const paperRef = useRef(paper);
+  const currentRef = useRef(current);
+  paperRef.current = paper;
+  currentRef.current = current;
   const house = job.key === 'house' || Boolean(job.kind === 'print' && job.slip);
   const focus = paper === 'torn' && Boolean(current) && job.kind === 'print' && !house;
   const paperMax = usePaperMax(focus, house);
@@ -178,6 +186,17 @@ export function ShippedStage({ opening, title }: { opening: Opening; title: Reac
   // /shipped/r/<id>/ finds out which receipt it is after the first render.
   useEffect(() => {
     if (touched.current) return;
+    if (opening.kind === 'loaded') {
+      const next = opening.loaded;
+      setCurrent(next);
+      setJob((prev) => {
+        if (prev.kind === 'print' && (prev.key === `r${next.receipt.id}` || prev.key.startsWith(`r${next.receipt.id}-`))) {
+          return { ...prev, content: <VisitorReceipt {...next} />, revision: next.receipt.items.length };
+        }
+        return openingJob(opening);
+      });
+      return;
+    }
     setJob(openingJob(opening));
     setCurrent(opening.kind === 'loaded' ? opening.loaded : null);
   }, [opening]);
@@ -216,6 +235,26 @@ export function ShippedStage({ opening, title }: { opening: Opening; title: Reac
     setJob(next);
   }
 
+  function showReceipt(loaded: Loaded) {
+    touched.current = true;
+    setCurrent(loaded);
+    rememberTorn(loaded.receipt.id);
+    const existing = printKey.current;
+    const key = existing ?? `r${loaded.receipt.id}-${prints.current + 1}`;
+    if (!existing) {
+      printKey.current = key;
+      prints.current += 1;
+      setPaper('printing');
+    }
+    setJob({
+      key,
+      kind: 'print',
+      label: `Your receipt, #${receiptNumber(loaded.receipt.id)}`,
+      content: <VisitorReceipt {...loaded} />,
+      revision: loaded.receipt.items.length,
+    });
+  }
+
   /** Tear off whatever is hanging first, so the next job never yanks a receipt out mid-air. */
   function clear(then: () => void) {
     if (paper === 'hanging' && job.kind === 'print') {
@@ -240,6 +279,10 @@ export function ShippedStage({ opening, title }: { opening: Opening; title: Reac
     setError(null);
     setTick(0);
     setStep({ name: 'feeding' });
+    printKey.current = null;
+    if (follow.current) follow.current.cancelled = true;
+    const watching = { cancelled: false };
+    follow.current = watching;
     clear(() => load({ key: `feed-${prints.current}`, kind: 'feed', label: `Printing ${candidate.display}’s receipt` }, null));
     try {
       const response = await fetch('/api/shipped/print', {
@@ -247,17 +290,40 @@ export function ShippedStage({ opening, title }: { opening: Opening; title: Reac
         headers: { 'content-type': 'application/json' },
         body: JSON.stringify({ subject: { kind: candidate.kind, id: candidate.id, display: candidate.display }, token: humanToken, listed }),
       });
-      const result = (await response.json().catch(() => ({}))) as { id?: number; pile?: string; error?: string };
+      let loaded: Loaded | null = null;
+      let lastId: number | undefined;
+      const apply = (chunk: PrintChunk) => {
+        if (chunk.error) throw new Error(chunk.error);
+        if (chunk.id) {
+          lastId = chunk.id;
+          rememberPile(chunk.id, chunk.pile);
+        }
+        const next = applyPrintChunk(loaded, chunk);
+        if (next) {
+          loaded = next;
+          showReceipt(next);
+        }
+      };
+      const result = await readPrintResponse(response, apply);
       human.current?.reset();
-      if (!response.ok || !result.id) throw new Error(result.error ?? 'ai-error');
-      rememberPile(result.id, result.pile);
-      const loaded = await fetch(`/api/shipped/receipts/${result.id}`).then((r) => (r.ok ? (r.json() as Promise<Loaded>) : null));
+      if (result.error) throw new Error(result.error);
+      if (!response.ok && !loaded) throw new Error(result.error ?? 'ai-error');
+      if (!loaded && (result.id || lastId)) {
+        const id = result.id ?? lastId!;
+        rememberPile(id, result.pile);
+        loaded = await fetchReceipt(id);
+      }
       if (!loaded) throw new Error('ai-error');
       track({ type: 'open', release: 'shipped', detail: `print-${candidate.kind}` });
       await new Promise((resolve) => window.setTimeout(resolve, 450));
       setStep({ name: 'idle' });
-      load({ key: `r${loaded.receipt.id}-${prints.current}`, kind: 'print', label: `Your receipt, #${receiptNumber(loaded.receipt.id)}`, content: <VisitorReceipt {...loaded} /> }, loaded);
+      showReceipt(loaded);
       refreshShippedState();
+      if (isReceiptOpen(result) || isReceiptOpen(loaded)) {
+        void followReceipt(loaded.receipt.id, (next) => {
+          if (!watching.cancelled) showReceipt(next);
+        }, watching);
+      }
     } catch (failure) {
       const code = failure instanceof Error ? failure.message : 'ai-error';
       if (code === 'out-of-paper' || code === 'closed') {
@@ -322,7 +388,35 @@ export function ShippedStage({ opening, title }: { opening: Opening; title: Reac
     return () => document.documentElement.classList.remove('shipped-focus');
   }, [focus]);
 
+  useEffect(() => {
+    if (focus && current) rememberTorn(current.receipt.id);
+  }, [focus, current]);
+
+  // Stripe / bfcache: put the torn receipt back so Back doesn't drop the visitor on the house slip.
+  useEffect(() => {
+    const restore = () => {
+      if (currentRef.current && paperRef.current === 'torn') return;
+      if (opening.kind === 'loaded') return;
+      const id = readTorn();
+      if (!id) return;
+      void fetchReceipt(id).then((loaded) => {
+        if (!loaded || currentRef.current?.receipt.id === loaded.receipt.id) return;
+        printKey.current = null;
+        showReceipt(loaded);
+      });
+    };
+    restore();
+    const onShow = () => restore();
+    window.addEventListener('pageshow', onShow);
+    return () => window.removeEventListener('pageshow', onShow);
+    // opening is the first-screen house slip or /r/<id>/; restore only needs that once.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [opening.kind]);
+
   function printAnother() {
+    forgetTorn();
+    printKey.current = null;
+    if (follow.current) follow.current.cancelled = true;
     if (opening.kind === 'loaded' || opening.kind === 'missing' || opening.kind === 'loading') {
       window.location.assign('/');
       return;
@@ -356,7 +450,8 @@ export function ShippedStage({ opening, title }: { opening: Opening; title: Reac
           tearSignal={tearSignal}
           onPrinted={() => {
             setPaper('hanging');
-            if (opening.kind === 'loaded' && !touched.current) {
+            // Visitor receipts open full-screen on their own. TEAR stays as an optional gesture.
+            if (currentRef.current) {
               window.setTimeout(() => setTearSignal((n) => n + 1), 120);
             }
           }}

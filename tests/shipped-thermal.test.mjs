@@ -86,7 +86,7 @@ test('filler bands never print, even if a stored layout still names them', () =>
   assert.match(text, /FIRST RUN/);
 });
 
-test('long tapes print significance group headers and a faint confidence mark', () => {
+test('long tapes print significance group headers without a status tilde', () => {
   const items = Array.from({ length: 8 }, (_, i) => ({
     name: `SHIP ${i + 1}`,
     status: 'SHIPPED',
@@ -102,7 +102,11 @@ test('long tapes print significance group headers and a faint confidence mark', 
   assert.ok(text.includes('NOTABLE LAUNCH'), text);
   assert.ok(text.includes('MINOR FIX'), text);
   assert.ok(text.includes('via OpenAI · Codex'), text);
-  assert.ok(doc.lines.some((line) => line.kind === 'lead' && String(line.right).includes('~')));
+  assert.equal(
+    doc.lines.some((line) => line.kind === 'lead' && String(line.right).includes('~')),
+    false,
+    'status words stay clean — no trailing ~',
+  );
 });
 
 test('a paid full tape prints the verified stamp and FULL serial', () => {

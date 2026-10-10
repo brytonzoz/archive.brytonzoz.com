@@ -22,6 +22,7 @@ import {
   type YearReceipt as Printed,
 } from '../../lib/shipped-year';
 import { press, tap } from './feel';
+import { openCheckout } from './print-stream';
 import { HumanCheck, type HumanCheckHandle } from './HumanCheck';
 import { refreshShippedState, useShippedState } from './state';
 import { YearReceipt } from './YearReceipt';
@@ -168,7 +169,7 @@ function MailedPrint({ receipt }: { receipt: Printed }) {
     const result = (await response?.json().catch(() => ({}))) as { url?: string; error?: string } | undefined;
     if (response?.ok && result?.url) {
       track({ type: 'open', release: 'shipped', detail: 'print-order' });
-      window.location.assign(result.url);
+      openCheckout(result.url, receipt.id);
       return;
     }
     setError(ORDER_ERRORS[result?.error ?? ''] ?? 'Checkout didn’t open. Try again.');
@@ -246,7 +247,7 @@ function UpgradePay({ receipt, kind }: { receipt: Printed; kind: 'full' | 'bundl
     const result = (await response?.json().catch(() => ({}))) as { url?: string; error?: string } | undefined;
     if (response?.ok && result?.url) {
       track({ type: 'open', release: 'shipped', detail: `upgrade-${kind}` });
-      window.location.assign(result.url);
+      openCheckout(result.url, receipt.id);
       return;
     }
     setError(ORDER_ERRORS[result?.error ?? ''] ?? 'Checkout didn’t open. Try again.');
@@ -398,8 +399,18 @@ export function SharePill({
     const onKey = (event: KeyboardEvent) => {
       if (event.key === 'Escape') close();
     };
+    const onPointer = (event: PointerEvent) => {
+      const node = event.target as Node | null;
+      if (!node) return;
+      if (panel.current?.contains(node)) return;
+      close();
+    };
     window.addEventListener('keydown', onKey);
-    return () => window.removeEventListener('keydown', onKey);
+    document.addEventListener('pointerdown', onPointer);
+    return () => {
+      window.removeEventListener('keydown', onKey);
+      document.removeEventListener('pointerdown', onPointer);
+    };
   }, [open]);
 
   async function shareImage() {

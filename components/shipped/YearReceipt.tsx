@@ -125,7 +125,6 @@ export function SponsorBlockView({ block }: { block: SponsorBlock | null }) {
 }
 
 function ItemRow({ item, compact }: { item: ViewItem; compact?: boolean }) {
-  const low = typeof item.confidence === 'number' && item.confidence < 0.85;
   return (
     <li className="shipped-year-item">
       {item.logo ? (
@@ -140,11 +139,6 @@ function ItemRow({ item, compact }: { item: ViewItem; compact?: boolean }) {
         <p className="shrink-0 text-[12px] font-semibold">
           <span className="sr-only">Status: </span>
           {item.status}
-          {low ? (
-            <span className="ml-1 font-normal opacity-40" title={`confidence ${(item.confidence! * 100).toFixed(0)}%`}>
-              ~
-            </span>
-          ) : null}
         </p>
       </div>
       {!compact && (item.date || item.description || item.via) ? (
@@ -183,7 +177,7 @@ function ItemList({ props }: { props: YearReceiptProps }) {
         <span>
           ITEMS SHIPPED
           {typeof props.shipScore === 'number' ? (
-            <span className="ml-2 text-[11px] font-medium opacity-70">SCORE {props.shipScore}</span>
+            <span className="ml-1.5 text-[11px] font-medium opacity-70">· SCORE {props.shipScore}</span>
           ) : null}
         </span>
         <span className="shipped-lead-fill" aria-hidden="true" />
@@ -231,13 +225,13 @@ export function YearReceipt(props: YearReceiptProps) {
       <Rule />
 
       <h2 className="text-center">
-        <span className="shipped-inverse">SHIPPED IN {props.year}</span>
-        <span className="sr-only">: </span>
-        <span className="mt-3 block text-[11px] font-normal opacity-70" aria-hidden="true">
-          CUSTOMER
-        </span>
-        <span className="mt-0.5 block break-words">
-          <Tall className="text-[16px] font-semibold">{props.who.toUpperCase()}</Tall>
+        <span className="sr-only">{`${props.who}. Shipped in ${props.year}.`}</span>
+        <span aria-hidden="true">
+          <span className="shipped-inverse">SHIPPED IN {props.year}</span>
+          <span className="mt-3 block text-[11px] font-normal opacity-70">CUSTOMER</span>
+          <span className="mt-0.5 block break-words">
+            <Tall className="text-[16px] font-semibold">{props.who.toUpperCase()}</Tall>
+          </span>
         </span>
       </h2>
       {props.kicker ? <p className="mt-1 text-center text-[11px] opacity-70">{props.kicker}</p> : null}

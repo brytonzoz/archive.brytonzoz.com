@@ -333,15 +333,25 @@
 .shipped-board-panel {
   display: grid;
   grid-template-rows: 0fr;
-  transition: grid-template-rows 220ms var(--ease-drawer);
+  overflow: hidden;
+  max-height: 0;
+  visibility: hidden;
+  pointer-events: none;
+  transition: grid-template-rows 220ms var(--ease-drawer), max-height 220ms var(--ease-drawer), visibility 0s linear 220ms;
 }
 
 .shipped-board.is-open .shipped-board-panel {
   grid-template-rows: 1fr;
+  max-height: 80rem;
+  visibility: visible;
+  pointer-events: auto;
+  transition: grid-template-rows 220ms var(--ease-drawer), max-height 220ms var(--ease-drawer), visibility 0s;
 }
 
 .shipped-board-panel-inner {
   overflow: hidden;
+  min-height: 0;
+  min-width: 0;
 }
 
 .shipped-slot-list {
@@ -1420,6 +1430,39 @@ html.shipped-focus .shipped-board {
   pointer-events: auto;
 }
 
+.shipped-turnstile.is-challenge {
+  position: relative;
+  left: auto;
+  bottom: auto;
+  z-index: 6;
+  width: min(18.5rem, 100%);
+  height: auto;
+  min-height: 0;
+  margin: 4px auto 0;
+  padding: 8px 10px 10px;
+  border: 1px solid rgba(243, 234, 216, 0.16);
+  border-radius: 12px;
+  background: rgba(26, 22, 18, 0.92);
+  box-shadow: 0 10px 24px rgba(0, 0, 0, 0.35);
+}
+
+.shipped-turnstile-label {
+  margin: 0 0 8px;
+  text-align: center;
+}
+
+.shipped-turnstile-hit {
+  border: 0;
+  padding: 0;
+  background: none;
+  color: rgba(243, 234, 216, 0.78);
+  font: inherit;
+  font-size: 11px;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  cursor: pointer;
+}
+
 .is-hanging .shipped-ticket {
   transform: rotate(0.35deg);
 }
@@ -1518,8 +1561,12 @@ html.shipped-focus .shipped-board {
   pointer-events: none;
 }
 
+.shipped-pill-root.is-open {
+  top: 0;
+}
+
 .shipped-pill-scrim {
-  position: fixed;
+  position: absolute;
   inset: 0;
   z-index: 0;
   border: 0;

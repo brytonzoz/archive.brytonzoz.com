@@ -111,8 +111,7 @@ export function receiptToDoc(receipt: ThermalReceipt): PrintDoc {
       if (printed > 0 && !group.label) feed(receipt.compact ? 4 : 12);
       else if (printed > 0 && group.label) feed(receipt.compact ? 4 : 10);
       if (item.logo && !receipt.compact) lines.push({ kind: 'logo', src: item.logo, align: 'left' });
-      const mark = typeof item.confidence === 'number' && item.confidence < 0.85 ? ' ~' : '';
-      lead(lines, item.name, `${item.status}${mark}`, { bold: true });
+      lead(lines, item.name, item.status, { bold: true });
       if (!receipt.compact && (item.description || item.date || item.via)) {
         const detail = [item.via, item.description, item.date].filter(Boolean).join('  ');
         text(lines, detail, 'left', { small: true });

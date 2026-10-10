@@ -21,7 +21,7 @@ type JobBase = {
 };
 
 export type Job =
-  | (JobBase & { kind: 'print'; content: React.ReactNode; slip?: boolean; end?: boolean; fast?: boolean })
+  | (JobBase & { kind: 'print'; content: React.ReactNode; slip?: boolean; end?: boolean; fast?: boolean; revision?: number })
   | (JobBase & { kind: 'feed' })
   | (JobBase & { kind: 'idle' });
 
@@ -256,6 +256,42 @@ export function Machine({ job, display, tone, onPrinted, onTorn, tearSignal = 0,
     // Only a new job restarts the print; fresh content for the same receipt doesn't.
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [live, shown.key, shown.kind]);
+
+  // Streaming: new lines after the first feed. Same job key, taller tape — shove the extra paper out.
+  const revision = shown.kind === 'print' ? shown.revision ?? 0 : 0;
+  const fedHeight = useRef(0);
+  useEffect(() => {
+    fedHeight.current = 0;
+  }, [shown.key]);
+  useEffect(() => {
+    const el = feed.current;
+    if (!live || !el || shown.kind !== 'print') return;
+    const height = el.offsetHeight;
+    if (fedHeight.current === 0) {
+      fedHeight.current = height;
+      return;
+    }
+    const hidden = height - fedHeight.current;
+    if (hidden < 12) return;
+    fedHeight.current = height;
+    if (phaseRef.current === 'printing' || phaseRef.current === 'tearing' || reducedMotion()) return;
+    const { frames, duration } = feedFrames(hidden, `${shown.key}:grow:${revision}`, 0.55);
+    motorOn();
+    const animation = el.animate(
+      frames.map((frame) => ({
+        offset: frame.offset,
+        clipPath: frame.clipPath,
+        webkitClipPath: frame.clipPath,
+        easing: frame.easing,
+      })),
+      { duration: Math.min(duration, 1600), fill: 'none' },
+    );
+    animation.finished.then(() => motorOff()).catch(() => motorOff());
+    return () => {
+      animation.cancel();
+      motorOff();
+    };
+  }, [live, shown.key, shown.kind, revision]);
 
   // Hanging: a small nudge so it reads as loose paper, and the hint.
   useEffect(() => {

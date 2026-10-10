@@ -78,6 +78,9 @@ export type YearReceipt = {
   full?: boolean;
   /** Settled payment, reprint in flight. */
   upgrading?: boolean;
+  /** First tape is incomplete; more items will arrive. */
+  provisional?: boolean;
+  pending?: boolean;
   /** Honest upsell from the free pass. Absent or offer:false when complete or already full. */
   upgrade?: { offer: boolean; teaser: string | null };
 };

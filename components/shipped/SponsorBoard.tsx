@@ -189,7 +189,7 @@ export function SponsorBoard() {
         <span className="shipped-board-chevron" aria-hidden />
       </button>
 
-      <div className="shipped-board-panel" id={panelId}>
+      <div className="shipped-board-panel" id={panelId} aria-hidden={!open}>
         <div className="shipped-board-panel-inner">
           <ul className="shipped-slot-list">
             {slots.map((slot) => (

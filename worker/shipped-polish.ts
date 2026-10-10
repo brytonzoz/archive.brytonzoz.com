@@ -13,6 +13,7 @@ import {
   logFlagshipGate,
   stripDateSuffix,
 } from './shipped-flagship';
+import { isLegacyNpmFamily } from './shipped-dates';
 import { ownedByBuilder, undatedPassesGate, type OwnerContext } from './shipped-ownership';
 import type { ItemStatus } from '../lib/shipped-year';
 import { ITEM_STATUSES } from '../lib/shipped-year';
@@ -880,6 +881,10 @@ export function polishCandidates<T extends Polishable>(items: T[], opts: PolishO
     }
     if (isJunkProductName(name, opts.handle || opts.owner?.github, who)) {
       drop(item, 'github-junk');
+      continue;
+    }
+    if (isLegacyNpmFamily(name)) {
+      drop(item, 'legacy-family');
       continue;
     }
     if (opts.owner && !ownedByBuilder({ ...item, name }, opts.owner)) {

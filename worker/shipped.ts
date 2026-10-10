@@ -28,6 +28,7 @@
 //   GET  /shipped/r/<id>/rollo.pdf     4-inch Rollo PDF (812 dots / 203 dpi, ?download=1)
 //   GET  /shipped/r/<id>/rollo.png     4-inch Rollo PNG (same layout)
 //   /api/admin/shipped*                moderation, takedowns, bids, the print queue, spend; behind the /admin password
+//   POST /api/admin/shipped            reprint-receipt { id } · print-subject { q } (fresh name, xAI off)
 //
 // Every guardrail (rate limits, locks, the budget, kill switches, the human check, headers) lives in
 // worker/shipped-guard.ts; the threat list is docs/shipped-security.md.
@@ -726,7 +727,7 @@ async function generate(
               const cap = await cycleBudgetCap(db, env);
               if (cap !== null && (await reserveBudget(db, cap, worst, budgetKey()))) {
                 try {
-                  const result = await assembleReceipt(subject, gathered, year, seed, env, worst);
+                  const result = await assembleReceipt(subject, gathered, year, seed, env, worst, await loadStoredNotes(db));
                   grown = result;
                   usage = { input: result.inputTokens, output: result.outputTokens, searches: result.searches, cost: result.costMicros };
                   await settleBudget(db, worst, usage.cost, budgetKey());
@@ -771,7 +772,7 @@ async function generate(
       if (!(await reserveBudget(db, cap, worst, budgetKey()))) return json({ error: 'out-of-paper' }, 503);
       holdBudget(worst);
       try {
-        const result = await assembleReceipt(subject, gathered, year, seed, env, worst);
+        const result = await assembleReceipt(subject, gathered, year, seed, env, worst, await loadStoredNotes(db));
         draft = result;
         usage = { input: result.inputTokens, output: result.outputTokens, searches: result.searches, cost: result.costMicros };
         holdBudget(0);
@@ -1583,7 +1584,7 @@ async function rerunFullReceipt(db: D1Database, env: ShippedEnv, id: number): Pr
     }
     const seed = seedOf(subjectKey(current.subject));
     const draft = env.ANTHROPIC_API_KEY
-      ? await assembleReceipt(current.subject, gathered, year, seed, env, costMicros(env.SHIPPED_MODEL || DEFAULT_MODEL, 4_000, 256, 0))
+      ? await assembleReceipt(current.subject, gathered, year, seed, env, costMicros(env.SHIPPED_MODEL || DEFAULT_MODEL, 4_000, 256, 0), await loadStoredNotes(db, id))
       : demoReceipt(gathered, year, seed);
     const receipt: Omit<YearReceipt, 'id'> = {
       version: 2,
@@ -2179,6 +2180,23 @@ async function enrichReprintCompanyCache(
   return gathered;
 }
 
+async function loadStoredNotes(db: D1Database, exceptId?: number): Promise<string[]> {
+  const { results } = await db
+    .prepare('SELECT id, data FROM shipped_receipts WHERE hidden = 0 ORDER BY id DESC LIMIT 200')
+    .all<{ id: number; data: string }>();
+  const notes: string[] = [];
+  for (const row of results ?? []) {
+    if (exceptId && row.id === exceptId) continue;
+    try {
+      const note = (JSON.parse(row.data) as YearReceipt).note;
+      if (typeof note === 'string' && note.trim()) notes.push(note.trim());
+    } catch {
+      /* skip broken rows */
+    }
+  }
+  return notes;
+}
+
 /** Re-run gather + assemble for an existing row. Same id; listed/hidden stay as they are. */
 async function reprintReceipt(
   env: ShippedEnv,
@@ -2229,7 +2247,7 @@ async function reprintReceipt(
       if (!(await reserveBudget(db, cap, worst, budgetKey()))) return json({ error: 'out-of-paper' }, 503);
       reserved = worst;
       try {
-        const result = await assembleReceipt(subject, gathered, year, seedOf(row.login_key), env, worst);
+        const result = await assembleReceipt(subject, gathered, year, seedOf(row.login_key), env, worst, await loadStoredNotes(db, id));
         draft = result;
         usage = { input: result.inputTokens, output: result.outputTokens, searches: result.searches, cost: result.costMicros };
         reserved = 0;
@@ -2276,6 +2294,117 @@ async function reprintReceipt(
   } catch (error) {
     if (error instanceof PrintError) return json({ error: error.code }, error.status);
     console.error('shipped: reprint failed', error instanceof Error ? error.message : 'unknown');
+    return json({ error: 'jammed' }, 500);
+  } finally {
+    await release(db, slot).catch(() => undefined);
+    if (reserved) await settleBudget(db, reserved, 0, budgetKey()).catch(() => undefined);
+  }
+}
+
+/** Admin-only print of a new subject (no Turnstile). Reprints stay on existing ids; this adds a wall row. */
+async function printFreshSubject(env: ShippedEnv, db: D1Database, raw: string): Promise<Response> {
+  const query = readQuery(raw);
+  if (!query || hasBlockedWord(query.value)) return json({ error: 'invalid-query' }, 400);
+  const subject: Subject =
+    query.kind === 'domain'
+      ? { kind: 'domain', id: query.value, display: query.value }
+      : query.kind === 'handle'
+        ? { kind: isGithubLogin(query.value) && !isXHandle(query.value) ? 'github' : 'x', id: query.value, display: `@${query.value}` }
+        : { kind: 'name', id: query.value, display: query.value };
+  const key = subjectKey(subject);
+  if (await blocked(db, key)) return json({ error: 'taken-down' }, 410);
+  const year = yearOf(env);
+  const mode = modeOf(year);
+  const state = await generatorState(env, db);
+  if (!state.enabled) return json({ error: state.reason ?? 'off' }, 503);
+  const slot = await concurrencySlot(db, env, PRINT_LOCK);
+  if (!slot) return json({ error: 'busy' }, 503);
+  let reserved = 0;
+  try {
+    const gathered = await gather(
+      subject,
+      gatherEnv(env, db, { xaiMeter: denyXaiMeter(), xaiMode: 'off', SHIPPED_XAI_OFF: '1' }),
+      year,
+      tinyfishMeter(db),
+      { rebuild: true },
+    );
+    const resolved = gathered.profile.name && !hasBlockedWord(gathered.profile.name) ? gathered.profile.name : subject.display;
+    subject.display = prettyPersonName(resolved) || clean(resolved, 60);
+    let model: string | null = null;
+    let usage = { input: 0, output: 0, searches: 0, cost: 0 };
+    let draft;
+    const seed = seedOf(key);
+    if (state.demo) {
+      draft = demoReceipt(gathered, year, seed);
+    } else {
+      model = env.SHIPPED_MODEL || DEFAULT_MODEL;
+      const harvestedEnough = gathered.found.length >= 3;
+      const worst = harvestedEnough
+        ? costMicros(model, 4_000, 256, 0)
+        : worstCaseMicros(model, promptFor(subject, gathered, year).length, maxSearches(env));
+      const cap = await cycleBudgetCap(db, env);
+      if (cap === null) return json({ error: 'out-of-paper' }, 503);
+      if (!(await reserveBudget(db, cap, worst, budgetKey()))) return json({ error: 'out-of-paper' }, 503);
+      reserved = worst;
+      try {
+        const result = await assembleReceipt(subject, gathered, year, seed, env, worst, await loadStoredNotes(db));
+        draft = result;
+        usage = { input: result.inputTokens, output: result.outputTokens, searches: result.searches, cost: result.costMicros };
+        reserved = 0;
+        await settleBudget(db, worst, usage.cost, budgetKey());
+      } catch (error) {
+        const spent = error as { costMicros?: number };
+        reserved = 0;
+        await settleBudget(db, worst, spent.costMicros && spent.costMicros > 0 ? spent.costMicros : worst, budgetKey());
+        await recordSpend(db, false, 0, 0, 0);
+        if (error instanceof PrintError && error.code === 'out-of-credit') {
+          await setOutOfCredit(db);
+          return json({ error: 'out-of-paper' }, 503);
+        }
+        throw error;
+      }
+    }
+    const x = (gathered.profile.x && isXHandle(gathered.profile.x) ? gathered.profile.x : subject.kind === 'x' ? subject.id : null) || null;
+    const receipt: Omit<YearReceipt, 'id'> = {
+      version: 2,
+      year,
+      subject: { ...subject, x },
+      printedAt: new Date().toISOString(),
+      items: await withLogos(draft.items, env),
+      note: draft.note,
+      stats: draft.stats,
+      potential: draft.potential,
+      demo: state.demo,
+      listed: true,
+      layout: draft.layout,
+      shipScore: shipScore({ items: draft.items, potential: draft.potential }),
+      full: false,
+      upgrading: false,
+      growing: false,
+    };
+    const day = today();
+    const replaces = await db.prepare('SELECT 1 AS x FROM shipped_receipts WHERE login_key = ? AND day = ? AND mode = ?').bind(key, day, mode).first();
+    const inserted = await db
+      .prepare(
+        `INSERT INTO shipped_receipts (login, login_key, day, mode, data, demo, model, input_tokens, output_tokens, searches, cost_micros, listed, created_at)
+         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+         ON CONFLICT(login_key, day, mode) DO UPDATE SET data = excluded.data, demo = excluded.demo, model = excluded.model,
+           input_tokens = excluded.input_tokens, output_tokens = excluded.output_tokens, searches = excluded.searches,
+           cost_micros = excluded.cost_micros, listed = excluded.listed, created_at = excluded.created_at
+         WHERE shipped_receipts.hidden != 1 RETURNING id`,
+      )
+      .bind(subjectLabel(subject), key, day, mode, JSON.stringify(receipt), state.demo ? 1 : 0, model, usage.input, usage.output, usage.searches, usage.cost, 1, Date.now())
+      .first<{ id: number }>();
+    if (!inserted) return json({ error: 'taken-down' }, 410);
+    await db.prepare('UPDATE shipped_receipts SET hidden = 0 WHERE id = ? AND hidden = 2').bind(inserted.id).run();
+    if (!replaces) await bump(db, 'printed');
+    if (!state.demo) await recordSpend(db, true, usage.input, usage.output, usage.searches);
+    await dropShareImages(env, inserted.id).catch(() => undefined);
+    await dropListedCache(env, inserted.id);
+    return json({ ok: true, id: inserted.id });
+  } catch (error) {
+    if (error instanceof PrintError) return json({ error: error.code }, error.status);
+    console.error('shipped: print-subject failed', error instanceof Error ? error.message : 'unknown');
     return json({ error: 'jammed' }, 500);
   } finally {
     await release(db, slot).catch(() => undefined);
@@ -2392,6 +2521,10 @@ export async function adminShipped(request: Request, env: ShippedEnv): Promise<R
           ? (body.affiliation as Partial<import('./shipped-affiliation').Affiliation>)
           : undefined;
       return reprintReceipt(env, db, id, hint);
+    }
+    if (body.action === 'print-subject') {
+      const q = typeof body.q === 'string' ? body.q : typeof body.handle === 'string' ? body.handle : '';
+      return printFreshSubject(env, db, q);
     }
     if (body.action === 'remove-takedown' || body.action === 'dismiss-takedown') {
       const ask = await db.prepare(`SELECT * FROM shipped_takedowns WHERE id = ?`).bind(id).first<{ receipt_id: number; subject_key: string; status: string }>();

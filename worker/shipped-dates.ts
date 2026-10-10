@@ -262,6 +262,24 @@ function isOwnedPin(
   return ownedByBuilder(item, owner);
 }
 
+/** socket.io / engine.io and their -client/-adapter packages: first launched years ago. */
+export function isLegacyNpmFamily(name: string): boolean {
+  const n = name.replace(/^@[^/]+\//, '').trim().toLowerCase();
+  return /^(socket|engine)\.io(-client|-adapter|-parser|-server|-native|-types)?$/.test(n);
+}
+
+/** socket.io-client → https://socket.io/ so archive/RDAP can prove the product predates 2026. */
+export function npmFamilyProductUrls(name: string): string[] {
+  const raw = name.replace(/^@[^/]+\//, '').trim();
+  const stripped = raw.replace(/-(client|adapter|parser|server|native|types|js|node)$/i, '');
+  const parts = stripped.split('.').filter(Boolean);
+  if (parts.length !== 2) return [];
+  const [left, right] = parts;
+  if (left.length < 4 || right.length < 2 || right.length > 4) return [];
+  if (!/^[a-z][a-z0-9-]+$/i.test(left) || !/^[a-z]+$/i.test(right)) return [];
+  return [`https://${left.toLowerCase()}.${right.toLowerCase()}/`];
+}
+
 /** Product-domain URLs only — never npm/GitHub. Used so archive.org/RDAP can beat an npm publish day. */
 export function productLaunchUrlsForNpm(
   item: { name: string; link?: string | null },
@@ -269,12 +287,15 @@ export function productLaunchUrlsForNpm(
 ): string[] {
   const words = item.name.trim().split(/[^A-Za-z0-9]+/).filter(Boolean);
   const want = loose(item.name);
+  const family = npmFamilyProductUrls(item.name);
+  if (family.length) return family;
   if (words.length < 2 && want.length < 8) return [];
-  return productUrlsForPin(item, opts).filter((url) => {
+  const pins = productUrlsForPin(item, opts).filter((url) => {
     const host = hostOf(url);
     if (!host || STORE_HOST.test(host) || PROFILE_HOST.test(host)) return false;
     return want.length >= 4 && loose(host).includes(want);
   });
+  return [...new Set(pins)];
 }
 
 /** After a pin is proven pre-`year`, drop leftover npm/web lines with the same loose name (POST BRIDGE, not POSTBRIDGE-CLI). */
@@ -360,6 +381,16 @@ export async function dateOwnedPins<T extends { name: string; date: string | nul
     }
   }
   kept.push(...leftover);
+  const still: T[] = [];
+  for (const item of kept) {
+    if (isLegacyNpmFamily(item.name)) {
+      drops.push({ name: item.name, reason: 'legacy-family', source: item.source ?? null });
+      continue;
+    }
+    still.push(item);
+  }
+  kept.length = 0;
+  kept.push(...still);
   const npmRows = kept.filter((item) => item.source === 'npm');
   const npmBatch = npmRows.slice(0, 12);
   const npmVerdicts = await Promise.all(

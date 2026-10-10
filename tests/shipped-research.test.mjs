@@ -127,11 +127,13 @@ test('undated own-site products become found items; other years do not', () => {
 
 test('cashier note and stats are specific to the items, never stock copy', () => {
   const items = [
-    { name: 'PHOTOAI', description: 'Headshots', date: '2026-03', status: 'LIVE', link: 'https://photoai.com/', icon: null, source: 'web' },
-    { name: 'INTERIORAI', description: 'Rooms', date: '2026-04', status: 'LIVE', link: 'https://interiorai.com/', icon: null, source: 'site' },
-    { name: 'SUPERLEVELS', description: 'Repo', date: '2026-04-23', status: 'SHIPPED', link: 'https://github.com/levelsio/superlevels', icon: null, source: 'github' },
+    { name: 'PHOTOAI', description: 'Headshots', date: '2026-03', status: 'LIVE', link: 'https://photoai.com/', icon: null, source: 'web', spoken: 'PhotoAI' },
+    { name: 'INTERIORAI', description: 'Rooms', date: '2026-04', status: 'LIVE', link: 'https://interiorai.com/', icon: null, source: 'site', spoken: 'InteriorAI' },
+    { name: 'SUPERLEVELS', description: 'Repo', date: '2026-04-23', status: 'SHIPPED', link: 'https://github.com/levelsio/superlevels', icon: null, source: 'github', spoken: 'SuperLevels', significance: 3 },
   ];
   const note = ai.groundedNote(items, 2, 'levelsio', ['553 GitHub stars SuperLevels · github.com/levelsio/superlevels']);
+  assert.match(note, /PhotoAI|InteriorAI|SuperLevels/i);
+  assert.doesNotMatch(note, /does one job|the pair is|opens on|kept \w+ busy:|spent the year on/i);
   const clumsy = ai.groundedNote(
     [
       { name: 'LLM-MRCHATTERBOX', description: 'Chat', date: '2026-01', status: 'SHIPPED', link: 'https://github.com/simonw/llm-mrchatterbox', icon: null, source: 'github' },
@@ -142,35 +144,27 @@ test('cashier note and stats are specific to the items, never stock copy', () =>
     ['13k GitHub stars llm · github.com/simonw/llm'],
   );
   assert.doesNotMatch(clumsy, /stars llm for/i);
-  const ceo = ai.groundedNote(
-    [
-      { name: 'CODEX APP FOR MACOS', description: 'App', date: '2026-01', status: 'LAUNCHED', link: 'https://openai.com/codex', icon: null, source: 'changelog' },
-      { name: 'CHATGPT IMAGES', description: 'Images', date: '2026-02', status: 'LAUNCHED', link: 'https://openai.com/index/images', icon: null, source: 'changelog' },
-      { name: 'SORA', description: 'Video', date: '2026-03', status: 'LAUNCHED', link: 'https://openai.com/sora', icon: null, source: 'changelog' },
-      { name: 'GPT-5', description: 'Model', date: '2026-04', status: 'LAUNCHED', link: 'https://openai.com/gpt-5', icon: null, source: 'changelog' },
-    ],
-    2,
-    'Sam Altman',
-    [],
-    { role: 'ceo', company: 'OpenAI' },
-  );
-  assert.match(ceo, /OpenAI|4|company/i);
-  assert.doesNotMatch(ceo, /^CODEX\s+APP/i);
-  assert.match(ceo, /OpenAI|Sam|ChatGPT/i);
+  const ceoItems = [
+    { name: 'CODEX APP FOR MACOS', description: 'App', date: '2026-01', status: 'LAUNCHED', link: 'https://openai.com/codex', icon: null, source: 'changelog', spoken: 'Codex app', significance: 4 },
+    { name: 'CHATGPT IMAGES', description: 'Images', date: '2026-02', status: 'LAUNCHED', link: 'https://openai.com/index/images', icon: null, source: 'changelog', spoken: 'ChatGPT Images' },
+    { name: 'SORA', description: 'Video', date: '2026-03', status: 'LAUNCHED', link: 'https://openai.com/sora', icon: null, source: 'changelog', spoken: 'Sora' },
+    { name: 'GPT-5', description: 'Model', date: '2026-04', status: 'LAUNCHED', link: 'https://openai.com/gpt-5', icon: null, source: 'changelog', spoken: 'GPT-5' },
+  ];
+  const ceo = ai.groundedNote(ceoItems, 2, 'Sam Altman', [], { role: 'ceo', company: 'OpenAI', who: 'Sam Altman' });
+  assert.match(ceo, /Codex app|ChatGPT Images|Sora|GPT-5|Sam/i);
+  assert.doesNotMatch(ceo, /year opens|does one job|the pair is/i);
   const stats = ai.formatStats(items);
   assert.match(stats[0], /3 launches/);
   assert.match(stats[0], /GitHub/);
   assert.doesNotMatch(note, /Thank you for shipping|Come again|No refunds on momentum|Receipt paper running low|Someone likes the publish button|night shift|publish button|\bthe tape\b|\bthe register\b/i);
-  assert.match(note, /PHOTOAI|INTERIORAI|SUPERLEVELS/i);
-  assert.match(note, /553|stars/i);
   const one = ai.groundedNote(
-    [{ name: 'POSTBRIDGE-CLI', description: 'CLI', date: '2026-09-09', status: 'SHIPPED', link: 'https://github.com/jackfriks/postbridge-cli', icon: null, source: 'github' }],
+    [{ name: 'POSTBRIDGE-CLI', description: 'CLI', date: '2026-09-09', status: 'SHIPPED', link: 'https://github.com/jackfriks/postbridge-cli', icon: null, source: 'github', spoken: 'postbridge-cli' }],
     0,
     'Jack Friks',
     [],
   );
   assert.doesNotMatch(one, /plus 0 more/i);
-  assert.match(one, /POSTBRIDGE-CLI/i);
+  assert.match(one, /postbridge-cli/i);
   assert.equal(ai.noteMisusesStats('44k GitHub stars on ZOD', 23, ['553 GitHub stars SuperLevels · github.com/x']), true);
   assert.equal(ai.noteMisusesStats('Zod sits at 326k npm weekly downloads.', 21, ['326k npm weekly downloads Zod · npmjs.com/package/zod']), false);
   assert.equal(ai.cashierNoteLooksCanned(note), false);
@@ -186,17 +180,37 @@ test('cashier note and stats are specific to the items, never stock copy', () =>
   assert.equal(ai.noteFailsVoice('levelsio spent the year on Dronesim.com, then Infinite Slop.'), true);
   assert.equal(ai.noteFailsVoice('Guillermo kept Vercel busy: BotID first, Serve later.'), true);
   assert.equal(ai.noteFailsVoice('Sam kept OpenAI busy: Codex app first, GPT-5.3-Codex later.'), true);
+  assert.equal(ai.noteFailsVoice("Boron does one job. Zshy does another."), true);
+  assert.equal(ai.noteFailsVoice('The pair is claude-blocker and fs2-cli.'), true);
+  assert.equal(ai.noteFailsVoice("Sam's year opens on Codex app, with GPT-5.3-Codex beside it."), true);
   assert.equal(ai.cashierNoteLooksCanned("Codex grew long-running work this year, and Tibo's agents now stay clocked in overnight."), true);
   assert.equal(ai.noteFailsVoice('Tibo kept Codex on long-running work, then shipped GitLab support into Codex Cloud.'), false);
-  const styles = [0, 1, 2, 3, 4, 5].map((seed) =>
-    ai.groundedNote(items, seed, 'levelsio', ['553 GitHub stars SuperLevels · github.com/levelsio/superlevels']),
+  const punch = ai.pickBestNote(
+    [
+      'The pair is PhotoAI and InteriorAI.',
+      'SuperLevels is sitting at 553 GitHub stars.',
+      'Pieter launched PhotoAI and two more .coms. The receipt looks like a weekend.',
+    ],
+    items,
+    ['553 GitHub stars SuperLevels · github.com/levelsio/superlevels'],
+    { who: 'Pieter Levels', handle: 'levelsio', usedNotes: ['PhotoAI kept the lights on this year.'] },
   );
-  assert.ok(new Set(styles).size >= 3, JSON.stringify(styles));
-  for (const line of styles) {
-    assert.equal(ai.noteFailsVoice(line), false, line);
-    assert.doesNotMatch(line, /kept \w+ busy:|spent the year on .+, then |people will remember|the loud one/i);
-    assert.equal(ai.noteCitesUnknownShip(line, items, 'levelsio'), false, line);
-  }
+  assert.match(punch, /SuperLevels/i);
+  assert.doesNotMatch(punch, /the pair is|does one job|opens on|receipt looks like a weekend/i);
+  const unique = ai.pickBestNote(
+    [
+      "Sam's year opens on Codex app, with GPT-5.3-Codex beside it.",
+      'Codex app took the desktop. Sora still feels like the dare.',
+      'The pair is Codex app and Sora.',
+    ],
+    ceoItems,
+    [],
+    { who: 'Sam Altman', company: 'OpenAI', usedNotes: [] },
+  );
+  assert.match(unique, /Codex app/i);
+  assert.doesNotMatch(unique, /year opens|the pair is/i);
+  const clash = ai.groundedNote(ceoItems, 0, 'Tibo', [], { who: 'Tibo', usedNotes: ['Codex app'] });
+  assert.notEqual(clash.toLowerCase(), 'codex app');
   assert.equal(
     ai.noteCitesUnknownShip('Post Bridge also landed as a ChatGPT plugin.', [{ name: 'POSTBRIDGE-CLI', description: 'CLI' }], 'Jack'),
     true,
@@ -236,7 +250,7 @@ test('cashier note and stats are specific to the items, never stock copy', () =>
   const okNote = ai.validateDraft(
     {
       items: [{ name: 'SuperX', description: 'Growth', date: '2026-02-09', status: 'LAUNCHED', link: 'https://www.producthunt.com/posts/superx' }],
-      note: 'SuperX pulled 929 hunters in February. The other tabs are just the merch table.',
+      note: 'SuperX is the launch Tibo actually meant this year.',
       stats: ['929 Product Hunt upvotes SuperX · producthunt.com/posts/superx'],
     },
     {
@@ -253,8 +267,7 @@ test('cashier note and stats are specific to the items, never stock copy', () =>
     1,
   );
   assert.match(okNote.note, /SuperX/i);
-  assert.match(okNote.note, /929/);
-  assert.doesNotMatch(okNote.note, /night shift|the tape|publish button/i);
+  assert.doesNotMatch(okNote.note, /night shift|the tape|publish button|929 hunters|does one job|the pair is/i);
 });
 
 test('Product Hunt lookups follow X, handle tokens, and product sites', () => {

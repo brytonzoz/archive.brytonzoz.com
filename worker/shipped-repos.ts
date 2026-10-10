@@ -4,7 +4,7 @@ const REPO_NAME = /^[A-Za-z0-9._-]{1,100}$/;
 const SKIP_REPOS =
   /^(my-app|throwaway(-\d+)?|tmp|playground|sandbox|awesome[-_].*|yes|wip|dotfiles)$/i;
 const JUNK_REPO_TAIL =
-  /(^|[-_.])(repro|reproduction|bench|benchmark|demo|test|tests|example|examples)([-_.]|$)/i;
+  /(^|[-_.])(repro|reproduction|bench|benchmark|demo|test|tests|example|examples|todo|todos|toy|hello-?world|fizzbuzz)([-_.]|$)/i;
 const NOT_A_PERSON_WORD = new Set([
   'agents',
   'agent',
@@ -74,11 +74,17 @@ const NOT_A_PERSON_WORD = new Set([
   'model',
 ]);
 
-/** `greeting.query`, `createHttpServer`, `bun-types`, bare `listen`. */
+const CODE_TLD = /\.(com|io|ai|dev|app|org|net|co|xyz|me|so|gg)\b/i;
+const CODE_KEYWORD = /\b(await|async|const|function)\b/i;
+
+/** `greeting.query`, `Await AsyncCodec.encodeAsync`, `createHttpServer`, `bun-types`. */
 export function looksLikeCodeIdentifier(name: string): boolean {
   const t = name.replace(/\s+/g, ' ').trim();
   if (!t) return false;
-  if (/^[A-Za-z_]\w*\s*\.\s*[A-Za-z_]\w*$/.test(t) && !/\.(com|io|ai|dev|app|org|net|co|xyz|me|so|gg)$/i.test(t)) return true;
+  if (/\(/.test(t)) return true;
+  if (CODE_KEYWORD.test(t)) return true;
+  if (/[A-Za-z_]\w{2,}\s*\.\s*[A-Za-z_]\w{2,}/.test(t) && !CODE_TLD.test(t)) return true;
+  if (/^[A-Za-z_]\w*\s*\.\s*[A-Za-z_]\w*$/.test(t) && !CODE_TLD.test(t)) return true;
   if (/^(create|get|set|has|is|on|use|make)[A-Z][A-Za-z0-9]{2,}$/.test(t)) return true;
   const compact = t.replace(/[\s._-]+/g, '');
   if (/^(create|get|set|has|listen)[a-z]{8,}$/i.test(compact) && !/\s/.test(t)) return true;

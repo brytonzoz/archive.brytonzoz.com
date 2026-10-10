@@ -59,6 +59,7 @@ jobs:
           SHIPPED_ORIGIN: ${{ github.event_name == 'workflow_dispatch' && inputs.origin || 'https://shipped-staging.brytonzoz.com' }}
           SHIPPED_REPRINT_FORCE: '1'
           SHIPPED_REPRINT_FORCE_IDS: ${{ github.event_name == 'workflow_dispatch' && inputs.ids || '6,7,13,16,17,18,19,20' }}
+          SHIPPED_PRINT_SUBJECTS: ${{ github.event_name == 'workflow_dispatch' && '' || 'tdinh_me,stephanj' }}
         run: |
           if [ -z "$ADMIN_PASSWORD" ]; then
             echo "::error::ADMIN_PASSWORD is required to reprint receipts."

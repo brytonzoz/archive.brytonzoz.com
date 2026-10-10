@@ -263,9 +263,9 @@ test('notes must use the final post-filter count', () => {
     icon: null,
     source: 'changelog',
   }));
-  const note = ai.groundedNote(items, 0, 'Tibo', [], { role: 'ceo', company: 'OpenAI' });
-  assert.match(note, /OpenAI|Tibo|Ship/i);
-  assert.doesNotMatch(note, /\b37\b|\b12 public\b|\blines\b/i);
+  const note = ai.groundedNote(items, 0, 'Tibo', [], { role: 'ceo', company: 'OpenAI', who: 'Tibo' });
+  assert.match(note, /Ship/i);
+  assert.doesNotMatch(note, /\b37\b|\b12 public\b|\blines\b|does one job|the pair is|opens on/i);
   assert.equal(ai.noteFailsVoice(note), false);
   assert.equal(polish.noteCountMismatch(note, 12), false);
 });
@@ -494,6 +494,14 @@ test('pricing, token-efficiency, person names, and code identifiers never print'
   assert.equal(repos.looksLikeCodeIdentifier('LISTEN'), true);
   assert.equal(repos.looksLikeCodeIdentifier('BUN-TYPES'), true);
   assert.equal(repos.looksLikeCodeIdentifier('NUB'), false);
+  assert.equal(repos.looksLikeCodeIdentifier('AWAIT ASYNCCODEC.ENCODEASYNC'), true);
+  assert.equal(repos.looksLikeCodeIdentifier('AsyncCodec.encodeAsync'), true);
+  assert.equal(repos.looksLikeCodeIdentifier('encodeAsync()'), true);
+  assert.equal(repos.looksLikeCodeIdentifier('socket.io-client'), false);
+  assert.equal(repos.looksLikeCodeIdentifier('hotelist.com'), false);
+  assert.equal(repos.isJunkRepoName('emoji-todo'), true);
+  assert.equal(repos.isJunkProductName('emoji-todo'), true);
+  assert.equal(polish.isJunkTitle('AWAIT ASYNCCODEC.ENCODEASYNC'), true);
   assert.equal(repos.isJunkProductName('MATTIA ASTORINO'), true);
   assert.equal(repos.isJunkProductName('CREATEHTTPSERVER'), true);
   const items = polish.polishCandidates(
@@ -604,6 +612,26 @@ test('archive.org/RDAP product hosts beat an npm publish day for the product its
   assert.equal(zodUrls.length, 0);
   const cliUrls = dates.productLaunchUrlsForNpm({ name: 'POSTBRIDGE-CLI', link: 'https://www.npmjs.com/package/postbridge-cli' }, { pageText: 'https://post-bridge.com' });
   assert.equal(cliUrls.some((url) => /post-bridge\.com/.test(url)), false);
+  const socketUrls = dates.productLaunchUrlsForNpm({ name: 'socket.io-client', link: 'https://www.npmjs.com/package/socket.io-client' }, {});
+  assert.deepEqual(socketUrls, ['https://socket.io/']);
+  const engineUrls = dates.npmFamilyProductUrls('engine.io-client');
+  assert.deepEqual(engineUrls, ['https://engine.io/']);
+  assert.equal(dates.isLegacyNpmFamily('socket.io-client'), true);
+  assert.equal(dates.isLegacyNpmFamily('Engine.io-Client'), true);
+  assert.equal(dates.isLegacyNpmFamily('socket.io-adapter'), true);
+  assert.equal(dates.isLegacyNpmFamily('@zod/mini'), false);
+  const socketTape = polish.polishCandidates(
+    [
+      found({ name: 'Serve', date: '2026-03-03', source: 'changelog', link: 'https://vercel.com/blog/serve' }),
+      found({ name: 'socket.io-client', date: '2026-04-01', source: 'npm', link: 'https://www.npmjs.com/package/socket.io-client' }),
+      found({ name: 'emoji-todo', date: '2026-04-24', source: 'github', link: 'https://github.com/rauchg/emoji-todo' }),
+      found({ name: 'AWAIT ASYNCCODEC.ENCODEASYNC', date: null, source: 'site', link: 'https://colinhacks.com/' }),
+    ],
+    { year: 2026, who: 'Guillermo Rauch' },
+  );
+  const socketNames = socketTape.map((item) => item.name);
+  assert.equal(socketNames.some((name) => /socket\.io|emoji-todo|encodeasync|asynccodec/i.test(name)), false, JSON.stringify(socketNames));
+  assert.ok(socketNames.some((name) => /serve/i.test(name)), JSON.stringify(socketNames));
 });
 
 test('sitemap slugs become flagship names and june-2026 slugs get a day', () => {

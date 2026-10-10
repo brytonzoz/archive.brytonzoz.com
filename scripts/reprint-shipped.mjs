@@ -16,6 +16,8 @@
 // After de3d3e3: version monthly rollup, person-name gate, archive/RDAP beats npm for the product itself.
 // After 80487e7: GitLab prefix-only merge; reject copied cashier examples.
 // After c85e99e: seeded note styles, undated ownership gate, leftover Codex fragments.
+// After note-punchline: 3-candidate cashier notes, code-method drop, Socket.IO family gate.
+// Optional SHIPPED_PRINT_SUBJECTS=handle,handle prints two fresh names via admin print-subject.
 //
 //   ADMIN_PASSWORD=… node scripts/reprint-shipped.mjs [origin]
 const RECEIPT_PATH = (id) => `/r/${id}/`;
@@ -29,6 +31,10 @@ const FORCE_IDS = new Set(
     .map((id) => Number(id.trim()))
     .filter((id) => Number.isFinite(id) && id > 0),
 );
+const PRINT_SUBJECTS = (process.env.SHIPPED_PRINT_SUBJECTS || '')
+  .split(',')
+  .map((value) => value.trim().replace(/^@/, ''))
+  .filter(Boolean);
 const realCount = (receipt) => {
   const items = Array.isArray(receipt?.items) ? receipt.items : [];
   return items.filter((item) => item && item.name && item.name !== 'YOUR POTENTIAL' && item.source !== 'none').length;
@@ -124,6 +130,47 @@ for (const target of TARGETS) {
   const url = `${origin}${RECEIPT_PATH(target.id)}`;
   console.log(`#${target.id} ${who} → ${items} items ${url}`);
   rows.push({ id: target.id, who, items, url, skipped: false });
+}
+
+async function printSubject(q) {
+  const res = await fetch(`${origin}/api/admin/shipped`, {
+    method: 'POST',
+    headers,
+    body: JSON.stringify({ action: 'print-subject', q }),
+  });
+  const text = await res.text();
+  let body = {};
+  try {
+    body = JSON.parse(text);
+  } catch {
+    body = { error: text.slice(0, 160) };
+  }
+  return { ok: res.ok && body.ok === true, status: res.status, error: body.error || null, id: Number(body.id) || 0 };
+}
+
+for (const q of PRINT_SUBJECTS) {
+  let last = { ok: false, status: 0, error: 'not-tried', id: 0 };
+  for (let attempt = 0; attempt < 3; attempt++) {
+    if (attempt) await new Promise((ok) => setTimeout(ok, 8000));
+    last = await printSubject(q);
+    if (last.ok) break;
+    console.log(`@${q} print ${last.status} ${last.error || ''} (try ${attempt + 1})`);
+  }
+  if (!last.ok) {
+    console.error(`@${q} print failed: ${last.status} ${last.error || ''}`);
+    process.exit(1);
+  }
+  await new Promise((ok) => setTimeout(ok, 3000));
+  let after = last.id ? await readReceipt(last.id) : null;
+  if (!after) {
+    await new Promise((ok) => setTimeout(ok, 8000));
+    after = last.id ? await readReceipt(last.id) : null;
+  }
+  const who = after?.subject?.display || after?.login || `@${q}`;
+  const items = realCount(after);
+  const url = last.id ? `${origin}${RECEIPT_PATH(last.id)}` : origin;
+  console.log(`#${last.id} ${who} → ${items} items ${url}`);
+  rows.push({ id: last.id, who, items, url, skipped: false, fresh: true, q });
 }
 
 console.log(JSON.stringify({ origin, receipts: rows }, null, 2));

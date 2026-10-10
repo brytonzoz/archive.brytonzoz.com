@@ -368,10 +368,16 @@ function containedName(a: string, b: string): boolean {
   return true;
 }
 
-export function shareKeywords(a: { name: string; link?: string | null }, b: { name: string; link?: string | null }): boolean {
+export function shareKeywords(
+  a: { name: string; link?: string | null; date?: string | null },
+  b: { name: string; link?: string | null; date?: string | null },
+): boolean {
   const x = loose(a.name);
   const y = loose(b.name);
   if (!x || !y || x.length < 4 || y.length < 4) return false;
+  const day = (value?: string | null) => (value && /^\d{4}-\d{2}-\d{2}$/.test(value) ? value : '');
+  // Dated changelog cards are different ships even when they share "Codex" + "app".
+  if (day(a.date) && day(b.date) && day(a.date) !== day(b.date) && x !== y) return false;
   if (containedName(x, y)) return true;
   const ta = coreTokens(a.name);
   const tb = coreTokens(b.name);

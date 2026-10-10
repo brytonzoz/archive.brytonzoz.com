@@ -2296,7 +2296,12 @@ async function reprintReceipt(
     if (!state.demo) await recordSpend(db, true, usage.input, usage.output, usage.searches);
     await dropShareImages(env, row.id).catch(() => undefined);
     await dropListedCache(env, row.id);
-    return json({ ok: true, id: row.id });
+    return json({
+      ok: true,
+      id: row.id,
+      note: draft.note,
+      noteCandidates: 'noteCandidates' in draft ? draft.noteCandidates ?? [] : [],
+    });
   } catch (error) {
     if (error instanceof PrintError) return json({ error: error.code }, error.status);
     console.error('shipped: reprint failed', error instanceof Error ? error.message : 'unknown');

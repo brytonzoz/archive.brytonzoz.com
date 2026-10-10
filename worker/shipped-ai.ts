@@ -81,8 +81,16 @@ export type DraftItem = {
   /** Source / proper casing for notes (tsc-rs, BotID). */
   spoken?: string;
 };
+export type NoteCandidateLog = { note: string; reason: NoteRejectReason | null; score: number };
 export type Draft = { items: DraftItem[]; note: string; stats: string[]; potential: boolean; layout: ModuleId[] };
-export type AiResult = Draft & { model: string; inputTokens: number; outputTokens: number; searches: number; costMicros: number };
+export type AiResult = Draft & {
+  model: string;
+  inputTokens: number;
+  outputTokens: number;
+  searches: number;
+  costMicros: number;
+  noteCandidates?: NoteCandidateLog[];
+};
 
 /** Long tapes: harvest prints the lines. Claude writes the note, it does not invent 200 JSON items. */
 export const MAX_ITEMS = 200;
@@ -247,7 +255,7 @@ export function noteFailsVoice(note: string): boolean {
 }
 
 const NOTE_NAME_OK =
-  /^(jan(?:uary)?|feb(?:uary)?|mar(?:ch)?|apr(?:il)?|may|jun(?:e)?|jul(?:y)?|aug(?:ust)?|sep(?:t(?:ember)?)?|oct(?:ober)?|nov(?:ember)?|dec(?:ember)?|monday|tuesday|wednesday|thursday|friday|saturday|sunday|openai|vercel|anthropic|github|chatgpt|gpt|cursor|they|them|this|that|year|just|same|weekly|public|nothing|everything|someone|anyone|desktop|spotlight|honest|receipt|launch|launches|ship|ships|update|updates|app|cli|sdk|api|mcp)$/i;
+  /^(jan(?:uary)?|feb(?:uary)?|mar(?:ch)?|apr(?:il)?|may|jun(?:e)?|jul(?:y)?|aug(?:ust)?|sep(?:t(?:ember)?)?|oct(?:ober)?|nov(?:ember)?|dec(?:ember)?|monday|tuesday|wednesday|thursday|friday|saturday|sunday|openai|vercel|anthropic|github|chatgpt|gpt|cursor|aws|cdn|dns|sql|rss|http|they|them|this|that|year|just|same|weekly|public|nothing|everything|someone|anyone|desktop|spotlight|honest|receipt|launch|launches|ship|ships|update|updates|app|cli|sdk|api|mcp)$/i;
 
 function spokenOf(item: { name: string; spoken?: string }): string {
   return item.spoken || spokenShipName(item.name);
@@ -505,7 +513,9 @@ export type NoteRejectReason =
 
 const NOTE_HAS_URL = /https?:\/\/|\bwww\.|\b(npmjs|github|producthunt|twitter)\.com\b/i;
 
-/** Hard rejects only. Everything else is soft scoring. */
+const PUBLIC_TAPE_NOTE = /\bpublic tape\b|\blead ship\b/i;
+
+/** Hard rejects: factual problems, exact dupes, and the banned fallback phrases. Style is soft. */
 export function hardRejectNote(
   note: string,
   items: DraftItem[],
@@ -517,17 +527,12 @@ export function hardRejectNote(
   if (items.length && isEmptyTapeNote(text)) return 'empty-tape';
   if (!ok(text)) return 'unsafe';
   if (NOTE_HAS_URL.test(text)) return 'url';
-  if (BANNED_NOTE_SHAPE.test(text)) return 'banned-phrase';
-  if (MISSING_DATA_NOTE.test(text)) return 'missing-data';
+  if (PUBLIC_TAPE_NOTE.test(text)) return 'banned-phrase';
   if (noteMisusesStats(text, items.length, stats) || noteCountMismatch(text, items.length)) return 'unsourced-number';
   if (noteAlreadyUsed(text, ctx.usedNotes ?? [])) return 'duplicate';
   if (noteCitesUnknownShip(text, items, ctx)) return 'unknown-ship';
   if (noteCitesOtherPerson(text, items, ctx)) return 'other-person';
-  if (text.split(/\s+/).filter(Boolean).length < 8) return 'too-short';
-  if (/\bthe one (public ship here|on this tape)\b/i.test(text) && items.length !== 1) return 'banned-phrase';
-  if (/[·]/.test(text)) return 'banned-phrase';
-  if (noteCopiesDescription(text, items)) return 'verbatim-desc';
-  if (noteRestatesTitle(text, items)) return 'title-restate';
+  if (/\bthe one (public ship here|on this tape)\b/i.test(text) && items.length !== 1) return 'unsourced-number';
   return null;
 }
 
@@ -627,6 +632,12 @@ export function scoreCashierNote(
   else if (detail === 1) score += 8;
   if (/\bis a \w+(?:\s+\w+){0,3} that shipped this year\.?$/i.test(text)) score -= 24;
   if (/\bopens in a new window\b|\bis a product\b/i.test(text)) score -= 24;
+  if (BANNED_NOTE_SHAPE.test(text) || MISSING_DATA_NOTE.test(text)) score -= 16;
+  if (text.split(/\s+/).filter(Boolean).length < 8) score -= 20;
+  if (noteCopiesDescription(text, items)) score -= 18;
+  if (noteRestatesTitle(text, items)) score -= 14;
+  if (/[·]/.test(text)) score -= 12;
+  if (PUBLIC_TAPE_NOTE.test(text)) score -= 30;
   return score;
 }
 
@@ -687,16 +698,19 @@ export function rankCashierNotes(
     });
 }
 
+function noteCandidateLog(ranked: RankedNote[]): NoteCandidateLog[] {
+  return ranked.map((row) => ({ note: row.note, reason: row.hard, score: row.score }));
+}
+
 function logNoteReject(ctx: NoteContext, ranked: RankedNote[], retry: boolean | 'exhausted') {
   const rejected = ranked.filter((row) => row.hard);
-  if (!rejected.length && retry !== 'exhausted') return;
   console.log(
     JSON.stringify({
       shipped: 'note-reject',
       who: ctx.who || null,
       handle: ctx.handle || null,
       reasons: rejected.map((row) => ({ note: row.note, reason: row.hard, score: row.score })),
-      candidates: ranked.map((row) => ({ note: row.note, reason: row.hard, score: row.score })),
+      candidates: noteCandidateLog(ranked),
       retry,
     }),
   );
@@ -771,10 +785,11 @@ export function safeNoteFromTopShip(items: DraftItem[], ctx: NoteContext = {}): 
     .filter((word) => !titleWords.has(word) && !/^(can|will|may|also|just|now|been)$/.test(word))
     .slice(0, 2)
     .join(' ');
+  const who = (ctx.who || '').replace(/^@/, '').split(/\s+/).filter(Boolean)[0] || '';
   const candidates = [
-    extra ? `This year's public tape starts with ${label}, built around ${extra}.` : '',
-    `This year's public tape starts with ${label} as the lead ship.`,
-    `${label} is the named product on this year's public tape.`,
+    extra ? `${label} is the one that does ${extra}.` : '',
+    who ? `${who} printed ${label} first this year.` : '',
+    `${label} is the first line on this receipt.`,
   ].filter(Boolean);
   for (const note of candidates) {
     if (isEmptyTapeNote(note)) continue;
@@ -783,7 +798,7 @@ export function safeNoteFromTopShip(items: DraftItem[], ctx: NoteContext = {}): 
     if (!printable(note)) continue;
     return clipSentence(note, 140);
   }
-  return clipSentence(`This year's public tape starts with ${label} as the lead ship.`, 140);
+  return clipSentence(`${label} is the first line on this receipt.`, 140);
 }
 
 /** When Claude is up but every candidate died: a sentence, never a bare product name. */
@@ -795,16 +810,19 @@ export function sentenceFallbackNote(items: DraftItem[], ctx: NoteContext = {}):
   const kind = kindFromShipName(`${notable.name} ${spoken}`);
   const who = (ctx.who || '').replace(/^@/, '').split(/\s+/).filter(Boolean)[0] || '';
   const lead = does ? does.charAt(0).toLowerCase() + does.slice(1) : '';
+  const leadClause = lead
+    ? /^(is|are|was|does|did|can|will|helps?|lets?|builds?|posts?|bridges|generates?|installs?)\b/i.test(lead)
+      ? lead
+      : `is ${lead}`
+    : '';
   const next = items.length > 1 ? spokenOf(items.find((row) => spokenOf(row) !== spoken) || items[1]!) : '';
   const candidates = [
-    does && foldNote(does) !== foldNote(spoken) && !foldNote(`which ${lead}`).includes(foldNote(does).split(/\s+/).slice(0, 8).join(' '))
-      ? `Keep an eye on ${spoken}, which ${lead}`
-      : '',
-    who ? `${spoken} is ${who}'s ${kind} on this year's public tape.` : '',
+    leadClause && foldNote(does) !== foldNote(spoken) ? `Keep an eye on ${spoken}, which ${leadClause}` : '',
+    who ? `${spoken} is ${who}'s ${kind} printed on this receipt.` : '',
     items.length > 1 && next
-      ? `${spoken} and ${next} are both on this ${items.length}-ship tape.`
+      ? `${spoken} and ${next} are both on this ${items.length}-ship receipt.`
       : '',
-    items.length === 1 ? `This tape has one public ship, and ${spoken} is it.` : '',
+    items.length === 1 ? `${spoken} is the only ship printed on this receipt.` : '',
   ].filter(Boolean);
   for (const note of candidates) {
     if (isEmptyTapeNote(note)) continue;
@@ -813,7 +831,7 @@ export function sentenceFallbackNote(items: DraftItem[], ctx: NoteContext = {}):
     if (!printable(note)) continue;
     return clipSentence(note, 140);
   }
-  const last = `${spoken} is the named product on this year's public tape.`;
+  const last = `${spoken} is the named product printed on this receipt.`;
   if (!isEmptyTapeNote(last) && !hardRejectNote(last, items, [], ctx) && printable(last) && !isBareProductNote(last, items)) {
     return clipSentence(last, 140);
   }
@@ -1119,13 +1137,13 @@ function noteOnlySystem(year: number, affiliation?: Affiliation | null, count = 
     `You are the cashier on a SHIPPED IN ${year} receipt. You have read their year. Write the punchline people will screenshot.`,
     'Return exactly 3 different notes. Each is one or two sentences, max 140 characters, never cut mid-word.',
     'A dry, knowing cashier: specific, human, a little sideways. Not a template. Not a recap.',
-    'Mention the single most notable ship from the item list. Keep that product\'s original casing (tsc-rs, BotID, Post Bridge). Never ALL CAPS.',
+    'Mention the single most notable ship from the item list. Keep that product\'s original casing (AWS, tsc-rs, BotID, Post Bridge). Never ALL CAPS. Never Title-Case an acronym (AWS, not Aws).',
     'At most one number, and only if it is copied from <found>.stats (stars or downloads). Prefer no number.',
     'Never invent a plugin, extension, extra product, or fact that is not in the item list or bio.',
     'If you name a person, it must be this customer (their name or handle only). Never another person — including a name hiding inside a repo (jev-tetris is a product, not Jev).',
     'Never mention a missing description, missing date, or that something shipped without copy.',
     'Reuse a concrete detail from the item description — what the ship does. Thin tapes still get one specific line about that one ship.',
-    'Do not write "showed up", "is the one that stuck", "opens in a new window", "shipped this year", "is a product", "leads N ships", or "N receipts, and X keeps coming back".',
+    'Do not write "showed up", "is the one that stuck", "opens in a new window", "shipped this year", "is a product", "leads N ships", "public tape", "lead ship", or "N receipts, and X keeps coming back".',
     'Never use a middot. Never paste the item description. Never open by restating the item title.',
     'Every note is at least 8 words. Never scrape UI chrome into the note.',
     'Do not restate two item names and a month as the whole note. Do not talk down a thin tape or say the bio does the talking.',
@@ -1458,6 +1476,7 @@ export async function assembleReceipt(
     };
     let note = '';
     let apiDown = false;
+    let noteCandidates: NoteCandidateLog[] = [];
     const ask = async (userContent: string): Promise<string[] | null> => {
       const request = {
         model,
@@ -1490,6 +1509,7 @@ export async function assembleReceipt(
         apiDown = true;
       } else {
         const ranked = rankCashierNotes(first, harvested, stats, noteCtx);
+        noteCandidates = noteCandidateLog(ranked);
         logNoteReject(noteCtx, ranked, false);
         note = ranked.find((row) => !row.hard)?.note ?? '';
         if (!note) {
@@ -1504,6 +1524,7 @@ export async function assembleReceipt(
               apiDown = true;
             } else {
               const ranked2 = rankCashierNotes(second, harvested, stats, noteCtx);
+              noteCandidates = [...noteCandidates, ...noteCandidateLog(ranked2)];
               logNoteReject(noteCtx, ranked2, true);
               note = ranked2.find((row) => !row.hard)?.note ?? '';
               if (!note) {
@@ -1525,7 +1546,7 @@ export async function assembleReceipt(
     const draft = finish(harvested, note, seed, undefined, stats, { ...noteCtx, apiDown });
     const cost = spent();
     console.log(JSON.stringify({ shipped: 'ai', model, mode: 'note-only', items: harvested.length, inputTokens: usage.input, outputTokens: usage.output, costMicros: cost }));
-    return { ...draft, model, inputTokens: usage.input, outputTokens: usage.output, searches: 0, costMicros: cost };
+    return { ...draft, model, inputTokens: usage.input, outputTokens: usage.output, searches: 0, costMicros: cost, noteCandidates };
   }
 
   let tools = toolSets[0];

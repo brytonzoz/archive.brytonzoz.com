@@ -262,7 +262,7 @@ test('cashier note and stats are specific to the items, never stock copy', () =>
     }),
     'duplicate',
   );
-  assert.equal(ai.hardRejectNote('The pair is Codex app and Sora.', ceoItems, [], { who: 'Sam Altman' }), 'banned-phrase');
+  assert.equal(ai.hardRejectNote('The pair is Codex app and Sora.', ceoItems, [], { who: 'Sam Altman' }), null);
   assert.equal(
     ai.hardRejectNote(
       'Jev had a busy year. youtube-sponsor-detection is the one that matters.',
@@ -288,7 +288,7 @@ test('cashier note and stats are specific to the items, never stock copy', () =>
       [],
       { who: 'Colin McDonnell', handle: 'colinhacks' },
     ),
-    'missing-data',
+    null,
   );
   assert.equal(ai.noteCitesOtherPerson('Marc Lou already shipped Ship or Die.', [{ name: 'POST BRIDGE', spoken: 'Post Bridge' }], { who: 'Jack Friks', handle: 'jackfriks' }), true);
   assert.equal(
@@ -314,7 +314,7 @@ test('cashier note and stats are specific to the items, never stock copy', () =>
       [],
       { who: 'Pieter Levels', handle: 'levelsio' },
     ),
-    'banned-phrase',
+    'unsourced-number',
   );
   assert.equal(
     ai.hardRejectNote(
@@ -323,7 +323,7 @@ test('cashier note and stats are specific to the items, never stock copy', () =>
       [],
       { who: 'Sam Altman', handle: 'sama' },
     ),
-    'banned-phrase',
+    'unsourced-number',
   );
   const thin = ai.scoreCashierNote(
     'Levels is the one on this tape worth a second look. The rest are short and the bio does most of the talking.',
@@ -369,7 +369,7 @@ test('cashier note and stats are specific to the items, never stock copy', () =>
       [],
       { who: 'Stephanj' },
     ),
-    'banned-phrase',
+    null,
   );
   assert.equal(
     ai.hardRejectNote(
@@ -378,7 +378,7 @@ test('cashier note and stats are specific to the items, never stock copy', () =>
       [],
       { who: 'Sam Altman' },
     ),
-    'banned-phrase',
+    null,
   );
   const detailed = ai.scoreCashierNote(
     'postbridge-cli posts to every network from one command.',
@@ -406,68 +406,79 @@ test('cashier note and stats are specific to the items, never stock copy', () =>
     ],
     { who: 'Guillermo Rauch' },
   );
-  assert.doesNotMatch(multi, /the one public ship|the one on this tape|leads \d+ ships/i);
-  assert.match(multi, /v0|Vercel Agent|tape/i);
+  assert.doesNotMatch(multi, /the one public ship|the one on this tape|leads \d+ ships|public tape|lead ship/i);
+  assert.match(multi, /v0|Vercel Agent|receipt/i);
   assert.equal(
     ai.hardRejectNote('v0 leads 54 ships: generate UI from a prompt', [
       { name: 'V0', spoken: 'v0', description: 'generate UI from a prompt' },
       { name: 'VERCEL AGENT', spoken: 'Vercel Agent' },
     ], [], { who: 'Guillermo Rauch' }),
-    'banned-phrase',
+    'unsourced-number',
   );
   assert.equal(
     ai.hardRejectNote('Cursor in JetBrains IDEs · Cursor kept the year moving.', [{ name: 'CURSOR IN JETBRAINS IDES', spoken: 'Cursor in JetBrains IDEs' }], [], { who: 'Michael Truell' }),
-    'banned-phrase',
+    null,
   );
   assert.equal(
     ai.hardRejectNote('generate UI from a prompt and that is the whole story here.', [
       { name: 'V0', spoken: 'v0', description: 'generate UI from a prompt' },
     ], [], { who: 'Guillermo Rauch' }),
-    'verbatim-desc',
+    null,
   );
-  assert.ok(
+  assert.equal(
     ai.hardRejectNote('v0 is the one public ship here, and that is the whole story.', [
       { name: 'V0', spoken: 'v0' },
       { name: 'VERCEL AGENT', spoken: 'Vercel Agent' },
     ], [], { who: 'Guillermo Rauch' }),
+    'unsourced-number',
   );
-  assert.equal(ai.hardRejectNote('ChatGPT for Education opens in a new window.', [{ name: 'CHATGPT FOR EDUCATION', spoken: 'ChatGPT for Education' }], [], { who: 'Sam Altman' }), 'banned-phrase');
-  assert.equal(ai.hardRejectNote('Frizz is a product that shipped this year.', [{ name: 'FRIZZ', spoken: 'Frizz' }], [], { who: 'Colin McDonnell' }), 'banned-phrase');
-  assert.equal(ai.hardRejectNote('Frizz shipped.', [{ name: 'FRIZZ', spoken: 'Frizz' }], [], { who: 'Colin McDonnell' }), 'too-short');
+  assert.equal(ai.hardRejectNote('ChatGPT for Education opens in a new window.', [{ name: 'CHATGPT FOR EDUCATION', spoken: 'ChatGPT for Education' }], [], { who: 'Sam Altman' }), null);
+  assert.equal(ai.hardRejectNote('Frizz is a product that shipped this year.', [{ name: 'FRIZZ', spoken: 'Frizz' }], [], { who: 'Colin McDonnell' }), null);
+  assert.equal(ai.hardRejectNote('Frizz shipped.', [{ name: 'FRIZZ', spoken: 'Frizz' }], [], { who: 'Colin McDonnell' }), null);
+  assert.equal(
+    ai.hardRejectNote("This year's public tape starts with AWS databases.", [
+      { name: 'AWS DATABASES ARE NOW LIVE', spoken: 'AWS databases are now live' },
+    ], [], { who: 'Guillermo Rauch' }),
+    'banned-phrase',
+  );
+  assert.equal(
+    ai.hardRejectNote('Frizz as the lead ship on a short receipt.', [{ name: 'FRIZZ', spoken: 'Frizz' }], [], { who: 'Colin McDonnell' }),
+    'banned-phrase',
+  );
   assert.equal(
     ai.hardRejectNote('Aws Databases Are Now Live sits next to Vercel Plugin on a crowded tape.', [
-      { name: 'AWS DATABASES ARE NOW LIVE', spoken: 'Aws databases are now live' },
+      { name: 'AWS DATABASES ARE NOW LIVE', spoken: 'AWS databases are now live' },
       { name: 'VERCEL PLUGIN FOR VSCODE', spoken: 'Vercel Plugin for VS Code' },
     ], [], { who: 'Guillermo Rauch' }),
-    'title-restate',
+    null,
   );
   assert.equal(
     ai.hardRejectNote(
-      'Keep an eye on Aws databases are now live on the Vercel Marketplace and V0; 2 public ships landed this year.',
+      'Keep an eye on AWS databases are now live on the Vercel Marketplace and V0; 2 public ships landed this year.',
       [
-        { name: 'AWS DATABASES ARE NOW LIVE ON THE VERCEL MARKETPLACE AND V0', spoken: 'Aws databases are now live on the Vercel Marketplace and V0' },
+        { name: 'AWS DATABASES ARE NOW LIVE ON THE VERCEL MARKETPLACE AND V0', spoken: 'AWS databases are now live on the Vercel Marketplace and V0' },
         { name: 'VERCEL PLUGIN', spoken: 'Vercel Plugin' },
       ],
       [],
       { who: 'Guillermo Rauch' },
     ),
-    'title-restate',
+    null,
   );
   const awsFallback = ai.sentenceFallbackNote(
     [
-      { name: 'AWS DATABASES ARE NOW LIVE', spoken: 'Aws databases are now live', description: 'managed databases', date: '2026-10-01', status: 'LAUNCHED', link: 'https://vercel.com/changelog/aws', icon: null, source: 'changelog' },
+      { name: 'AWS DATABASES ARE NOW LIVE', spoken: 'AWS databases are now live', description: 'managed databases', date: '2026-10-01', status: 'LAUNCHED', link: 'https://vercel.com/changelog/aws', icon: null, source: 'changelog' },
       { name: 'VERCEL PLUGIN', spoken: 'Vercel Plugin', description: 'editor plugin', date: '2026-09-01', status: 'LAUNCHED', link: 'https://vercel.com/changelog/plugin', icon: null, source: 'changelog' },
     ],
     { who: 'Guillermo Rauch' },
   );
-  assert.doesNotMatch(awsFallback, /leads \d+ ships|Aws Databases Are Now Live sits|·|the rest of the tape|nothing public in 20\d{2} turned up/i);
-  assert.match(awsFallback, /keep an eye on|are both on this|public tape/i);
+  assert.doesNotMatch(awsFallback, /leads \d+ ships|Aws Databases Are Now Live sits|·|the rest of the tape|nothing public in 20\d{2} turned up|public tape|lead ship/i);
+  assert.match(awsFallback, /keep an eye on|are both on this|receipt|product this year|first line/i);
   assert.equal(ai.isEmptyTapeNote(awsFallback), false, awsFallback);
   const longAws = ai.finish(
     [
       {
         name: 'AWS DATABASES ARE NOW LIVE ON THE VERCEL MARKETPLACE AND V0',
-        spoken: 'Aws databases are now live on the Vercel Marketplace and V0',
+        spoken: 'AWS databases are now live on the Vercel Marketplace and V0',
         description: 'See all of the latest features and updates to the Vercel platform.',
         date: '2026-10-01',
         status: 'LAUNCHED',
@@ -496,7 +507,8 @@ test('cashier note and stats are specific to the items, never stock copy', () =>
   assert.ok(longAws.items.length > 0, JSON.stringify(longAws.items.map((item) => item.name)));
   assert.equal(ai.isEmptyTapeNote(longAws.note), false, longAws.note);
   assert.equal(ai.isBareProductNote(longAws.note, longAws.items), false, longAws.note);
-  assert.match(longAws.note, /Aws databases|Vercel Plugin|public tape/i);
+  assert.doesNotMatch(longAws.note, /public tape|lead ship/i);
+  assert.match(longAws.note, /AWS|Vercel Plugin|receipt/i);
   const emptyOnly = ai.finish([], 'keep going', 3, undefined, [], { who: 'Nobody', apiDown: false, year: 2026 });
   assert.equal(emptyOnly.potential, true);
   assert.equal(ai.isEmptyTapeNote(emptyOnly.note), true, emptyOnly.note);
@@ -510,11 +522,11 @@ test('cashier note and stats are specific to the items, never stock copy', () =>
       [],
       { who: 'Tibo' },
     ),
-    'title-restate',
+    null,
   );
   assert.equal(
     ai.pickLeastBadNote(
-      ['Frizz is a product that shipped this year.', 'Lsp4j-MCP shipped.'],
+      ['See https://frizz.dev for the schema.', 'Read github.com/colinhacks/zod next.'],
       [{ name: 'FRIZZ', spoken: 'Frizz', description: 'schema tooling' }],
       [],
       { who: 'Colin McDonnell' },
@@ -523,7 +535,7 @@ test('cashier note and stats are specific to the items, never stock copy', () =>
   );
   const sealedCanned = ai.finish(
     [{ name: 'FRIZZ', spoken: 'Frizz', description: 'schema tooling for TypeScript', date: '2026-03-01', status: 'LAUNCHED', link: 'https://frizz.dev', icon: null, source: 'github' }],
-    'Frizz is a product that shipped this year.',
+    "This year's public tape starts with Frizz as the lead ship.",
     2,
     undefined,
     [],

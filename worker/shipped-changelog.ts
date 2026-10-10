@@ -220,31 +220,40 @@ function monthNum(word: string): string | null {
   return MONTH[word.toLowerCase().replace(/\.$/, '')] ?? null;
 }
 
-/** ISO, "Sep 23, 2026", "9 October 2026", RFC 2822, or month-day assumed as `year`. */
+function monthFromRaw(raw: string): number | null {
+  const md = raw.match(new RegExp(`\\b(${MONTH_ALT})\\b`, 'i'));
+  if (!md) return null;
+  const num = monthNum(md[1]);
+  return num ? Number(num) : null;
+}
+
+/** ISO, "Sep 23, 2026", "May 7, 2024", "9 October", RFC 2822. Other years stay other years. */
 export function parseFlexibleDate(raw: string, year: number, assumeYear = false): string | null {
   const text = String(raw || '').trim();
   if (!text) return null;
-  const iso = text.match(new RegExp(`\\b(${year})[-/.](\\d{1,2})(?:[-/.](\\d{1,2}))?`));
+  const iso = text.match(/\b(20\d{2})[-/.](\d{1,2})(?:[-/.](\d{1,2}))?/);
   if (iso) {
     const month = iso[2].padStart(2, '0');
     const day = iso[3] ? iso[3].padStart(2, '0') : '01';
     if (Number(month) < 1 || Number(month) > 12) return null;
-    return `${year}-${month}-${day}`;
+    return `${iso[1]}-${month}-${day}`;
   }
-  const md = text.match(new RegExp(`\\b(${MONTH_ALT})\\s+(\\d{1,2})(?:st|nd|rd|th)?(?:,)?(?:\\s+(${year}))?\\b`, 'i'));
+  const md = text.match(new RegExp(`\\b(${MONTH_ALT})\\s+(\\d{1,2})(?:st|nd|rd|th)?(?:,)?(?:\\s+(20\\d{2}))?\\b`, 'i'));
   if (md && (md[3] || assumeYear)) {
     const month = monthNum(md[1]);
-    if (month) return `${year}-${month}-${md[2].padStart(2, '0')}`;
+    const y = md[3] ? Number(md[3]) : year;
+    if (month) return `${y}-${month}-${md[2].padStart(2, '0')}`;
   }
-  const dm = text.match(new RegExp(`\\b(\\d{1,2})(?:st|nd|rd|th)?\\s+(${MONTH_ALT})(?:,)?(?:\\s+(${year}))?\\b`, 'i'));
+  const dm = text.match(new RegExp(`\\b(\\d{1,2})(?:st|nd|rd|th)?\\s+(${MONTH_ALT})(?:,)?(?:\\s+(20\\d{2}))?\\b`, 'i'));
   if (dm && (dm[3] || assumeYear)) {
     const month = monthNum(dm[2]);
-    if (month) return `${year}-${month}-${dm[1].padStart(2, '0')}`;
+    const y = dm[3] ? Number(dm[3]) : year;
+    if (month) return `${y}-${month}-${dm[1].padStart(2, '0')}`;
   }
+  if (!/\b20\d{2}\b/.test(text)) return null;
   const parsed = Date.parse(text);
   if (!Number.isNaN(parsed)) {
-    const date = new Date(parsed);
-    if (date.getUTCFullYear() === year) return date.toISOString().slice(0, 10);
+    return new Date(parsed).toISOString().slice(0, 10);
   }
   return null;
 }
@@ -314,6 +323,7 @@ function row(name: string, date: string | null, url: string, year: number, hint?
   if (isPriorYearJoin({ ...draft, date: date || slugDate }, year)) return null;
   if (isJoinOrAcquire(draft) && !String(date || slugDate || '').startsWith(String(year))) return null;
   const keepYear = isFlagshipYearKeep(draft, year);
+  if (date && /^\d{4}/.test(date) && !date.startsWith(String(year))) return null;
   const known = knownFlagshipDate({ ...draft, date: date || slugDate }, year);
   const resolved = known || (date && date.startsWith(String(year)) ? date : slugDate);
   const dated = Boolean(resolved && resolved.startsWith(String(year)));
@@ -413,15 +423,51 @@ export function itemsFromVersionReleases(text: string, url: string, year: number
   return found;
 }
 
-/** Vercel-style `9 October` / `October 9` day headings, then dash bullets (year assumed on changelog pages). */
+/**
+ * Reverse-chrono month-day lists (OpenAI API changelog, Vercel day headings).
+ * An explicit year wins. Otherwise the month going up (Jan → Dec) steps back a year.
+ * Never inherit the page's first date onto a later heading.
+ */
+function walkMonthDayYear(raw: string, prevMonth: number | null, cursorYear: number): { month: number | null; year: number } {
+  const month = monthFromRaw(raw);
+  const explicit = raw.match(/\b(20\d{2})\b/);
+  if (explicit) return { month, year: Number(explicit[1]) };
+  if (prevMonth != null && month != null && month > prevMonth) return { month, year: cursorYear - 1 };
+  return { month, year: cursorYear };
+}
+
+/** Date every month-day badge from its own heading. Used to spot-check the OpenAI API changelog. */
+export function outlineBadgeDates(labels: string[], year: number): { label: string; date: string }[] {
+  let cursorYear = year;
+  let prevMonth: number | null = null;
+  const out: { label: string; date: string }[] = [];
+  for (const raw of labels) {
+    const walked = walkMonthDayYear(raw, prevMonth, cursorYear);
+    cursorYear = walked.year;
+    if (walked.month != null) prevMonth = walked.month;
+    const date = parseFlexibleDate(raw, cursorYear, true);
+    if (date) out.push({ label: raw, date });
+  }
+  return out;
+}
+
+/** Vercel-style `9 October` / `October 9` day headings, then dash bullets. Year-walks when the page spans years. */
 export function itemsFromMonthHeadings(text: string, url: string, year: number): ChangelogFound[] {
   const found: ChangelogFound[] = [];
   const seen = new Set<string>();
-  const heading = new RegExp(`(?:^|\\n)\\s*(?:#{1,3}\\s*)?(\\d{1,2}\\s+(?:${MONTH_ALT})|(?:${MONTH_ALT})\\s+\\d{1,2})(?:\\s+${year})?\\b`, 'gi');
+  const heading = new RegExp(
+    `(?:^|\\n)\\s*(?:#{1,3}\\s*)?((?:${MONTH_ALT})\\s+\\d{1,2}(?:st|nd|rd|th)?(?:,?\\s+20\\d{2})?|\\d{1,2}\\s+(?:${MONTH_ALT})(?:,?\\s+20\\d{2})?)\\b`,
+    'gi',
+  );
   const marks = [...text.matchAll(heading)];
+  let cursorYear = year;
+  let prevMonth: number | null = null;
   for (let i = 0; i < marks.length; i++) {
-    const date = parseFlexibleDate(marks[i][1], year, true);
-    if (!date) continue;
+    const walked = walkMonthDayYear(marks[i][1], prevMonth, cursorYear);
+    cursorYear = walked.year;
+    if (walked.month != null) prevMonth = walked.month;
+    const date = parseFlexibleDate(marks[i][1], cursorYear, true);
+    if (!date || !date.startsWith(String(year))) continue;
     const start = (marks[i].index ?? 0) + marks[i][0].length;
     const end = i + 1 < marks.length ? (marks[i + 1].index ?? text.length) : Math.min(text.length, start + 900);
     const chunk = text.slice(start, end);
@@ -435,6 +481,35 @@ export function itemsFromMonthHeadings(text: string, url: string, year: number):
       const item = row(name, date, url, year);
       if (item) found.push(item);
     }
+  }
+  return found;
+}
+
+/** OpenAI API docs: outline badges (`May 7`) group entries; walk years, don't inherit the first badge. */
+export function itemsFromOutlineDateBadges(html: string, url: string, year: number): ChangelogFound[] {
+  const found: ChangelogFound[] = [];
+  const seen = new Set<string>();
+  const re = /data-variant="outline"[^>]*>\s*((?:Jan|Feb|Mar|Apr|May|Jun|Jul|Aug|Sep|Oct|Nov|Dec)[a-z]*\s+\d{1,2})\s*</gi;
+  const marks = [...html.matchAll(re)];
+  let cursorYear = year;
+  let prevMonth: number | null = null;
+  for (let i = 0; i < marks.length; i++) {
+    const walked = walkMonthDayYear(marks[i][1], prevMonth, cursorYear);
+    cursorYear = walked.year;
+    if (walked.month != null) prevMonth = walked.month;
+    const date = parseFlexibleDate(marks[i][1], cursorYear, true);
+    if (!date || !date.startsWith(String(year))) continue;
+    const start = (marks[i].index ?? 0) + marks[i][0].length;
+    const end = i + 1 < marks.length ? (marks[i + 1].index ?? html.length) : Math.min(html.length, start + 900);
+    const chunk = html.slice(start, end);
+    const p = chunk.match(/<p\b[^>]*>([\s\S]*?)<\/p>/i)?.[1] ?? '';
+    const heading = chunk.match(/<h[2-4]\b[^>]*>([\s\S]*?)<\/h[2-4]>/i)?.[1] ?? '';
+    const name = cleanTitle(tidy((p || heading).replace(/<[^>]+>/g, ' ')));
+    const key = loose(name);
+    if (!name || seen.has(key)) continue;
+    seen.add(key);
+    const item = row(name, date, url, year);
+    if (item) found.push(item);
   }
   return found;
 }
@@ -733,6 +808,7 @@ export function itemsFromCompanyPage(opts: {
   const assume = /\/(changelog|releases?|whats-new|updates?)\b/i.test(opts.url);
   const monthItems = assume ? itemsFromMonthHeadings(opts.text, opts.url, opts.year) : [];
   return mergeChangelog([
+    opts.html ? itemsFromOutlineDateBadges(opts.html, opts.url, opts.year) : [],
     itemsFromIsoDateHeadings(opts.text, opts.url, opts.year),
     itemsFromDatedCards(opts.text, opts.url, opts.year),
     itemsFromVersionReleases(opts.text, opts.url, opts.year),

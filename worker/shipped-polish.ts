@@ -582,6 +582,8 @@ export function isVagueOrCutTitle(name: string): boolean {
   if (/^(work with|use)\b.+\bfrom anywhere\b/i.test(text)) return true;
   if (/\bcan now help\b/i.test(text)) return true;
   if (/^released several\b|\bseveral new models and tools\b/i.test(text)) return true;
+  if (/^support for\b/i.test(text)) return true;
+  if (/^released uploads\b|\bupload large files in multiple parts\b/i.test(text)) return true;
   if (/\bconnections to api\.openai\.com\b|\bcan now use ipv6\b|\bipv6\b/i.test(text)) return true;
   if (/^server-side compaction\b|\bcompaction in the responses api\b/i.test(text)) return true;
   if (/^(pets|cloud|new)\s+[a-z]+$/i.test(text) && !/\b(cli|app|sdk|api|gpt|codex|cursor|chatgpt)\b/i.test(text)) return true;
@@ -622,6 +624,15 @@ const SHIP_WORD: Record<string, string> = {
   npm: 'npm',
   js: 'JS',
   ts: 'TS',
+  aws: 'AWS',
+  cdn: 'CDN',
+  dns: 'DNS',
+  ip: 'IP',
+  gpu: 'GPU',
+  cpu: 'CPU',
+  http: 'HTTP',
+  sql: 'SQL',
+  rss: 'RSS',
 };
 
 const PROPER_SHIP: Record<string, string> = {
@@ -1353,6 +1364,13 @@ export function polishCandidates<T extends Polishable>(items: T[], opts: PolishO
   };
   for (const item of items) {
     const flagship = flagshipLaunchName(item);
+    if (
+      (opts.affiliation?.role === 'ceo' || opts.affiliation?.role === 'founder') &&
+      isCeoApiMinutiae(item.name, item.link)
+    ) {
+      drop(item, 'ceo-api-minutiae');
+      continue;
+    }
     if (!inYearStrict(item, year)) {
       const reason = otherYearProduct(item.name, year)
         ? 'year-other'
@@ -1509,6 +1527,23 @@ export function isOpenAiCompanyWide(name: string, link?: string | null): boolean
   if (/chatgpt for ios\s*·/i.test(name)) return false;
   if (/openai\.com\/(index|sora|device)\b/i.test(link || '')) return true;
   return /\b(gpt-?\d|chatgpt|sora|(openai|chatgpt)\s+(device|computer|phone|hardware)|atlas)\b/i.test(name);
+}
+
+export function isApiChangelogHref(link?: string | null): boolean {
+  return /developers\.openai\.com\/(api\/)?docs\/changelog|platform\.openai\.com\/[^\s]*changelog/i.test(link || '');
+}
+
+/** A named model or product, not "support for X in the Y API". */
+export function isNamedModelOrProduct(name: string): boolean {
+  return /\b(gpt-?\d|gpt-realtime|gpt-audio|gpt-live|chatgpt|sora|codex|atlas|openai realtime|decisions api|agents api)\b/i.test(
+    name,
+  );
+}
+
+/** CEO tapes: API changelog crumbs stay only when they name a model or product. */
+export function isCeoApiMinutiae(name: string, link?: string | null): boolean {
+  if (!isApiChangelogHref(link) && !/developers\.openai\.com\/api\b/i.test(link || '')) return false;
+  return !isNamedModelOrProduct(name);
 }
 
 function isOpenAiLeadCrumb(name: string, link?: string | null): boolean {

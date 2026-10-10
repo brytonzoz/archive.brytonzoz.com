@@ -146,6 +146,112 @@ test('Vercel day headings plus bullets assume the harvest year', () => {
   assert.ok(items.some((item) => /Routing Middleware/i.test(item.name) && item.date === '2026-10-08'));
 });
 
+test('month-day changelog headings keep their own year and do not inherit 2026', () => {
+  assert.equal(changelog.parseFlexibleDate('May 7, 2024', 2026, true), '2024-05-07');
+  assert.equal(changelog.parseFlexibleDate('May 7', 2026, true), '2026-05-07');
+  assert.equal(changelog.parseFlexibleDate('2024-05-09', 2026), '2024-05-09');
+  const text = `Oct 8\n\nReleased GPT-6 Astra\n\nJan 9\n\nGPT-Realtime-1\n\nDec 19\n\nOld leftover\n\nJul 17\n\nReleased Uploads to upload large files in multiple parts\n\nJun 3\n\nSupport for file search customizations\n\nMay 15\n\nSupport for setting cost limits on a per-project\n\nMay 9\n\nSupport for image inputs to the Assistants API\n\nMay 7\n\nSupport for fine-tuned models to the Batch API`;
+  const items = changelog.itemsFromMonthHeadings(text, 'https://developers.openai.com/api/docs/changelog', 2026);
+  assert.ok(items.some((item) => /gpt-6 astra/i.test(item.name) && item.date === '2026-10-08'), JSON.stringify(items));
+  assert.ok(items.some((item) => /realtime/i.test(item.name) && item.date === '2026-01-09'), JSON.stringify(items));
+  assert.equal(items.some((item) => /uploads|file search|cost limits|image inputs|fine-tuned/i.test(item.name)), false, JSON.stringify(items.map((item) => `${item.date} ${item.name}`)));
+  const html = `
+    <div data-variant="outline">Oct 8</div><p>Released GPT-6 Astra</p>
+    <div data-variant="outline">Jan 9</div><p>GPT-Realtime-1</p>
+    <div data-variant="outline">Dec 19</div><p>Old leftover from last year</p>
+    <div data-variant="outline">Jul 17</div><p>Released Uploads to upload large files in multiple parts.</p>
+    <div data-variant="outline">Jun 3</div><p>Added support for file search customizations.</p>
+    <div data-variant="outline">May 15</div><p>Added support for setting cost limits on a per-project basis.</p>
+    <div data-variant="outline">May 9</div><p>Added support for image inputs to the Assistants API.</p>
+    <div data-variant="outline">May 7</div><p>Added support for fine-tuned models to the Batch API.</p>`;
+  const badges = changelog.itemsFromOutlineDateBadges(html, 'https://developers.openai.com/api/docs/changelog', 2026);
+  assert.ok(badges.some((item) => /gpt-6 astra/i.test(item.name) && item.date === '2026-10-08'), JSON.stringify(badges));
+  assert.equal(
+    badges.some((item) => /uploads|file search|cost limits|image inputs|fine-tuned|old leftover/i.test(item.name)),
+    false,
+    JSON.stringify(badges.map((item) => `${item.date} ${item.name}`)),
+  );
+  const spot = [
+    ['Oct 8', '2026-10-08', /gpt-6 astra/i],
+    ['Sep 3', '2026-09-03', /gpt-6/i],
+    ['Feb 23', '2026-02-23', /gpt-realtime/i],
+    ['Jan 9', '2026-01-09', /gpt-audio/i],
+    ['Dec 19', '2025-12-19', /gpt-image/i],
+    ['Aug 28', '2025-08-28', /realtime api is now/i],
+    ['Jul 17', '2024-07-17', /uploads/i],
+    ['Jun 3', '2024-06-03', /file search/i],
+    ['May 9', '2024-05-09', /image inputs/i],
+    ['May 7', '2024-05-07', /fine-tuned/i],
+  ];
+  const sample = [
+    'Oct 8',
+    'Released GPT-6 Astra',
+    'Sep 3',
+    'Released GPT-6.1 Sol',
+    'Feb 23',
+    'Released GPT-Realtime-1.5',
+    'Jan 9',
+    'GPT-Audio-1',
+    'Dec 19',
+    'Added gpt-image-1.5',
+    'Aug 28',
+    'The OpenAI Realtime API is now generally available',
+    'Jul 17',
+    'Released Uploads to upload large files in multiple parts',
+    'Jun 3',
+    'Added support for file search customizations',
+    'May 9',
+    'Added support for image inputs to the Assistants API',
+    'May 7',
+    'Added support for fine-tuned models to the Batch API',
+  ].join('\n');
+  const walked = changelog.itemsFromMonthHeadings(sample, 'https://developers.openai.com/api/docs/changelog', 2026);
+  for (const [label, want, needle] of spot) {
+    const date = changelog.parseFlexibleDate(label, Number(want.slice(0, 4)), true);
+    assert.equal(date, want, `${label} should be ${want}`);
+    if (want.startsWith('2026')) {
+      assert.ok(
+        walked.some((item) => item.date === want && needle.test(item.name)),
+        `${needle} ${want}: ${JSON.stringify(walked)}`,
+      );
+    } else {
+      assert.equal(walked.some((item) => needle.test(item.name)), false, `${needle} leaked: ${JSON.stringify(walked)}`);
+    }
+  }
+});
+
+test('live OpenAI API changelog badges date themselves; 2024 crumbs stay 2024', () => {
+  const fixture = JSON.parse(readFileSync(new URL('./fixtures/openai-api-changelog-badges.json', import.meta.url), 'utf8'));
+  const dated = changelog.outlineBadgeDates(fixture.badges, 2026);
+  assert.equal(dated.length, 179);
+  const years = dated.reduce((acc, row) => {
+    const y = row.date.slice(0, 4);
+    acc[y] = (acc[y] || 0) + 1;
+    return acc;
+  }, {});
+  assert.deepEqual(years, { 2026: 88, 2025: 45, 2024: 39, 2023: 7 });
+  const first = (label) => dated.find((row) => row.label === label);
+  const last = (label) => [...dated].reverse().find((row) => row.label === label);
+  const spot = [
+    [first('Oct 8'), '2026-10-08'],
+    [first('Sep 3'), '2026-09-03'],
+    [first('Feb 23'), '2026-02-23'],
+    [first('Dec 19'), '2025-12-19'],
+    [first('Aug 28'), '2025-08-28'],
+    [first('Jul 17'), '2024-07-17'],
+    [last('Jun 3'), '2024-06-03'],
+    [last('May 15'), '2024-05-15'],
+    [first('May 9'), '2024-05-09'],
+    [last('May 7'), '2024-05-07'],
+  ];
+  for (const [row, want] of spot) {
+    assert.ok(row, `missing ${want}`);
+    assert.equal(row.date, want, `${row.label} should be ${want}, got ${row.date}`);
+  }
+  assert.equal(dated.some((row) => row.label === 'May 9' && row.date.startsWith('2026')), false);
+  assert.equal(dated.some((row) => row.label === 'Jul 17' && row.date.startsWith('2026')), false);
+});
+
 test('RSS/Atom 2026 entries and sitemap lastmod become sourced lines', () => {
   const atom = `<?xml version="1.0"?><feed xmlns="http://www.w3.org/2005/Atom">
     <entry><title>New Pro teams now default to 30-day deployment retention</title>

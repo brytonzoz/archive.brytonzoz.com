@@ -110,7 +110,13 @@ async function reprint(id) {
   } catch {
     body = { error: text.slice(0, 160) };
   }
-  return { ok: res.ok && body.ok === true, status: res.status, error: body.error || null };
+  return {
+    ok: res.ok && body.ok === true,
+    status: res.status,
+    error: body.error || null,
+    note: typeof body.note === 'string' ? body.note : null,
+    noteCandidates: Array.isArray(body.noteCandidates) ? body.noteCandidates : [],
+  };
 }
 
 const rows = [];
@@ -143,7 +149,18 @@ for (const target of TARGETS) {
   const items = realCount(after) || (after?.potential ? 0 : prior);
   const url = `${origin}${RECEIPT_PATH(target.id)}`;
   console.log(`#${target.id} ${who} → ${items} items ${url}`);
-  rows.push({ id: target.id, who, items, url, skipped: false });
+  if (last.noteCandidates?.length || last.note) {
+    console.log(
+      JSON.stringify({
+        shipped: 'note-reject',
+        id: target.id,
+        who,
+        note: last.note,
+        candidates: last.noteCandidates,
+      }),
+    );
+  }
+  rows.push({ id: target.id, who, items, url, skipped: false, note: last.note, noteCandidates: last.noteCandidates });
 }
 
 async function printSubject(q) {

@@ -3000,6 +3000,13 @@
       "GPT-6",
       "ChatGPT Images"
     ],
+    "forbidden": [
+      "SUPPORT FOR IMAGE INPUTS TO THE ASSISTANTS API",
+      "SUPPORT FOR FINE-TUNED MODELS TO THE BATCH API",
+      "SUPPORT FOR SETTING COST LIMITS ON A PER-PROJECT",
+      "SUPPORT FOR FILE SEARCH CUSTOMIZATIONS",
+      "RELEASED UPLOADS TO UPLOAD LARGE FILES IN MULTIPLE PARTS"
+    ],
     "profile": {
       "name": "Sam Altman",
       "bio": "CEO of OpenAI",

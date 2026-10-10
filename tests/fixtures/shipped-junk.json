@@ -858,6 +858,51 @@
       "source": "changelog",
       "link": "https://learn.chatgpt.com/docs/changelog#flaky-plugin",
       "who": "Tibo"
+    },
+    {
+      "name": "SUPPORT FOR IMAGE INPUTS TO THE ASSISTANTS API",
+      "date": "2026-05-09",
+      "source": "changelog",
+      "link": "https://developers.openai.com/api/docs/changelog",
+      "who": "Sam Altman",
+      "company": "OpenAI",
+      "role": "ceo"
+    },
+    {
+      "name": "SUPPORT FOR FINE-TUNED MODELS TO THE BATCH API",
+      "date": "2026-05-07",
+      "source": "changelog",
+      "link": "https://developers.openai.com/api/docs/changelog",
+      "who": "Sam Altman",
+      "company": "OpenAI",
+      "role": "ceo"
+    },
+    {
+      "name": "SUPPORT FOR SETTING COST LIMITS ON A PER-PROJECT",
+      "date": "2026-05-15",
+      "source": "changelog",
+      "link": "https://developers.openai.com/api/docs/changelog",
+      "who": "Sam Altman",
+      "company": "OpenAI",
+      "role": "ceo"
+    },
+    {
+      "name": "SUPPORT FOR FILE SEARCH CUSTOMIZATIONS",
+      "date": "2026-06-03",
+      "source": "changelog",
+      "link": "https://developers.openai.com/api/docs/changelog",
+      "who": "Sam Altman",
+      "company": "OpenAI",
+      "role": "ceo"
+    },
+    {
+      "name": "RELEASED UPLOADS TO UPLOAD LARGE FILES IN MULTIPLE PARTS",
+      "date": "2026-07-17",
+      "source": "changelog",
+      "link": "https://developers.openai.com/api/docs/changelog",
+      "who": "Sam Altman",
+      "company": "OpenAI",
+      "role": "ceo"
     }
   ],
   "keep": [

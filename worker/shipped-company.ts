@@ -956,7 +956,7 @@ export async function harvestCompany(opts: {
   if (opts.storeOnly) {
     return { found: [], spend: emptyXaiSpend(), ran: ['company-store-miss'], cacheHit: false };
   }
-  const cacheKey = opts.deep ? `company:deep:v31:${year}:${slug}` : `company:v31:${year}:${slug}`;
+  const cacheKey = opts.deep ? `company:deep:v32:${year}:${slug}` : `company:v32:${year}:${slug}`;
   const load = async (): Promise<CompanyHarvest> => {
     const via = viaFor(affiliation);
     const ran: string[] = [];

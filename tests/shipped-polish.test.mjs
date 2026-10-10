@@ -700,8 +700,8 @@ test('vague leftover headings drop; spoken names keep source casing', () => {
   assert.equal(polish.spokenShipName('TSC-RS', 'tsc-rs'), 'tsc-rs');
   assert.equal(polish.spokenShipName('BOTID', 'BotID'), 'BotID');
   assert.equal(polish.displayShipName('CODEX APP'), 'Codex app');
-  assert.equal(polish.spokenShipName('AWS DATABASES ARE NOW LIVE'), 'Aws databases are now live');
-  assert.doesNotMatch(polish.spokenShipName('AWS DATABASES ARE NOW LIVE'), /Aws Databases Are Now Live/);
+  assert.equal(polish.spokenShipName('AWS DATABASES ARE NOW LIVE'), 'AWS databases are now live');
+  assert.doesNotMatch(polish.spokenShipName('AWS DATABASES ARE NOW LIVE'), /Aws Databases Are Now Live|Aws databases/);
   const leftover = polish.polishCandidates(
     [
       found({ name: 'CHATGPT WORK OR CODEX CHAT AND WORK', date: '2026-04-01', link: 'https://developers.openai.com/codex/or' }),
@@ -872,6 +872,37 @@ test('prereleases, starters, and Gateway model listings are not ships', () => {
   assert.equal(polish.isVagueOrCutTitle('WORK WITH CODEX FROM ANYWHERE'), true);
   assert.equal(polish.isVagueOrCutTitle('CODEX CAN NOW HELP'), true);
   assert.equal(polish.isVagueOrCutTitle('RELEASED SEVERAL NEW MODELS AND TOOLS AND A NEW API'), true);
+  assert.equal(polish.isVagueOrCutTitle('SUPPORT FOR IMAGE INPUTS TO THE ASSISTANTS API'), true);
+  assert.equal(polish.isVagueOrCutTitle('SUPPORT FOR FINE-TUNED MODELS TO THE BATCH API'), true);
+  assert.equal(polish.isVagueOrCutTitle('SUPPORT FOR SETTING COST LIMITS ON A PER-PROJECT'), true);
+  assert.equal(polish.isVagueOrCutTitle('SUPPORT FOR FILE SEARCH CUSTOMIZATIONS'), true);
+  assert.equal(polish.isVagueOrCutTitle('RELEASED UPLOADS TO UPLOAD LARGE FILES IN MULTIPLE PARTS'), true);
+  assert.equal(polish.isCeoApiMinutiae('SUPPORT FOR IMAGE INPUTS TO THE ASSISTANTS API', 'https://developers.openai.com/api/docs/changelog'), true);
+  assert.equal(polish.isCeoApiMinutiae('GPT-REALTIME-1', 'https://developers.openai.com/api/docs/changelog'), false);
+  assert.equal(polish.isCeoApiMinutiae('DATA RESIDENCY IN EUROPE', 'https://developers.openai.com/api/docs/changelog'), true);
+  const ceoApi = polish.gateReceiptItems(
+    [
+      found({
+        name: 'SUPPORT FOR IMAGE INPUTS TO THE ASSISTANTS API',
+        date: '2026-05-09',
+        link: 'https://developers.openai.com/api/docs/changelog',
+      }),
+      found({
+        name: 'GPT-REALTIME-1',
+        date: '2026-02-23',
+        link: 'https://developers.openai.com/api/docs/changelog',
+      }),
+      found({ name: 'GPT-6', date: '2026-09-03', link: 'https://openai.com/index/gpt-6-astra/' }),
+    ],
+    {
+      year: 2026,
+      who: 'Sam Altman',
+      affiliation: { role: 'ceo', company: 'OpenAI', name: 'Sam Altman' },
+    },
+  );
+  assert.equal(ceoApi.some((item) => /support for/i.test(item.name)), false, JSON.stringify(ceoApi.map((item) => item.name)));
+  assert.ok(ceoApi.some((item) => /gpt-realtime/i.test(item.name)));
+  assert.ok(ceoApi.some((item) => /gpt-6/i.test(item.name)));
   assert.equal(polish.isVagueOrCutTitle('CONNECTIONS TO API.OPENAI.COM CAN NOW USE IPV6'), true);
   assert.equal(polish.isVagueOrCutTitle('SERVER-SIDE COMPACTION IN THE RESPONSES API'), true);
   assert.equal(polish.isCodeOrBugfixTitle('WEB_SEARCH = "DISABLED" TO REMOVE'), true);

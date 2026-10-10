@@ -665,7 +665,9 @@ export async function harvestCompany(opts: {
       const off = await opts.store.get(year, key);
       if (!off) continue;
       const scoped = scopeFilter(affiliation, stripVia(off.found));
-      if (scoped.length || companyScope(affiliation) === 'all') {
+      // An empty cache row is a miss (the Actions job may be mid-write). Never
+      // treat zero ships as a hit or a CEO tape collapses to nothing.
+      if (scoped.length) {
         return {
           found: withVia(scoped, via),
           spend: emptyXaiSpend(),

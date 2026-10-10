@@ -308,6 +308,20 @@ test('off-worker cache is preferred and scoped on read', async () => {
   assert.equal(reprint.cacheHit, true);
   assert.ok(reprint.ran.includes('company-offworker'));
   assert.ok(reprint.found.some((item) => /codex cli/i.test(item.name)));
+
+  const emptyStore = {
+    async get() {
+      return { fetchedAt: Date.now(), slug: 'cursor', year: 2026, found: [], ran: ['gha'] };
+    },
+    async queue() {
+      return false;
+    },
+  };
+  const cursorCeo = { ...affiliation.emptyAffiliation(), company: 'Cursor', role: 'ceo', typedCompany: true };
+  const miss = await company.harvestCompany({ affiliation: cursorCeo, year: 2026, env: {}, store: emptyStore, storeOnly: true });
+  assert.equal(miss.cacheHit, false);
+  assert.equal(miss.found.length, 0);
+  assert.ok(miss.ran.includes('company-store-miss'));
 });
 
 test('seed list includes OpenAI Codex plus the companies Bryton will look up', () => {

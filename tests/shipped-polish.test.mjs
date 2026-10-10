@@ -66,6 +66,14 @@ test('title cleaner extracts a short product name or drops the line', () => {
   assert.match(polish.cleanShipTitle('CURSOR ROUTER WORKS'), /cursor router/i);
   assert.equal(polish.cleanShipTitle('GPT-5'), '');
   assert.equal(polish.cleanShipTitle('GPT-5.4 MINI'), 'GPT-5.4 MINI');
+  assert.equal(polish.cleanShipTitle('RUN CODEX NATIVELY ON WINDOWS'), '');
+  assert.equal(polish.cleanShipTitle('CURSOR ANNOUNCES MAJOR UPDATE TO AI'), '');
+  assert.equal(polish.cleanShipTitle('A TECHNICAL REPORT ON COMPOSER 2'), '');
+  assert.equal(polish.cleanShipTitle('JOINING SPACEX'), '');
+  assert.equal(polish.cleanShipTitle('MY MACHINES CONNECTS A SINGLE LAPTOP'), '');
+  assert.equal(polish.cleanShipTitle('AND PULLFROG'), '');
+  assert.match(polish.cleanShipTitle('WINDOWS. IN THE CHATGPT MOBILE APP'), /chatgpt mobile app/i);
+  assert.equal(polish.cleanShipTitle('THIS.CLASSLIST.REMOVE'), '');
   assert.equal(polish.isProductNounPhrase('ChatGPT Mobile App'), true);
   assert.equal(polish.isProductNounPhrase('USE WINDOWS APPS'), false);
 });

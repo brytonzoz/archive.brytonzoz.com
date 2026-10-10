@@ -20,12 +20,16 @@ const RESEARCH_GERUND = /^(improving|bootstrapping|deprecating|continually|rewar
 const ACQUISITION = /\b(is joining|joins)\b/i;
 const CUSTOMER_STORY = /\bships\s+[\d.,]+[×x]\s+faster\b|·\s*\d+[kmb]\s*$/i;
 const TRAILING_PREP =
-  /\b(of|in|to|for|and|or|the|a|an|with|on|as|by|from|into|longer|kind|new|our|your|through|their|its|vs|lower|higher|more|less|day|days|managed|security)$/i;
+  /\b(of|in|to|for|and|or|the|a|an|with|on|as|by|from|into|longer|kind|new|our|your|through|their|its|vs|lower|higher|more|less|day|days|managed|security|controlled|trusted|general|advanced|remote|task|chat)$/i;
 const TITLE_START_BAD =
-  /^(in|on|at|for|with|from|to|of|by|as|use|using|start|starting|lines|line|built|build|building|control|give|let|take|work|choose|scan|create|organize|talk|try|visit|explore|download|get|see|read|learn|join|follow|watch|make|making|how|when|while|after|before|without|inside|beyond|under|over)\b/i;
-const TITLE_END_BAD = /\b(of|a|an|the|with|and|or|security)\s*$/i;
-const TITLE_VERB = /^(built|builds|building|works|working|uses|using|used|launched|ships|shipped|released|added|created|makes|made|lets|can|will)\b/i;
+  /^(in|on|at|for|with|from|to|of|by|as|a|an|the|and|or|use|using|start|starting|lines|line|built|build|building|run|running|join|joining|announce|announces|announcing|added|add|fixed|fix|connect|review|share|more|ways|preview|control|give|let|take|work|choose|scan|create|organize|talk|try|visit|explore|download|get|see|read|learn|follow|watch|make|making|how|when|while|after|before|without|inside|beyond|under|over|my|our|your|quitting)\b/i;
+const TITLE_END_BAD = /\b(of|a|an|the|with|and|or|security|controlled|trusted|general|advanced|remote|task|chat)\s*$/i;
+const TITLE_VERB =
+  /^(announces|announce|announced|connects|connect|built|builds|building|works|working|uses|using|used|launched|ships|shipped|released|added|adds|created|makes|made|lets|can|will|is|are|was|were|gives|reaches|joins|keeps|combines|deprecated)$/i;
+const SENTENCE_VERB =
+  /\b(announces|announce|announced|connects|gives|reaches|joins|keeps|combines|deprecated|also added|is now|now keeps)\b/i;
 const BARE_MODEL = /^gpt-\d+$/i;
+const CODE_TITLE = /^[a-z][\w-]*\.[a-z][\w-]*\.[a-z]/i;
 const MID_WORD =
   /^(ontrol|elease|pdate|ettings|vailable|olling|espectively|ead|nounced|ntroducing|aunched|hipped)\b/i;
 const OLD_PRODUCT =
@@ -206,7 +210,8 @@ export function isJunkTitle(title: string, opts: { who?: string | null; company?
   if (BYLINE.test(text) || NAME_LIST.test(text) || ROUNDUP.test(text) || READ_THE.test(text) || INSTRUCTIONAL.test(text)) return true;
   if (RESEARCH_GERUND.test(text) || CUSTOMER_STORY.test(text) || isAcquisitionNews(text)) return true;
   if (CTA_NAV.test(text) || CTA_TRAIL.test(text)) return true;
-  if (/^(download on the|get it on|get the app|affiliates|analytics|available on|filed under)\b/i.test(text)) return true;
+  if (/^(download on the|get it on|get the app|affiliates|analytics|available on|filed under|quitting|a technical report)\b/i.test(text)) return true;
+  if (CODE_TITLE.test(text) || /^(object|query|router)$/i.test(text)) return true;
   if (/\bgithub stars\b|\bweekly downloads\b/i.test(text) && !/\b(zod|nub|tsc|cli|app)\b/i.test(text)) return true;
   if (/^respectively\.?$/i.test(text)) return true;
   if (DOCS_NAV.test(text) || /^(recent highlights|cursor support|under:)/i.test(text)) return true;
@@ -320,13 +325,19 @@ export function isProductNounPhrase(title: string): boolean {
 export function gateShipTitle(raw: string, cleaned = ''): string {
   let text = tidy(cleaned || raw);
   if (!text) return '';
+  const dotted = text.match(/^[^.]{2,40}\.\s+(?:in the\s+)?(.+)$/i);
+  if (dotted && isProductNounPhrase(dotted[1])) text = dotted[1].trim();
   text = text.replace(/^(in the|on the|in|on|at the|at)\s+/i, '').trim();
   const works = text.match(/^(.{4,36}?)\s+works$/i);
   if (works && works[1].trim().split(/\s+/).length >= 2) text = works[1].trim();
-  text = text.replace(/\s+\b(of|a|an|the|with|and|or|security)\s*$/i, '').trim();
+  text = text.replace(/\s+\b(of|a|an|the|with|and|or|security|controlled|trusted|general|advanced|remote|task|chat)\s*$/i, '').trim();
   if (!text) return '';
   if (BARE_MODEL.test(text.replace(/\s+/g, ''))) return '';
   if (/^use\b/i.test(tidy(raw)) || /^use\b/i.test(text)) return '';
+  if (SENTENCE_VERB.test(text) || CODE_TITLE.test(text)) {
+    const phrase = nounPhraseFromSentence(raw);
+    return phrase && isProductNounPhrase(phrase) && !SENTENCE_VERB.test(phrase) ? phrase : '';
+  }
   if (isProductNounPhrase(text)) return text;
   const phrase = nounPhraseFromSentence(raw);
   if (phrase && isProductNounPhrase(phrase) && !/^use\b/i.test(tidy(raw))) return phrase;

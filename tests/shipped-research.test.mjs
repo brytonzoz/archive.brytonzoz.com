@@ -183,6 +183,9 @@ test('cashier note and stats are specific to the items, never stock copy', () =>
   assert.equal(ai.noteFailsVoice("Boron does one job. Zshy does another."), true);
   assert.equal(ai.noteFailsVoice('The pair is claude-blocker and fs2-cli.'), true);
   assert.equal(ai.noteFailsVoice("Sam's year opens on Codex app, with GPT-5.3-Codex beside it."), true);
+  assert.equal(ai.cashierNoteLooksCanned('Codex took the whole terminal and then the browser, and Tibo filed each one as a changelog entry like it was nothing.'), true);
+  assert.equal(ai.cashierNoteLooksCanned('Zod is still the schema everyone copies. Colin spent the rest of the year on Zshy.'), true);
+  assert.equal(ai.cashierNoteLooksCanned('Harbor is the whole receipt. The CLI is just the grip.'), true);
   assert.equal(ai.cashierNoteLooksCanned("Codex grew long-running work this year, and Tibo's agents now stay clocked in overnight."), true);
   assert.equal(ai.noteFailsVoice('Tibo kept Codex on long-running work, then shipped GitLab support into Codex Cloud.'), false);
   const punch = ai.pickBestNote(

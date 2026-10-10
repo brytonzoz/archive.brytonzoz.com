@@ -193,7 +193,7 @@ export function formatStats(items: { source?: string }[], sourced: SourcedStat[]
 }
 
 const TEMPLATE_NOTE =
-  /is first on the tape|led the year|closed the year|set the tone|through-line|Receipt paper running low|Someone likes the publish button|\d+\s+launches?\s+·|night shift|publish button|\bthe tape\b|\bthe register\b|stock the shelves|counted receipts|got the paperwork|rings the publish|cashier has seen worse|mostly i just|wish and a prayer|nobody asked|same maker, more skus|runs on a wish|plus 0 more|github stars (llm|blog) for |supposed to be quiet|still be quoting|earned the grin|kept the year interesting|plus \d+ more, and |\byear is\b.+\bthrough\b|\b\d+\s+public\s+(ships?|lines?)\b|\bpublic lines\b|agents now stay clocked in overnight|other packages are just opening acts|treats Composer 2 like the real headline|kept \w[\w.]* busy:|(^|[.!?]\s+)\S[\w.]* first,\s+\S.+ later|spent the year on .+, then |kept stacking|people will remember|\bthe sleeper\b|the loud one|slipped .+ beside|compiler toys|watches the bots|did not make a fuss|the bit is the product|the rest is scenery|ambition, compact|wallpaper a fridge|pays the rent|obvious next errand|treats \.com|enterprise PDFs|suspiciously so|side quests with sharper names|changelog like a group chat|normal behavior|tax office will have questions|filed the rest as changelog|year was a patch list|receipt looks like a weekend|just how you hold it|blog posts around it are louder/i;
+  /is first on the tape|led the year|closed the year|set the tone|through-line|Receipt paper running low|Someone likes the publish button|\d+\s+launches?\s+·|night shift|publish button|\bthe tape\b|\bthe register\b|stock the shelves|counted receipts|got the paperwork|rings the publish|cashier has seen worse|mostly i just|wish and a prayer|nobody asked|same maker, more skus|runs on a wish|plus 0 more|github stars (llm|blog) for |supposed to be quiet|still be quoting|earned the grin|kept the year interesting|plus \d+ more, and |\byear is\b.+\bthrough\b|\b\d+\s+public\s+(ships?|lines?)\b|\bpublic lines\b|agents now stay clocked in overnight|other packages are just opening acts|treats Composer 2 like the real headline|kept \w[\w.]* busy:|(^|[.!?]\s+)\S[\w.]* first,\s+\S.+ later|spent the (rest of the )?year on |kept stacking|people will remember|\bthe sleeper\b|the loud one|slipped .+ beside|compiler toys|watches the bots|did not make a fuss|the bit is the product|the rest is scenery|ambition, compact|wallpaper a fridge|pays the rent|obvious next errand|treats \.com|enterprise PDFs|suspiciously so|side quests with sharper names|changelog like a group chat|normal behavior|tax office will have questions|filed the rest as changelog|filed each one as a changelog|took over the desktop|took the whole terminal|schema everyone copies|year was a patch list|receipt looks like a weekend|just how you hold it|blog posts around it are louder|opened the year|kept the drawer open|weather kite|smaller Quilt|parking meter|just the grip|plating the editor|announcement posts are doing too much|city will send a letter/i;
 
 /** A number in the note must be the item count, or a sourced stars/downloads figure that is labeled. */
 export function noteMisusesStats(note: string, count: number, stats: string[] = []): boolean {
@@ -212,7 +212,7 @@ export function noteMisusesStats(note: string, count: number, stats: string[] = 
 }
 
 const BANNED_NOTE_SHAPE =
-  /kept \w[\w.]* busy:|(^|[.!?]\s+)\S[\w.]* first,\s+\S.+ later|spent the year on .+, then |kept stacking|people will remember|\bthe sleeper\b|the loud one|slipped .+ beside|\bthe pair is\b|\bdoes one job\b|\bdoes another\b|\bopens on\b|\byear opens\b|\bno encore\b/i;
+  /kept \w[\w.]* busy:|(^|[.!?]\s+)\S[\w.]* first,\s+\S.+ later|spent the (rest of the )?year on |kept stacking|people will remember|\bthe sleeper\b|the loud one|slipped .+ beside|\bthe pair is\b|\bdoes one job\b|\bdoes another\b|\bopens on\b|\bopened the year\b|\byear opens\b|\bno encore\b/i;
 
 /** URLs, raw stat dumps, ALL-CAPS tape names, or the word "lines" — a human note never does this. */
 export function noteFailsVoice(note: string): boolean {
@@ -606,13 +606,13 @@ function noteOnlySystem(year: number, affiliation?: Affiliation | null, count = 
     'At most one number, and only if it is copied from <found>.stats (stars or downloads). Prefer no number.',
     'Never invent a plugin, extension, extra product, or fact that is not in the item list or bio.',
     desk,
-    'The bar (do not copy these):',
-    '"Codex took over the desktop and then the browser. Tibo filed the rest as changelog."',
-    '"Cursor 3 showed up in April. Michael kept shipping the editor like the year was a patch list."',
-    '"Zod is still the schema everyone copies. Colin answered with @zod/mini."',
-    '"Pieter launched a drone sim and two more .coms. The receipt looks like a weekend."',
-    '"Post Bridge is the whole Jack story. The CLI is just how you hold it."',
-    '"Serve is the quiet Vercel ship. The blog posts around it are louder than the binary."',
+    'The bar (do not copy these, and never write about these invented people):',
+    '"Northline shipped a radio, then a weather kite. The kite is the one people will steal."',
+    '"Quilt hit 12k stars. Priya answered by writing a smaller Quilt."',
+    '"Six launches, one of them a parking meter. The city will send a letter."',
+    '"Harbor is the whole receipt. The CLI is just the grip."',
+    '"April was Atlas 3. Jules kept plating the editor like dishes."',
+    '"Relay is the quiet one. The announcement posts are doing too much."',
     'Banned shapes: "the pair is", "does one job", "opens on", "kept Y busy: A first, B later", "spent the year on A, then B".',
     'Bad: "Boron does one job. Zshy does another."',
     'Bad: "The pair is claude-blocker and fs2-cli."',

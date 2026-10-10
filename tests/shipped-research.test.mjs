@@ -399,6 +399,21 @@ test('cashier note and stats are specific to the items, never stock copy', () =>
   );
   assert.match(fallback, /language servers|MCP/i);
   assert.doesNotMatch(fallback, /showed up|stuck|shipped this year|is a product/i);
+  const multi = ai.sentenceFallbackNote(
+    [
+      { name: 'V0', spoken: 'v0', description: 'generate UI from a prompt', date: '2026-03-01', status: 'LAUNCHED', link: 'https://v0.dev', icon: null, source: 'changelog' },
+      { name: 'VERCEL AGENT', spoken: 'Vercel Agent', description: 'installs private packages', date: '2026-09-30', status: 'LAUNCHED', link: 'https://vercel.com/changelog/agent', icon: null, source: 'changelog' },
+    ],
+    { who: 'Guillermo Rauch' },
+  );
+  assert.doesNotMatch(multi, /the one public ship|the one on this tape/i);
+  assert.match(multi, /v0|Vercel Agent|2 ships/i);
+  assert.ok(
+    ai.hardRejectNote('v0 is the one public ship here, and that is the whole story.', [
+      { name: 'V0', spoken: 'v0' },
+      { name: 'VERCEL AGENT', spoken: 'Vercel Agent' },
+    ], [], { who: 'Guillermo Rauch' }),
+  );
   assert.equal(ai.hardRejectNote('ChatGPT for Education opens in a new window.', [{ name: 'CHATGPT FOR EDUCATION', spoken: 'ChatGPT for Education' }], [], { who: 'Sam Altman' }), 'banned-phrase');
   assert.equal(ai.hardRejectNote('Frizz is a product that shipped this year.', [{ name: 'FRIZZ', spoken: 'Frizz' }], [], { who: 'Colin McDonnell' }), 'banned-phrase');
   assert.equal(ai.hardRejectNote('Frizz shipped.', [{ name: 'FRIZZ', spoken: 'Frizz' }], [], { who: 'Colin McDonnell' }), 'too-short');

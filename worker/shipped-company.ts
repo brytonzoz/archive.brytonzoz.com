@@ -5,7 +5,7 @@ import { extraResearchPaths, itemsFromProjectList } from './shipped-research';
 import { looksLikeNotAShip } from './shipped-decisions';
 import { flagshipLaunchName, flagshipProbePaths, knownFlagshipDate, logFlagshipGate } from './shipped-flagship';
 import { isPrereleaseShip, prettyBrand, versionParts } from './shipped-polish';
-import { companyOrgGuess, companyScope, companySlug, companyTokens, leadProductTokens, type Affiliation } from './shipped-affiliation';
+import { companyOrgGuess, companyScope, companySlug, companyTokens, matchesLeadProduct, type Affiliation } from './shipped-affiliation';
 import { type XaiEnv, type XaiSpend, emptyXaiSpend } from './shipped-xai';
 import { stripVia, type CompanyStore } from './shipped-company-store';
 import {
@@ -211,6 +211,8 @@ export function compactCompanyFound(found: Found[], cap = COMPANY_CACHE_CAP): Fo
     const url = item.link || '';
     const name = item.name || '';
     if (isCompactMustKeep(item)) return true;
+    if (/chatgpt for (ios|android|ipad)/i.test(name)) return false;
+    if (versionParts(name) && !flagshipLaunchName(item)) return false;
     if (/openai\.com\/(sora|device|index)\b/i.test(url) && !/\bcodex\b/i.test(name)) return true;
     return /\b(gpt-?\d|chatgpt|sora|atlas|v0)\b/i.test(name) && !/\bcodex\b/i.test(name);
   };
@@ -854,12 +856,7 @@ async function appStoreVersionHistory(trackId: number, appName: string, year: nu
 
 function scopeFilter(affiliation: Affiliation, found: Found[]): Found[] {
   if (companyScope(affiliation) !== 'product' || !affiliation.product) return found;
-  const tokens = leadProductTokens(affiliation.product, affiliation.company).map((t) => t.toLowerCase());
-  if (!tokens.length) return found;
-  return found.filter((item) => {
-    const hay = `${item.name} ${item.description} ${item.link ?? ''}`.toLowerCase();
-    return tokens.some((token) => hay.includes(token));
-  });
+  return found.filter((item) => matchesLeadProduct(item, affiliation.product, affiliation.company));
 }
 
 export async function harvestCompany(opts: {
@@ -911,7 +908,7 @@ export async function harvestCompany(opts: {
   if (opts.storeOnly) {
     return { found: [], spend: emptyXaiSpend(), ran: ['company-store-miss'], cacheHit: false };
   }
-  const cacheKey = opts.deep ? `company:deep:v22:${year}:${slug}` : `company:v22:${year}:${slug}`;
+  const cacheKey = opts.deep ? `company:deep:v23:${year}:${slug}` : `company:v23:${year}:${slug}`;
   const load = async (): Promise<CompanyHarvest> => {
     const via = viaFor(affiliation);
     const ran: string[] = [];
@@ -936,7 +933,9 @@ export async function harvestCompany(opts: {
     const discoveredHosts: string[] = [];
     const takePages = async (site: string, tag: string) => {
       const host = hostOf(site);
-      if (!host || seenHost.has(host)) return false;
+      if (!host) return false;
+      const exact = /\/(changelog|atom|rss|feed|index)(\/|$)/i.test(site);
+      if (seenHost.has(host) && !exact) return false;
       const pageItems = await pagesForCompany(site, year, affiliation.product, ctx, affiliation.company);
       if (!pageItems.found.length && !pageItems.feeds.length && !pageItems.extraHosts.length) return false;
       seenHost.add(host);

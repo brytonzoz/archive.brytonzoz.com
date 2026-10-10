@@ -240,6 +240,10 @@ test('time-plus-heading changelog cards become dated ships; month-only titles dr
   const items = changelog.itemsFromTimedHeadings(html, 'https://developers.openai.com/codex/changelog', 2026);
   assert.ok(items.some((item) => /sol ultrafast/i.test(item.name) && item.date === '2026-10-08'), JSON.stringify(items));
   assert.ok(items.some((item) => /0\.145\.0/.test(item.name) && item.date === '2026-07-21'), JSON.stringify(items));
+  assert.ok(
+    items.some((item) => /sol ultrafast/i.test(item.name) && /#codex-2026-10-08/.test(item.link || '')),
+    JSON.stringify(items.map((item) => item.link)),
+  );
   const sameLine = changelog.itemsFromIsoDateHeadings('2026-07-21 Codex CLI 0.145.0\n', 'https://developers.openai.com/codex/changelog', 2026);
   assert.ok(sameLine.some((item) => /0\.145\.0/.test(item.name)), JSON.stringify(sameLine));
   const listed = changelog.itemsFromIsoDateHeadings(
@@ -447,6 +451,33 @@ test('OpenAI compact keeps named Codex features when version dumps fill the rest
   assert.ok(compact.some((item) => /sandbox/i.test(item.name)), JSON.stringify(compact.map((i) => i.name)));
 });
 
+test('OpenAI compact does not treat ChatGPT for iOS versions as company-wide', () => {
+  const ios = Array.from({ length: 40 }, (_, i) => ({
+    name: `ChatGPT for iOS 1.2026.${i}`,
+    description: '',
+    date: `2026-07-${String((i % 28) + 1).padStart(2, '0')}`,
+    link: `https://learn.chatgpt.com/docs/changelog#codex-2026-07-${String((i % 28) + 1).padStart(2, '0')}-mobile`,
+    source: 'changelog',
+    status: 'LAUNCHED',
+    score: 7,
+    thisYear: true,
+    icon: null,
+  }));
+  const wide = {
+    name: 'ChatGPT Atlas',
+    description: '',
+    date: '2026-10-01',
+    link: 'https://openai.com/index/chatgpt-atlas',
+    source: 'changelog',
+    status: 'LAUNCHED',
+    score: 6,
+    thisYear: true,
+    icon: null,
+  };
+  const compact = company.compactCompanyFound([...ios, wide], 12);
+  assert.ok(compact.some((item) => /atlas/i.test(item.name)), JSON.stringify(compact.map((i) => i.name)));
+});
+
 test('OpenAI compact reserves company-wide launches beside a Codex dump', () => {
   const dump = Array.from({ length: 180 }, (_, i) => ({
     name: `Codex CLI 0.${i}.0`,
@@ -498,6 +529,26 @@ test('off-worker cache is preferred and scoped on read', async () => {
       via: 'via OpenAI',
     },
     {
+      name: 'Team Config for shared configuration',
+      description: '',
+      date: '2026-04-16',
+      link: 'https://learn.chatgpt.com/docs/changelog#codex-2026-04-16-team',
+      source: 'changelog',
+      status: 'LAUNCHED',
+      score: 6,
+      thisYear: true,
+    },
+    {
+      name: 'ChatGPT for iOS',
+      description: '',
+      date: '2026-10-07',
+      link: 'https://learn.chatgpt.com/docs/changelog#codex-2026-10-07-mobile',
+      source: 'changelog',
+      status: 'LAUNCHED',
+      score: 6,
+      thisYear: true,
+    },
+    {
       name: 'ChatGPT Images 2.5',
       description: 'images',
       date: '2026-06-01',
@@ -521,12 +572,14 @@ test('off-worker cache is preferred and scoped on read', async () => {
   assert.equal(got.cacheHit, true);
   assert.ok(got.ran.includes('company-offworker'));
   assert.ok(got.found.some((item) => /codex cli/i.test(item.name)));
+  assert.ok(got.found.some((item) => /team config/i.test(item.name)));
   assert.ok(!got.found.some((item) => /images/i.test(item.name)));
+  assert.ok(!got.found.some((item) => /chatgpt for ios/i.test(item.name)));
   assert.ok(got.found.every((item) => item.via === 'via OpenAI · Codex'));
 
   const ceo = { ...affiliation.emptyAffiliation(), company: 'OpenAI', role: 'ceo', typedCompany: true };
   const all = await company.harvestCompany({ affiliation: ceo, year: 2026, env: {}, store });
-  assert.equal(all.found.length, 2);
+  assert.equal(all.found.length, 4);
   assert.ok(all.found.every((item) => item.via === 'via OpenAI'));
   const reprint = await company.harvestCompany({ affiliation: lead, year: 2026, env: {}, store, rebuild: true });
   assert.equal(reprint.cacheHit, true);

@@ -508,6 +508,7 @@ export function hardRejectNote(
   if (noteCitesUnknownShip(text, items, ctx)) return 'unknown-ship';
   if (noteCitesOtherPerson(text, items, ctx)) return 'other-person';
   if (text.split(/\s+/).filter(Boolean).length < 8) return 'too-short';
+  if (/\bthe one (public ship here|on this tape)\b/i.test(text) && items.length !== 1) return 'banned-phrase';
   return null;
 }
 
@@ -686,11 +687,14 @@ export function sentenceFallbackNote(items: DraftItem[], ctx: NoteContext = {}):
   const kind = kindFromShipName(`${notable.name} ${spoken}`);
   const who = (ctx.who || '').replace(/^@/, '').split(/\s+/).filter(Boolean)[0] || '';
   const lead = does ? does.charAt(0).toLowerCase() + does.slice(1) : '';
+  const next = items.length > 1 ? spokenOf(items.find((row) => spokenOf(row) !== spoken) || items[1]!) : '';
   const candidates = [
-    does ? `${spoken} is the one on this tape: ${does}.` : '',
+    items.length > 1 && does ? `${spoken} leads ${items.length} ships: ${lead}` : '',
+    items.length > 1 && next && does ? `${spoken} then ${next}. ${does}` : '',
+    items.length === 1 && does ? `${spoken} is the one on this tape: ${does}.` : '',
     who && does ? `${spoken} is ${who}'s ${kind}: ${lead}.` : '',
     does ? `${spoken} does one concrete thing: ${lead}.`.replace(/does one concrete thing: does /i, '') : '',
-    `${spoken} is the one public ship here, and that is the whole story.`,
+    items.length === 1 ? `${spoken} is the one public ship here, and that is the whole story.` : '',
   ].filter(Boolean);
   for (const note of candidates) {
     if (hardRejectNote(note, items, [], ctx)) continue;
@@ -698,7 +702,12 @@ export function sentenceFallbackNote(items: DraftItem[], ctx: NoteContext = {}):
     if (!printable(note)) continue;
     return clipSentence(note, 140);
   }
-  return clipSentence(`${spoken} is the one public ship here, and that is the whole story.`, 140);
+  return clipSentence(
+    items.length > 1
+      ? `${spoken} leads ${items.length} ships${does ? `: ${lead}` : ', and the changelog is still moving.'}`
+      : `${spoken} is the one public ship here, and that is the whole story.`,
+    140,
+  );
 }
 
 /** Last resort only: the notable ship name. No sentence costume. */
@@ -827,7 +836,7 @@ export async function hydrateItemDescriptions<T extends { name?: string; descrip
   const need = items
     .map((item, index) => ({ item, index }))
     .filter(({ item }) => !cleanDescription(item.description) && item.link)
-    .slice(0, 8);
+    .slice(0, 16);
   if (!need.length) return items;
   const out = items.slice();
   await Promise.all(

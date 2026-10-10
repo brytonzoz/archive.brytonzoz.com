@@ -635,7 +635,24 @@ function resolvePageUrl(href: string | undefined, base: string): string {
   }
 }
 
-function headingHref(chunk: string, headingIndex: number, titleHtml: string, base: string): string {
+function hrefWithHash(base: string, id: string | null | undefined): string {
+  if (!id) return base;
+  try {
+    const next = new URL(base);
+    next.hash = id;
+    return next.toString();
+  } catch {
+    return base;
+  }
+}
+
+function liIdNear(html: string, at: number): string | null {
+  const window = html.slice(Math.max(0, at - 600), at + 80);
+  const match = window.match(/<li\b[^>]*\bid=["']([^"']+)["']/i);
+  return match?.[1] && /codex|chatgpt|20\d\d-/i.test(match[1]) ? match[1] : null;
+}
+
+function headingHref(chunk: string, headingIndex: number, titleHtml: string, base: string, html?: string, absIndex?: number): string {
   const inner = titleHtml.match(/<a\b[^>]*href=["']([^"']+)["']/i)?.[1];
   if (inner) return resolvePageUrl(inner, base);
   const before = chunk.slice(Math.max(0, headingIndex - 240), headingIndex);
@@ -643,7 +660,8 @@ function headingHref(chunk: string, headingIndex: number, titleHtml: string, bas
   if (wrapped) return resolvePageUrl(wrapped, base);
   const after = chunk.slice(headingIndex, headingIndex + 280);
   const nearby = after.match(/<a\b[^>]*href=["']([^"'#]+\/(?:changelog|index|sora|device)\/[^"']+)["']/i)?.[1];
-  return resolvePageUrl(nearby, base);
+  const resolved = resolvePageUrl(nearby, base);
+  return hrefWithHash(resolved, html != null && absIndex != null ? liIdNear(html, absIndex) : liIdNear(chunk, headingIndex));
 }
 
 /** `<time datetime>` then every card heading until the next time — Vercel groups many h3s under one day. */
@@ -673,7 +691,8 @@ export function itemsFromTimedHeadings(html: string, url: string, year: number):
     const chunk = html.slice(start, end);
     const headings = [...chunk.matchAll(/<h[2-4]\b[^>]*>([\s\S]*?)<\/h[2-4]>/gi)].slice(0, 80);
     for (const heading of headings) {
-      add(times[i].date, heading[1], headingHref(chunk, heading.index ?? 0, heading[1], url));
+      const abs = start + (heading.index ?? 0);
+      add(times[i].date, heading[1], headingHref(chunk, heading.index ?? 0, heading[1], url, html, abs));
     }
   }
   const headingThenTime = new RegExp(
@@ -687,7 +706,15 @@ export function itemsFromTimedHeadings(html: string, url: string, year: number):
   for (const match of html.matchAll(datedLi)) {
     const date = parseFlexibleDate(match[1], year);
     const heading = match[2].match(/<h[1-4]\b[^>]*>([\s\S]*?)<\/h[1-4]>/i)?.[1] ?? '';
-    if (date && heading) add(date, heading);
+    if (date && heading) {
+      try {
+        const next = new URL(url);
+        next.hash = match[1];
+        add(date, heading, next.toString());
+      } catch {
+        add(date, heading);
+      }
+    }
   }
   return found;
 }

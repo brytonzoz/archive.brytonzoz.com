@@ -277,6 +277,39 @@ export function leadProductTokens(product: string | null | undefined, company: s
   return use.slice(-1);
 }
 
+/** Codex changelog after the 308 to learn.chatgpt.com — cards keep `#codex-` even when the title does not say Codex. */
+export function isCodexChangelogHref(link?: string | null): boolean {
+  const url = String(link || '');
+  if (!url) return false;
+  if (/\/codex(\/|$|#)/i.test(url) || /#codex-/i.test(url)) return true;
+  return /learn\.chatgpt\.com\/docs\/changelog/i.test(url) || /developers\.openai\.com\/codex/i.test(url);
+}
+
+function isChatGptOnlyOnCodexTape(name: string): boolean {
+  if (/\bcodex\b/i.test(name)) return false;
+  if (/chatgpt for (ios|android|ipad)/i.test(name)) return true;
+  return /^chatgpt\b/i.test(name);
+}
+
+/** Lead scope: product token in the row, or a feature card on that product's changelog. */
+export function matchesLeadProduct(
+  item: { name?: string; description?: string; link?: string | null },
+  product: string | null | undefined,
+  company?: string | null,
+): boolean {
+  const tokens = leadProductTokens(product, company).map((t) => t.toLowerCase());
+  if (!tokens.length) return true;
+  const hay = `${item.name || ''} ${item.description || ''} ${item.link || ''}`.toLowerCase();
+  if (tokens.some((token) => hay.includes(token))) {
+    if (tokens.includes('codex') && isChatGptOnlyOnCodexTape(item.name || '')) return false;
+    return true;
+  }
+  if (tokens.includes('codex') && isCodexChangelogHref(item.link)) {
+    return !isChatGptOnlyOnCodexTape(item.name || '');
+  }
+  return false;
+}
+
 export function primaryProduct(product: string | null | undefined, company: string | null | undefined = null): string | null {
   return leadProductTokens(product, company)[0] ?? null;
 }

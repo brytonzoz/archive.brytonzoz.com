@@ -59,6 +59,26 @@ test('typed queries become person → role → company', () => {
   assert.deepEqual(affiliation.leadProductTokens('ChatGPT & Codex', 'OpenAI'), ['Codex']);
   assert.equal(affiliation.primaryProduct('ChatGPT & Codex', 'OpenAI'), 'Codex');
   assert.equal(affiliation.viaLabel({ ...affiliation.emptyAffiliation(), company: 'OpenAI', product: 'Codex', role: 'lead' }, 'company-led-by-person'), 'via OpenAI · Codex');
+  assert.equal(
+    affiliation.matchesLeadProduct(
+      { name: 'Team Config for shared configuration', link: 'https://learn.chatgpt.com/docs/changelog#codex-2026-04-16-team' },
+      'Codex',
+      'OpenAI',
+    ),
+    true,
+  );
+  assert.equal(
+    affiliation.matchesLeadProduct(
+      { name: 'ChatGPT for iOS', link: 'https://learn.chatgpt.com/docs/changelog#codex-2026-10-07-mobile' },
+      'Codex',
+      'OpenAI',
+    ),
+    false,
+  );
+  assert.equal(
+    affiliation.matchesLeadProduct({ name: 'ChatGPT Images', link: 'https://openai.com/index/chatgpt-images' }, 'Codex', 'OpenAI'),
+    false,
+  );
 });
 
 test('bio lines upgrade a typed "from Company" into a lead or CEO', () => {
@@ -118,6 +138,18 @@ test('tutorials, case studies, and research writeups are not ships', () => {
   );
   assert.equal(codex.attribution, 'company-led-by-person');
   assert.ok(decisions.shouldKeep(codex), JSON.stringify(codex));
+  const team = decisions.heuristicMark(
+    found({
+      name: 'Team Config for shared configuration',
+      description: '',
+      link: 'https://learn.chatgpt.com/docs/changelog#codex-2026-04-16-team',
+      via: 'via OpenAI · Codex',
+    }),
+    2026,
+    lead,
+  );
+  assert.equal(team.attribution, 'company-led-by-person');
+  assert.ok(decisions.shouldKeep(team), JSON.stringify(team));
   const indie = { ...affiliation.emptyAffiliation(), company: 'Readmake', role: 'founder' };
   const photo = found({
     name: 'PhotoAI',

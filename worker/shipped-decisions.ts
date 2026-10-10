@@ -2,7 +2,7 @@
 // gpt-6-luna. No other OpenAI models or endpoints. Input is $0.10 / 1M tokens; output is free.
 // Docs: https://platform.openai.com/docs/guides/decisions
 import type { Attribution, Affiliation } from './shipped-affiliation';
-import { defaultAttribution, leadProductTokens } from './shipped-affiliation';
+import { defaultAttribution, leadProductTokens, matchesLeadProduct } from './shipped-affiliation';
 import { flagshipLaunchName } from './shipped-flagship';
 import { looksLikePersonName } from './shipped-repos';
 import { ownedByBuilder, ownershipEvidence, type OwnerContext } from './shipped-ownership';
@@ -234,9 +234,8 @@ function scopedAttribution(item: Found, affiliation: Affiliation, owner?: OwnerC
   // Personal repos, packages, and site products stay on the tape even when a bio
   // named one of many companies (TrustMRR, Readmake). Company harvest still scopes leads.
   if (isPersonalShipSource(item, owner)) return 'personal';
-  const tokens = leadProductTokens(affiliation.product, affiliation.company).map((t) => t.toLowerCase());
-  const hay = `${item.name} ${item.description} ${item.link ?? ''}`.toLowerCase();
-  const matchesProduct = tokens.length ? tokens.some((token) => hay.includes(token)) : false;
+  const tokens = leadProductTokens(affiliation.product, affiliation.company);
+  const matchesProduct = tokens.length ? matchesLeadProduct(item, affiliation.product, affiliation.company) : false;
   const isLead = affiliation.role === 'lead' || (affiliation.typedCompany && Boolean(affiliation.product));
   if (isLead && item.via && tokens.length) {
     return matchesProduct ? 'company-led-by-person' : 'unrelated';

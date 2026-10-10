@@ -820,6 +820,14 @@ test('prereleases, starters, and Gateway model listings are not ships', () => {
   assert.equal(polish.isGatewayModelListing("Liquid AI's d1 is available on AI Gateway"), true);
   assert.equal(polish.isGatewayModelListing('Grok Imagine Video 1.5 Lite on AI Gateway'), true);
   assert.equal(polish.isGatewayModelListing('Vercel Agent now in Slack'), false);
+  assert.equal(
+    polish.isGatewayModelListing('Claude Fable 5', 'https://vercel.com/changelog/claude-fable-5-now-available-on-ai-gateway'),
+    true,
+  );
+  assert.equal(
+    polish.isGatewayModelListing('AI Gateway adds Browserbase search and fetch tools', 'https://vercel.com/changelog/ai-gateway-adds-browserbase-search-and-fetch-tools'),
+    false,
+  );
   assert.equal(polish.cleanShipTitle('GPT-IMAGE-2-'), '');
   assert.equal(polish.cleanShipTitle('INSTALL THE CHATGPT DESKTOP APP ON LINUX'), 'ChatGPT Desktop for Linux');
   assert.match(polish.cleanShipTitle('BETTER PROMPT CACHING FOR GPT-6 PRODUCT SEP 22, 2026'), /better prompt caching for gpt-6/i);
@@ -830,6 +838,7 @@ test('prereleases, starters, and Gateway model listings are not ships', () => {
     [
       found({ name: "Liquid AI's d1 is available on AI Gateway", date: '2026-10-08', link: 'https://vercel.com/changelog/liquid-d1' }),
       found({ name: 'Grok Imagine Video 1.5 Lite on AI Gateway', date: '2026-10-08', link: 'https://vercel.com/changelog/grok-imagine' }),
+      found({ name: 'Claude Fable 5', date: '2026-06-09', link: 'https://vercel.com/changelog/claude-fable-5-now-available-on-ai-gateway' }),
       found({ name: 'v0 Platform API now in beta', date: '2026-04-01', link: 'https://vercel.com/changelog/v0-platform-api-now-in-beta' }),
     ],
     { year: 2026, who: 'Guillermo Rauch' },

@@ -446,13 +446,18 @@ export function isNeverShipKind(name: string): boolean {
 }
 
 /** A model listing on AI Gateway — roll up, don't print each vendor. */
-export function isGatewayModelListing(name: string): boolean {
+export function isGatewayModelListing(name: string, link?: string | null, description?: string): boolean {
   const text = tidy(name);
-  if (!text) return false;
+  const hay = `${text} ${link || ''} ${description || ''}`;
+  if (!text && !link) return false;
   if (/\b(v0|vercel agent|botid)\b/i.test(text)) return false;
   if (/\b(adds|supports|typeSafe|http api|asynchronous|browserbase|confidence-based)\b/i.test(text)) return false;
   if (/^liquid ai\b/i.test(text)) return true;
-  return /\b(?:now )?available on (?:the )?(?:vercel )?ai gateway\b|\bon ai gateway\b/i.test(text);
+  if (/[-/](?:on-)?ai-gateway|available-on-ai-gateway|\/ai-gateway/i.test(link || '')) {
+    if (/\b(adds|tools|fallback|browserbase|confidence)\b/i.test(text)) return false;
+    return true;
+  }
+  return /\b(?:now )?available on (?:the )?(?:vercel )?ai gateway\b|\bon ai gateway\b/i.test(hay);
 }
 
 /** Company-org GitHub repo roots that never earned a homepage / launch post. */
@@ -1059,7 +1064,7 @@ export function rollupGatewayModels<T extends Polishable>(items: T[]): T[] {
   const models: T[] = [];
   const kept: T[] = [];
   for (const item of items) {
-    if (isGatewayModelListing(item.name)) models.push(item);
+    if (isGatewayModelListing(item.name, item.link, item.description)) models.push(item);
     else kept.push(item);
   }
   if (!models.length) return items;

@@ -3,6 +3,7 @@
 // releases, and App Store version rows. No per-company URL tables.
 import { extraResearchPaths, itemsFromProjectList } from './shipped-research';
 import { looksLikeNotAShip } from './shipped-decisions';
+import { flagshipLaunchName, logFlagshipGate } from './shipped-flagship';
 import { prettyBrand } from './shipped-polish';
 import { companyOrgGuess, companyScope, companySlug, companyTokens, leadProductTokens, type Affiliation } from './shipped-affiliation';
 import { type XaiEnv, type XaiSpend, emptyXaiSpend } from './shipped-xai';
@@ -153,7 +154,7 @@ export function compactCompanyFound(found: Found[], cap = COMPANY_CACHE_CAP): Fo
     if (/\/(changelog|release-notes|whats-new|docs\/changelog)/i.test(url)) n += 50;
     if (item.date && /^\d{4}-\d{2}-\d{2}$/.test(item.date)) n += 30;
     if (/\/(blog|news|research|index)\//i.test(url) && !/changelog/i.test(url)) n -= 20;
-    if (looksLikeNotAShip(item)) n -= 80;
+    if (looksLikeNotAShip(item) && !flagshipLaunchName(item)) n -= 80;
     if (/\b(bug fixes?|get started|configuration details|see setup)\b/i.test(name)) n -= 60;
     if (/\b(codex|chatgpt|claude|cursor|gpt-?\d)/i.test(name) && name.length <= 72) n += 25;
     return n;
@@ -165,7 +166,8 @@ export function compactCompanyFound(found: Found[], cap = COMPANY_CACHE_CAP): Fo
     const key = item.name.toLowerCase().replace(/[^a-z0-9]+/g, '');
     const letters = item.name.replace(/[^a-zA-Z]/g, '').length;
     if (key.length < 4 || letters < 3 || seen.has(key)) continue;
-    if (looksLikeNotAShip(item)) continue;
+    if (looksLikeNotAShip(item) && !flagshipLaunchName(item)) continue;
+    if (looksLikeNotAShip(item) && flagshipLaunchName(item)) logFlagshipGate(item, 'company-compact-not-a-ship', flagshipLaunchName(item));
     if (/\b(get started with|configuration details|see setup)\b/i.test(item.name)) continue;
     seen.add(key);
     out.push(item);

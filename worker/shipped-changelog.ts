@@ -1,5 +1,6 @@
 // Generic first-party ship extractors: changelog cards, RSS/Atom, sitemaps, JSON-LD.
 // No per-company URL tables — callers discover pages, this file turns dated markup into Found rows.
+import { dateFromShipSlug, flagshipLaunchName, isFlagshipYearKeep, stripDateSuffix } from './shipped-flagship';
 
 export type ChangelogFound = {
   name: string;
@@ -157,7 +158,7 @@ function isNoiseTitle(text: string): boolean {
 
 /** Headline verbs → a short product name. Never cut mid-word. */
 export function shipName(value: unknown, max = 40): string {
-  let text = tidy(value)
+  let text = stripDateSuffix(tidy(value))
     .replace(/^(guides?|editorials?|listicles?|news|product|safety|research|company|inside\s+\w+)\s+/i, '')
     .replace(/\s+\d+\s*min(?:ute)?s?\s*$/i, '')
     .replace(/^\d+\s*min(?:ute)?s?\s*·\s*/i, '')
@@ -300,21 +301,25 @@ function cleanTitle(name: string): string {
 }
 
 function row(name: string, date: string | null, url: string, year: number, _hint?: string): ChangelogFound | null {
-  const title = cleanTitle(name);
+  const flagship = flagshipLaunchName({ name, link: url, source: 'changelog', date });
+  const title = flagship || cleanTitle(name);
   if (!title) return null;
-  const dated = Boolean(date && date.startsWith(String(year)));
-  const otherYear = Boolean(date && /^\d{4}/.test(date) && !date.startsWith(String(year)));
+  const slugDate = dateFromShipSlug(url, year);
+  const keepPrior = isFlagshipYearKeep({ name: title, link: url, source: 'changelog', date }, year);
+  const resolved = date && (date.startsWith(String(year)) || keepPrior) ? date : slugDate;
+  const dated = Boolean(resolved && (resolved.startsWith(String(year)) || keepPrior));
+  const otherYear = Boolean(resolved && /^\d{4}/.test(resolved) && !resolved.startsWith(String(year)) && !keepPrior);
   return {
     name: title,
     description: hostOf(url) ?? '',
-    date: dated ? date : null,
+    date: dated ? resolved : null,
     dateConfidence: dated ? 'exact' : 'unknown',
     link: publicUrl(url),
     icon: null,
     source: 'changelog',
     status: 'LAUNCHED',
-    score: dated ? 7 : 5,
-    thisYear: dated || !otherYear,
+    score: dated || Boolean(flagship) ? 7 : 5,
+    thisYear: dated || Boolean(flagship) || !otherYear,
   };
 }
 
@@ -352,6 +357,24 @@ export function itemsFromDatedCards(text: string, url: string, year: number): Ch
     if (!name || key.length < 3 || seen.has(key)) continue;
     seen.add(key);
     const item = row(name, date, url, year, `Dated ${date} on ${hostOf(url) ?? 'their site'}`);
+    if (item) found.push(item);
+  }
+  const prior = year - 1;
+  const priorRe = new RegExp(
+    `\\b(?:${prior}-12-\\d{1,2}|(?:dec(?:ember)?)\\s+\\d{1,2}(?:st|nd|rd|th)?,?\\s+${prior}|\\d{1,2}(?:st|nd|rd|th)?\\s+(?:dec(?:ember)?),?\\s+${prior})\\b`,
+    'gi',
+  );
+  for (const match of text.matchAll(priorRe)) {
+    const date = parseFlexibleDate(match[0], prior);
+    if (!date) continue;
+    const idx = match.index ?? 0;
+    const rawName = nearestTitle(text.slice(Math.max(0, idx - 160), idx), text.slice(idx + match[0].length, idx + match[0].length + 160));
+    const flagship = flagshipLaunchName({ name: rawName, link: url, source: 'changelog', date });
+    if (!flagship) continue;
+    const key = loose(flagship);
+    if (seen.has(key)) continue;
+    seen.add(key);
+    const item = row(rawName, date, url, year, `Dated ${date} on ${hostOf(url) ?? 'their site'}`);
     if (item) found.push(item);
   }
   return found;
@@ -439,8 +462,13 @@ export function itemsFromFeedXml(xml: string, year: number): ChangelogFound[] {
       chunk.match(/<(?:pubDate|published|updated|dc:date)[^>]*>([^<]+)</i)?.[1] ??
       chunk.match(/<(?:pubDate|published|updated)[^>]*>([^<]+)</i)?.[1] ??
       '';
-    const date = parseFlexibleDate(datedRaw, year);
+    const date =
+      parseFlexibleDate(datedRaw, year) ??
+      (flagshipLaunchName({ name: title, link, source: 'changelog' })
+        ? parseFlexibleDate(datedRaw, year - 1)
+        : null);
     if (!date || !title || !link) continue;
+    if (date.startsWith(String(year - 1)) && !flagshipLaunchName({ name: title, link, source: 'changelog', date })) continue;
     const key = loose(title);
     if (seen.has(key)) continue;
     seen.add(key);

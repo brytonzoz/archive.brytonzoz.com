@@ -1,6 +1,15 @@
 // Hard pre-filters + title cleanup for the SHIPPED tape. Runs BEFORE Decisions
 // so bylines, docs nav, roundups, and cut-off headings never get scored as ships.
 import type { Affiliation } from './shipped-affiliation';
+import { isJunkRepoName } from './shipped-repos';
+import {
+  cursorModelTitle,
+  flagshipLaunchName,
+  isCursorModelNote,
+  isFlagshipYearKeep,
+  logFlagshipGate,
+  stripDateSuffix,
+} from './shipped-flagship';
 import { ownedByBuilder, type OwnerContext } from './shipped-ownership';
 import type { ItemStatus } from '../lib/shipped-year';
 import { ITEM_STATUSES } from '../lib/shipped-year';
@@ -17,7 +26,7 @@ const ROUNDUP =
 const READ_THE = /^(read the|see the|check out the|learn more|if you\b|those\b|your agent can\b|prepare for\b|choose \w+ for complex)\b/i;
 const INSTRUCTIONAL = /^(if you|those |your agent can|you can|you don|use a |use the |use \w[\w.-]* for complex)\b/i;
 const RESEARCH_GERUND = /^(improving|bootstrapping|deprecating|continually|reward hacking|evaluating)\b/i;
-const ACQUISITION = /\b(is joining|joins)\b/i;
+const ACQUISITION = /\b(is now a part of|acquired by|has been acquired)\b/i;
 const CUSTOMER_STORY = /\bships\s+[\d.,]+[×x]\s+faster\b|·\s*\d+[kmb]\s*$/i;
 const TRAILING_PREP =
   /\b(of|in|to|for|and|or|the|a|an|with|on|as|by|from|into|longer|kind|new|our|your|through|their|its|vs|lower|higher|more|less|day|days|managed|security|controlled|trusted|general|advanced|remote|task|chat)$/i;
@@ -210,7 +219,7 @@ export function isJunkTitle(title: string, opts: { who?: string | null; company?
   if (BYLINE.test(text) || NAME_LIST.test(text) || ROUNDUP.test(text) || READ_THE.test(text) || INSTRUCTIONAL.test(text)) return true;
   if (RESEARCH_GERUND.test(text) || CUSTOMER_STORY.test(text) || isAcquisitionNews(text)) return true;
   if (CTA_NAV.test(text) || CTA_TRAIL.test(text)) return true;
-  if (/^(download on the|get it on|get the app|affiliates|analytics|available on|filed under|quitting|a technical report)\b/i.test(text)) return true;
+  if (/^(download on the|get it on|get the app|affiliates|analytics|available on|filed under|quitting)\b/i.test(text)) return true;
   if (CODE_TITLE.test(text) || /^(object|query|router)$/i.test(text)) return true;
   if (/\bgithub stars\b|\bweekly downloads\b/i.test(text) && !/\b(zod|nub|tsc|cli|app)\b/i.test(text)) return true;
   if (/^respectively\.?$/i.test(text)) return true;
@@ -274,6 +283,12 @@ export function nounPhraseFromSentence(raw: string): string {
   }
   const lets = text.match(/^([A-Za-z][\w. -]{1,32}?)\s+(lets?|can also|can now|will)\b/i);
   if (lets) return tidy(lets[1]);
+  const isNow = text.match(/^([A-Za-z][\w.-]{1,32})\s+is now\b/i);
+  if (isNow) return tidy(isNow[1]);
+  const joining = text.match(/^([A-Za-z][\w.-]{1,32})\s+(?:is joining|joins)\s+([A-Za-z][\w.-]{1,32})/i);
+  if (joining) return `${tidy(joining[1])} joining ${tidy(joining[2])}`;
+  const report = text.match(/^a technical report on\s+(.+)$/i);
+  if (report?.[1]) return tidy(report[1]);
   text = text
     .replace(/\s+in the (api|app|chatgpt|desktop app).*$/i, '')
     .replace(/\s+(can also|lets?|will retire).*$/i, '')
@@ -283,8 +298,14 @@ export function nounPhraseFromSentence(raw: string): string {
 
 /** Extract a clean product / feature name. Empty string means drop the item. */
 export function cleanShipTitle(raw: unknown, max = TITLE_MAX): string {
-  let text = normalizeVersionTokens(tidy(raw));
+  let text = normalizeVersionTokens(stripDateSuffix(tidy(raw)));
   if (!text) return '';
+  const join = text.match(/^([A-Za-z][\w.-]{1,32})\s+(?:is joining|joins)\s+([A-Za-z][\w.-]{1,32})/i);
+  if (join) text = `${join[1]} joining ${join[2]}`;
+  const report = text.match(/^a technical report on\s+(.+)$/i);
+  if (report?.[1]) text = report[1];
+  const meet = text.match(/^meet the new\s+(.+)$/i);
+  if (meet?.[1]) text = meet[1];
   text = text
     .replace(/^(introducing|launching|announcing|presenting|meet|say hello to|now available[:\s]+|how to|read the|launched)\s+/i, '')
     .replace(/\s+launched as\b.*$/i, '')
@@ -378,13 +399,16 @@ export function inYearDate(value: unknown, year: number): string | null {
 }
 
 export function inYearStrict(item: Polishable, year: number): boolean {
-  if (otherYearProduct(item.name, year)) return false;
+  if (otherYearProduct(item.name, year) && !flagshipLaunchName(item)) return false;
   const raw = item.date ? String(item.date) : '';
-  if (/^\d{4}/.test(raw) && !raw.startsWith(String(year))) return false;
+  if (/^\d{4}/.test(raw) && !raw.startsWith(String(year))) {
+    if (isFlagshipYearKeep(item, year)) return true;
+    return false;
+  }
   if (isFutureDate(item.date)) return false;
   const company = item.source === 'changelog' || item.source === 'company';
-  if (company && isScrapeDate(item.date)) return false;
-  if (company && item.date && !inYearDate(item.date, year)) return false;
+  if (company && isScrapeDate(item.date) && !flagshipLaunchName(item)) return false;
+  if (company && item.date && !inYearDate(item.date, year) && !isFlagshipYearKeep(item, year)) return false;
   return true;
 }
 
@@ -505,6 +529,7 @@ export function npmFamilyKey(name: string): string | null {
   const scope = slash >= 0 ? raw.slice(0, slash) : null;
   const pkg = slash >= 0 ? raw.slice(slash + 1) : raw;
   const brand = (scope || '').replace(/js$/i, '');
+  if (scope && /^shooj?s?$/i.test(scope)) return 'shoo';
   if (scope && loose(pkg) === loose(brand)) return brand;
   if (scope && (PLATFORM_LEAF.test(pkg) || SCOPE_SUBPACKAGE.test(pkg))) return brand;
   if (PLATFORM_LEAF.test(pkg)) {
@@ -528,6 +553,11 @@ export function rollupPlatformPackages<T extends Polishable>(items: T[]): T[] {
     groups.set(key, list);
   }
   for (const [key, list] of groups) {
+    if (loose(key) === 'shoo') {
+      const pick = list.slice().sort((a, b) => (b.score ?? 0) - (a.score ?? 0))[0]!;
+      kept.push({ ...pick, name: 'SHOO' });
+      continue;
+    }
     if (list.length === 1 && !PLATFORM_LEAF.test(list[0].name.replace(/^@[^/]+\//, ''))) {
       kept.push(list[0]);
       continue;
@@ -579,6 +609,23 @@ export function rollupVersions<T extends Polishable>(items: T[]): T[] {
       description: '',
     });
   }
+  return kept;
+}
+
+export function rollupCursorModels<T extends Polishable>(items: T[]): T[] {
+  const models: T[] = [];
+  const kept: T[] = [];
+  for (const item of items) {
+    if (isCursorModelNote(item)) models.push(item);
+    else kept.push(item);
+  }
+  if (!models.length) return items;
+  if (models.length === 1) {
+    kept.push({ ...models[0]!, name: cursorModelTitle(models[0]!.name) });
+    return kept;
+  }
+  const latest = models.slice().sort((a, b) => (b.date ?? '').localeCompare(a.date ?? ''))[0]!;
+  kept.push({ ...latest, name: 'New models in Cursor' });
   return kept;
 }
 
@@ -641,33 +688,53 @@ export function polishCandidates<T extends Polishable>(items: T[], opts: PolishO
     opts.onDrop?.(row);
   };
   for (const item of items) {
+    const flagship = flagshipLaunchName(item);
     if (!inYearStrict(item, year)) {
-      drop(
-        item,
-        otherYearProduct(item.name, year)
-          ? 'year-other'
-          : isFutureDate(item.date)
-            ? 'year-future'
-            : isScrapeDate(item.date)
-              ? 'scrape-date'
-              : 'year-strict',
-      );
-      continue;
+      const reason = otherYearProduct(item.name, year)
+        ? 'year-other'
+        : isFutureDate(item.date)
+          ? 'year-future'
+          : isScrapeDate(item.date)
+            ? 'scrape-date'
+            : 'year-strict';
+      if (flagship && isFlagshipYearKeep(item, year)) {
+        logFlagshipGate(item, reason, flagship);
+      } else {
+        if (flagship) logFlagshipGate(item, reason, null);
+        drop(item, reason);
+        continue;
+      }
     }
-    const name = cleanShipTitle(item.name);
+    let name = cleanShipTitle(item.name);
+    if (flagship && (!name || name.split(/\s+/).length <= 1 || /^the new\b/i.test(name))) {
+      if (!name) logFlagshipGate(item, isJunkTitle(item.name, { who }) ? 'junk-title' : 'title-empty', flagship);
+      name = flagship;
+    }
     if (!name) {
       drop(item, isJunkTitle(item.name, { who, company: opts.affiliation?.company }) ? 'junk-title' : 'title-empty');
       continue;
     }
     if (isJunkTitle(name, { who, company: opts.affiliation?.company })) {
-      drop(item, 'junk-title');
+      if (flagship) {
+        logFlagshipGate(item, 'junk-title', flagship);
+        name = flagship;
+      } else {
+        drop(item, 'junk-title');
+        continue;
+      }
+    }
+    if ((item.source === 'github' || /^https?:\/\/github\.com\//i.test(item.link ?? '')) && isJunkRepoName(name, opts.handle || opts.owner?.github, who)) {
+      drop(item, 'github-junk');
       continue;
     }
     if (opts.owner && !ownedByBuilder({ ...item, name }, opts.owner)) {
-      drop(item, 'not-owned');
-      continue;
+      if (flagship) logFlagshipGate(item, 'not-owned', flagship);
+      else {
+        drop(item, 'not-owned');
+        continue;
+      }
     }
-    const date = inYearDate(item.date, year);
+    const date = isFlagshipYearKeep(item, year) && item.date ? String(item.date).slice(0, 10) : inYearDate(item.date, year);
     out.push({
       ...item,
       name,
@@ -675,7 +742,7 @@ export function polishCandidates<T extends Polishable>(items: T[], opts: PolishO
       date,
       via: sourceVia({ ...item, name }, opts.affiliation),
       status: cleanStatus(item.status),
-      thisYear: Boolean(item.thisYear) || Boolean(date && String(date).startsWith(String(year))),
+      thisYear: Boolean(item.thisYear) || Boolean(date && (String(date).startsWith(String(year)) || isFlagshipYearKeep(item, year))),
     });
   }
   const beforeHref = out.length;
@@ -690,11 +757,13 @@ export function polishCandidates<T extends Polishable>(items: T[], opts: PolishO
   const versioned = rollupVersions(collapsed);
   if (versioned.length < beforeRoll) drop({ name: `${beforeRoll - versioned.length} version rows` }, 'version-rollup');
   const beforePkg = versioned.length;
-  const rolled = rollupPlatformPackages(versioned);
-  if (rolled.length < beforePkg) drop({ name: `${beforePkg - rolled.length} platform packages` }, 'platform-rollup');
-  const inherited = inheritDates(rolled);
+  const packaged = rollupPlatformPackages(versioned);
+  if (packaged.length < beforePkg) drop({ name: `${beforePkg - packaged.length} platform packages` }, 'platform-rollup');
+  const models = rollupCursorModels(packaged);
+  if (models.length < packaged.length) drop({ name: `${packaged.length - models.length} model notes` }, 'model-rollup');
+  const inherited = inheritDates(models);
   const capped = capUndated(inherited, drop);
-  if ((shouldLogIndieDrops(who, opts.handle) || shouldLogIndieDrops(opts.who, opts.handle)) && drops.length) {
+  if (drops.length) {
     console.log(JSON.stringify({ shipped: 'polish-drops', who, handle: opts.handle || null, kept: capped.length, drops: drops.slice(0, 80) }));
   }
   return capped

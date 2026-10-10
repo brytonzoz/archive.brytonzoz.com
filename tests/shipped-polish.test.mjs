@@ -5,6 +5,8 @@ import { test } from 'node:test';
 const polish = await import('../worker/shipped-polish.ts');
 const changelog = await import('../worker/shipped-changelog.ts');
 const ai = await import('../worker/shipped-ai.ts');
+const repos = await import('../worker/shipped-repos.ts');
+const dates = await import('../worker/shipped-dates.ts');
 
 const found = (item) => ({
   description: '',
@@ -42,7 +44,7 @@ test('title cleaner extracts a short product name or drops the line', () => {
   assert.equal(polish.cleanShipTitle('BOOTSTRAPPING COMPOSER WITH'), '');
   assert.equal(polish.cleanShipTitle('IMPROVING COMPOSER THROUGH REAL-TIME'), '');
   assert.equal(polish.cleanShipTitle('IF YOU DON’T SEE GPT-5.4 YET, UPDATE'), '');
-  assert.equal(polish.cleanShipTitle('GRAPHITE IS JOINING CURSOR'), '');
+  assert.match(polish.cleanShipTitle('GRAPHITE IS JOINING CURSOR'), /graphite joining cursor/i);
   assert.equal(polish.cleanShipTitle('RILLET SHIPS 3× FASTER WITH AI AGENTS'), '');
   assert.equal(polish.cleanShipTitle('TRUSTMRR REVENUECAT INTEGRATION (API'), '');
   assert.ok(polish.cleanShipTitle('Remote control for local agents').length <= 38);
@@ -68,7 +70,7 @@ test('title cleaner extracts a short product name or drops the line', () => {
   assert.equal(polish.cleanShipTitle('GPT-5.4 MINI'), 'GPT-5.4 MINI');
   assert.equal(polish.cleanShipTitle('RUN CODEX NATIVELY ON WINDOWS'), '');
   assert.equal(polish.cleanShipTitle('CURSOR ANNOUNCES MAJOR UPDATE TO AI'), '');
-  assert.equal(polish.cleanShipTitle('A TECHNICAL REPORT ON COMPOSER 2'), '');
+  assert.match(polish.cleanShipTitle('A TECHNICAL REPORT ON COMPOSER 2'), /composer 2/i);
   assert.equal(polish.cleanShipTitle('JOINING SPACEX'), '');
   assert.equal(polish.cleanShipTitle('MY MACHINES CONNECTS A SINGLE LAPTOP'), '');
   assert.equal(polish.cleanShipTitle('AND PULLFROG'), '');
@@ -298,4 +300,100 @@ test('harvest drops other-year changelog dates and sorts remaining lines chronol
   const demo = ai.demoReceipt(gathered, 2026, 1);
   assert.equal(demo.items.length, 2);
   assert.doesNotMatch(demo.note, /\b37\b|\b3 public ships\b/i);
+});
+
+test('flagship company launches survive the title gate with a logged keep', () => {
+  const items = polish.polishCandidates(
+    [
+      found({ name: 'Meet the new Cursor', date: '2026-04-02', link: 'https://cursor.com/blog/cursor-3' }),
+      found({ name: 'Introducing Composer 2', date: '2026-03-19', link: 'https://cursor.com/blog/composer-2' }),
+      found({ name: 'A technical report on Composer 2', date: '2026-03-27', link: 'https://cursor.com/blog/composer-2-technical-report' }),
+      found({ name: 'Graphite is joining Cursor', date: '2025-12-19', link: 'https://cursor.com/blog/graphite' }),
+      found({ name: 'Bugbot is now over 3x faster, 22% cheaper, and finds 10% more bugs', date: '2026-06-10', link: 'https://cursor.com/changelog/bugbot-updates-june-2026' }),
+      found({ name: 'ORIGIN · SEP 14, 2026', date: '2026-09-14', link: 'https://cursor.com/changelog/origin' }),
+      found({ name: 'CURSOR WEB · CLOUD AGENTS · SEP 14', date: '2026-09-14', link: 'https://cursor.com/changelog/cursor-web' }),
+      found({ name: 'Introducing Grok 4.6', date: '2026-08-12', link: 'https://cursor.com/blog/grok-4-6' }),
+      found({ name: 'Introducing Grok 4.7', date: '2026-09-21', link: 'https://cursor.com/blog/grok-4-7' }),
+    ],
+    { year: 2026, who: 'Michael Truell', affiliation: { name: 'Michael Truell', company: 'Cursor', role: 'ceo', product: null, companyX: null, companyGithub: null, companySite: 'https://cursor.com', typedCompany: false } },
+  );
+  const names = items.map((item) => item.name);
+  assert.ok(names.some((name) => /cursor 3/i.test(name)), JSON.stringify(names));
+  assert.ok(names.some((name) => /composer 2/i.test(name)), JSON.stringify(names));
+  assert.ok(names.some((name) => /graphite joining cursor/i.test(name)), JSON.stringify(names));
+  assert.ok(names.some((name) => /^bugbot$/i.test(name)), JSON.stringify(names));
+  assert.ok(names.some((name) => /^origin$/i.test(name)), JSON.stringify(names));
+  assert.ok(names.some((name) => /cursor web/i.test(name) && !/sep/i.test(name)), JSON.stringify(names));
+  assert.equal(names.filter((name) => /grok/i.test(name)).length, 0);
+  assert.ok(names.some((name) => /new models in cursor/i.test(name)), JSON.stringify(names));
+  const harvested = ai.harvestItems(
+    {
+      found: items,
+      web: [],
+      pages: [],
+      site: null,
+      profile: { name: 'Michael Truell', bio: '', site: null, x: null, github: 'truell20', affiliation: { name: 'Michael Truell', company: 'Cursor', role: 'ceo', product: null, companyX: null, companyGithub: null, companySite: 'https://cursor.com', typedCompany: false } },
+      ran: [],
+      failed: [],
+      stats: [],
+    },
+    2026,
+  );
+  const tape = harvested.map((item) => item.name);
+  assert.ok(tape.some((name) => /CURSOR 3/i.test(name)), JSON.stringify(tape));
+  assert.ok(tape.some((name) => /COMPOSER 2/i.test(name)), JSON.stringify(tape));
+  assert.ok(tape.some((name) => /GRAPHITE/i.test(name)), JSON.stringify(tape));
+  assert.ok(tape.some((name) => /BUGBOT/i.test(name)), JSON.stringify(tape));
+});
+
+test('repro bench demo and profile repos are not ships; @shoojs rolls into SHOO', () => {
+  assert.equal(repos.isJunkRepoName('nextjs-node-options-repro'), true);
+  assert.equal(repos.isJunkRepoName('remix-gvs-repro'), true);
+  assert.equal(repos.isJunkRepoName('hono-response-copy-benchmark'), true);
+  assert.equal(repos.isJunkRepoName('shoo-vite-demo'), true);
+  assert.equal(repos.isJunkRepoName('t3dotgg', 't3dotgg'), true);
+  assert.equal(repos.isJunkRepoName('T3 - THEO', 't3dotgg', 'Theo'), true);
+  assert.equal(repos.isJunkRepoName('yes'), true);
+  assert.equal(repos.isShipRepo({ name: 'zod', description: 'TypeScript-first schema validation', stars: 30000, homepage: 'https://zod.dev' }, 'colinhacks'), true);
+  assert.equal(repos.isShipRepo({ name: 'bun-workspaces', description: 'wip', stars: 2, homepage: null }, 'colinhacks'), false);
+  assert.equal(repos.isShipRepo({ name: 'turbopack-nested-namespace', description: '', stars: 1, homepage: null }, 'colinhacks'), false);
+  const rolled = polish.rollupPlatformPackages([
+    found({ name: '@shoojs/core', source: 'npm', link: 'https://www.npmjs.com/package/@shoojs/core' }),
+    found({ name: '@shoojs/vite', source: 'npm', link: 'https://www.npmjs.com/package/@shoojs/vite' }),
+  ]);
+  assert.equal(rolled.length, 1);
+  assert.equal(rolled[0].name, 'SHOO');
+});
+
+test('owned pin dates keep 2026 first launches and drop pre-2026 evidence', () => {
+  assert.equal(dates.parseCdxTimestamp([['timestamp'], ['20260315120000']]), '2026-03-15');
+  assert.equal(dates.parseCdxTimestamp([['timestamp'], ['20240315120000']]), '2024-03-15');
+  assert.equal(dates.parseRdapRegistration({ events: [{ eventAction: 'registration', eventDate: '2026-02-01T00:00:00Z' }] }), '2026-02-01');
+  assert.equal(dates.parseCopyrightYear('© 2024 Jack Friks'), 2024);
+  assert.equal(dates.parseCopyrightYear('Copyright 2026'), 2026);
+  const keep = dates.verdictFromEvidence(2026, [{ source: 'archive.org', date: '2026-04-12' }]);
+  assert.equal(keep.drop, false);
+  assert.equal(keep.date, '2026-04-12');
+  const drop = dates.verdictFromEvidence(2026, [{ source: 'archive.org', date: '2024-01-08' }, { source: 'rdap', date: '2023-11-01' }]);
+  assert.equal(drop.drop, true);
+  assert.equal(drop.reason, 'pre-2026');
+  const unknown = dates.verdictFromEvidence(2026, []);
+  assert.equal(unknown.drop, false);
+  assert.equal(unknown.date, null);
+});
+
+test('sitemap slugs become flagship names and june-2026 slugs get a day', () => {
+  const xml = `<?xml version="1.0"?><urlset>
+    <url><loc>https://cursor.com/blog/cursor-3</loc></url>
+    <url><loc>https://cursor.com/blog/composer-2</loc></url>
+    <url><loc>https://cursor.com/blog/graphite</loc></url>
+    <url><loc>https://cursor.com/changelog/bugbot-updates-june-2026</loc></url>
+  </urlset>`;
+  const items = changelog.itemsFromSitemap(xml, 2026);
+  assert.ok(items.some((item) => /cursor 3/i.test(item.name)), JSON.stringify(items.map((i) => i.name)));
+  assert.ok(items.some((item) => /composer 2/i.test(item.name)));
+  assert.ok(items.some((item) => /graphite joining cursor/i.test(item.name)));
+  const bugbot = items.find((item) => /bugbot/i.test(item.name));
+  assert.ok(bugbot);
+  assert.equal(bugbot.date, '2026-06-01');
 });

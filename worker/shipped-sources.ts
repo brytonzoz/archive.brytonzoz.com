@@ -39,6 +39,7 @@ import {
   type XProfile,
 } from './shipped-identity';
 import { hostNamesOwner, ownerFromProfile, ownerTokens } from './shipped-ownership';
+import { isJunkRepoName, isShipRepo } from './shipped-repos';
 import {
   compactNumber,
   describeWithStat,
@@ -385,9 +386,6 @@ async function tinyfishPage(url: string, tinyfish: TinyfishAccess): Promise<Tiny
 }
 
 const REPO_NAME = /^[A-Za-z0-9._-]{1,100}$/;
-/** Toys and placeholders that are not a ship. */
-const SKIP_REPOS =
-  /^(my-app|throwaway(-\d+)?|test[-_.]?|tmp|demo|dotfiles|playground|sandbox|awesome[-_].*)(-|$)/i;
 /** github.com/<these> are GitHub's own pages, not people. */
 const NOT_USERS = new Set(
   'about apps blog collections contact customer-stories dashboard enterprise events explore features github issues join login logout marketplace new notifications orgs organizations pricing pulls readme search security sessions settings signup site sponsors stars team topics trending users codespaces copilot solutions resources premium-support git-guides mobile partners password_reset watching'.split(' '),
@@ -542,7 +540,19 @@ const github: SourceProvider = {
     for (const [key, date] of createdOn) {
       const row = rows.get(key);
       const name = row?.name ?? [...(searched ?? []), ...(feed ?? []).map((e) => e.repo)].find((n) => n.toLowerCase() === key) ?? key;
-      if (SKIP_REPOS.test(name)) continue;
+      if (isJunkRepoName(name, login)) continue;
+      if (
+        !isShipRepo(
+          {
+            name,
+            description: row?.description ?? '',
+            stars: row?.stars ?? 0,
+            homepage: row?.homepage ?? null,
+          },
+          login,
+        )
+      )
+        continue;
       const repoUrl = `${GH}/${login}/${name}`;
       found.push(
         withMetrics(
@@ -569,7 +579,8 @@ const github: SourceProvider = {
 
     // Older repos still pushed this year with public numbers — a site mention should inherit stars.
     for (const row of rows.values()) {
-      if (createdOn.has(row.name.toLowerCase()) || (row.stars ?? 0) < 20 || !inYear(row.updated, year)) continue;
+      if (createdOn.has(row.name.toLowerCase()) || !inYear(row.updated, year)) continue;
+      if (!isShipRepo(row, login)) continue;
       const repoUrl = `${GH}/${login}/${row.name}`;
       found.push(
         withMetrics(
@@ -595,8 +606,21 @@ const github: SourceProvider = {
     for (const event of feed ?? []) {
       const key = event.repo.toLowerCase();
       if (event.kind !== 'released' || !inYear(event.date, year) || createdOn.has(key) || released.has(key)) continue;
-      released.add(key);
       const row = rows.get(key);
+      if (
+        !isShipRepo(
+          {
+            name: row?.name ?? event.repo,
+            description: row?.description ?? '',
+            stars: row?.stars ?? 0,
+            homepage: row?.homepage ?? null,
+            hasRelease: true,
+          },
+          login,
+        )
+      )
+        continue;
+      released.add(key);
       found.push({
         name: clean(`${row?.name ?? event.repo}${event.tag ? ` ${clean(event.tag, 20)}` : ''}`, 60),
         description: row?.description ?? '',
@@ -627,6 +651,7 @@ const github: SourceProvider = {
         const row = active[i];
         const release = result.value.find((r) => !r.draft && !r.prerelease && inYear(day(r.published_at), year));
         if (!release) return;
+        if (!isShipRepo({ ...row, hasRelease: true }, login)) return;
         const tag = clean(release.tag_name, 20);
         found.push({
           name: clean(`${row.name}${tag ? ` ${tag}` : ''}`, 60),
@@ -2118,6 +2143,25 @@ async function gatherFresh(
     if (company.spend.ticks || company.spend.costMicros) xaiHit = true;
   } catch {
     failed.push('company-harvest');
+  }
+
+  try {
+    const { dateOwnedPins } = await import('./shipped-dates');
+    const pinLinks = [...(site?.links ?? [])];
+    const dated = await dateOwnedPins(dedupeFound(found), {
+      year,
+      owner: polishOpts().owner,
+      links: pinLinks,
+      pageText: [site?.text, ...pages.map((page) => page.text)].filter(Boolean).join('\n'),
+    });
+    if (dated.drops.length) {
+      ran.push(`pin-dates:drop:${dated.drops.length}`);
+      console.log(JSON.stringify({ shipped: 'pin-date-drops', who, drops: dated.drops.slice(0, 20) }));
+    }
+    found.length = 0;
+    found.push(...dated.items);
+  } catch {
+    failed.push('pin-dates');
   }
 
   deduped = polishCandidates(

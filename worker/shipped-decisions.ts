@@ -3,6 +3,7 @@
 // Docs: https://platform.openai.com/docs/guides/decisions
 import type { Attribution, Affiliation } from './shipped-affiliation';
 import { defaultAttribution, leadProductTokens } from './shipped-affiliation';
+import { flagshipLaunchName } from './shipped-flagship';
 import { ownedByBuilder, ownershipEvidence, type OwnerContext } from './shipped-ownership';
 import type { Found } from './shipped-sources';
 import { clean } from './shipped-sources';
@@ -193,7 +194,8 @@ function pick(answers: Answer[], name: string): Answer | undefined {
 const NOT_A_SHIP =
   /\b(how to|tutorial|case stud(?:y|ies)|customer stor(?:y|ies)|deep dive|event recap|hiring|we.?re hiring|opinion piece|explainer|what we learned|behind the scenes|lessons? from|research paper|whitepaper|preprint|teas(?:e|ing)|coming soon|roadmap|retweet|rt @|customer spotlight|success stor(?:y|ies)|frontier firms|pulling ahead|what i ship(?:ped)? here)\b/i;
 
-export function looksLikeNotAShip(item: { name?: string; description?: string; link?: string | null }): boolean {
+export function looksLikeNotAShip(item: { name?: string; description?: string; link?: string | null; source?: string }): boolean {
+  if (flagshipLaunchName(item)) return false;
   const name = (item.name ?? '').trim();
   const hay = `${item.name ?? ''} ${item.description ?? ''} ${item.link ?? ''}`;
   if (/^authors?\s*[:\-–—]/i.test(name)) return true;

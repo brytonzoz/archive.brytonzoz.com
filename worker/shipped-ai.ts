@@ -10,6 +10,7 @@ import { clean, hostOf, inYearCount, publicUrl, type Found, type Gathered } from
 import { shipName } from './shipped-changelog';
 import { shareKeywords } from './shipped-decisions';
 import { ownerFromProfile } from './shipped-ownership';
+import { flagshipLaunchName, isFlagshipYearKeep, logFlagshipGate } from './shipped-flagship';
 import { cleanDescription, cleanShipTitle, cleanStatus, noteCountMismatch, polishCandidates, prettyBrand } from './shipped-polish';
 import type { Affiliation } from './shipped-affiliation';
 import { RECEIPT_BUDGET_MICROS, formatReceiptStats, searchBudget, type SourcedStat } from './shipped-research';
@@ -320,16 +321,33 @@ export const potentialItem = (): DraftItem => ({
 });
 
 function toDraftItem(item: Found, year: number): DraftItem | null {
-  const name = cleanShipTitle(item.name);
-  if (!name || !ok(name) || !publicUrl(item.link)) return null;
-  if (yearDate(item.date, year) === false) return null;
+  const flagship = flagshipLaunchName(item);
+  let name = cleanShipTitle(item.name);
+  if (flagship && (!name || name.split(/\s+/).length <= 1)) name = flagship;
+  if (!name || !ok(name) || !publicUrl(item.link)) {
+    if (flagship) logFlagshipGate(item, !name ? 'draft-title' : 'draft-link', null);
+    return null;
+  }
   const dated = yearDate(item.date, year);
-  if (dated === null && (item.source === 'changelog' || item.source === 'company')) return null;
+  if (dated === false && !isFlagshipYearKeep(item, year)) {
+    if (flagship) logFlagshipGate(item, 'draft-year', null);
+    return null;
+  }
+  if (dated === null && (item.source === 'changelog' || item.source === 'company') && !flagship) {
+    return null;
+  }
   const description = cleanDescription(item.description);
   return {
     name: name.toUpperCase(),
     description: description && ok(description) ? description : '',
-    date: (dated as string | null) ?? (item.source === 'changelog' || item.source === 'company' ? null : item.date),
+    date:
+      typeof dated === 'string'
+        ? dated
+        : isFlagshipYearKeep(item, year) && item.date
+          ? String(item.date).slice(0, 10)
+          : item.source === 'changelog' || item.source === 'company'
+            ? null
+            : item.date,
     status: cleanStatus(item.status),
     link: item.link,
     icon: item.icon,
@@ -358,8 +376,17 @@ export function harvestItems(gathered: Gathered, year: number): DraftItem[] {
     if (!draft) continue;
     const key = loose(draft.name);
     if (!key || seen.has(key)) continue;
-    if (items.some((kept) => shareKeywords(kept, draft))) continue;
-    seen.add(key);
+    const overlap = items.find((kept) => shareKeywords(kept, draft));
+    if (overlap) {
+      const stronger = flagshipLaunchName({ ...item, name: draft.name });
+      if (stronger && !flagshipLaunchName(overlap)) {
+        items.splice(items.indexOf(overlap), 1, { ...draft, name: stronger.toUpperCase() });
+        logFlagshipGate(item, 'shareKeywords-replace', stronger);
+        continue;
+      }
+      if (flagshipLaunchName({ ...item, name: draft.name })) logFlagshipGate(item, 'shareKeywords', null);
+      continue;
+    }
     items.push(draft);
     if (items.length === MAX_ITEMS) break;
   }

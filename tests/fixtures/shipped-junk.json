@@ -696,6 +696,18 @@
       "date": "2026-04-01",
       "source": "changelog",
       "link": "https://learn.chatgpt.com/docs/changelog#joining"
+    },
+    {
+      "name": "DATABRICKS BRINGS GPT-5.5 TO ENTERPRISE AGENT WORKFLOWS",
+      "date": "2026-05-15",
+      "source": "changelog",
+      "link": "https://openai.com/index/databricks"
+    },
+    {
+      "name": "CREATING WITH SORA SAFELY",
+      "date": "2026-03-23",
+      "source": "changelog",
+      "link": "https://openai.com/index/creating-with-sora-safely"
     }
   ],
   "keep": [

@@ -196,6 +196,8 @@ export function compactCompanyFound(found: Found[], cap = COMPANY_CACHE_CAP): Fo
     if (/\b(codex|chatgpt|claude|cursor|gpt-?\d)/i.test(name) && name.length <= 72) n += 25;
     if (/^(introducing|launching)\b/i.test(name)) n += 80;
     if (/^(how|helping)\b/i.test(name) || /\b(cuts?|boosts?|saves?|turns?|halves?)\b.+\bwith\b/i.test(name)) n -= 90;
+    if (/^[A-Za-z][\w'’]*(?:\s+AI)?(?:'s)?\s+(brings|trusts|reviewed|ships|widens|completes|improves)\b/i.test(name)) n -= 90;
+    if (/\b(lowers the cost of|bio bug bounty|creating with sora|trusted access)\b/i.test(name)) n -= 90;
     if (isCompactMustKeep(item)) n += 200;
     return n;
   };
@@ -216,8 +218,10 @@ export function compactCompanyFound(found: Found[], cap = COMPANY_CACHE_CAP): Fo
     if (isCompactMustKeep(item)) return true;
     if (/chatgpt for (ios|android|ipad)/i.test(name)) return false;
     if (versionParts(name) && !flagshipLaunchName(item)) return false;
-    if (/openai\.com\/(sora|device|index)\b/i.test(url) && !/\bcodex\b/i.test(name)) return true;
-    return /\b(gpt-?\d|chatgpt|sora|atlas|v0)\b/i.test(name) && !/\bcodex\b/i.test(name);
+    if (/openai\.com\/(sora|device|index)\b/i.test(url) && !/\bcodex\b/i.test(name)) {
+      return !/^[A-Za-z][\w'’]*(?:\s+AI)?(?:'s)?\s+(brings|trusts|reviewed|ships|widens|completes|improves)\b/i.test(name);
+    }
+    return /\b(gpt-?\d|chatgpt|sora|atlas|v0)\b/i.test(name) && !/\bcodex\b/i.test(name) && !/^[A-Za-z][\w'’]*(?:\s+AI)?(?:'s)?\s+(brings|trusts|reviewed|ships|widens|completes|improves)\b/i.test(name);
   };
   const isNamedCodex = (item: Found) => {
     const name = item.name || '';
@@ -883,7 +887,7 @@ export async function harvestCompany(opts: {
   if (opts.storeOnly) {
     return { found: [], spend: emptyXaiSpend(), ran: ['company-store-miss'], cacheHit: false };
   }
-  const cacheKey = opts.deep ? `company:deep:v25:${year}:${slug}` : `company:v25:${year}:${slug}`;
+  const cacheKey = opts.deep ? `company:deep:v26:${year}:${slug}` : `company:v26:${year}:${slug}`;
   const load = async (): Promise<CompanyHarvest> => {
     const via = viaFor(affiliation);
     const ran: string[] = [];

@@ -207,7 +207,8 @@ export function looksFragment(text: string): boolean {
 }
 
 /** Last word is a chopped headline ending. Short product nouns like "FLUX 3 Image" stay. */
-const KEEP_TAIL_ACRONYM = /^(cli|sdk|api|app|gpt|cdn|dns|sso|cpu|gpu|sql|css|html|aws|v0|ui|ai|mcp|npm|mrr|ios|mac|dev|sol)$/i;
+const KEEP_TAIL_ACRONYM =
+  /^(cli|sdk|api|app|gpt|cdn|dns|sso|cpu|gpu|sql|css|html|aws|v0|ui|ai|mcp|npm|mrr|ios|mac|dev|sol|jan|feb|mar|apr|may|jun|jul|aug|sep|oct|nov|dec|plan|beta|live|pro|max|mini|web|bot|kit|hub|lab|one|all)$/i;
 
 export function endsWithCutOffWord(text: string): boolean {
   const words = tidy(text).split(/\s+/).filter(Boolean);
@@ -281,10 +282,24 @@ export function isDocsOrReferenceTitle(title: string): boolean {
   return false;
 }
 
+/** A customer used the product — not the company's own ship. */
+export function isCustomerStoryTitle(title: string): boolean {
+  const text = tidy(title);
+  if (!text) return false;
+  if (/^(how|helping)\b/i.test(text)) return true;
+  if (/\b(cuts?|boosts?|saves?|turns?|halves?)\b.+\bwith\b/i.test(text)) return true;
+  if (/\b(lowers the cost of|bio bug bounty|creating with sora|trusted access)\b/i.test(text)) return true;
+  if (/^[A-Za-z][\w'’]*(?:\s+AI)?(?:'s)?\s+(brings|trusts|reviewed|ships|widens|completes|improves)\b/i.test(text)) {
+    return true;
+  }
+  return false;
+}
+
 /** Blog essays, reports, and cut-off thought-pieces. */
 export function isBlogEssayTitle(title: string): boolean {
   const text = tidy(title);
   if (!text) return true;
+  if (isCustomerStoryTitle(text)) return true;
   if (/\bkeeping\b.+\bwhile\b/i.test(text)) return true;
   if (/^(we\s+)?migrated\b/i.test(text)) return true;
   if (/^reproducing\b/i.test(text)) return true;
@@ -742,7 +757,7 @@ export function cleanShipTitle(raw: unknown, max = TITLE_MAX): string {
   const deployFrom = text.match(/^deploy from (.+) to vercel$/i);
   if (deployFrom) text = `${deployFrom[1].trim()} deploys`;
   const tagline = text.match(/^([A-Za-z0-9][\w.+ -]{1,40}):\s+(.+)$/);
-  if (tagline && /\b(new generation|next generation|the next|a new)\b/i.test(tagline[2])) {
+  if (tagline && /\b(new generation|next[- ]generation|the next|a new)\b/i.test(tagline[2])) {
     text = tagline[1].trim();
   }
   text = text.replace(/^the new\s+/i, '').replace(/^new\s+(v\d\b)/i, '$1');

@@ -134,6 +134,8 @@ test('Cursor flagship probe paths cover Cursor 3 / Bugbot / Origin', async () =>
   assert.equal(flagship.flagshipLaunchName({ name: '', link: 'https://openai.com/sora', source: 'changelog' }), 'Sora');
   assert.equal(flagship.flagshipLaunchName({ name: '', link: 'https://openai.com/index/chatgpt-images', source: 'changelog' }), 'ChatGPT Images');
   assert.equal(flagship.flagshipLaunchName({ name: '', link: 'https://openai.com/device', source: 'changelog' }), 'OpenAI Device');
+  assert.equal(flagship.flagshipLaunchName({ name: 'Origin', link: 'https://cursor.com/blog/origin', source: 'changelog' }), 'Origin');
+  assert.equal(flagship.flagshipLaunchName({ name: 'Origin', link: 'https://vercel.com/docs/git#origin', source: 'changelog' }), null);
 });
 
 test('Vercel day headings plus bullets assume the harvest year', () => {
@@ -361,10 +363,11 @@ test('OpenAI news RSS keeps Introducing launches and drops customer stories', ()
     <item><title>Introducing GPT-6.1 Sol</title><link>https://openai.com/index/introducing-gpt-6-1-sol</link><pubDate>Tue, 29 Sep 2026 00:00:00 GMT</pubDate><description>A new GPT-6 model</description></item>
     <item><title>How Oracle turns days of work into minutes with ChatGPT</title><link>https://openai.com/index/oracle</link><pubDate>Thu, 08 Oct 2026 00:00:00 GMT</pubDate></item>
     <item><title>Asana cuts model costs 76x in browser tests with GPT-6.1 Sol</title><link>https://openai.com/index/asana-browser-agent</link><pubDate>Fri, 09 Oct 2026 00:00:00 GMT</pubDate></item>
+    <item><title>Databricks brings GPT-5.5 to enterprise agent workflows</title><link>https://openai.com/index/databricks</link><pubDate>Fri, 15 May 2026 00:00:00 GMT</pubDate></item>
   </channel></rss>`;
   const items = changelog.itemsFromFeedXml(xml, 2026);
   assert.ok(items.some((item) => /gpt-6\.1 sol/i.test(item.name)), JSON.stringify(items.map((i) => i.name)));
-  assert.ok(!items.some((item) => /oracle|asana/i.test(item.name)));
+  assert.ok(!items.some((item) => /oracle|asana|databricks/i.test(item.name)));
   assert.ok(items.every((item) => item.link && /^https:\/\//.test(item.link)));
 });
 

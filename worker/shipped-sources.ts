@@ -1185,10 +1185,12 @@ export async function readSite(siteUrl: string): Promise<SiteInfo | null> {
     if (href && !links.some((l) => l.url === href)) links.push({ text: '', url: href });
     if (links.length >= 120) break;
   }
-  const embedded = (html.match(/<script\b[^>]*id=["']__NEXT_DATA__["'][^>]*>[\s\S]*?<\/script>/i) ?? [])[0] || '';
-  const rawText = linedText(html, 48_000);
-  const dated = (rawText.match(/(?:^|\n).{0,20}20\d\d[-/.]\d{1,2}.{0,80}/g) ?? []).join('\n');
-  const text = `${dated}\n${rawText}`.trim().slice(0, 48_000);
+  const nextData = (html.match(/<script\b[^>]*id=["']__NEXT_DATA__["'][^>]*>[\s\S]*?<\/script>/i) ?? [])[0] || '';
+  const isXmlFeed = feed || /<(rss|feed)\b/i.test(html.slice(0, 2000));
+  const rawText = isXmlFeed && /<item\b|<entry\b/i.test(html) ? html.slice(0, 200_000) : linedText(html, 48_000);
+  const dated = isXmlFeed ? '' : (rawText.match(/(?:^|\n).{0,20}20\d\d[-/.]\d{1,2}.{0,80}/g) ?? []).join('\n');
+  const text = `${dated}\n${rawText}`.trim().slice(0, isXmlFeed ? 200_000 : 48_000);
+  const embedded = nextData || (isXmlFeed ? html.slice(0, 200_000) : '');
   return {
     url: base,
     title: clean(decode(html.match(/<title[^>]*>([\s\S]*?)<\/title>/i)?.[1] ?? ''), 100) || clean(meta('og:title'), 100),
@@ -2056,7 +2058,7 @@ async function gatherFresh(
     const text = `${page.title}\n${page.description}\n${page.text}`;
     found.push(...itemsFromProjectList({ text, url: page.url, year }));
     found.push(...itemsFromDatedJournal({ text, url: page.url, year }));
-    found.push(...itemsFromPersonalFeed({ text, url: page.url, year }));
+    found.push(...itemsFromPersonalFeed({ text: page.embedded && /<item\b|<entry\b/i.test(page.embedded) ? page.embedded : text, url: page.url, year }));
     found.push(...itemsFromEmbeddedPortfolio({ html: page.embedded || text, url: page.url, year }));
   }
   if (storeHarvest.found.length) {

@@ -55,6 +55,9 @@ test('title cleaner extracts a short product name or drops the line', () => {
   assert.equal(polish.endsWithCutOffWord('Vercel Terraform Provider Now'), true);
   assert.equal(polish.endsWithCutOffWord('Observability Dashboard for Image'), true);
   assert.equal(polish.endsWithCutOffWord('FLUX 3 Image'), false);
+  assert.equal(polish.endsWithCutOffWord('VERCEL PLATFORM · 4 UPDATES IN SEP'), false);
+  assert.equal(polish.endsWithCutOffWord('UNLIMITED VERCEL BLOB STORES ON EVERY PLAN'), false);
+  assert.equal(polish.endsWithCutOffWord('REDUCE FUTURE DEPLOYMENT SIZE BY REMOVING UNNECESSARY BUIL'), true);
   assert.match(polish.cleanShipTitle('3.10 JUN 30, 2026'), /cursor 3\.10/i);
   assert.equal(polish.dateFromLabeledTitle('3.11 JUL 10, 2026', 2026), '2026-07-10');
   assert.equal(polish.isVagueOrCutTitle('BETA AND ROLLING OUT TO ALL USERS'), true);
@@ -849,6 +852,9 @@ test('prereleases, starters, and Gateway model listings are not ships', () => {
   assert.equal(polish.isVagueOrCutTitle('CHATGPT'), true);
   assert.equal(polish.isVagueOrCutTitle('CODEX JOINING'), true);
   assert.equal(polish.isBlogEssayTitle('GPT-5.6 Sol helps run quantum computing experiments applied'), true);
+  assert.equal(polish.isCustomerStoryTitle('Databricks brings GPT-5.5 to enterprise agent workflows'), true);
+  assert.equal(polish.isCustomerStoryTitle('Airbnb widens access to GPT-6 Astra and OpenAI frontier'), true);
+  assert.equal(polish.isCustomerStoryTitle('GPT-6.1 Sol'), false);
   assert.equal(polish.isForeignProductOnCompanyTape('STRIPE', 'Vercel'), true);
   assert.equal(polish.isForeignProductOnCompanyTape('CURSOR', 'Vercel'), true);
   assert.equal(polish.isForeignProductOnCompanyTape('CURSOR', 'Cursor'), false);

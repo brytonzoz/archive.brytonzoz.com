@@ -79,6 +79,10 @@ jobs:
           SHIPPED_CACHE_ONLY=vercel node --experimental-transform-types --no-warnings scripts/cache-shipped-companies.mjs
           SHIPPED_CACHE_ONLY=openai node --experimental-transform-types --no-warnings scripts/cache-shipped-companies.mjs
 
+      - name: Wait for staging Worker
+        if: ${{ github.event_name == 'push' }}
+        run: sleep 120
+
       - name: Reprint
         env:
           ADMIN_PASSWORD: ${{ secrets.ADMIN_PASSWORD }}

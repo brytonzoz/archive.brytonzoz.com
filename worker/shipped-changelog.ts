@@ -464,6 +464,8 @@ export function itemsFromFeedXml(xml: string, year: number): ChangelogFound[] {
     if (/^(how|helping)\b/i.test(title) || /\brecap\b/i.test(title) || /^state of\b/i.test(title)) continue;
     if (/\b(cuts?|boosts?|saves?|turns?|halves?)\b.+\bwith\b/i.test(title)) continue;
     if (/\band openai (expand|bring|reach|partner)/i.test(title)) continue;
+    if (/^[A-Za-z][\w'’]*(?:\s+AI)?(?:'s)?\s+(brings|trusts|reviewed|ships|widens|completes|improves)\b/i.test(title)) continue;
+    if (/\b(lowers the cost of|bio bug bounty|creating with sora|trusted access)\b/i.test(title)) continue;
     const key = loose(title);
     if (seen.has(key)) continue;
     seen.add(key);

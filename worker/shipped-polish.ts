@@ -14,7 +14,7 @@ const NAME_LIST =
 const ROUNDUP =
   /^(week of|this week in|monthly roundup|what we shipped (this|the) week)\b|updates?\s+(jan(?:uary)?|feb(?:ruary)?|mar(?:ch)?|apr(?:il)?|may|jun(?:e)?|jul(?:y)?|aug(?:ust)?|sep(?:t(?:ember)?)?|oct(?:ober)?|nov(?:ember)?|dec(?:ember)?)\s+20\d\d/i;
 const READ_THE = /^(read the|see the|check out the|learn more|if you\b|those\b|your agent can\b|prepare for\b|choose \w+ for complex)\b/i;
-const INSTRUCTIONAL = /^(if you|those |your agent can|you can|you don|use \w[\w.-]* for complex)\b/i;
+const INSTRUCTIONAL = /^(if you|those |your agent can|you can|you don|use a |use the |use \w[\w.-]* for complex)\b/i;
 const RESEARCH_GERUND = /^(improving|bootstrapping|deprecating|continually|reward hacking|evaluating)\b/i;
 const ACQUISITION = /\b(is joining|joins)\b/i;
 const CUSTOMER_STORY = /\bships\s+[\d.,]+[×x]\s+faster\b/i;
@@ -23,7 +23,14 @@ const TRAILING_PREP =
 const MID_WORD =
   /^(ontrol|elease|pdate|ettings|vailable|olling|espectively|ead|nounced|ntroducing|aunched|hipped)\b/i;
 const OLD_PRODUCT =
-  /\b(gpt-?3(?:\.5)?(?:-turbo)?|text-embedding-?[123]|embedding v[123]|ada-?002|davinci|curie|babbage|turbo-0?125|whisper-1|o1|o3(?:-mini)?)\b/i;
+  /\b(gpt-?4o(?:-mini)?|gpt-?3(?:\.5)?(?:-turbo)?|text-embedding-?[123]|embedding v[123]|ada-?002|davinci|curie|babbage|turbo-0?125|whisper-1|o1|o3(?:-mini)?)\b/i;
+const CTA_NAV =
+  /^(visit our|try .{0,24} now|explore (enterprise|pricing|docs|plans)|watch (on )?youtube|subscribe|follow us|join (us|now)|get started|sign up|learn more|see more|read more|contact (us|sales)|book a (demo|call)|youtube channel)\b/i;
+const CTA_TRAIL = /[↗→⬅︎↵]\s*$|youtube channel|try cursor now|explore enterprise/i;
+const FRAGMENT_START = /^(ies|ing|ted|ated|nced|trol|elease|pdate|ontrol|espectively)\b/i;
+const PLATFORM_LEAF =
+  /(?:^|[-_/])(linux|darwin|win32|windows|freebsd|android|macos|ios)[-_]?(x64|arm64|armv7|ia32|musl|gnu|x86_64|aarch64)?$/i;
+const SCOPE_SUBPACKAGE = /^(types|loader|core|cli|native|bin|node|wasm|binding|runtime|parser|extensions?)s?$/i;
 const MONTHS_SHORT = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
 const META_DESC = /sitemap lastmod|^(dated |linked from )/i;
 const HOST_ONLY = /^(https?:\/\/)?([a-z0-9-]+\.)+[a-z]{2,}$/i;
@@ -143,9 +150,17 @@ export function isShipListHref(url: string | null | undefined): boolean {
 
 export function looksMidWord(text: string): boolean {
   const first = (text.trim().split(/\s+/)[0] || '');
-  if (MID_WORD.test(first)) return true;
+  if (MID_WORD.test(first) || FRAGMENT_START.test(first)) return true;
   if (/^(is|are|was|were|can|will|to)\s+/i.test(text.trim())) return true;
   return false;
+}
+
+export function looksFragment(text: string): boolean {
+  const trimmed = tidy(text);
+  if (!trimmed) return true;
+  if (!/^[A-Za-z0-9@#]/.test(trimmed) && !/^[a-z0-9-]+\.[a-z]{2,}/i.test(trimmed)) return true;
+  if (FRAGMENT_START.test(trimmed.split(/\s+/)[0] || '')) return true;
+  return looksMidWord(trimmed);
 }
 
 export function looksCutOff(text: string): boolean {
@@ -182,10 +197,11 @@ export function isJunkTitle(title: string, opts: { who?: string | null; company?
   if (!text || text.length < 3) return true;
   if (BYLINE.test(text) || NAME_LIST.test(text) || ROUNDUP.test(text) || READ_THE.test(text) || INSTRUCTIONAL.test(text)) return true;
   if (RESEARCH_GERUND.test(text) || CUSTOMER_STORY.test(text) || isAcquisitionNews(text)) return true;
+  if (CTA_NAV.test(text) || CTA_TRAIL.test(text)) return true;
   if (/^respectively\.?$/i.test(text)) return true;
-  if (DOCS_NAV.test(text)) return true;
+  if (DOCS_NAV.test(text) || /^(recent highlights|cursor support)$/i.test(text)) return true;
   if (isAboutPerson(text, opts.who)) return true;
-  if (looksMidWord(text) || looksCutOff(text)) return true;
+  if (looksFragment(text) || looksMidWord(text) || looksCutOff(text)) return true;
   if ((text.replace(/[^a-zA-Z]/g, '').length < 3) && /\d/.test(text)) return true;
   return false;
 }
@@ -225,6 +241,31 @@ export function versionParts(name: string): { product: string; version: string; 
   return { product, version: match[2] };
 }
 
+/** Pull a product/feature noun phrase out of a changelog sentence, or empty to drop. */
+export function nounPhraseFromSentence(raw: string): string {
+  let text = tidy(raw);
+  if (!text) return '';
+  text = text.split(/[.!?]/)[0]?.trim() ?? text;
+  text = text.split(/:\s+/)[0]?.trim() ?? text;
+  text = text
+    .replace(/^(released|added|announced|launched|shipped|introduced|built)\s+/i, '')
+    .replace(/^(in the|on the)\s+/i, '')
+    .trim();
+  if (/^(use|give|let|take|work with|choose|scan|create|organize|talk through)\b/i.test(text)) {
+    const product = text.match(
+      /\b((?:gpt|codex|chatgpt|claude|cursor|grok)[\w. -]{0,28}|(?:[A-Z][A-Za-z0-9.+-]{2,20})(?:\s+(?:cli|api|app|sdk|ios|desktop))?)/i,
+    );
+    return product ? tidy(product[1]) : '';
+  }
+  const lets = text.match(/^([A-Za-z][\w. -]{1,32}?)\s+(lets?|can also|can now|will)\b/i);
+  if (lets) return tidy(lets[1]);
+  text = text
+    .replace(/\s+in the (api|app|chatgpt|desktop app).*$/i, '')
+    .replace(/\s+(can also|lets?|will retire).*$/i, '')
+    .trim();
+  return text;
+}
+
 /** Extract a clean product / feature name. Empty string means drop the item. */
 export function cleanShipTitle(raw: unknown, max = TITLE_MAX): string {
   let text = normalizeVersionTokens(tidy(raw));
@@ -240,10 +281,17 @@ export function cleanShipTitle(raw: unknown, max = TITLE_MAX): string {
     .replace(/\s+/g, ' ')
     .trim();
   if (!text) return '';
+  const sentence = /\b(released|lets?|can also|can now|in the api|use a |with site)\b/i.test(text);
+  if (sentence) {
+    const phrase = nounPhraseFromSentence(text);
+    if (!phrase || phrase.split(/\s+/).length > 6) return '';
+    text = phrase;
+  }
+  if (!text) return '';
   if (isJunkTitle(text)) return '';
   const keepVersion = Boolean(versionParts(text));
   const clamped = wordClamp(text, keepVersion ? Math.max(max, 56) : max);
-  if (!clamped || isJunkTitle(clamped) || looksMidWord(clamped) || looksCutOff(clamped)) return '';
+  if (!clamped || isJunkTitle(clamped) || looksMidWord(clamped) || looksCutOff(clamped) || looksFragment(clamped)) return '';
   return clamped;
 }
 
@@ -254,6 +302,13 @@ export function otherYearProduct(name: string, year: number): boolean {
     if (new RegExp(`\\b${y}\\b`).test(name)) return true;
   }
   return false;
+}
+
+export function isScrapeDate(value: unknown, now = new Date()): boolean {
+  const match = String(value || '').match(/^(\d{4})-(\d{2})-(\d{2})$/);
+  if (!match) return false;
+  const today = `${now.getUTCFullYear()}-${String(now.getUTCMonth() + 1).padStart(2, '0')}-${String(now.getUTCDate()).padStart(2, '0')}`;
+  return `${match[1]}-${match[2]}-${match[3]}` === today;
 }
 
 export function isFutureDate(value: unknown, now = new Date()): boolean {
@@ -279,6 +334,7 @@ export function inYearStrict(item: Polishable, year: number): boolean {
   if (/^\d{4}/.test(raw) && !raw.startsWith(String(year))) return false;
   if (isFutureDate(item.date)) return false;
   const company = item.source === 'changelog' || item.source === 'company';
+  if (company && isScrapeDate(item.date)) return false;
   if (company && !inYearDate(item.date, year)) return false;
   return true;
 }
@@ -291,10 +347,23 @@ export function cleanStatus(value: unknown): ItemStatus {
   return (ITEM_STATUSES as string[]).includes(text) ? (text as ItemStatus) : 'LAUNCHED';
 }
 
+const DESC_MAX = 90;
+
 export function cleanDescription(value: unknown): string {
-  const text = tidy(value);
+  let text = tidy(value);
   if (!text || META_DESC.test(text) || HOST_ONLY.test(text)) return '';
-  return text;
+  text = text
+    .replace(/<\/?[a-z][^>]*>/gi, ' ')
+    .replace(/\b(p|h[1-6]|div|span|img|a|ul|ol|li|br)\s+(align|class|src|href|style)=["'][^"']*["']/gi, ' ')
+    .replace(/\b(p|h[1-6])\s+align=["']?center["']?/gi, ' ')
+    .replace(/align=["']?center["']?/gi, ' ')
+    .replace(/\s+/g, ' ')
+    .trim();
+  if (!text || /<\/?[a-z]|align=["']|^(p|h[1-6]|div|span|img|ul|ol|li)\b/i.test(text)) return '';
+  if (text.length <= DESC_MAX) return text;
+  const cut = wordClamp(text, DESC_MAX);
+  if (!cut) return '';
+  return /[.!?…]$/.test(cut) ? cut : `${cut}…`;
 }
 
 export function prettyBrand(company: string | null | undefined, host?: string | null): string {
@@ -376,6 +445,47 @@ function versionCount(item: Polishable): number {
   return versionParts(item.name)?.extra ?? 1;
 }
 
+export function npmFamilyKey(name: string): string | null {
+  const raw = tidy(name).replace(/^@/, '');
+  if (!raw) return null;
+  const slash = raw.indexOf('/');
+  const scope = slash >= 0 ? raw.slice(0, slash) : null;
+  const pkg = slash >= 0 ? raw.slice(slash + 1) : raw;
+  if (scope && (PLATFORM_LEAF.test(pkg) || SCOPE_SUBPACKAGE.test(pkg))) {
+    return scope.replace(/js$/i, '');
+  }
+  if (PLATFORM_LEAF.test(pkg)) {
+    const parent = pkg.replace(PLATFORM_LEAF, '').replace(/[-_]+$/g, '');
+    return parent.length >= 2 ? parent : scope;
+  }
+  return null;
+}
+
+export function rollupPlatformPackages<T extends Polishable>(items: T[]): T[] {
+  const groups = new Map<string, T[]>();
+  const kept: T[] = [];
+  for (const item of items) {
+    const key = npmFamilyKey(item.name);
+    if (!key) {
+      kept.push(item);
+      continue;
+    }
+    const list = groups.get(key) ?? [];
+    list.push(item);
+    groups.set(key, list);
+  }
+  for (const [key, list] of groups) {
+    if (list.length === 1 && !PLATFORM_LEAF.test(list[0].name.replace(/^@[^/]+\//, ''))) {
+      kept.push(list[0]);
+      continue;
+    }
+    const parent = list.find((item) => loose(item.name.replace(/^@/, '').split('/').pop() ?? '') === loose(key));
+    const pick = parent ?? list.slice().sort((a, b) => (b.score ?? 0) - (a.score ?? 0))[0]!;
+    kept.push({ ...pick, name: key });
+  }
+  return kept;
+}
+
 export function rollupVersions<T extends Polishable>(items: T[]): T[] {
   const groups = new Map<string, T[]>();
   const kept: T[] = [];
@@ -420,7 +530,10 @@ export function rollupVersions<T extends Polishable>(items: T[]): T[] {
 }
 
 export function noteCountMismatch(note: string, count: number): boolean {
-  const mention = /\b(\d{1,4})\s+(public\s+)?(ships?|lines?|launches?|things?|updates?|items?)\b/i.exec(note);
+  const mention =
+    /\b(\d{1,4})\s+(public\s+)?(ships?|lines?|launches?|things?|updates?|items?|projects?|repos?|repositories)\b/i.exec(
+      note,
+    );
   if (!mention) return false;
   return Number(mention[1]) !== count;
 }
@@ -437,7 +550,16 @@ export function polishCandidates<T extends Polishable>(items: T[], opts: PolishO
   };
   for (const item of items) {
     if (!inYearStrict(item, year)) {
-      drop(item, otherYearProduct(item.name, year) ? 'year-other' : isFutureDate(item.date) ? 'year-future' : 'year-strict');
+      drop(
+        item,
+        otherYearProduct(item.name, year)
+          ? 'year-other'
+          : isFutureDate(item.date)
+            ? 'year-future'
+            : isScrapeDate(item.date)
+              ? 'scrape-date'
+              : 'year-strict',
+      );
       continue;
     }
     const name = cleanShipTitle(item.name);
@@ -473,8 +595,11 @@ export function polishCandidates<T extends Polishable>(items: T[], opts: PolishO
     }
   }
   const beforeRoll = collapsed.length;
-  const rolled = rollupVersions(collapsed);
-  if (rolled.length < beforeRoll) drop({ name: `${beforeRoll - rolled.length} version rows` }, 'version-rollup');
+  const versioned = rollupVersions(collapsed);
+  if (versioned.length < beforeRoll) drop({ name: `${beforeRoll - versioned.length} version rows` }, 'version-rollup');
+  const beforePkg = versioned.length;
+  const rolled = rollupPlatformPackages(versioned);
+  if (rolled.length < beforePkg) drop({ name: `${beforePkg - rolled.length} platform packages` }, 'platform-rollup');
   if ((shouldLogIndieDrops(who, opts.handle) || shouldLogIndieDrops(opts.who, opts.handle)) && drops.length) {
     console.log(JSON.stringify({ shipped: 'polish-drops', who, handle: opts.handle || null, kept: rolled.length, drops: drops.slice(0, 80) }));
   }

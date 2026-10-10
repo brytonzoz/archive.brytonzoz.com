@@ -151,6 +151,11 @@ export function itemsFromProjectList(opts: { text: string; url: string; year: nu
   );
   for (const match of text.matchAll(namedDate)) add(match[1], null, `Dated ${year} on ${hostOf(url) ?? 'their site'}`);
 
+  const pins = text.matchAll(/([A-Za-z][A-Za-z0-9 .'-]{1,32})\s*\(([^)]{3,80})\)/g);
+  for (const match of pins) {
+    add(match[1], null, clean(match[2], 80) || `Listed on ${hostOf(url) ?? 'their site'}`);
+  }
+
   return found.slice(0, 80);
 }
 

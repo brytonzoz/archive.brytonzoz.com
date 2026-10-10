@@ -47,6 +47,14 @@ test('title cleaner extracts a short product name or drops the line', () => {
   assert.equal(polish.cleanShipTitle('TRUSTMRR REVENUECAT INTEGRATION (API'), '');
   assert.ok(polish.cleanShipTitle('Remote control for local agents').length <= 38);
   assert.equal(polish.cleanShipTitle('Introducing Codex long-running work'), 'Codex long-running work');
+  assert.equal(polish.cleanShipTitle('VISIT OUR YOUTUBE CHANNEL ↗'), '');
+  assert.equal(polish.cleanShipTitle('TRY CURSOR NOW'), '');
+  assert.equal(polish.cleanShipTitle('EXPLORE ENTERPRISE →'), '');
+  assert.equal(polish.cleanShipTitle('IES A AND MAGIC'), '');
+  assert.match(polish.cleanShipTitle('RELEASED GPT-4O IN THE API. GPT-4O IS') || 'GPT-4O', /gpt-?4o/i);
+  assert.equal(polish.isJunkTitle('USE A WEBSITE’S TOOLS: WITH SITE'), true);
+  const cli = polish.cleanShipTitle('CODEX CLI CAN ALSO IMPORT SUPPORTED');
+  assert.ok(!cli || /^codex cli$/i.test(cli));
 });
 
 test('same article href collapses to the best title; changelog index cards stay distinct', () => {
@@ -133,7 +141,7 @@ test('source lines are via Brand · host with no sitemap metadata', () => {
       found({
         name: 'Cursor 2',
         description: 'Sitemap lastmod 2026-10-10',
-        date: '2026-10-10',
+        date: '2026-09-10',
         link: 'https://cursor.com/changelog',
         via: 'via Anysphere · cursor.com',
       }),
@@ -149,6 +157,40 @@ test('source lines are via Brand · host with no sitemap metadata', () => {
   assert.equal(polish.prettyBrand('open ai'), 'OpenAI');
   assert.equal(polish.cleanStatus('LAUNCHED~'), 'LAUNCHED');
   assert.equal(polish.cleanDescription('learn.chatgpt.com'), '');
+  assert.equal(polish.cleanDescription('p align="center" h1 TypeScript loader'), '');
+  const clipped = polish.cleanDescription('Standalone TypeScript loader for Node.js from the Nub project — TypeScript, JSX, tsconfig paths, and data-format imports through a native transform');
+  assert.ok(clipped.length <= 91);
+  assert.ok(/…$/.test(clipped) || clipped.length < 90);
+  assert.doesNotMatch(clipped, /tr$/);
+});
+
+test('platform npm packages roll into the parent name', () => {
+  const rolled = polish.rollupPlatformPackages([
+    found({ name: '@tsc-rs/linux-x64', source: 'npm', link: 'https://www.npmjs.com/package/@tsc-rs/linux-x64' }),
+    found({ name: '@tsc-rs/darwin-arm64', source: 'npm', link: 'https://www.npmjs.com/package/@tsc-rs/darwin-arm64' }),
+    found({ name: '@nubjs/loader-win32-arm64', source: 'npm', link: 'https://www.npmjs.com/package/@nubjs/loader-win32-arm64' }),
+    found({ name: '@nubjs/types', source: 'npm', link: 'https://www.npmjs.com/package/@nubjs/types' }),
+    found({ name: '@nubjs/nub', source: 'npm', link: 'https://www.npmjs.com/package/@nubjs/nub' }),
+  ]);
+  const names = rolled.map((item) => item.name.toLowerCase());
+  assert.ok(names.some((n) => n === 'tsc-rs'));
+  assert.equal(names.filter((n) => n === 'nub' || n === 'nubjs').length, 1);
+  assert.equal(names.some((n) => /linux|darwin|win32|types/.test(n)), false);
+});
+
+test('scrape-dated changelog cards are dropped', () => {
+  const today = new Date().toISOString().slice(0, 10);
+  const items = polish.polishCandidates(
+    [
+      found({ name: 'Visit our YouTube channel', date: '2026-06-01', link: 'https://cursor.com/youtube' }),
+      found({ name: 'Cursor 2', date: today, link: 'https://cursor.com/changelog/today' }),
+      found({ name: 'Agents Window', date: '2026-04-02', link: 'https://cursor.com/changelog/agents' }),
+    ],
+    { year: 2026, who: 'Michael Truell' },
+  );
+  assert.equal(items.some((item) => /youtube|visit our/i.test(item.name)), false);
+  assert.equal(items.some((item) => item.date === today), false);
+  assert.ok(items.some((item) => /agents window/i.test(item.name)));
 });
 
 test('notes must use the final post-filter count', () => {
@@ -178,9 +220,8 @@ test('changelog rows no longer print sitemap lastmod and docs nav slugs stay out
   const items = changelog.itemsFromSitemap(xml, 2026);
   assert.equal(items.some((item) => /overview/i.test(item.name)), false);
   assert.ok(items.some((item) => /cursor 2/i.test(item.name)));
-  assert.equal(items[0].description, 'cursor.com');
-  assert.doesNotMatch(items[0].description, /sitemap lastmod/i);
-  assert.equal(items[0].thisYear, true);
+  assert.equal(items.find((item) => /cursor 2/i.test(item.name))?.date, null);
+  assert.doesNotMatch(items.find((item) => /cursor 2/i.test(item.name))?.description ?? '', /sitemap lastmod/i);
 });
 
 test('harvest drops other-year changelog dates and sorts remaining lines chronologically', () => {

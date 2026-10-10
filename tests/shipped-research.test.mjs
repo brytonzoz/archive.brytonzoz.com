@@ -19,6 +19,9 @@ test('handle variants stitch X spellings to GitHub logins', () => {
 test('name queries split "Tibo from OpenAI"', () => {
   assert.deepEqual(identity.parsePersonName('Tibo from OpenAI'), { name: 'Tibo', company: 'OpenAI', tokens: ['Tibo'], product: null });
   assert.equal(identity.parsePersonName('Steven Tey').company, null);
+  assert.equal(identity.prettyPersonName('tibo from open ai'), 'Tibo');
+  assert.equal(identity.prettyPersonName('jack friks'), 'Jack Friks');
+  assert.equal(identity.prettyPersonName('Michael Truell'), 'Michael Truell');
 });
 
 test('bio text yields product URLs and skips social hosts', () => {
@@ -140,6 +143,16 @@ test('cashier note and stats are specific to the items, never stock copy', () =>
   assert.doesNotMatch(note, /Thank you for shipping|Come again|No refunds on momentum|Receipt paper running low|Someone likes the publish button|night shift|publish button|\bthe tape\b|\bthe register\b/i);
   assert.match(note, /PHOTOAI|INTERIORAI|SUPERLEVELS/i);
   assert.match(note, /553|stars/i);
+  const one = ai.groundedNote(
+    [{ name: 'POSTBRIDGE-CLI', description: 'CLI', date: '2026-09-09', status: 'SHIPPED', link: 'https://github.com/jackfriks/postbridge-cli', icon: null, source: 'github' }],
+    0,
+    'Jack Friks',
+    [],
+  );
+  assert.doesNotMatch(one, /plus 0 more/i);
+  assert.match(one, /POSTBRIDGE-CLI/i);
+  assert.equal(ai.noteMisusesStats('44k GitHub stars on ZOD', 23, ['553 GitHub stars SuperLevels · github.com/x']), true);
+  assert.equal(ai.noteMisusesStats('Zod sits at 326k npm weekly downloads.', 21, ['326k npm weekly downloads Zod · npmjs.com/package/zod']), false);
   assert.equal(ai.cashierNoteLooksCanned(note), false);
   assert.equal(ai.cashierNoteLooksCanned('Hallmark passed 30k stars while the night shift counted receipts.'), true);
   assert.equal(ai.cashierNoteLooksCanned('runs on a wish and a prayer'), true);
@@ -253,6 +266,14 @@ test('a /projects page dated 2026 becomes found items', () => {
   assert.ok(news.some((item) => /codex/i.test(item.name)), JSON.stringify(news.map((i) => i.name)));
   assert.ok(news.some((item) => /sora/i.test(item.name)));
   assert.equal(news.some((item) => /legacy/i.test(item.name)), false);
+  const pins = research.itemsFromProjectList({
+    text: "things i'm working on\n📌  post bridge ( social media scheduler )\n📌  lovelee ( couples app )\ncuriosity quench ( quit scrolling app )",
+    url: 'https://www.jackfriks.com/',
+    year: 2026,
+  });
+  assert.ok(pins.some((item) => /post bridge/i.test(item.name)), JSON.stringify(pins.map((i) => i.name)));
+  assert.ok(pins.some((item) => /lovelee/i.test(item.name)));
+  assert.ok(pins.some((item) => /curiosity quench/i.test(item.name)));
 });
 
 test('indie blog month archives become dated ships and skip commentary', () => {

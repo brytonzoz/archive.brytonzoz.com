@@ -205,6 +205,17 @@ export function parsePersonName(text: string): NameParts {
   return { name, company, tokens, product: null };
 }
 
+/** Receipt customer line: "tibo from open ai" → "Tibo", "jack friks" → "Jack Friks". */
+export function prettyPersonName(raw: string | null | undefined): string {
+  const text = cleanText(raw, 80);
+  if (!text) return '';
+  const from = text.match(/^(.+?)\s+(?:from|at|of)\s+.+$/i);
+  const name = cleanText(from?.[1] ?? text, 60);
+  if (!name) return text;
+  if (/[a-z]/.test(name) && /[A-Z]/.test(name) && /\s/.test(name)) return name;
+  return name.replace(/[A-Za-z][A-Za-z']*/g, (word) => word[0].toUpperCase() + word.slice(1).toLowerCase());
+}
+
 /**
  * Other spellings of a handle that might be the GitHub login (underscores, a doubled last letter).
  * `dannypostmaa` → `dannypostma`; `tdinh_me` → `tdinhme`, `tdinh-me`, `tdinh`.

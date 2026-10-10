@@ -12,6 +12,11 @@ on:
       - worker/shipped-sources.ts
       - worker/shipped-affiliation.ts
       - worker/shipped-company-seeds.ts
+      - worker/shipped-polish.ts
+      - worker/shipped-changelog.ts
+      - worker/shipped-research.ts
+      - worker/shipped-ai.ts
+      - worker/shipped-identity.ts
   workflow_dispatch:
     inputs:
       ids:
@@ -48,7 +53,7 @@ jobs:
           ADMIN_PASSWORD: ${{ secrets.ADMIN_PASSWORD }}
           SHIPPED_ORIGIN: ${{ github.event_name == 'workflow_dispatch' && inputs.origin || 'https://shipped-staging.brytonzoz.com' }}
           SHIPPED_REPRINT_FORCE: '1'
-          SHIPPED_REPRINT_FORCE_IDS: ${{ github.event_name == 'workflow_dispatch' && inputs.ids || '17,13' }}
+          SHIPPED_REPRINT_FORCE_IDS: ${{ github.event_name == 'workflow_dispatch' && inputs.ids || '16,17,18,19,20' }}
         run: |
           if [ -z "$ADMIN_PASSWORD" ]; then
             echo "::error::ADMIN_PASSWORD is required to reprint receipts."

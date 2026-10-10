@@ -54,13 +54,27 @@ export function pileTokenFor(id: number): string | null {
   }
 }
 
+function titleCustomer(raw: string): string {
+  const from = raw.match(/^(.+?)\s+(?:from|at|of)\s+.+$/i);
+  const name = (from?.[1] || raw).trim();
+  if (!name) return raw;
+  if (/[a-z]/.test(name) && /[A-Z]/.test(name) && /\s/.test(name)) return name;
+  return name.replace(/[A-Za-z][A-Za-z']*/g, (word) => word[0].toUpperCase() + word.slice(1).toLowerCase());
+}
+
 export function VisitorReceipt({ receipt, sponsors }: Loaded) {
-  const who = subjectLabel(receipt.subject);
-  const kicker = receipt.subject.kind === 'github' && receipt.subject.display !== who ? `@${receipt.subject.id} · GITHUB` : KICKER[receipt.subject.kind];
+  const who = titleCustomer(subjectLabel(receipt.subject));
+  const kicker = receipt.subject.x
+    ? `@${receipt.subject.x} · X`
+    : receipt.subject.kind === 'github' && receipt.subject.display !== who
+      ? `@${receipt.subject.id} · GITHUB`
+      : receipt.subject.kind === 'name'
+        ? ''
+        : KICKER[receipt.subject.kind];
   return (
     <YearReceipt
       year={receipt.year}
-      who={receipt.subject.kind === 'github' ? receipt.subject.display : who}
+      who={who}
       kicker={kicker}
       date={receiptDate(receipt.printedAt)}
       number={receiptNumber(receipt.id)}

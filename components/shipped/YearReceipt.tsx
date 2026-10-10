@@ -162,16 +162,18 @@ function ItemList({ props }: { props: YearReceiptProps }) {
         <span className="shipped-lead-fill is-blank" />
         <span>STATUS</span>
       </p>
-      <ol className="mt-1">
+      <div className="mt-1">
         {groups.map((group) => (
-          <React.Fragment key={group.key}>
-            {group.label ? <li className="mt-3 mb-1 list-none text-[10px] tracking-[0.14em] opacity-45">{group.label}</li> : null}
-            {group.items.map((item) => (
-              <ItemRow key={item.key} item={item} compact={props.compact} />
-            ))}
-          </React.Fragment>
+          <div key={group.key}>
+            {group.label ? <p className="mt-3 mb-1 text-[10px] tracking-[0.14em] opacity-45">{group.label}</p> : null}
+            <ol>
+              {group.items.map((item) => (
+                <ItemRow key={item.key} item={item} compact={props.compact} />
+              ))}
+            </ol>
+          </div>
         ))}
-      </ol>
+      </div>
       <Rule heavy />
       <div className="shipped-lead items-end py-1 text-[13px] font-semibold">
         <span>

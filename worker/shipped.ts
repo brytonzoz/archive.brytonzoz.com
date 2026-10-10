@@ -62,6 +62,7 @@ import {
   type Gathered,
   type SourceEnv,
 } from './shipped-sources';
+import { prettyPersonName } from './shipped-identity';
 import { makeCompanyStore, parseOffworkerCache, putOffworkerCache } from './shipped-company-store';
 import { TINYFISH_DAILY, type TinyfishKind, type TinyfishMeter } from './shipped-tinyfish';
 import { checkFetchUrl, finalUrl } from './shipped-fetch';
@@ -654,7 +655,8 @@ async function generate(
       next: { items: DraftItem[]; note: string; stats?: string[]; potential: boolean; layout?: string[] },
       extra: { growing: boolean; model: string | null; usage: { input: number; output: number; searches: number; cost: number }; id?: number },
     ) => {
-      if (gathered.profile.name && !hasBlockedWord(gathered.profile.name)) subject.display = clean(gathered.profile.name, 60);
+      const resolved = gathered.profile.name && !hasBlockedWord(gathered.profile.name) ? gathered.profile.name : subject.display;
+      subject.display = prettyPersonName(resolved) || clean(resolved, 60);
       const x = (gathered.profile.x && isXHandle(gathered.profile.x) ? gathered.profile.x : subject.kind === 'x' ? subject.id : null) || null;
       const receipt: Omit<YearReceipt, 'id'> = {
         version: 2,
@@ -748,7 +750,10 @@ async function generate(
     }
 
     const gathered = full ?? (await fullP);
-    if (gathered.profile.name && !hasBlockedWord(gathered.profile.name)) subject.display = clean(gathered.profile.name, 60);
+    {
+      const resolved = gathered.profile.name && !hasBlockedWord(gathered.profile.name) ? gathered.profile.name : subject.display;
+      subject.display = prettyPersonName(resolved) || clean(resolved, 60);
+    }
     let model: string | null = null;
     let usage = { input: 0, output: 0, searches: 0, cost: 0 };
     let draft;
@@ -1572,7 +1577,10 @@ async function rerunFullReceipt(db: D1Database, env: ShippedEnv, id: number): Pr
       tinyfishMeter(db),
       { mode: 'full' },
     );
-    if (gathered.profile.name && !hasBlockedWord(gathered.profile.name)) current.subject.display = clean(gathered.profile.name, 60);
+    {
+      const resolved = gathered.profile.name && !hasBlockedWord(gathered.profile.name) ? gathered.profile.name : current.subject.display;
+      current.subject.display = prettyPersonName(resolved) || clean(resolved, 60);
+    }
     const seed = seedOf(subjectKey(current.subject));
     const draft = env.ANTHROPIC_API_KEY
       ? await assembleReceipt(current.subject, gathered, year, seed, env, costMicros(env.SHIPPED_MODEL || DEFAULT_MODEL, 4_000, 256, 0))
@@ -2206,7 +2214,8 @@ async function reprintReceipt(
       { rebuild: true, affiliation: affiliationHint },
     );
     gathered = await enrichReprintCompanyCache(env, db, year, affiliationHint, gathered);
-    if (subject.kind === 'github' && gathered.profile.name && !hasBlockedWord(gathered.profile.name)) subject.display = clean(gathered.profile.name, 60);
+    const resolved = gathered.profile.name && !hasBlockedWord(gathered.profile.name) ? gathered.profile.name : subject.display;
+    subject.display = prettyPersonName(resolved) || clean(resolved, 60);
     let model: string | null = null;
     let usage = { input: 0, output: 0, searches: 0, cost: 0 };
     let draft;

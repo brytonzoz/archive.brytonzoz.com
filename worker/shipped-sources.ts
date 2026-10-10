@@ -38,6 +38,7 @@ import {
   type XProfile,
 } from './shipped-identity';
 import {
+  compactNumber,
   describeWithStat,
   detectGaps,
   extraResearchPaths,
@@ -384,7 +385,7 @@ async function tinyfishPage(url: string, tinyfish: TinyfishAccess): Promise<Tiny
 const REPO_NAME = /^[A-Za-z0-9._-]{1,100}$/;
 /** Toys and placeholders that are not a ship. */
 const SKIP_REPOS =
-  /^(my-app|throwaway(-\d+)?|test[-_.]?|tmp|demo|dotfiles|playground|sandbox)(-|$)/i;
+  /^(my-app|throwaway(-\d+)?|test[-_.]?|tmp|demo|dotfiles|playground|sandbox|awesome[-_].*)(-|$)/i;
 /** github.com/<these> are GitHub's own pages, not people. */
 const NOT_USERS = new Set(
   'about apps blog collections contact customer-stories dashboard enterprise events explore features github issues join login logout marketplace new notifications orgs organizations pricing pulls readme search security sessions settings signup site sponsors stars team topics trending users codespaces copilot solutions resources premium-support git-guides mobile partners password_reset watching'.split(' '),
@@ -807,7 +808,7 @@ const npm: SourceProvider = {
         score: 1 + (score?.final ?? 0) * 2 + Math.log10(1 + weekly),
         metrics:
           weekly && link
-            ? [sourcedStat('downloads', `${weekly >= 1000 ? `${(weekly / 1000).toFixed(weekly >= 10_000 ? 0 : 1).replace(/\.0$/, '')}k` : String(weekly)} npm weekly downloads`, weekly, link, clean(pkg.name, 40))].filter(
+            ? [sourcedStat('downloads', `${compactNumber(weekly)} npm weekly downloads`, weekly, link, clean(pkg.name, 40))].filter(
                 (s): s is SourcedStat => Boolean(s),
               )
             : [],
@@ -1934,6 +1935,23 @@ async function gatherFresh(
   if (site) ran.push('site');
   if (extraSites.some(Boolean)) ran.push('sites');
   ran.push('research-pass:harvest');
+
+  const seenHome = new Set([hostOf(homepage), ...extraHomes.map((u) => hostOf(u))].filter((h): h is string => Boolean(h)));
+  const productHomes = (site?.links ?? [])
+    .map((link) => publicUrl(link.url))
+    .filter((url): url is string => {
+      const host = hostOf(url);
+      if (!url || !host || seenHome.has(host) || SKIP_PAGES.test(host)) return false;
+      if (host === hostOf(homepage)) return false;
+      return true;
+    })
+    .filter((url, i, all) => all.findIndex((u) => hostOf(u) === hostOf(url)) === i)
+    .slice(0, 4);
+  if (productHomes.length) {
+    const more = await Promise.all(productHomes.map((url) => raceTimeout(readSite(url).catch(() => null), SOURCE_TIMEOUT_MS, null)));
+    extraSites.push(...more);
+    if (more.some(Boolean)) ran.push('product-sites');
+  }
 
   const web: WebResult[] = [];
   for (const row of searched.flat()) {

@@ -32,6 +32,9 @@ const DEFAULT_TARGETS = [
   { id: 14, who: 'Marc Lou' },
   { id: 6, who: 'levelsio' },
   { id: 7, who: 'Guillermo Rauch' },
+  { id: 18, who: 'jackfriks' },
+  { id: 19, who: 'colinhacks' },
+  { id: 20, who: 't3dotgg' },
 ];
 
 const TARGETS =

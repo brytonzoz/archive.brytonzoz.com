@@ -189,7 +189,23 @@ export function formatStats(items: { source?: string }[], sourced: SourcedStat[]
 }
 
 const TEMPLATE_NOTE =
-  /is first on the tape|led the year|closed the year|set the tone|through-line|Receipt paper running low|Someone likes the publish button|\d+\s+launches?\s+·|night shift|publish button|\bthe tape\b|\bthe register\b|stock the shelves|counted receipts|got the paperwork|rings the publish|cashier has seen worse|mostly i just|wish and a prayer|nobody asked|same maker, more skus|runs on a wish|github stars (llm|blog) for /i;
+  /is first on the tape|led the year|closed the year|set the tone|through-line|Receipt paper running low|Someone likes the publish button|\d+\s+launches?\s+·|night shift|publish button|\bthe tape\b|\bthe register\b|stock the shelves|counted receipts|got the paperwork|rings the publish|cashier has seen worse|mostly i just|wish and a prayer|nobody asked|same maker, more skus|runs on a wish|plus 0 more|github stars (llm|blog) for /i;
+
+/** A number in the note must be the item count, or a sourced stars/downloads figure that is labeled. */
+export function noteMisusesStats(note: string, count: number, stats: string[] = []): boolean {
+  const text = note.replace(/\s+/g, ' ').trim();
+  if (!text) return false;
+  if (/\bplus 0 more\b/i.test(text)) return true;
+  const labeled = /\b(?:[\d.,]+[kmb]?)\s+(?:github\s+)?stars\b|\b(?:[\d.,]+[kmb]?)\s+(?:npm\s+)?(?:weekly\s+)?downloads\b/i.test(text);
+  if (labeled) {
+    const phrase = text.match(/((?:[\d.,]+[kmb]?)\s+(?:github\s+)?stars|(?:[\d.,]+[kmb]?)\s+(?:npm\s+)?(?:weekly\s+)?downloads)/i)?.[1];
+    if (!phrase) return false;
+    const sourced = stats.some((line) => line.toLowerCase().includes(phrase.toLowerCase().replace(/\s+/g, ' ')));
+    return !sourced;
+  }
+  const numbers = [...text.matchAll(/\b(\d{1,7})\b/g)].map((m) => Number(m[1]));
+  return numbers.some((n) => n !== count && (n < 2000 || n > 2100) && n > 1);
+}
 
 /** Notes that read like a leftover slogan, a fallback stat line, or the same cashier bit. */
 export function cashierNoteLooksCanned(note: string): boolean {
@@ -269,6 +285,15 @@ export function groundedNote(items: DraftItem[], seed: number, profileName = '',
       `${paired.item.name} put ${paired.phrase} on the board. The rest is just keeping it company.`,
       `${paired.phrase} on ${paired.item.name}. Not bad for a year that was supposed to be quiet.`,
       `${paired.item.name} showed up with ${paired.phrase} and somehow made it look easy.`,
+    ];
+    return clipSentence(variants[seed % variants.length], 140);
+  }
+  if (real.length === 1) {
+    const only = real[0]?.name ?? first;
+    const variants = [
+      `${only} is the whole tape this year. One public ship, no encore.`,
+      `Just ${only} this year, printed as a single line.`,
+      `${only} stands alone on the receipt. Nothing else made the cut.`,
     ];
     return clipSentence(variants[seed % variants.length], 140);
   }
@@ -353,7 +378,11 @@ function finish(items: DraftItem[], note: string, seed: number, modulesRaw?: unk
         .slice(0, 4)
     : formatStats(sorted);
   const whoNote =
-    ok(note) && !cashierNoteLooksCanned(note) && /\d/.test(note) && !noteCountMismatch(note, sorted.length)
+    ok(note) &&
+    !cashierNoteLooksCanned(note) &&
+    /\d/.test(note) &&
+    !noteCountMismatch(note, sorted.length) &&
+    !noteMisusesStats(note, sorted.length, Array.isArray(statsRaw) ? statsRaw : stats)
       ? note
       : groundedNote(sorted, seed, ctx.company || '', stats, ctx);
   const printed = printNote(whoNote, stats);
@@ -391,7 +420,7 @@ function noteOnlyPrompt(subject: Subject, items: DraftItem[], stats: string[], y
   return `<found>\n${JSON.stringify({ who, year, items: tape, stats })}\n</found>\nWrite the cashier note for the SHIPPED IN ${year} receipt. JSON only: {"note":""}`;
 }
 
-function noteOnlySystem(year: number, affiliation?: Affiliation | null) {
+function noteOnlySystem(year: number, affiliation?: Affiliation | null, count = 0) {
   const ceo =
     affiliation && (affiliation.role === 'ceo' || affiliation.role === 'founder')
       ? `This person is the ${affiliation.role} of ${affiliation.company || 'the company'}. Summarize the COMPANY-WIDE year (several products, a count). Never write a note that only names one product.`
@@ -409,6 +438,7 @@ function noteOnlySystem(year: number, affiliation?: Affiliation | null) {
     'Bad: "200/mo public revenue on CHATGPT FOR RESEARCH"',
     'Bad: "13k GitHub stars llm for LLM-MRCHATTERBOX"',
     'Bad: "1.4k GitHub stars blog for NEW INSTANT ROLLBACK FLOW"',
+    `The tape has exactly ${count} printed line${count === 1 ? '' : 's'} — if you mention a ship/line/launch/item/project/repo count, it must be ${count}. A star or download figure is fine only when it is copied from <found>.stats and labeled as stars or downloads. Never write "plus 0 more". For a 1-item tape, write a one-ship note.`,
     'Banned: wish and a prayer, Nobody asked, Same maker more SKUs, night shift, publish button, the tape, the register, receipt paper, stock the shelves, invented numbers, insults, exclamation marks, emoji, pairing a star count with the wrong product.',
     'Finish with only a JSON object, no markdown: {"note":""}',
   ]
@@ -694,7 +724,7 @@ export async function assembleReceipt(subject: Subject, gathered: Gathered, year
       const request = {
         model,
         max_tokens: 256,
-        system: noteOnlySystem(year, affiliation),
+        system: noteOnlySystem(year, affiliation, harvested.length),
         messages: [{ role: 'user', content: noteOnlyPrompt(subject, harvested, stats, year, affiliation) }],
         thinking: { type: 'disabled' },
       };

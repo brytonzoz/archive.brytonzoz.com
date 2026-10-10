@@ -164,6 +164,16 @@ export function shipName(value: unknown, max = 40): string {
     .replace(/^·\s*/, '');
   if (isNoiseTitle(text)) return '';
   text = text.replace(SHIP_PREFIX, '').trim();
+  if (/\b(released|lets?|can also|can now|use a |with site)\b/i.test(text)) {
+    const first = (text.split(/[.!?]/)[0] ?? text).trim();
+    const named = first.match(
+      /^(?:released|added|announced|launched)\s+([A-Z0-9@][\w. +-]{1,36}?)(?:\s+in\s+the\b.*)?$/i,
+    );
+    const lets = first.match(/^([A-Za-z][\w. -]{1,32}?)\s+(lets?|can also|can now)\b/i);
+    const product = named?.[1] || lets?.[1] || '';
+    text = tidy(product) || '';
+    if (!text) return '';
+  }
   text = text
     .replace(/\s+launches?\s+on\s+/i, ' for ')
     .replace(/\s+introduces?\s+/i, ' ')
@@ -455,13 +465,13 @@ export function itemsFromSitemap(xml: string, year: number): ChangelogFound[] {
   const seen = new Set<string>();
   for (const block of xml.matchAll(/<url\b[\s\S]*?<\/url>/gi)) {
     const loc = publicUrl(decodeXml(block[0].match(/<loc>\s*([^<]+)\s*<\/loc>/i)?.[1] ?? ''));
-    const lastmod = parseFlexibleDate(block[0].match(/<lastmod>\s*([^<]+)\s*<\/lastmod>/i)?.[1] ?? '', year);
-    if (!loc || !lastmod || !isSitemapShipPath(loc)) continue;
+    if (!loc || !isSitemapShipPath(loc)) continue;
     const name = titleFromSlug(loc);
     const key = loose(name) || loc;
     if (!name || seen.has(key)) continue;
     seen.add(key);
-    const item = row(name, lastmod, loc, year);
+    // lastmod is crawl metadata, not a publish date — never stamp it as the ship day.
+    const item = row(name, null, loc, year);
     if (item) found.push(item);
     if (found.length >= 160) break;
   }

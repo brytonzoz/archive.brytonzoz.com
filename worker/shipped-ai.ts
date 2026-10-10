@@ -214,7 +214,7 @@ export function noteFailsVoice(note: string): boolean {
   const text = note.replace(/\s+/g, ' ').trim();
   if (!text) return true;
   if (/https?:\/\/|\bwww\./i.test(text)) return true;
-  if (/\b[\w.-]+\.(com|io|dev|ai|org|net|app)\b/i.test(text)) return true;
+  if (/\b(npmjs|github|producthunt|twitter)\.com\b/i.test(text)) return true;
   if (/\blines\b/i.test(text)) return true;
   if (/\byear is\b/i.test(text) && /\bthrough\b/i.test(text)) return true;
   if (/\b\d+\s+public\s+(ships?|lines?)\b/i.test(text)) return true;

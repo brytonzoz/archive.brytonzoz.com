@@ -95,6 +95,14 @@ jobs:
             echo "::error::ADMIN_PASSWORD is required to reprint receipts."
             exit 1
           fi
+          if [ "${GITHUB_EVENT_NAME}" != "workflow_dispatch" ]; then
+            MSG=$(git log -1 --pretty=%B)
+            PARSED=$(printf '%s\n' "$MSG" | sed -n 's/.*\[shipped-reprint \([0-9][0-9, ]*\)\].*/\1/p' | tr -d ' ' | head -n1)
+            if [ -n "$PARSED" ]; then
+              export SHIPPED_REPRINT_FORCE_IDS="$PARSED"
+            fi
+          fi
+          echo "Reprint ids: $SHIPPED_REPRINT_FORCE_IDS"
           node --no-warnings scripts/reprint-shipped.mjs
 
       - name: Assert live goldens

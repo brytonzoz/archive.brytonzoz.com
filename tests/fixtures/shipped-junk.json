@@ -903,6 +903,33 @@
       "who": "Sam Altman",
       "company": "OpenAI",
       "role": "ceo"
+    },
+    {
+      "name": "UPDATED THE GPT-5.2-CHAT-LATEST SLUG TO POINT TO THE LATEST",
+      "date": "2026-02-10",
+      "source": "changelog",
+      "link": "https://developers.openai.com/api/docs/changelog",
+      "who": "Sam Altman",
+      "company": "OpenAI",
+      "role": "ceo"
+    },
+    {
+      "name": "UPDATED THE GPT-5.3-CHAT-LATEST SLUG TO POINT TO THE LATEST",
+      "date": "2026-03-16",
+      "source": "changelog",
+      "link": "https://developers.openai.com/api/docs/changelog",
+      "who": "Sam Altman",
+      "company": "OpenAI",
+      "role": "ceo"
+    },
+    {
+      "name": "GPT-5.6 SOL NOW COSTS $4 PER MILLION INPUT TOKENS",
+      "date": "2026-08-21",
+      "source": "changelog",
+      "link": "https://developers.openai.com/api/docs/changelog",
+      "who": "Sam Altman",
+      "company": "OpenAI",
+      "role": "ceo"
     }
   ],
   "keep": [
@@ -1066,6 +1093,33 @@
       "link": "https://www.npmjs.com/package/@shoojs/core",
       "who": "Theo",
       "handle": "t3dotgg"
+    },
+    {
+      "name": "GPT-REALTIME-2, A NEW REALTIME VOICE MODEL",
+      "date": "2026-05-07",
+      "source": "changelog",
+      "link": "https://developers.openai.com/api/docs/changelog",
+      "who": "Sam Altman",
+      "company": "OpenAI",
+      "role": "ceo"
+    },
+    {
+      "name": "RELEASED THE DECISIONS API IN BETA WITH GPT-6-LUNA",
+      "date": "2026-10-06",
+      "source": "changelog",
+      "link": "https://developers.openai.com/api/docs/changelog",
+      "who": "Sam Altman",
+      "company": "OpenAI",
+      "role": "ceo"
+    },
+    {
+      "name": "AGENTS API IN PUBLIC BETA",
+      "date": "2026-09-10",
+      "source": "changelog",
+      "link": "https://developers.openai.com/api/docs/changelog",
+      "who": "Sam Altman",
+      "company": "OpenAI",
+      "role": "ceo"
     }
   ]
 }

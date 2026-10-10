@@ -931,6 +931,58 @@ test('prereleases, starters, and Gateway model listings are not ships', () => {
   assert.equal(polish.isCustomerStoryTitle('Airbnb widens access to GPT-6 Astra and OpenAI frontier'), true);
   assert.equal(polish.isCustomerStoryTitle('GPT-6.1 Sol'), false);
   assert.equal(polish.isCustomerStoryTitle("Warp's big bet on building open source with GPT-5.5"), true);
+  assert.match(polish.cleanShipTitle('GPT-REALTIME-2, A NEW REALTIME VOICE MODEL'), /gpt-realtime-2$/i);
+  assert.match(polish.cleanShipTitle('RELEASED THE DECISIONS API IN BETA WITH GPT-6-LUNA'), /^decisions api$/i);
+  assert.match(polish.cleanShipTitle('AGENTS API IN PUBLIC BETA'), /agents api in public beta/i);
+  assert.equal(polish.isNotAShipTitle('UPDATED THE GPT-5.2-CHAT-LATEST SLUG TO POINT TO THE LATEST'), true);
+  assert.equal(polish.isNotAShipTitle('GPT-5.2-CHAT-LATEST SLUG TO POINT TO THE LATEST'), true);
+  assert.equal(polish.isPricingOrMetricNote('GPT-5.6 SOL NOW COSTS $4 PER MILLION INPUT TOKENS'), true);
+  const samTitles = polish.gateReceiptItems(
+    [
+      found({
+        name: 'UPDATED THE GPT-5.2-CHAT-LATEST SLUG TO POINT TO THE LATEST',
+        date: '2026-02-10',
+        link: 'https://developers.openai.com/api/docs/changelog',
+      }),
+      found({
+        name: 'UPDATED THE GPT-5.3-CHAT-LATEST SLUG TO POINT TO THE LATEST',
+        date: '2026-03-16',
+        link: 'https://developers.openai.com/api/docs/changelog',
+      }),
+      found({
+        name: 'GPT-5.6 SOL NOW COSTS $4 PER MILLION INPUT TOKENS',
+        date: '2026-08-21',
+        link: 'https://developers.openai.com/api/docs/changelog',
+      }),
+      found({
+        name: 'GPT-REALTIME-2, A NEW REALTIME VOICE MODEL',
+        date: '2026-05-07',
+        link: 'https://developers.openai.com/api/docs/changelog',
+      }),
+      found({
+        name: 'RELEASED THE DECISIONS API IN BETA WITH GPT-6-LUNA',
+        date: '2026-10-06',
+        link: 'https://developers.openai.com/api/docs/changelog',
+      }),
+      found({
+        name: 'AGENTS API IN PUBLIC BETA',
+        date: '2026-09-10',
+        link: 'https://developers.openai.com/api/docs/changelog',
+      }),
+      found({ name: 'GPT-6', date: '2026-09-03', link: 'https://openai.com/index/gpt-6-astra/' }),
+    ],
+    {
+      year: 2026,
+      who: 'Sam Altman',
+      affiliation: { role: 'ceo', company: 'OpenAI', name: 'Sam Altman' },
+    },
+  );
+  const samNames = samTitles.map((item) => item.name);
+  assert.equal(samNames.some((name) => /slug|now costs|per million/i.test(name)), false, JSON.stringify(samNames));
+  assert.ok(samNames.some((name) => /^gpt-realtime-2$/i.test(name)), JSON.stringify(samNames));
+  assert.ok(samNames.some((name) => /^decisions api$/i.test(name)), JSON.stringify(samNames));
+  assert.ok(samNames.some((name) => /agents api in public beta/i.test(name)), JSON.stringify(samNames));
+  assert.ok(samNames.some((name) => /gpt-6/i.test(name)), JSON.stringify(samNames));
   assert.equal(polish.isBlogEssayTitle('Overview: GPT-6 Astra'), true);
   assert.equal(polish.isForeignProductOnCompanyTape('STRIPE', 'Vercel'), true);
   assert.equal(polish.isForeignProductOnCompanyTape('CURSOR', 'Vercel'), true);

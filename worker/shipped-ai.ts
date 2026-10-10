@@ -647,7 +647,25 @@ export function scoreCashierNote(
   if (noteRestatesTitle(text, items)) score -= 14;
   if (/[·]/.test(text)) score -= 12;
   if (PUBLIC_TAPE_NOTE.test(text)) score -= 30;
+  if (noteNonSequitur(text, items)) score -= 22;
   return score;
+}
+
+/** Second sentence should follow the first (same ship or shared content), not a new metaphor. */
+export function noteNonSequitur(note: string, items: DraftItem[] = []): boolean {
+  const parts = note
+    .replace(/\s+/g, ' ')
+    .trim()
+    .split(/(?<=[.!?])\s+/)
+    .map((part) => part.trim())
+    .filter((part) => part.replace(/[.!?]/g, '').trim());
+  if (parts.length < 2) return false;
+  const first = parts[0]!;
+  const rest = parts.slice(1).join(' ');
+  if (noteMentionsShip(rest, items) > 0) return false;
+  const head = new Set(wordsIn(first));
+  const shared = wordsIn(rest).filter((word) => head.has(word) && word.length > 3);
+  return shared.length === 0;
 }
 
 const NOTE_STOP = new Set([

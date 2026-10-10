@@ -850,3 +850,23 @@ test('public MRR and stars keep their source URL', () => {
   const junk = research.extractPublicStats('Save $70 on monitors and 0000M impressions', 'https://interiorai.com/', 'Interior AI');
   assert.equal(junk.some((s) => s.kind === 'mrr'), false);
 });
+
+test('cashier notes prefer a second sentence that follows the first', () => {
+  const items = [
+    {
+      name: 'AWS DATABASES ARE NOW LIVE ON THE VERCEL MARKETPLACE AND V0',
+      spoken: 'AWS databases',
+      description: 'provision a database from v0 while the app is still being built',
+      source: 'changelog',
+    },
+  ];
+  const ctx = { who: 'Guillermo Rauch' };
+  const follows = 'AWS databases now provision straight from v0 while the app is still being built. Those AWS databases come up before the first deploy.';
+  const leap = 'AWS databases now provision straight from v0 while the app is still being built. Guillermo, the boss, bought his own store out.';
+  assert.equal(ai.noteNonSequitur(leap, items), true);
+  assert.equal(ai.noteNonSequitur(follows, items), false);
+  assert.ok(
+    ai.scoreCashierNote(follows, items, [], ctx) > ai.scoreCashierNote(leap, items, [], ctx),
+    `${ai.scoreCashierNote(follows, items, [], ctx)} vs ${ai.scoreCashierNote(leap, items, [], ctx)}`,
+  );
+});

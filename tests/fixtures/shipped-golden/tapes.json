@@ -3005,7 +3005,20 @@
       "SUPPORT FOR FINE-TUNED MODELS TO THE BATCH API",
       "SUPPORT FOR SETTING COST LIMITS ON A PER-PROJECT",
       "SUPPORT FOR FILE SEARCH CUSTOMIZATIONS",
-      "RELEASED UPLOADS TO UPLOAD LARGE FILES IN MULTIPLE PARTS"
+      "RELEASED UPLOADS TO UPLOAD LARGE FILES IN MULTIPLE PARTS",
+      "UPDATED THE GPT-5.2-CHAT-LATEST SLUG TO POINT TO THE LATEST",
+      "UPDATED THE GPT-5.3-CHAT-LATEST SLUG TO POINT TO THE LATEST",
+      "GPT-5.6 SOL NOW COSTS $4 PER MILLION INPUT TOKENS"
+    ],
+    "forbiddenRe": [
+      {
+        "key": "chat-latest-slug",
+        "re": "chat-latest.{0,40}slug|slug.{0,40}(chat-latest|point to the latest)"
+      },
+      {
+        "key": "sol-pricing",
+        "re": "now costs.{0,40}per million"
+      }
     ],
     "profile": {
       "name": "Sam Altman",

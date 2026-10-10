@@ -464,6 +464,8 @@ export function isPricingOrMetricNote(name: string): boolean {
   if (/\b(pric(e|ing|es)|billing|skus?)\b/i.test(text) && !/\b(app|cli|sdk|api|model)\b/i.test(text)) return true;
   if (/\b(pricing plans?|plan pricing|teams plans?)\b/i.test(text)) return true;
   if (/^(improved|better|faster|cheaper|reduced|lower|higher)\s+[A-Za-z]+(?:\s+[A-Za-z]+)?$/i.test(text)) return true;
+  if (/\bnow costs?\b|\bper million\b/i.test(text)) return true;
+  if (/\$\d+/.test(text) && /\b(token|input|output|million)\b/i.test(text)) return true;
   return false;
 }
 
@@ -557,6 +559,8 @@ export function isNotAShipTitle(name: string): boolean {
   if (/\bmodels? for model availability\b/i.test(text) || /\bmodel availability update\b/i.test(text)) return true;
   if (/\binto the\b/i.test(text)) return true;
   if (/\bupdates\s*:/i.test(text)) return true;
+  if (/\bslugs?\b/i.test(text) && /\b(point|alias|latest|chat-latest)\b/i.test(text)) return true;
+  if (/\balias(es)?\b/i.test(text) && /\b(point|slug|latest)\b/i.test(text)) return true;
   if (/·\s*\d+\s+updates?\s+in\s+/i.test(text)) return false;
   if (/^(?:[A-Za-z][\w.+-]*\s+and\s+)?.+\s+updates$/i.test(text)) return true;
   return false;
@@ -800,6 +804,11 @@ export function cleanShipTitle(raw: unknown, max = TITLE_MAX): string {
     text = tagline[1].trim();
   }
   text = text.replace(/^the new\s+/i, '').replace(/^new\s+(v\d\b)/i, '$1');
+  if (/^(released|updated|added)\s+/i.test(text)) {
+    text = text.replace(/^(released|updated|added)\s+/i, '').replace(/^the\s+/i, '').trim();
+  }
+  text = text.replace(/,\s+a new\b.*$/i, '').trim();
+  text = text.replace(/\s+in (public )?beta with\b.*$/i, '').trim();
   text = text.replace(/-+$/, '').trim();
   const speedTag = text.match(/^(.*?):\s*(.+?)\s+at up to\s+\d+x\b.*$/i);
   if (speedTag) {
@@ -808,7 +817,7 @@ export function cleanShipTitle(raw: unknown, max = TITLE_MAX): string {
     text = left && !isJunkTitle(left) && !isVagueOrCutTitle(left) ? left : mid || left;
   }
   text = text
-    .replace(/^(introducing|launching|announcing|presenting|meet|say hello to|now available[:\s]+|how to|read the|launched|previewing)\s+/i, '')
+    .replace(/^(introducing|launching|announcing|presenting|meet|say hello to|now available[:\s]+|how to|read the|launched|previewing|released|updated|added)\s+/i, '')
     .replace(/:?\s*at up to\s+\d+x\b.*$/i, '')
     .replace(/\s+launched as\b.*$/i, '')
     .replace(/\s+(is )?(now |generally )?available(\s+(today|on\b.*|in\b.*))?$/i, '')

@@ -588,6 +588,9 @@ export function secure(headers: Headers): Headers {
 /** For images and other non-page bodies: nothing in them may run. */
 export const INERT_CSP = "default-src 'none'; img-src 'self' data:; style-src 'unsafe-inline'; sandbox; frame-ancestors 'none'";
 
+/** Images viewed as documents: `sandbox` makes Chrome log sandboxed-script errors. */
+export const IMAGE_CSP = "default-src 'none'; frame-ancestors 'none'";
+
 export function cspFor(scriptHashes: string[]): string {
   return [
     "default-src 'self'",
@@ -630,7 +633,9 @@ export async function hardenPage(response: Response): Promise<Response> {
   const headers = secure(new Headers(response.headers));
   const type = headers.get('content-type') ?? '';
   if (!type.includes('text/html') || !response.body) {
-    if (!type.includes('text/html')) headers.set('content-security-policy', INERT_CSP);
+    if (!type.includes('text/html')) {
+      headers.set('content-security-policy', type.startsWith('image/') ? IMAGE_CSP : INERT_CSP);
+    }
     return new Response(response.body, { status: response.status, statusText: response.statusText, headers });
   }
   const html = await response.text();

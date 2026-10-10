@@ -29,7 +29,7 @@ export type ViewItem = {
 export type YearReceiptProps = {
   year: number;
   who: string;
-  kicker?: string | null;
+  kicker?: React.ReactNode;
   date: string;
   number: string;
   items: ViewItem[];
@@ -184,18 +184,13 @@ function ItemList({ props }: { props: YearReceiptProps }) {
         ))}
       </div>
       <Rule heavy />
-      <div className="shipped-lead items-end py-1 text-[13px] font-semibold">
-        <span>
-          {typeof props.shipScore === 'number' ? (
-            <>
-              ITEMS SHIPPED <span className="text-[11px] font-medium opacity-70">· SCORE {props.shipScore}</span>
-            </>
-          ) : (
-            'ITEMS SHIPPED'
-          )}
-        </span>
+      <div className="shipped-lead items-baseline py-1 text-[13px] font-semibold">
+        <span className="shrink-0">ITEMS SHIPPED</span>
         <span className="shipped-lead-fill" aria-hidden="true" />
-        <Tall className="text-[18px] tabular-nums">{String(props.count)}</Tall>
+        <span className="shipped-totals-end">
+          <Tall className="text-[18px] tabular-nums">{String(props.count)}</Tall>
+          {typeof props.shipScore === 'number' ? <span className="shipped-score">SCORE {props.shipScore}</span> : null}
+        </span>
       </div>
       <Rule heavy />
     </>

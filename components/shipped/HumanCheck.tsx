@@ -8,7 +8,7 @@ import React, { forwardRef, useEffect, useImperativeHandle, useRef } from 'react
 import { Turnstile, type TurnstileHandle } from './Turnstile';
 
 export type HumanCheckConfig = { kind: 'turnstile'; siteKey: string } | { kind: 'pow'; bits: number };
-export type HumanCheckHandle = { reset: () => void; execute: () => Promise<string | null> };
+export type HumanCheckHandle = { reset: () => void; execute: () => Promise<string | null>; warm: () => void };
 
 type Props = {
   check: HumanCheckConfig | null | undefined;
@@ -85,6 +85,10 @@ export const HumanCheck = forwardRef<HumanCheckHandle, Props>(function HumanChec
       if (checkRef.current?.kind === 'turnstile') turnstile.current?.reset();
       else setRound((n) => n + 1);
     },
+    warm: () => {
+      setNeeded(true);
+      turnstile.current?.warm();
+    },
     execute: async () => {
       token.current = null;
       onToken(null);
@@ -98,7 +102,6 @@ export const HumanCheck = forwardRef<HumanCheckHandle, Props>(function HumanChec
         while (!turnstile.current && Date.now() - start < 8_000) {
           await new Promise((resolve) => window.setTimeout(resolve, 50));
         }
-        turnstile.current?.reset();
         return turnstile.current?.execute() ?? null;
       }
       if (current?.kind === 'pow') {

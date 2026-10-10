@@ -32,12 +32,14 @@ export type Console = {
   query: string;
   onQuery: (value: string) => void;
   onPrint: () => void;
+  /** Mount Turnstile on first focus so PRINT and Enter share one warmed widget. */
+  onWarm?: () => void;
   printing: boolean;
   listed: boolean;
   onListed: (value: boolean) => void;
   closed?: boolean;
   invalid?: boolean;
-  /** LCD shows TRY AGAIN; Print is still enabled. */
+  /** Last print failed the human check; input stays, PRINT re-runs. */
   retry?: boolean;
 };
 
@@ -475,7 +477,7 @@ export function Machine({ job, display, tone, onPrinted, onTorn, tearSignal = 0,
   const stubKey = ownStub ? shown.key : stubSeed;
   const stubVisible = ownStub || phase === 'feeding' || (phase === 'idle' && stubKey !== null);
   const lead = shown.kind === 'feed';
-  const showInput = Boolean(desk && !desk.closed && !desk.printing && !desk.retry && (phase === 'idle' || phase === 'hanging' || phase === 'torn'));
+  const showInput = Boolean(desk && !desk.closed && !desk.printing && (phase === 'idle' || phase === 'hanging' || phase === 'torn'));
   const houseSlip = shown.kind === 'print' && (shown.key === 'house' || Boolean(shown.slip));
   const status =
     phase === 'idle'
@@ -534,7 +536,16 @@ export function Machine({ job, display, tone, onPrinted, onTorn, tearSignal = 0,
         TEAR
       </button>
       {desk ? (
-        <button type="submit" className="shipped-key is-print" disabled={desk.closed || desk.printing} onPointerDown={press}>
+        <button
+          type="button"
+          className="shipped-key is-print"
+          disabled={desk.closed || desk.printing}
+          onPointerDown={press}
+          onClick={() => {
+            if (desk.closed || desk.printing) return;
+            desk.onPrint();
+          }}
+        >
           PRINT
         </button>
       ) : null}
@@ -555,6 +566,7 @@ export function Machine({ job, display, tone, onPrinted, onTorn, tearSignal = 0,
                 className="shipped-lcd-input"
                 value={desk.query}
                 onChange={(event) => desk.onQuery(event.target.value)}
+                onFocus={() => desk.onWarm?.()}
                 autoComplete="off"
                 autoCapitalize="none"
                 spellCheck={false}
@@ -566,6 +578,18 @@ export function Machine({ job, display, tone, onPrinted, onTorn, tearSignal = 0,
               />
               <span className="shipped-lcd-block" aria-hidden="true" />
             </>
+          ) : desk?.retry ? (
+            <button
+              type="button"
+              className="shipped-lcd-text is-retry"
+              onPointerDown={press}
+              onClick={() => {
+                desk.onWarm?.();
+                desk.onPrint();
+              }}
+            >
+              TRY AGAIN
+            </button>
           ) : (
             <span key={display} className="shipped-lcd-text" aria-hidden="true">
               {display}

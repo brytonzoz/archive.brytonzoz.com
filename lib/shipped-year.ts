@@ -204,6 +204,22 @@ export function xHandle(receipt: Pick<YearReceipt, 'subject'>): string | null {
   const { subject } = receipt;
   if (subject.kind === 'x' && isXHandle(subject.id)) return subject.id;
   if (subject.x && isXHandle(subject.x)) return subject.x;
+  const at = subject.display.startsWith('@') ? subject.display.slice(1) : '';
+  if (at && isXHandle(at)) return at;
+  // Typed @handle that resolved to a display name (id kept the handle).
+  if (subject.kind === 'name' && subject.id !== subject.display && isXHandle(subject.id)) return subject.id;
+  return null;
+}
+
+/** Linked customer label. Hidden when there is no URL (bare "GITHUB"). */
+export function subjectKicker(subject: Subject): { text: string; href: string } | null {
+  if (subject.x && isXHandle(subject.x)) return { text: `@${subject.x} · X`, href: `https://x.com/${subject.x}` };
+  if (subject.kind === 'x' && isXHandle(subject.id)) return { text: `@${subject.id} · X`, href: `https://x.com/${subject.id}` };
+  if (subject.kind === 'github' && isGithubLogin(subject.id)) return { text: `@${subject.id} · GITHUB`, href: `https://github.com/${subject.id}` };
+  if (subject.kind === 'domain' && subject.id.includes('.')) {
+    const host = subject.id.replace(/^https?:\/\//, '').replace(/\/.*$/, '');
+    return { text: host, href: `https://${host}` };
+  }
   return null;
 }
 

@@ -17,6 +17,7 @@ import {
   receiptNumber,
   shareText,
   shareTweet,
+  subjectKicker,
   subjectLabel,
   type SponsorBlock,
   type YearReceipt as Printed,
@@ -28,13 +29,6 @@ import { refreshShippedState, useShippedState } from './state';
 import { YearReceipt } from './YearReceipt';
 
 export type Loaded = { receipt: Printed; sponsors: SponsorBlock };
-
-const KICKER: Record<Printed['subject']['kind'], string> = {
-  github: 'GITHUB',
-  x: 'X / TWITTER',
-  domain: 'WEBSITE',
-  name: 'NAME',
-};
 
 /** The token that proves this browser printed the receipt (it can toss it on the pile or remove it). */
 const pileKey = (id: number) => `shipped:pile:${id}`;
@@ -64,18 +58,18 @@ function titleCustomer(raw: string): string {
 
 export function VisitorReceipt({ receipt, sponsors }: Loaded) {
   const who = titleCustomer(subjectLabel(receipt.subject));
-  const kicker = receipt.subject.x
-    ? `@${receipt.subject.x} · X`
-    : receipt.subject.kind === 'github' && receipt.subject.display !== who
-      ? `@${receipt.subject.id} · GITHUB`
-      : receipt.subject.kind === 'name'
-        ? ''
-        : KICKER[receipt.subject.kind];
+  const kicker = subjectKicker(receipt.subject);
   return (
     <YearReceipt
       year={receipt.year}
       who={who}
-      kicker={kicker}
+      kicker={
+        kicker ? (
+          <a href={kicker.href} target="_blank" rel="noopener noreferrer" className="shipped-link">
+            {kicker.text}
+          </a>
+        ) : null
+      }
       date={receiptDate(receipt.printedAt)}
       number={receiptNumber(receipt.id)}
       printedAt={receipt.printedAt}

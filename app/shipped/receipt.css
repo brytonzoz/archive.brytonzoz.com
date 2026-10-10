@@ -909,6 +909,32 @@ html.shipped-focus .shipped-board {
   color: hsl(6 90% 72%);
 }
 
+.shipped-desk-error.is-retry {
+  display: block;
+  border: 0;
+  padding: 0;
+  background: none;
+  font: inherit;
+  cursor: pointer;
+  text-decoration: underline;
+  text-underline-offset: 3px;
+}
+
+.shipped-totals-end {
+  display: inline-flex;
+  align-items: baseline;
+  gap: 0.55rem;
+  flex: 0 0 auto;
+  white-space: nowrap;
+}
+
+.shipped-score {
+  font-size: 11px;
+  font-weight: 550;
+  letter-spacing: 0.08em;
+  opacity: 0.7;
+}
+
 .shipped-desk-status {
   width: min(26.5rem, 100%);
   margin: 0;
@@ -1152,6 +1178,21 @@ html.shipped-focus .shipped-board {
   text-overflow: clip;
   text-transform: uppercase;
   animation: shipped-lcd 160ms steps(2, jump-none) both;
+}
+
+button.shipped-lcd-text {
+  width: 100%;
+  margin: 0;
+  padding: 0;
+  border: 0;
+  background: none;
+  color: inherit;
+  font: inherit;
+  letter-spacing: inherit;
+  text-align: left;
+  cursor: pointer;
+  text-decoration: underline;
+  text-underline-offset: 3px;
 }
 
 .tone-busy .shipped-lcd-text::after {
@@ -1729,8 +1770,10 @@ html.shipped-focus .shipped-board {
 
 .shipped-pill.is-open {
   width: min(26.5rem, 100%);
-  max-height: min(72svh, 36rem);
+  max-height: calc(100svh - 7.5rem - env(safe-area-inset-bottom, 0px));
   overflow: auto;
+  overscroll-behavior: contain;
+  -webkit-overflow-scrolling: touch;
   border-radius: 16px;
   background: #1a1612;
   padding: 8px 12px 12px;
@@ -2413,8 +2456,12 @@ html.shipped-wall-focus-open .shipped-wall-board {
 }
 
 .shipped-wall-focus-canvas {
-  display: block;
+  display: none;
   margin: 0 auto;
+}
+
+.shipped-wall-focus-canvas.is-on {
+  display: block;
 }
 
 .shipped-wall-focus-actions {

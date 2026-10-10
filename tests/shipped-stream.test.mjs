@@ -87,7 +87,9 @@ test('the tape and the DOM copy keep ITEMS SHIPPED · SCORE and drop the status 
   assert.doesNotMatch(doc.text, /LAUNCHED ~/);
 
   const year = fs.readFileSync(new URL('../components/shipped/YearReceipt.tsx', import.meta.url), 'utf8');
-  assert.match(year, /ITEMS SHIPPED <span className="text-\[11px\] font-medium opacity-70">· SCORE/);
+  assert.match(year, /ITEMS SHIPPED/);
+  assert.match(year, /shipped-totals-end/);
+  assert.match(year, /SCORE \{props\.shipScore\}/);
   assert.match(year, /block opacity-60/);
   assert.equal(year.includes('opacity-40">'), false);
   assert.doesNotMatch(year, /sr-only">: /);
@@ -133,7 +135,8 @@ test('after a print the stage auto-tears; sponsors stay collapsed; Turnstile has
 
   assert.match(stage, /forgetTorn\(\)/);
   assert.match(stage, /human\.current\?\.reset\(\)/);
-  assert.doesNotMatch(stage, /token \?\? \(await human/);
+  assert.match(stage, /humanToken = token \?\? \(await human/);
+  assert.match(stage, /const humanToken = \(await human\.current\?\.execute\(\)\)/);
 
   assert.match(css, /\.shipped-out \{[\s\S]*pointer-events: none;/);
   const wall = fs.readFileSync(new URL('../components/shipped/wall/ReceiptWall.tsx', import.meta.url), 'utf8');
@@ -164,6 +167,16 @@ test('shared receipt pages are the hero; DATE/RECEIPT pairs do not collide; chec
   const pay = fs.readFileSync(new URL('../worker/shipped.ts', import.meta.url), 'utf8');
   assert.match(pay, /\/r\/\$\{id\}\/\?paid=\{CHECKOUT_SESSION_ID\}/);
   assert.match(pay, /\/r\/\$\{id\}\/\?canceled=1/);
+  const pngStart = pay.indexOf('function png');
+  const pngFn = pay.slice(pngStart, pay.indexOf('\n}', pngStart) + 2);
+  assert.match(pngFn, /default-src 'none'/);
+  assert.doesNotMatch(pngFn, /sandbox/);
+  const guard = fs.readFileSync(new URL('../worker/shipped-guard.ts', import.meta.url), 'utf8');
+  assert.match(guard, /IMAGE_CSP/);
+  assert.match(guard, /type\.startsWith\('image\/'\)/);
+
+  assert.match(css, /100svh - 7\.5rem/);
+  assert.match(css, /\.shipped-wall-focus-canvas\.is-on/);
 
   const visitor = fs.readFileSync(new URL('../components/shipped/visitor.tsx', import.meta.url), 'utf8');
   assert.match(visitor, /params\.get\('paid'\)/);
@@ -171,6 +184,24 @@ test('shared receipt pages are the hero; DATE/RECEIPT pairs do not collide; chec
 
   const human = fs.readFileSync(new URL('../components/shipped/HumanCheck.tsx', import.meta.url), 'utf8');
   assert.match(human, /setNeeded/);
+  assert.match(human, /warm:/);
+
+  const turnstile = fs.readFileSync(new URL('../components/shipped/Turnstile.tsx', import.meta.url), 'utf8');
+  assert.match(turnstile, /api\.current\.execute/);
+  assert.match(turnstile, /api\.current\.reset/);
+  assert.match(turnstile, /minting/);
+  assert.doesNotMatch(turnstile, /if \(token\.current && !spent\.current\)/);
+
+  const machine = fs.readFileSync(new URL('../components/shipped/Machine.tsx', import.meta.url), 'utf8');
+  assert.match(machine, /type="button"/);
+  assert.match(machine, /desk\.onPrint\(\)/);
+  assert.match(machine, /onWarm/);
+  assert.match(machine, /desk\?\.retry/);
+  assert.doesNotMatch(machine, /!desk\.retry &&/);
+
+  assert.match(stage, /humanToken = token \?\?/);
+  assert.match(stage, /human\.current\?\.warm/);
+  assert.match(stage, /is-retry/);
 
   const sound = fs.readFileSync(new URL('../components/shipped/sound.ts', import.meta.url), 'utf8');
   assert.match(sound, /allowSound/);

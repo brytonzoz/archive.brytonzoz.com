@@ -1771,7 +1771,8 @@ export async function qrRedirect(env: ShippedEnv, key: string, ctx: ExecutionCon
 
 function png(body: BodyInit | null, cache: string): Response {
   const headers = secure(new Headers({ 'content-type': 'image/png', 'cache-control': cache, 'x-robots-tag': 'noindex' }));
-  headers.set('content-security-policy', "default-src 'none'; sandbox");
+  // Viewing /r/<id>/og.png as a document must not inherit a restricted browsing context.
+  headers.set('content-security-policy', "default-src 'none'");
   return new Response(body, { headers });
 }
 

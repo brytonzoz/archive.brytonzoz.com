@@ -267,12 +267,12 @@ export function ShippedStage({ opening, title }: { opening: Opening; title: Reac
     load({ key: `${key}-${prints.current}`, kind: 'print', slip: true, end, label, content }, null);
   }
 
-  async function print(candidate: Candidate, gen = run.current) {
-    human.current?.reset();
-    const humanToken = (await human.current?.execute()) ?? null;
+  async function print(candidate: Candidate, gen = run.current, token?: string | null) {
+    const humanToken = token ?? (await human.current?.execute()) ?? null;
     if (run.current !== gen) return;
     if (!humanToken) {
       setStep({ name: 'retry' });
+      input.current?.focus();
       return setError(ERRORS.turnstile);
     }
     // Invalidate the LOOKING UP timeout so a long print never flips the LCD to TRY AGAIN.
@@ -350,12 +350,23 @@ export function ShippedStage({ opening, title }: { opening: Opening; title: Reac
     }
     const gen = ++run.current;
     setError(null);
+    // PRINT and Enter both land here. Take the token during this gesture, before lookup.
+    human.current?.warm();
+    const humanToken = (await human.current?.execute()) ?? null;
+    if (run.current !== gen) return;
+    if (!humanToken) {
+      setStep({ name: 'retry' });
+      setError(ERRORS.turnstile);
+      input.current?.focus();
+      return;
+    }
     setStep({ name: 'looking' });
     const timer = window.setTimeout(() => {
       if (run.current !== gen) return;
       ++run.current;
       setStep({ name: 'retry' });
       setError(ERRORS.turnstile);
+      input.current?.focus();
     }, LOOKUP_MS);
     try {
       const response = await fetch('/api/shipped/lookup', {
@@ -366,10 +377,9 @@ export function ShippedStage({ opening, title }: { opening: Opening; title: Reac
       const result = (await response.json().catch(() => ({}))) as { candidates?: Candidate[]; auto?: boolean; error?: string };
       if (run.current !== gen) return;
       if (!response.ok || !result.candidates?.length) throw new Error(result.error ?? 'invalid-query');
-      // Lookup is done. Clear the 15s timer before Turnstile/print, or TRY AGAIN fires while execute() runs.
       window.clearTimeout(timer);
       if (result.auto) {
-        await print(result.candidates[0], gen);
+        await print(result.candidates[0], gen, humanToken);
         return;
       }
       setStep({ name: 'pick', candidates: result.candidates });
@@ -384,6 +394,10 @@ export function ShippedStage({ opening, title }: { opening: Opening; title: Reac
   }
 
   const busy = step.name === 'looking' || step.name === 'feeding';
+
+  useEffect(() => {
+    if (step.name === 'retry') input.current?.focus();
+  }, [step.name]);
 
   useEffect(() => {
     document.documentElement.classList.toggle('shipped-focus', focus);
@@ -506,6 +520,7 @@ export function ShippedStage({ opening, title }: { opening: Opening; title: Reac
                     if (error) setError(null);
                   },
                   onPrint: () => void submit(),
+                  onWarm: () => human.current?.warm(),
                   printing: busy,
                   retry: step.name === 'retry',
                   listed,
@@ -525,7 +540,21 @@ export function ShippedStage({ opening, title }: { opening: Opening; title: Reac
 
         {shared ? null : <HumanCheck ref={human} check={generator?.enabled ? generator.human : null} onToken={() => undefined} theme="dark" appearance="execute" />}
 
-        {error ? (
+        {error && step.name === 'retry' ? (
+          <button
+            type="button"
+            id="shipped-print-error"
+            className="shipped-desk-error is-retry"
+            onPointerDown={press}
+            onClick={() => {
+              human.current?.reset();
+              input.current?.focus();
+              void submit();
+            }}
+          >
+            {error}
+          </button>
+        ) : error ? (
           <p id="shipped-print-error" className="shipped-desk-error" role="alert">
             {error}
           </p>

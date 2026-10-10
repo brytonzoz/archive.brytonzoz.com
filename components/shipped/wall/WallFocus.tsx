@@ -28,11 +28,15 @@ export function WallFocus({ receipt, crumpled, reduced, onClose, onCrumple, onUn
   const canvas = useRef<HTMLCanvasElement>(null);
   const spin = useRef({ rx: 0, ry: 0, vx: 0, vy: 0, px: 0, py: 0, dragging: false, raf: 0 });
   const crumple = useRef<Crumple | null>(null);
+  const anim = useRef(0);
   const [ball, setBall] = useState(crumpled);
   const [origin, setOrigin] = useState('');
   const painted = useRef(false);
 
   useEffect(() => setOrigin(window.location.origin), []);
+  useEffect(() => () => {
+    if (anim.current) window.cancelAnimationFrame(anim.current);
+  }, []);
 
   useEffect(() => {
     document.documentElement.classList.add('shipped-wall-focus-open');
@@ -138,6 +142,8 @@ export function WallFocus({ receipt, crumpled, reduced, onClose, onCrumple, onUn
   }
 
   function runCrumple(to: number) {
+    if (anim.current) window.cancelAnimationFrame(anim.current);
+    anim.current = 0;
     const node = canvas.current;
     if (!node) return;
     const width = 280;
@@ -175,16 +181,22 @@ export function WallFocus({ receipt, crumpled, reduced, onClose, onCrumple, onUn
     const start = performance.now();
     const dur = 520;
     const tick = (now: number) => {
+      if (crumple.current !== engine) return;
       const t = Math.min(1, (now - start) / dur);
       const eased = t * t * (3 - 2 * t);
       engine.update(from + (to - from) * eased);
       ctx.clearRect(0, 0, node.width, node.height);
       engine.draw(ctx, { x: 0, y: 0, angle: 0, scale: 1 }, dpr);
-      if (t < 1) window.requestAnimationFrame(tick);
-      else setBall(to > 0.5);
+      if (t < 1) {
+        anim.current = window.requestAnimationFrame(tick);
+        return;
+      }
+      anim.current = 0;
+      if (to <= 0.5) ctx.clearRect(0, 0, node.width, node.height);
+      setBall(to > 0.5);
     };
     setBall(true);
-    window.requestAnimationFrame(tick);
+    anim.current = window.requestAnimationFrame(tick);
   }
 
   // First paint of an already-crumpled slip; runCrumple always reads the current receipt.
@@ -212,7 +224,7 @@ export function WallFocus({ receipt, crumpled, reduced, onClose, onCrumple, onUn
           onPointerUp={onPointerUp}
           onPointerCancel={onPointerUp}
         >
-          <canvas ref={canvas} className="shipped-wall-focus-canvas" hidden={!ball} aria-hidden="true" />
+          <canvas ref={canvas} className={`shipped-wall-focus-canvas${ball ? ' is-on' : ''}`} aria-hidden="true" />
           {ball ? null : <WallSlip receipt={receipt} />}
         </div>
         <div className="shipped-wall-focus-actions">

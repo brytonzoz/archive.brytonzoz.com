@@ -33,7 +33,7 @@ function loadTurnstile(): Promise<TurnstileApi> {
   return script;
 }
 
-export type TurnstileHandle = { reset: () => void; execute: () => Promise<string | null> };
+export type TurnstileHandle = { reset: () => void; execute: () => Promise<string | null>; warm: () => void };
 
 type TurnstileProps = {
   siteKey: string;
@@ -54,6 +54,7 @@ export const Turnstile = forwardRef<TurnstileHandle, TurnstileProps>(function Tu
   const api = useRef<TurnstileApi | null>(null);
   const token = useRef<string | null>(null);
   const spent = useRef(false);
+  const minting = useRef(false);
   const waiters = useRef<((value: string | null) => void)[]>([]);
   const callback = useRef(onToken);
   callback.current = onToken;
@@ -62,15 +63,24 @@ export const Turnstile = forwardRef<TurnstileHandle, TurnstileProps>(function Tu
   const [round, setRound] = useState(0);
   const [failed, setFailed] = useState(false);
 
-  function emit(value: string | null) {
-    token.current = value;
-    spent.current = false;
-    callback.current(value);
+  function resolveWaiters(value: string | null) {
     const pending = waiters.current.splice(0);
     pending.forEach((resolve) => resolve(value));
   }
 
+  function emit(value: string | null) {
+    token.current = value;
+    spent.current = false;
+    callback.current(value);
+    // reset() fires expired/error with null. A mint in flight must keep waiting
+    // for the new token — resolving here is what made PRINT 400 after Enter worked.
+    if (value == null && minting.current) return;
+    minting.current = false;
+    resolveWaiters(value);
+  }
+
   function askToVerify() {
+    minting.current = false;
     setChallenge(true);
     setFailed(true);
     emit(null);
@@ -93,28 +103,36 @@ export const Turnstile = forwardRef<TurnstileHandle, TurnstileProps>(function Tu
     reset: () => {
       resetWidget();
     },
+    warm: () => {
+      setChallenge(false);
+      setFailed(false);
+    },
     execute: () => {
-      // A Turnstile token is single-use. Never hand the last one back.
-      if (token.current && !spent.current) {
-        spent.current = true;
-        const value = token.current;
-        token.current = null;
-        return Promise.resolve(value);
-      }
+      // Always mint a new token. A leftover or spent one is what made PRINT 400.
+      minting.current = true;
       token.current = null;
       spent.current = false;
-      resetWidget();
+      if (widget.current && api.current) {
+        try {
+          api.current.reset(widget.current);
+        } catch {
+          // Remounting here would drop the waiter. Execute the current widget instead.
+        }
+      }
       return new Promise((resolve) => {
         waiters.current.push(resolve);
         const start = Date.now();
         let kicked = false;
         const run = () => {
-          if (token.current) return;
+          if (token.current) {
+            minting.current = false;
+            resolveWaiters(token.current);
+            return;
+          }
           if (widget.current && api.current && !kicked) {
             kicked = true;
             try {
-              if (visible) api.current.reset(widget.current);
-              else api.current.execute(widget.current);
+              api.current.execute(widget.current);
             } catch {
               askToVerify();
               return;
@@ -126,7 +144,8 @@ export const Turnstile = forwardRef<TurnstileHandle, TurnstileProps>(function Tu
           }
           if (!token.current) window.setTimeout(run, 50);
         };
-        run();
+        // reset() must settle before execute() or Cloudflare answers 400.
+        window.setTimeout(run, 120);
       });
     },
   }));
@@ -173,10 +192,8 @@ export const Turnstile = forwardRef<TurnstileHandle, TurnstileProps>(function Tu
         setFailed(true);
         emit(null);
       });
-    const pending = waiters.current;
     return () => {
       cancelled = true;
-      pending.splice(0).forEach((resolve) => resolve(null));
       if (widget.current && window.turnstile) window.turnstile.remove(widget.current);
       widget.current = null;
       api.current = null;

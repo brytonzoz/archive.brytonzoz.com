@@ -2,7 +2,7 @@ import assert from 'node:assert/strict';
 import { test } from 'node:test';
 import fs from 'node:fs';
 import { SHIPPED_STATUSES, shippedCounts, toItems, yearGroups } from '../lib/shipped.ts';
-import { isGithubLogin, itemDate, itemsShipped, readQuery, receiptPageTitle, shareText, shareTweet, shippedYear, subjectKey, subjectLabel, xHandle } from '../lib/shipped-year.ts';
+import { isGithubLogin, itemDate, itemsShipped, readQuery, receiptPageTitle, shareText, shareTweet, shippedYear, subjectKey, subjectKicker, subjectLabel, xHandle } from '../lib/shipped-year.ts';
 
 const read = (file) => JSON.parse(fs.readFileSync(new URL(file, import.meta.url), 'utf8'));
 const DATA = read('../data/shipped/businesses.json');
@@ -116,6 +116,21 @@ test('item dates and the share text', () => {
   const githubWithX = { ...receipt, subject: { kind: 'github', id: 'levelsio', display: 'Pieter Levels', x: 'levelsio' } };
   assert.equal(xHandle(githubWithX), 'levelsio');
   assert.equal(shareTweet(githubWithX), '@levelsio shipped 3 things in 2026 🧾');
+  const typedHandle = { ...receipt, subject: { kind: 'name', id: 'nicolashug', display: 'Nico' } };
+  assert.equal(xHandle(typedHandle), 'nicolashug');
+  assert.equal(shareTweet(typedHandle), '@nicolashug shipped 3 things in 2026 🧾');
+});
+
+test('kickers are links or they are hidden', () => {
+  assert.deepEqual(subjectKicker({ kind: 'github', id: 'rauchg', display: 'Guillermo Rauch' }), {
+    text: '@rauchg · GITHUB',
+    href: 'https://github.com/rauchg',
+  });
+  assert.equal(subjectKicker({ kind: 'name', id: 'Nico', display: 'Nico' }), null);
+  assert.deepEqual(subjectKicker({ kind: 'x', id: 'rauchg', display: '@rauchg' }), {
+    text: '@rauchg · X',
+    href: 'https://x.com/rauchg',
+  });
 });
 
 test('the year is configurable and falls back to this year', () => {

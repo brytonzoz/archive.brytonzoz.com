@@ -262,6 +262,15 @@ test('JSON bodies are capped whatever content-length claims', async () => {
   assert.equal(await guard.readJsonCapped(requestFrom('192.0.2.1', { body: 'nope' })), null);
 });
 
+test('og.png is not served as a sandboxed document', async () => {
+  const image = await guard.hardenPage(new Response(new Uint8Array([137, 80, 78, 71]), { headers: { 'content-type': 'image/png' } }));
+  const csp = image.headers.get('content-security-policy') ?? '';
+  assert.match(csp, /default-src 'none'/);
+  assert.doesNotMatch(csp, /sandbox/);
+  const other = await guard.hardenPage(new Response('{}', { headers: { 'content-type': 'application/json' } }));
+  assert.match(other.headers.get('content-security-policy') ?? '', /sandbox/);
+});
+
 test('every page gets strict headers and a CSP without unsafe-inline scripts', async () => {
   const html = '<!doctype html><html><head><script>self.__x=1</script></head><body>hi</body></html>';
   const page = await guard.hardenPage(new Response(html, { headers: { 'content-type': 'text/html' } }));

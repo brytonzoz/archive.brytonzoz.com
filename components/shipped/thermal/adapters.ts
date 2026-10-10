@@ -3,17 +3,10 @@
 // the pile and the DOM receipt never disagree.
 import { receiptDate } from '../../../lib/shipped';
 import { isFirstRun, receiptModules } from '../../../lib/shipped-modules';
-import { itemDate, itemsShipped, receiptNumber, subjectLabel, type SponsorBlock, type YearReceipt } from '../../../lib/shipped-year';
+import { itemDate, itemsShipped, receiptNumber, subjectKicker, subjectLabel, type SponsorBlock, type YearReceipt } from '../../../lib/shipped-year';
 import type { ThermalReceipt } from './types';
 
 export type LoadedReceipt = { receipt: YearReceipt; sponsors: SponsorBlock | null };
-
-const KICKER: Record<YearReceipt['subject']['kind'], string> = {
-  github: 'GITHUB',
-  x: 'X / TWITTER',
-  domain: 'WEBSITE',
-  name: 'NAME',
-};
 
 function titleCustomer(raw: string): string {
   const from = raw.match(/^(.+?)\s+(?:from|at|of)\s+.+$/i);
@@ -32,13 +25,7 @@ export function paidByLines(sponsors: SponsorBlock | null): Pick<ThermalReceipt,
 
 export function fromLoaded({ receipt, sponsors }: LoadedReceipt): ThermalReceipt {
   const who = titleCustomer(subjectLabel(receipt.subject));
-  const kicker = receipt.subject.x
-    ? `@${receipt.subject.x} · X`
-    : receipt.subject.kind === 'github' && receipt.subject.display !== who
-      ? `@${receipt.subject.id} · GITHUB`
-      : receipt.subject.kind === 'name'
-        ? ''
-        : KICKER[receipt.subject.kind];
+  const kicker = subjectKicker(receipt.subject)?.text ?? '';
   const modules = receiptModules({ receipt });
   return {
     id: `r${receipt.id}`,

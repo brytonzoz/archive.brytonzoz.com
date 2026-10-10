@@ -717,6 +717,20 @@ test('undated crumbs need ownership plus a description', async () => {
   );
   assert.equal(
     ownership.undatedPassesGate(
+      { name: 'TRPC', description: 'end-to-end typesafe APIs', date: null, source: 'site', link: 'https://colinhacks.com/' },
+      { name: 'Colin McDonnell', github: 'colinhacks', site: 'https://colinhacks.com/' },
+    ),
+    false,
+  );
+  assert.equal(
+    ownership.undatedPassesGate(
+      { name: 'TRANSFORM', description: 'val = parseFloat(val', date: null, source: 'site', link: 'https://colinhacks.com/' },
+      { name: 'Colin McDonnell', github: 'colinhacks', site: 'https://colinhacks.com/' },
+    ),
+    false,
+  );
+  assert.equal(
+    ownership.undatedPassesGate(
       { name: 'ALL CHECKS', description: '', date: null, source: 'site', link: 'https://colinhacks.com/' },
       { name: 'Colin McDonnell', github: 'colinhacks', site: 'https://colinhacks.com/' },
     ),
@@ -725,7 +739,8 @@ test('undated crumbs need ownership plus a description', async () => {
   const items = polish.polishCandidates(
     [
       found({ name: 'TRPC', date: null, source: 'npm', link: 'https://www.npmjs.com/package/@trpc/server', description: '' }),
-      found({ name: 'TRPC', date: null, source: 'site', link: 'https://colinhacks.com/', description: '' }),
+      found({ name: 'TRPC', date: null, source: 'site', link: 'https://colinhacks.com/', description: 'end-to-end typesafe APIs' }),
+      found({ name: 'TRANSFORM', date: null, source: 'site', link: 'https://colinhacks.com/', description: 'val = parseFloat(val' }),
       found({ name: 'ALL CHECKS', date: null, source: 'site', link: 'https://colinhacks.com/', description: '' }),
       found({ name: 'NUMBER', date: null, source: 'npm', link: 'https://www.npmjs.com/package/number', description: '' }),
       found({ name: 'Zod', date: '2026-01-15', source: 'npm', link: 'https://www.npmjs.com/package/zod', description: 'Schema' }),

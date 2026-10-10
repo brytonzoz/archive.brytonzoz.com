@@ -126,7 +126,12 @@ export function undatedPassesGate(
     return hasDesc && hostNamesOwner(host, owner);
   }
   if (kind === 'named' || kind === 'portfolio') {
-    return hasDesc;
+    if (!hasDesc) return false;
+    const n = loose(item.name || '');
+    if (ownerTokens(owner).some((token) => token.length >= 4 && (n.includes(token) || token.includes(n)))) return true;
+    if (githubOwned(item.link, owner)) return true;
+    if (PORTFOLIO_HINT.test(desc)) return true;
+    return false;
   }
   return false;
 }

@@ -1402,7 +1402,7 @@ html.shipped-focus .shipped-board {
 
 .shipped-printer.is-focus .shipped-tilt.is-scroll,
 .shipped-printer.is-hero .shipped-tilt.is-scroll {
-  max-height: calc(100svh - 72px);
+  max-height: calc(100svh - 72px - var(--shipped-pill-stack) - env(safe-area-inset-bottom, 0px));
   overflow: auto;
   overscroll-behavior: contain;
   padding-bottom: calc(var(--shipped-pill-stack) + env(safe-area-inset-bottom, 0px));

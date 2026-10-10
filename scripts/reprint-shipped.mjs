@@ -16,7 +16,7 @@
 // After de3d3e3: version monthly rollup, person-name gate, archive/RDAP beats npm for the product itself.
 // After 80487e7: GitLab prefix-only merge; reject copied cashier examples.
 // After c85e99e: seeded note styles, undated ownership gate, leftover Codex fragments.
-// After dbdb472: 3-candidate cashier notes, code-method drop, Socket.IO family gate.
+// After b2fb93f: invented few-shots so cashier notes are not copies of Tibo/Colin.
 // Optional SHIPPED_PRINT_SUBJECTS=handle,handle prints two fresh names via admin print-subject.
 //
 //   ADMIN_PASSWORD=… node scripts/reprint-shipped.mjs [origin]

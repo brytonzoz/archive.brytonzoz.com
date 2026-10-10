@@ -23,6 +23,7 @@ export const LIVE_RECEIPT_IDS = [6, 7, 13, 16, 17, 18, 19, 20, 21, 22];
 export const LIVE_SPEC_OVERRIDE = {
   tibo: { min: 15 },
   sam: { min: 15 },
+  rauch: { min: 25 },
 };
 
 const THIN_NOTE =

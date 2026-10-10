@@ -1557,7 +1557,7 @@ html.shipped-focus .shipped-board {
   left: 0;
   right: 0;
   bottom: 0;
-  z-index: 50;
+  z-index: 70;
   pointer-events: none;
 }
 
@@ -1619,6 +1619,8 @@ html.shipped-focus .shipped-board {
 
 .shipped-pill.is-open {
   width: min(26.5rem, 100%);
+  max-height: min(72svh, 36rem);
+  overflow: auto;
   border-radius: 16px;
   background: #1a1612;
   padding: 8px 12px 12px;

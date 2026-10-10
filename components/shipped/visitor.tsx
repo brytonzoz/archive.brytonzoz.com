@@ -406,10 +406,10 @@ export function SharePill({
       close();
     };
     window.addEventListener('keydown', onKey);
-    document.addEventListener('pointerdown', onPointer);
+    document.addEventListener('pointerdown', onPointer, true);
     return () => {
       window.removeEventListener('keydown', onKey);
-      document.removeEventListener('pointerdown', onPointer);
+      document.removeEventListener('pointerdown', onPointer, true);
     };
   }, [open]);
 

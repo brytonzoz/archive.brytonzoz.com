@@ -22,8 +22,7 @@ export const LIVE_RECEIPT_IDS = [6, 7, 13, 16, 17, 18, 19, 20, 21, 22];
 /** Floors are the fixture mins. Do not lower them for live reprints. */
 export const LIVE_SPEC_OVERRIDE = {};
 
-const THIN_NOTE =
-  /\bshowed up\b|\bis the one that stuck\b|\bkeeps coming back\b|\breceipts?, and\b/i;
+const THIN_NOTE = /\bpublic tape\b|\blead ship\b/i;
 
 export function loose(text) {
   return String(text || '')

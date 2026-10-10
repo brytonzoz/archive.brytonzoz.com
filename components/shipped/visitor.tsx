@@ -490,8 +490,8 @@ export function SharePill({
           type="button"
           className="shipped-pill-scrim"
           aria-label="Close share"
-          onPointerDown={(event) => {
-            press(event);
+          onPointerDown={() => {
+            press();
             close();
           }}
           onClick={close}

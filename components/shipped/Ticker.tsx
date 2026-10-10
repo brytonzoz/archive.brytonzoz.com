@@ -173,7 +173,7 @@ function Odometer({ value, places, size = 'md' }: { value: number; places: numbe
   );
 }
 
-export function Ticker() {
+export function Ticker({ compact = false }: { compact?: boolean }) {
   const state = useShippedState();
   const [open, setOpen] = useState(false);
   const [live, setLive] = useState(false);
@@ -188,7 +188,7 @@ export function Ticker() {
     <>
       <button
         type="button"
-        className="shipped-ticker"
+        className={`shipped-ticker${compact ? ' is-slim' : ''}`}
         aria-label={live && state ? `Printed ${fmt(printed)}, shared ${fmt(shared)}, mailed ${fmt(shipped)}, views ${fmt(views)}. Open proof.` : 'Open proof.'}
         onClick={() => setOpen(true)}
       >
@@ -196,17 +196,19 @@ export function Ticker() {
           <Odometer value={printed} places={places} />
           <span className="shipped-ticker-k">printed</span>
         </span>
-        <span className="shipped-ticker-rest">
-          <span>
-            <Odometer value={shared} places={3} size="sm" /> shared
+        {compact ? null : (
+          <span className="shipped-ticker-rest">
+            <span>
+              <Odometer value={shared} places={3} size="sm" /> shared
+            </span>
+            <span>
+              <Odometer value={shipped} places={3} size="sm" /> mailed
+            </span>
+            <span>
+              <Odometer value={views} places={3} size="sm" /> views
+            </span>
           </span>
-          <span>
-            <Odometer value={shipped} places={3} size="sm" /> mailed
-          </span>
-          <span>
-            <Odometer value={views} places={3} size="sm" /> views
-          </span>
-        </span>
+        )}
       </button>
       {open ? <ProofSheet onClose={() => setOpen(false)} /> : null}
     </>

@@ -3,7 +3,7 @@
 // Paper sounds for the pile and the toss, synthesized like the printer's (components/shipped/sound.ts) and
 // behind the same SND switch: nothing plays until the visitor turns sound on. The printer's own sounds
 // (tick, motor, rip, click) are re-exported so a page imports one module for every hook.
-import { soundOn } from '../sound';
+import { canPlaySound } from '../sound';
 
 export { click, motorOff, motorOn, rip, tick, soundOn, useSound } from '../sound';
 
@@ -11,7 +11,7 @@ let ctx: AudioContext | null = null;
 let noise: AudioBuffer | null = null;
 
 function audio(): AudioContext | null {
-  if (!soundOn()) return null;
+  if (!canPlaySound()) return null;
   if (!ctx) {
     const Ctor = window.AudioContext ?? (window as unknown as { webkitAudioContext?: typeof AudioContext }).webkitAudioContext;
     if (!Ctor) return null;

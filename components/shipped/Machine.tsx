@@ -54,6 +54,8 @@ export type MachineProps = {
   paperMax?: number;
   /** Torn visitor receipt fills the viewport; printer recedes. */
   focus?: boolean;
+  /** Shared /r/<id>/ page: the receipt is already out; skip the printer chrome. */
+  hero?: boolean;
   console?: Console;
   inputRef?: React.Ref<HTMLInputElement>;
 };
@@ -110,8 +112,8 @@ function runSpring(el: HTMLElement, from: Vec, to: Vec, velocity: Vec, config: S
   return () => cancelAnimationFrame(frame);
 }
 
-export function Machine({ job, display, tone, onPrinted, onTorn, tearSignal = 0, paperMax, focus = false, console: desk, inputRef }: MachineProps) {
-  const [phase, setPhase] = useState<Phase>(phaseFor(job));
+export function Machine({ job, display, tone, onPrinted, onTorn, tearSignal = 0, paperMax, focus = false, hero = false, console: desk, inputRef }: MachineProps) {
+  const [phase, setPhase] = useState<Phase>(() => (hero ? 'torn' : phaseFor(job)));
   const [more, setMore] = useState(false);
   const [leaving, setLeaving] = useState<{ key: string; job: Job; transform: string } | null>(null);
   const [shown, setShown] = useState<Job>(job);
@@ -191,6 +193,11 @@ export function Machine({ job, display, tone, onPrinted, onTorn, tearSignal = 0,
   // Parent callbacks are deferred: onPrinted/onTorn update ShippedStage during this effect and crash the root.
   useEffect(() => {
     if (!live || shown.kind !== 'print') return;
+    if (hero) {
+      setPhase('torn');
+      window.setTimeout(() => callbacks.current.onTorn?.(shown.key), 0);
+      return;
+    }
     const el = feed.current;
     const p = pull.current;
     if (!el || !p) return;
@@ -257,7 +264,7 @@ export function Machine({ job, display, tone, onPrinted, onTorn, tearSignal = 0,
     };
     // Only a new job restarts the print; fresh content for the same receipt doesn't.
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [live, shown.key, shown.kind]);
+  }, [live, shown.key, shown.kind, hero]);
 
   // Streaming: new lines after the first feed. Same job key, taller tape — shove the extra paper out.
   const revision = shown.kind === 'print' ? shown.revision ?? 0 : 0;
@@ -574,7 +581,7 @@ export function Machine({ job, display, tone, onPrinted, onTorn, tearSignal = 0,
   );
 
   return (
-    <div className={`shipped-printer is-${phase} tone-${tone}${focus ? ' is-focus' : ''}`} data-sound={sound ? 'on' : 'off'}>
+    <div className={`shipped-printer is-${phase} tone-${tone}${focus ? ' is-focus' : ''}${hero ? ' is-hero' : ''}`} data-sound={sound ? 'on' : 'off'}>
       <div className="shipped-printer-body" ref={body}>
         {desk ? (
           <form

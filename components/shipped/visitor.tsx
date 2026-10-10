@@ -606,7 +606,12 @@ const ORDER_STATUS: Record<string, string> = {
 export function OrderNotice() {
   const [message, setMessage] = useState<string | null>(null);
   useEffect(() => {
-    const checkout = new URLSearchParams(window.location.search).get('order');
+    const params = new URLSearchParams(window.location.search);
+    if (params.get('canceled') === '1') {
+      setMessage(ORDER_STATUS.failed);
+      return;
+    }
+    const checkout = params.get('paid') || params.get('order');
     if (!checkout || !/^[A-Za-z0-9_-]{6,200}$/.test(checkout)) return;
     setMessage(ORDER_STATUS.checkout);
     fetch(`/api/shipped/checkout?checkout=${encodeURIComponent(checkout)}`, { cache: 'no-store' })

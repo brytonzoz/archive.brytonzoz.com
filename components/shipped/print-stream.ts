@@ -119,17 +119,10 @@ export async function fetchReceipt(id: number): Promise<StreamedLoad | null> {
 }
 
 /** Keep pulling a receipt while the pipeline marks it provisional / pending / upgrading. */
-/** Desktop: new tab so the torn tape stays. Phone: stand on /r/<id>/ first so Back lands there. */
+/** Same-tab Stripe. Always stand on /r/<id>/ first so Back and cancel land on this receipt. */
 export function openCheckout(url: string, receiptId: number) {
-  const desktop = window.matchMedia('(hover: hover) and (pointer: fine)').matches;
-  if (desktop) {
-    const tab = window.open(url, '_blank', 'noopener,noreferrer');
-    if (tab) return;
-  }
   const path = RECEIPT_PATH(receiptId);
-  if (window.location.pathname !== path && window.location.pathname !== `/shipped${path}`) {
-    history.pushState({ shipped: 'receipt' }, '', path);
-  }
+  history.pushState({ shipped: 'receipt' }, '', path);
   window.location.assign(url);
 }
 

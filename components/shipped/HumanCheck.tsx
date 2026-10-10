@@ -67,6 +67,10 @@ export const HumanCheck = forwardRef<HumanCheckHandle, Props>(function HumanChec
   const checkRef = useRef(check);
   checkRef.current = check;
   const [round, setRound] = React.useState(0);
+  const [needed, setNeeded] = React.useState(appearance === 'always');
+  React.useEffect(() => {
+    if (appearance === 'always') setNeeded(true);
+  }, [appearance]);
 
   function emit(value: string | null) {
     token.current = value;
@@ -84,13 +88,19 @@ export const HumanCheck = forwardRef<HumanCheckHandle, Props>(function HumanChec
     execute: async () => {
       token.current = null;
       onToken(null);
-      if (checkRef.current?.kind === 'turnstile') turnstile.current?.reset();
+      setNeeded(true);
       const start = Date.now();
       while (!checkRef.current && Date.now() - start < 8_000) {
         await new Promise((resolve) => window.setTimeout(resolve, 50));
       }
       const current = checkRef.current;
-      if (current?.kind === 'turnstile') return turnstile.current?.execute() ?? null;
+      if (current?.kind === 'turnstile') {
+        while (!turnstile.current && Date.now() - start < 8_000) {
+          await new Promise((resolve) => window.setTimeout(resolve, 50));
+        }
+        turnstile.current?.reset();
+        return turnstile.current?.execute() ?? null;
+      }
       if (current?.kind === 'pow') {
         return Promise.race([
           new Promise<string | null>((resolve) => waiters.current.push(resolve)),
@@ -103,6 +113,7 @@ export const HumanCheck = forwardRef<HumanCheckHandle, Props>(function HumanChec
 
   if (!check) return null;
   if (check.kind === 'turnstile') {
+    if (!needed) return null;
     return <Turnstile ref={turnstile} siteKey={check.siteKey} onToken={emit} theme={theme} appearance={appearance} />;
   }
   return <Puzzle onToken={emit} round={round} />;

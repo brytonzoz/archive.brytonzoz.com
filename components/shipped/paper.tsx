@@ -14,10 +14,10 @@ export function Rule({ heavy = false }: { heavy?: boolean }) {
 
 export function Line({ label, value, className = '' }: { label: React.ReactNode; value: React.ReactNode; className?: string }) {
   return (
-    <div className={`shipped-lead ${className}`}>
-      <span className="min-w-0">{label}</span>
+    <div className={`shipped-lead is-pair ${className}`}>
+      <span className="shipped-lead-k">{label}</span>
       <span className="shipped-lead-fill" aria-hidden="true" />
-      <span className="shrink-0 tabular-nums">{value}</span>
+      <span className="shipped-lead-v">{value}</span>
     </div>
   );
 }

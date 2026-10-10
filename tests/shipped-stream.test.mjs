@@ -93,27 +93,14 @@ test('the tape and the DOM copy keep ITEMS SHIPPED · SCORE and drop the status 
   assert.doesNotMatch(year, /sr-only">: /);
 });
 
-test('checkout prefers a new tab on a fine pointer, otherwise stands on /r/<id>/', () => {
+test('checkout always stands on /r/<id>/ in the same tab', () => {
   const calls = [];
-  const path = { pathname: '/' };
   globalThis.window = {
-    matchMedia: (q) => ({ matches: String(q).includes('hover') }),
-    open: (url, target) => {
-      calls.push(['open', url, target]);
-      return { ok: true };
-    },
-    location: path,
+    location: { pathname: '/', assign: (url) => calls.push(['assign', url]) },
   };
   globalThis.history = {
     pushState: (...args) => calls.push(['push', ...args]),
   };
-  openCheckout('https://checkout.stripe.com/c/pay/cs_test', 17);
-  assert.deepEqual(calls, [['open', 'https://checkout.stripe.com/c/pay/cs_test', '_blank']]);
-
-  globalThis.window.matchMedia = () => ({ matches: false });
-  globalThis.window.open = () => null;
-  globalThis.window.location.assign = (url) => calls.push(['assign', url]);
-  calls.length = 0;
   openCheckout('https://checkout.stripe.com/c/pay/cs_test', 17);
   assert.equal(calls[0][0], 'push');
   assert.equal(calls[0][3], '/r/17/');
@@ -156,4 +143,35 @@ test('after a print the stage auto-tears; sponsors stay collapsed; Turnstile has
   const machine = fs.readFileSync(new URL('../components/shipped/Machine.tsx', import.meta.url), 'utf8');
   assert.match(machine, /printed \+ line/);
   assert.match(machine, /stepMs/);
+});
+
+test('shared receipt pages are the hero; DATE/RECEIPT pairs do not collide; checkout returns to the same receipt', () => {
+  const stage = fs.readFileSync(new URL('../components/shipped/ShippedStage.tsx', import.meta.url), 'utf8');
+  assert.match(stage, /is-shared/);
+  assert.match(stage, /Print yours/);
+  assert.match(stage, /hero=\{shared\}/);
+
+  const paper = fs.readFileSync(new URL('../components/shipped/paper.tsx', import.meta.url), 'utf8');
+  assert.match(paper, /shipped-lead-k/);
+  assert.match(paper, /shipped-lead-v/);
+
+  const css = fs.readFileSync(new URL('../app/shipped/receipt.css', import.meta.url), 'utf8');
+  assert.match(css, /--shipped-pill-stack/);
+  assert.match(css, /text-wrap: balance/);
+  assert.match(css, /\.shipped-printer\.is-hero \.shipped-printer-body/);
+
+  const pay = fs.readFileSync(new URL('../worker/shipped.ts', import.meta.url), 'utf8');
+  assert.match(pay, /\/r\/\$\{id\}\/\?paid=\{CHECKOUT_SESSION_ID\}/);
+  assert.match(pay, /\/r\/\$\{id\}\/\?canceled=1/);
+
+  const visitor = fs.readFileSync(new URL('../components/shipped/visitor.tsx', import.meta.url), 'utf8');
+  assert.match(visitor, /params\.get\('paid'\)/);
+  assert.match(visitor, /canceled/);
+
+  const human = fs.readFileSync(new URL('../components/shipped/HumanCheck.tsx', import.meta.url), 'utf8');
+  assert.match(human, /setNeeded/);
+
+  const sound = fs.readFileSync(new URL('../components/shipped/sound.ts', import.meta.url), 'utf8');
+  assert.match(sound, /allowSound/);
+  assert.match(sound, /!gestured/);
 });

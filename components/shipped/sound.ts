@@ -10,6 +10,16 @@ const EVENT = 'shipped-sound';
 let ctx: AudioContext | null = null;
 let noise: AudioBuffer | null = null;
 let motor: { osc: OscillatorNode; gain: GainNode } | null = null;
+let gestured = false;
+
+/** Browsers block AudioContext until a tap. House-slip feed must not create one on load. */
+export function allowSound() {
+  gestured = true;
+}
+
+export function canPlaySound() {
+  return soundOn() && gestured;
+}
 
 export function soundOn(): boolean {
   try {
@@ -20,7 +30,7 @@ export function soundOn(): boolean {
 }
 
 function audio(): AudioContext | null {
-  if (!soundOn()) return null;
+  if (!soundOn() || !gestured) return null;
   if (!ctx) {
     const Ctor = window.AudioContext ?? (window as unknown as { webkitAudioContext?: typeof AudioContext }).webkitAudioContext;
     if (!Ctor) return null;
@@ -41,7 +51,10 @@ export function setSound(on: boolean) {
   }
   if (!on) motorOff();
   window.dispatchEvent(new Event(EVENT));
-  if (on) click();
+  if (on) {
+    allowSound();
+    click();
+  }
 }
 
 export function useSound(): [boolean, () => void] {

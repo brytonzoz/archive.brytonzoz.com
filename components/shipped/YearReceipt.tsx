@@ -132,7 +132,7 @@ function ItemRow({ item, compact }: { item: ViewItem; compact?: boolean }) {
         <img src={item.logo.src} width={item.logo.width} height={item.logo.height} alt="" loading="lazy" decoding="async" className="shipped-item-logo shipped-logo mb-1" />
       ) : null}
       <div className="shipped-lead">
-        <h3 className="min-w-0 break-words text-[13.5px] font-semibold leading-snug">
+        <h3 className="shipped-item-name min-w-0 font-semibold leading-snug">
           <ItemName item={item} />
         </h3>
         <span className="shipped-lead-fill" aria-hidden="true" />

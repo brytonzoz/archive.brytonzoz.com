@@ -156,7 +156,8 @@ export function ShippedStage({ opening, title }: { opening: Opening; title: Reac
   const [error, setError] = useState<string | null>(null);
   const [job, setJob] = useState<Job>(() => openingJob(opening));
   const [current, setCurrent] = useState<Loaded | null>(opening.kind === 'loaded' ? opening.loaded : null);
-  const [paper, setPaper] = useState<'printing' | 'hanging' | 'torn'>('printing');
+  const [paper, setPaper] = useState<'printing' | 'hanging' | 'torn'>(opening.kind === 'loaded' ? 'torn' : 'printing');
+  const shared = opening.kind === 'loaded';
   const [tearSignal, setTearSignal] = useState(0);
   const [tick, setTick] = useState(0);
   const touched = useRef(false);
@@ -457,11 +458,20 @@ export function ShippedStage({ opening, title }: { opening: Opening; title: Reac
   }
 
   return (
-    <div className={`shipped-stage${focus ? ' is-focus' : ''}`}>
-      <div className="shipped-ticker-pin">
-        <Ticker />
-        <Countdown />
-      </div>
+    <div className={`shipped-stage${focus ? ' is-focus' : ''}${shared ? ' is-shared' : ''}`}>
+      {shared ? (
+        <div className="shipped-hero-bar">
+          <Ticker compact />
+          <a href="/" className="shipped-print-yours">
+            Print yours
+          </a>
+        </div>
+      ) : (
+        <div className="shipped-ticker-pin">
+          <Ticker />
+          <Countdown />
+        </div>
+      )}
 
       <section className="shipped-counter" id="print" aria-labelledby="shipped-title">
         <h1 id="shipped-title" className="sr-only">
@@ -483,6 +493,7 @@ export function ShippedStage({ opening, title }: { opening: Opening; title: Reac
           onTorn={() => setPaper('torn')}
           paperMax={paperMax}
           focus={focus}
+          hero={shared}
           inputRef={input}
           console={
             empty || (offline && !busy)
@@ -512,7 +523,7 @@ export function ShippedStage({ opening, title }: { opening: Opening; title: Reac
           }
         />
 
-        <HumanCheck ref={human} check={generator?.enabled ? generator.human : null} onToken={() => undefined} theme="dark" appearance="execute" />
+        {shared ? null : <HumanCheck ref={human} check={generator?.enabled ? generator.human : null} onToken={() => undefined} theme="dark" appearance="execute" />}
 
         {error ? (
           <p id="shipped-print-error" className="shipped-desk-error" role="alert">

@@ -110,6 +110,30 @@ test('cashier note and stats are specific to the items, never stock copy', () =>
     { name: 'SUPERLEVELS', description: 'Repo', date: '2026-04-23', status: 'SHIPPED', link: 'https://github.com/levelsio/superlevels', icon: null, source: 'github' },
   ];
   const note = ai.groundedNote(items, 1, 'levelsio', ['553 GitHub stars SuperLevels · github.com/levelsio/superlevels']);
+  const clumsy = ai.groundedNote(
+    [
+      { name: 'LLM-MRCHATTERBOX', description: 'Chat', date: '2026-01', status: 'SHIPPED', link: 'https://github.com/simonw/llm-mrchatterbox', icon: null, source: 'github' },
+      { name: 'datasette', description: 'Tool', date: '2026-02', status: 'SHIPPED', link: 'https://github.com/simonw/datasette', icon: null, source: 'github' },
+    ],
+    1,
+    'simonw',
+    ['13k GitHub stars llm · github.com/simonw/llm'],
+  );
+  assert.doesNotMatch(clumsy, /stars llm for/i);
+  const ceo = ai.groundedNote(
+    [
+      { name: 'CODEX APP FOR MACOS', description: 'App', date: '2026-01', status: 'LAUNCHED', link: 'https://openai.com/codex', icon: null, source: 'changelog' },
+      { name: 'CHATGPT IMAGES', description: 'Images', date: '2026-02', status: 'LAUNCHED', link: 'https://openai.com/index/images', icon: null, source: 'changelog' },
+      { name: 'SORA', description: 'Video', date: '2026-03', status: 'LAUNCHED', link: 'https://openai.com/sora', icon: null, source: 'changelog' },
+      { name: 'GPT-5', description: 'Model', date: '2026-04', status: 'LAUNCHED', link: 'https://openai.com/gpt-5', icon: null, source: 'changelog' },
+    ],
+    2,
+    'Sam Altman',
+    [],
+    { role: 'ceo', company: 'OpenAI' },
+  );
+  assert.match(ceo, /OpenAI|4|company/i);
+  assert.doesNotMatch(ceo, /^CODEX/i);
   const stats = ai.formatStats(items);
   assert.match(stats[0], /3 launches/);
   assert.match(stats[0], /GitHub/);

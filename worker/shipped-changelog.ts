@@ -86,8 +86,12 @@ const MONTH_ALT = 'jan(?:uary)?|feb(?:ruary)?|mar(?:ch)?|apr(?:il)?|may|jun(?:e)
 const SKIP_TITLE =
   /^(home|about|blog|news|changelog|releases?|updates?|guides?|editorials?|listicles?|product|safety|research|company|all|careers?|sign in|log in|learn more|read more|show more|whats? new|index|docs|pricing|login|related posts?|skip to main content)$/i;
 const ARTICLE_TITLE =
-  /\b(how to|tutorial|case stud(?:y|ies)|customer stor(?:y|ies)|deep dive|event recap|what we learned|behind the scenes|lessons? from|research paper|whitepaper)\b/i;
-const SHIP_PREFIX = /^(introducing|launching|announcing|presenting|meet|say hello to|now available[:\s]+|how to|how)\s+/i;
+  /\b(how to|tutorial|case stud(?:y|ies)|customer stor(?:y|ies)|deep dive|event recap|what we learned|behind the scenes|lessons? from|research paper|whitepaper|customer spotlight|success stor(?:y|ies))\b/i;
+const CUSTOMER_STORY =
+  /\b(engineers? (accelerate|adopt|use|used|build|built)|frontier firms|pulling ahead|what i ship(?:ped)? here|ships faster with|customer spotlight)\b/i;
+const SHIP_PREFIX = /^(introducing|launching|announcing|presenting|meet|say hello to|now available[:\s]+|how to|how|the)\s+/i;
+const BARE_VERSION = /^v?\d+(?:\.\d+){1,4}[a-z0-9.-]*$/i;
+const BARE_YEAR = /^20\d\d(?:-\d{2}){0,2}$/;
 
 function tidy(value: unknown): string {
   if (typeof value !== 'string') return '';
@@ -112,24 +116,26 @@ function clean(value: unknown, max: number): string {
 
 function isNoiseTitle(text: string): boolean {
   if (!text || text.length < 3 || SKIP_TITLE.test(text)) return true;
+  if (BARE_YEAR.test(text) || BARE_VERSION.test(text)) return true;
   if (/^by\s+\S/i.test(text)) return true;
   if (/\bmin(?:ute)?s?\s+read\b/i.test(text)) return true;
-  if (ARTICLE_TITLE.test(text)) return true;
+  if (ARTICLE_TITLE.test(text) || CUSTOMER_STORY.test(text)) return true;
   if (/^how\s+\w+\s+is\b/i.test(text)) return true;
   if (/\baccelerating\b/i.test(text) && !/\b(launch|released?|version|v\d)\b/i.test(text)) return true;
-  if (/^[A-Za-z0-9][\w.-]{1,40}\s+builds\b/i.test(text)) return true;
+  if (/^[A-Za-z0-9][\w.-]{1,40}\s+(builds|engineers?)\b/i.test(text)) return true;
   if (/\busing\b.{0,48}\bto\s+(search|find|build|make|create|train)\b/i.test(text)) return true;
   if (/\b(uses|using)\b.{0,48}\b(to|for)\b/i.test(text)) return true;
   if (/\bsystem card\b/i.test(text)) return true;
   if (/^(to get started|each dot |sign in |contact |blog \/|company \/)/i.test(text)) return true;
   if (/^(blog|company|research|sign in|contact|resources|customers|support|next|submit now|see the changelog|timeline|of the year|do not sell|series [abc])\b/i.test(text)) return true;
-  if (/^(inside|beyond|securing|decision time|cfos?)\b/i.test(text)) return true;
+  if (/^(inside|beyond|securing|decision time|cfos?|what i ship)\b/i.test(text)) return true;
   if (/\b(ships faster with|running .{0,40} safely|harness engineering|beyond rate limits|leveraging|economics of|guidance)\b/i.test(text)) return true;
   if (/^(output:|screenshot|to get started|each dot |design \()/i.test(text)) return true;
+  if (/^(launched|released|shipped|live|available)(\s+as(\s+a)?\s+\w+)?$/i.test(text)) return true;
   return false;
 }
 
-/** Clean short product name: strip Introducing/How, never cut mid-word. */
+/** Headline verbs → a short product name. Never cut mid-word. */
 export function shipName(value: unknown, max = 40): string {
   let text = tidy(value)
     .replace(/^(guides?|editorials?|listicles?|news|product|safety|research|company|inside\s+\w+)\s+/i, '')
@@ -138,6 +144,14 @@ export function shipName(value: unknown, max = 40): string {
     .replace(/^·\s*/, '');
   if (isNoiseTitle(text)) return '';
   text = text.replace(SHIP_PREFIX, '').trim();
+  text = text
+    .replace(/\s+launches?\s+on\s+/i, ' for ')
+    .replace(/\s+introduces?\s+/i, ' ')
+    .replace(/\s+(launches?|released?|ships|is (?:now )?(?:live|available))$/i, '')
+    .replace(/^new\s+/i, '')
+    .replace(/\s+flow$/i, '')
+    .replace(/\s+/g, ' ')
+    .trim();
   if (!text || isNoiseTitle(text)) return '';
   return wordClamp(text, max);
 }
@@ -241,7 +255,7 @@ export function extractAlternateFeeds(html: string, base: string): string[] {
 function cleanTitle(name: string): string {
   const trimmed = shipName(name, 60);
   if (!trimmed || trimmed.length < 3) return '';
-  if (/^20\d\d(-\d{2}){1,2}$/.test(trimmed)) return '';
+  if (BARE_YEAR.test(trimmed) || BARE_VERSION.test(trimmed)) return '';
   if (/^\d+\s*min/i.test(trimmed)) return '';
   if (/^(changelog|contact|sign in|download|contact sales|search blog)$/i.test(trimmed)) return '';
   if (/^(?:jan(?:uary)?|feb(?:ruary)?|mar(?:ch)?|apr(?:il)?|may|jun(?:e)?|jul(?:y)?|aug(?:ust)?|sep(?:t(?:ember)?)?|oct(?:ober)?|nov(?:ember)?|dec(?:ember)?)\s+\d{1,2}/i.test(trimmed)) return '';

@@ -8,6 +8,8 @@ import { hasBlockedWord } from '../lib/shipped-sponsors';
 import { REQUIRED_MODULES, sanitizeLayout, type ModuleId } from '../lib/shipped-modules';
 import { clean, hostOf, inYearCount, publicUrl, type Found, type Gathered } from './shipped-sources';
 import { shipName } from './shipped-changelog';
+import { shareKeywords } from './shipped-decisions';
+import type { Affiliation } from './shipped-affiliation';
 import { RECEIPT_BUDGET_MICROS, formatReceiptStats, searchBudget, type SourcedStat } from './shipped-research';
 
 export interface AiEnv {
@@ -186,7 +188,7 @@ export function formatStats(items: { source?: string }[], sourced: SourcedStat[]
 }
 
 const TEMPLATE_NOTE =
-  /is first on the tape|led the year|closed the year|set the tone|through-line|Receipt paper running low|Someone likes the publish button|\d+\s+launches?\s+·|night shift|publish button|\bthe tape\b|\bthe register\b|stock the shelves|counted receipts|got the paperwork|rings the publish|cashier has seen worse|mostly i just|wish and a prayer|nobody asked|same maker, more skus|runs on a wish/i;
+  /is first on the tape|led the year|closed the year|set the tone|through-line|Receipt paper running low|Someone likes the publish button|\d+\s+launches?\s+·|night shift|publish button|\bthe tape\b|\bthe register\b|stock the shelves|counted receipts|got the paperwork|rings the publish|cashier has seen worse|mostly i just|wish and a prayer|nobody asked|same maker, more skus|runs on a wish|github stars (llm|blog) for /i;
 
 /** Notes that read like a leftover slogan, a fallback stat line, or the same cashier bit. */
 export function cashierNoteLooksCanned(note: string): boolean {
@@ -197,8 +199,17 @@ export function cashierNoteLooksCanned(note: string): boolean {
 }
 
 function statPhrase(line: string): string {
-  return line.replace(/\s*·\s*.*$/, '').replace(/\s+/g, ' ').trim();
+  const head = line.replace(/\s*·\s*.*$/, '').replace(/\s+/g, ' ').trim();
+  const numbered = head.match(/^((?:[\d.,]+[kmb]?)\s+(?:github stars|stars|upvotes|weekly downloads|downloads|users|hn points))/i);
+  return numbered ? numbered[1] : head;
 }
+
+function statAbout(line: string): string {
+  const head = line.replace(/\s*·\s*.*$/, '').replace(/\s+/g, ' ').trim();
+  return head.replace(/^[\d.,]+[kmb]?\s+(?:github stars|stars|upvotes|weekly downloads|downloads|users|hn points)\s*/i, '').trim();
+}
+
+const GENERIC_NOTE_NAME = /^(blog|llm|site|website|home|docs|readme|app|cli|api|web|www)$/i;
 
 function clipSentence(text: string, max: number): string {
   const trimmed = text.replace(/\s+/g, ' ').trim();
@@ -213,25 +224,50 @@ function clipSentence(text: string, max: number): string {
   return out;
 }
 
+export type NoteContext = { role?: string | null; company?: string | null };
+
 /** Warm-roast, one sentence, grounded in the loudest real fact. Never mean. */
-export function groundedNote(items: DraftItem[], seed: number, profileName = '', stats: string[] = []): string {
-  const real = items.filter((item) => item.source !== 'none');
+export function groundedNote(items: DraftItem[], seed: number, profileName = '', stats: string[] = [], ctx: NoteContext = {}): string {
+  const real = items.filter((item) => item.source !== 'none' && !GENERIC_NOTE_NAME.test(item.name.trim()));
   if (!real.length) return POTENTIAL_NOTES[seed % POTENTIAL_NOTES.length];
   const first = real[0]?.name ?? 'THIS';
   const short = real.filter((item) => item.name.split(/\s+/).length <= 6 && item.name.length <= 36);
   const pool = short.length ? short : real;
   const loud = pool[(seed + first.length) % pool.length] ?? real[0];
-  const phrase = statPhrase(
-    stats.find((line) => /\b(stars|upvotes|downloads|users)\b/i.test(line) && !/\brepos\b/i.test(line)) ??
-      stats.find((line) => /\d/.test(line) && !/\/mo\b/i.test(line) && !/\brepos\b/i.test(line)) ??
-      '',
-  );
   const who = profileName.split(/\s+/)[0] ?? '';
-  if (phrase && loud?.name) {
+  const company = (ctx.company || '').trim();
+  if ((ctx.role === 'ceo' || ctx.role === 'founder') && real.length >= 4) {
+    const label = company || who || 'They';
     const variants = [
-      `${loud.name} put ${phrase} on the board. The rest is just keeping it company.`,
-      `${phrase} for ${loud.name}. Not bad for a year that was supposed to be quiet.`,
-      `${loud.name} showed up with ${phrase} and somehow made it look easy.`,
+      `${label} put ${real.length} public ships on the year, company-wide, not one product's highlight.`,
+      `${real.length} company ships under ${label}, across the products they actually run.`,
+      `${label}'s year is the whole catalog: ${real.length} public lines, not a single-product recap.`,
+    ];
+    return clipSentence(variants[seed % variants.length], 140);
+  }
+  const paired = stats
+    .map((line) => {
+      const phrase = statPhrase(line);
+      if (!phrase || !/\b(stars|upvotes|downloads|users)\b/i.test(phrase) || /\brepos\b/i.test(line) || /\/mo\b/i.test(line)) return null;
+      const about = statAbout(line);
+      const match = about
+        ? real.find((item) => {
+            const a = loose(item.name);
+            const b = loose(about);
+            if (!a || !b) return false;
+            if (GENERIC_NOTE_NAME.test(about) && a !== b) return false;
+            if (b.length < 4 && a !== b) return false;
+            return a === b || a.includes(b) || b.includes(a);
+          })
+        : null;
+      return match ? { phrase, item: match } : null;
+    })
+    .find((row): row is { phrase: string; item: DraftItem } => Boolean(row));
+  if (paired) {
+    const variants = [
+      `${paired.item.name} put ${paired.phrase} on the board. The rest is just keeping it company.`,
+      `${paired.phrase} on ${paired.item.name}. Not bad for a year that was supposed to be quiet.`,
+      `${paired.item.name} showed up with ${paired.phrase} and somehow made it look easy.`,
     ];
     return clipSentence(variants[seed % variants.length], 140);
   }
@@ -284,6 +320,7 @@ export function harvestItems(gathered: Gathered, year: number): DraftItem[] {
     if (!draft) continue;
     const key = loose(draft.name);
     if (!key || seen.has(key)) continue;
+    if (items.some((kept) => shareKeywords(kept, draft))) continue;
     seen.add(key);
     items.push(draft);
     if (items.length === MAX_ITEMS) break;
@@ -291,7 +328,7 @@ export function harvestItems(gathered: Gathered, year: number): DraftItem[] {
   return items;
 }
 
-function finish(items: DraftItem[], note: string, seed: number, modulesRaw?: unknown, statsRaw?: unknown): Draft {
+function finish(items: DraftItem[], note: string, seed: number, modulesRaw?: unknown, statsRaw?: unknown, ctx: NoteContext = {}): Draft {
   const layout = sanitizeLayout(modulesRaw, seed);
   if (!items.length) {
     return { items: [potentialItem()], note: POTENTIAL_NOTES[seed % POTENTIAL_NOTES.length], stats: [], potential: true, layout };
@@ -307,7 +344,7 @@ function finish(items: DraftItem[], note: string, seed: number, modulesRaw?: unk
   const whoNote =
     ok(note) && !cashierNoteLooksCanned(note) && /\d/.test(note)
       ? note
-      : groundedNote(sorted, seed, '', stats);
+      : groundedNote(sorted, seed, ctx.company || '', stats, ctx);
   const printed = printNote(whoNote, stats);
   return { items: sorted, note: printed, stats, potential: false, layout };
 }
@@ -319,27 +356,53 @@ function printNote(note: string, _stats: string[]): string {
 /** Without the AI: the harvested, verified lines as they are, and a canned note. */
 export function demoReceipt(gathered: Gathered, year: number, seed: number): Draft {
   const items = harvestItems(gathered, year);
-  return finish(items, groundedNote(items, seed, gathered.profile.name), seed, undefined, formatStats(items, gathered.stats ?? []));
+  const affiliation = gathered.profile.affiliation;
+  return finish(
+    items,
+    groundedNote(items, seed, gathered.profile.name, formatStats(items, gathered.stats ?? []), {
+      role: affiliation?.role,
+      company: affiliation?.company,
+    }),
+    seed,
+    undefined,
+    formatStats(items, gathered.stats ?? []),
+    { role: affiliation?.role, company: affiliation?.company },
+  );
 }
 
-function noteOnlyPrompt(subject: Subject, items: DraftItem[], stats: string[], year: number): string {
+function noteOnlyPrompt(subject: Subject, items: DraftItem[], stats: string[], year: number, affiliation?: Affiliation | null): string {
   const tape = items.slice(0, 40).map((item) => ({ name: item.name, description: item.description, date: item.date, via: item.via ?? undefined }));
-  return `<found>\n${JSON.stringify({ who: clean(subject.display, 60), year, items: tape, stats })}\n</found>\nWrite the cashier note for the SHIPPED IN ${year} receipt. JSON only: {"note":""}`;
+  const who = {
+    name: clean(subject.display, 60),
+    role: affiliation?.role || undefined,
+    company: affiliation?.company || undefined,
+  };
+  return `<found>\n${JSON.stringify({ who, year, items: tape, stats })}\n</found>\nWrite the cashier note for the SHIPPED IN ${year} receipt. JSON only: {"note":""}`;
 }
 
-function noteOnlySystem(year: number) {
+function noteOnlySystem(year: number, affiliation?: Affiliation | null) {
+  const ceo =
+    affiliation && (affiliation.role === 'ceo' || affiliation.role === 'founder')
+      ? `This person is the ${affiliation.role} of ${affiliation.company || 'the company'}. Summarize the COMPANY-WIDE year (several products, a count). Never write a note that only names one product.`
+      : '';
   return [
     `You write only the cashier note on a SHIPPED IN ${year} receipt. The items are already printed — do not list or invent any.`,
     'One sentence, warm-roast tone: playful and admiring, never mean. Built on the single most impressive REAL fact in <found> (a count, a big launch, or a streak). Max ~140 characters. Never cut a word. Copy the fact exactly — no misread stats, no "/mo" glued onto a product name.',
+    ceo,
     'Good: "Codex grew long-running work this year, and Tibo\'s agents now stay clocked in overnight."',
     'Good: "cn is at 8.2M weekly downloads. The other packages are just opening acts."',
     'Good: "104 public Replit ships later and Amjad still treats shipped like a first draft."',
+    'Good: "OpenAI put 80 public ships on the year, and none of them get the whole note."',
     'Bad: "runs on a wish and a prayer"',
     'Bad: "Nobody asked for ChatGPT for Research."',
     'Bad: "200/mo public revenue on CHATGPT FOR RESEARCH"',
-    'Banned: wish and a prayer, Nobody asked, Same maker more SKUs, night shift, publish button, the tape, the register, receipt paper, stock the shelves, invented numbers, insults, exclamation marks, emoji.',
+    'Bad: "13k GitHub stars llm for LLM-MRCHATTERBOX"',
+    'Bad: "1.4k GitHub stars blog for NEW INSTANT ROLLBACK FLOW"',
+    'Banned: wish and a prayer, Nobody asked, Same maker more SKUs, night shift, publish button, the tape, the register, receipt paper, stock the shelves, invented numbers, insults, exclamation marks, emoji, pairing a star count with the wrong product.',
     'Finish with only a JSON object, no markdown: {"note":""}',
-  ].join('\n');
+  ]
+    .filter(Boolean)
+    .join('\n');
 }
 
 function systemPrompt(year: number, searches: number) {
@@ -355,7 +418,7 @@ function systemPrompt(year: number, searches: number) {
     '"link" must be a URL that appears in the data or your search results, copied exactly, or null. Never make up a URL.',
     'Status (one allowed word) goes where a price would. LIVE for a running product or site, RELEASED for a version/release, LAUNCHED for a launch post, SHIPPED otherwise, BETA if it says beta, DECEASED if shut down.',
     'Item names: a clean short product name people would recognize (ChatGPT Images 2.5, Codex long-running work, Composer 2). Strip Introducing/Launching/How. Truncate on a word boundary, never mid-word. Max 40 characters. Description: a specific one-liner grounded in the source (what it is, not a slogan), max 70 characters.',
-    'Cashier "note": one sentence, ~140 characters, warm-roast (playful, admiring, never mean), built on the single most impressive real fact (a count, a big launch, a streak). Copy the number exactly. Good: "Codex grew long-running work this year, and Tibo\'s agents now stay clocked in overnight." Good: "cn is at 8.2M weekly downloads. The other packages are just opening acts." Good: "104 public Replit ships later and Amjad still treats shipped like a first draft." Bad: "runs on a wish and a prayer" Bad: "Nobody asked for ChatGPT for Research." Bad: "200/mo public revenue on CHATGPT FOR RESEARCH" Banned: wish and a prayer, Nobody asked, Same maker more SKUs, night shift, publish button, the tape, invented stats.',
+    'Cashier "note": one sentence, ~140 characters, warm-roast (playful, admiring, never mean), built on the single most impressive real fact (a count, a big launch, a streak). Copy the number exactly. If they are a CEO or founder, summarize the company-wide year, never one product. Good: "Codex grew long-running work this year, and Tibo\'s agents now stay clocked in overnight." Good: "cn is at 8.2M weekly downloads. The other packages are just opening acts." Good: "104 public Replit ships later and Amjad still treats shipped like a first draft." Bad: "runs on a wish and a prayer" Bad: "Nobody asked for ChatGPT for Research." Bad: "13k GitHub stars llm for LLM-MRCHATTERBOX" Banned: wish and a prayer, Nobody asked, Same maker more SKUs, night shift, publish button, the tape, invented stats, pairing a star count with the wrong product.',
     'Also output "stats": 1-4 short lines copied from <found>.stats (GitHub stars, npm weekly downloads, PH upvotes, App Store ratings, public MRR, user counts, HN points). Keep the source host/path on each line. Never invent a number.',
     'Banned words and moves everywhere: delve, testament, journey, innovative, seamless, elevate, unlock, empower, leverage, cutting-edge, game-changer, robust, passion, incredible, amazing, "truly", loser, pathetic, scam, flop, cringe, exclamation marks, emoji, em dashes, and praise like "impressive year".',
     `Do not add extra receipt bands. The tape is short: items, a one-line cashier note, stamp and serial. If you output modules, ids only from ${REQUIRED_MODULES.join(', ')}. Never output HTML, markdown, CSS, filler ids (deep-cut, first-last, platforms, still-running, volume, friend, sources, serial) or extra keys.`,
@@ -482,7 +545,10 @@ function normalize(raw: unknown, gathered: Gathered, allowed: Allowed, year: num
     if (items.length === MAX_ITEMS) break;
   }
   const note = typeof data.note === 'string' ? clean(data.note, 180).replace(/\s*[\u2014\u2013]\s*/g, '. ').replace(/!+/g, '.') : '';
-  return finish(items, note, seed, data.modules, data.stats);
+  return finish(items, note, seed, data.modules, data.stats, {
+    role: gathered.profile.affiliation?.role,
+    company: gathered.profile.affiliation?.company,
+  });
 }
 
 /** The model's raw reply checked against the receipt schema, with only these links allowed. Exported for tests. */
@@ -603,15 +669,19 @@ export async function assembleReceipt(subject: Subject, gathered: Gathered, year
     return send(body);
   };
 
+  const affiliation = gathered.profile.affiliation;
   if (harvested.length && !want) {
     const stats = formatStats(harvested, gathered.stats ?? []);
-    let note = groundedNote(harvested, seed, gathered.profile.name, stats);
+    let note = groundedNote(harvested, seed, gathered.profile.name, stats, {
+      role: affiliation?.role,
+      company: affiliation?.company,
+    });
     try {
       const request = {
         model,
         max_tokens: 256,
-        system: noteOnlySystem(year),
-        messages: [{ role: 'user', content: noteOnlyPrompt(subject, harvested, stats, year) }],
+        system: noteOnlySystem(year, affiliation),
+        messages: [{ role: 'user', content: noteOnlyPrompt(subject, harvested, stats, year, affiliation) }],
         thinking: { type: 'disabled' },
       };
       let response = await call(request);
@@ -635,7 +705,7 @@ export async function assembleReceipt(subject: Subject, gathered: Gathered, year
     } catch (error) {
       if (error instanceof PrintError && error.code === 'out-of-credit') throw error;
     }
-    const draft = finish(harvested, note, seed, undefined, stats);
+    const draft = finish(harvested, note, seed, undefined, stats, { role: affiliation?.role, company: affiliation?.company });
     const cost = spent();
     console.log(JSON.stringify({ shipped: 'ai', model, mode: 'note-only', items: harvested.length, inputTokens: usage.input, outputTokens: usage.output, costMicros: cost }));
     return { ...draft, model, inputTokens: usage.input, outputTokens: usage.output, searches: 0, costMicros: cost };

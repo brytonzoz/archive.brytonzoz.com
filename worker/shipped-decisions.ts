@@ -170,7 +170,7 @@ function pick(answers: Answer[], name: string): Answer | undefined {
 }
 
 const NOT_A_SHIP =
-  /\b(how to|tutorial|case stud(?:y|ies)|customer stor(?:y|ies)|deep dive|event recap|hiring|we.?re hiring|opinion piece|explainer|what we learned|behind the scenes|lessons? from|research paper|whitepaper|preprint|teas(?:e|ing)|coming soon|roadmap|retweet|rt @)\b/i;
+  /\b(how to|tutorial|case stud(?:y|ies)|customer stor(?:y|ies)|deep dive|event recap|hiring|we.?re hiring|opinion piece|explainer|what we learned|behind the scenes|lessons? from|research paper|whitepaper|preprint|teas(?:e|ing)|coming soon|roadmap|retweet|rt @|customer spotlight|success stor(?:y|ies)|frontier firms|pulling ahead|what i ship(?:ped)? here)\b/i;
 
 export function looksLikeNotAShip(item: { name?: string; description?: string; link?: string | null }): boolean {
   const name = (item.name ?? '').trim();
@@ -179,18 +179,20 @@ export function looksLikeNotAShip(item: { name?: string; description?: string; l
   if (NOT_A_SHIP.test(hay)) return true;
   if (/^how\s+\w+\s+is\b/i.test(name)) return true;
   if (/\baccelerating\b/i.test(name) && !/\b(launch|released?|version|v\d)\b/i.test(name)) return true;
-  if (/^[A-Za-z0-9][\w.-]{1,40}\s+builds\b/i.test(name)) return true;
+  if (/^[A-Za-z0-9][\w.-]{1,40}\s+(builds|engineers?)\b/i.test(name)) return true;
   if (/\busing\b.{0,48}\bto\s+(search|find|build|make|create|train)\b/i.test(name)) return true;
   if (/^(rapidly|safely|simply)\s+\w+ing\b/i.test(name)) return true;
   if (/\b(uses|using)\b.{0,48}\b(to|for)\b/i.test(name)) return true;
   if (/\bsystem card\b/i.test(name)) return true;
   if (/\b(gartner|cfo council|analyst|keynote)\b/i.test(name)) return true;
-  if (/^(blog|company|research|sign in|contact|resources|customers|support|next|submit now|see the changelog|timeline|of the year|do not sell|series [abc])\b/i.test(name)) return true;
+  if (/^(blog|company|research|sign in|contact|resources|customers|support|next|submit now|see the changelog|timeline|of the year|do not sell|series [abc]|what i ship)\b/i.test(name)) return true;
   if (/^(inside|beyond|securing|decision time|cfos?)\b/i.test(name)) return true;
   if (/\b(ships faster with|running .{0,40} safely|harness engineering|beyond rate limits|leveraging|economics of|guidance)\b/i.test(name)) return true;
   if (/^(output:|screenshot|to get started|each dot |design \()/i.test(name)) return true;
+  if (/^(launched|released|shipped|live|available)(\s+as(\s+a)?\s+\w+)?$/i.test(name)) return true;
+  if (/^v?\d+(?:\.\d+){1,4}[a-z0-9.-]*$/i.test(name) || /^20\d\d(?:-\d{2}){0,2}$/.test(name)) return true;
   if (/\/(customers|topic|resources|support)(\/|$)/i.test(item.link ?? '')) return true;
-  if (/\/(research|blog)\//i.test(item.link ?? '') && /\b(how |why |tutorial|case |stor(?:y|ies)|accelerat)/i.test(name)) return true;
+  if (/\/(research|blog)\//i.test(item.link ?? '') && /\b(how |why |tutorial|case |stor(?:y|ies)|accelerat|engineers?|rakuten|ramp )\b/i.test(name)) return true;
   return false;
 }
 
@@ -313,12 +315,69 @@ export async function verifyCandidates(opts: {
 }
 
 const loose = (text: string) => text.toLowerCase().replace(/[^a-z0-9]+/g, '');
+const STOP_SHIP = new Set([
+  'the',
+  'and',
+  'for',
+  'app',
+  'desktop',
+  'cli',
+  'api',
+  'web',
+  'new',
+  'now',
+  'from',
+  'with',
+  'via',
+  'launch',
+  'launched',
+  'launches',
+  'introduces',
+  'introduced',
+  'introducing',
+  'released',
+  'release',
+  'ships',
+  'shipped',
+  'available',
+  'live',
+  'flow',
+  'version',
+]);
 
-export function shareKeywords(a: Found, b: Found): boolean {
+function coreTokens(name: string): Set<string> {
+  return new Set(
+    name
+      .toLowerCase()
+      .replace(/[^a-z0-9]+/g, ' ')
+      .split(/\s+/)
+      .filter((token) => token.length >= 3 && !STOP_SHIP.has(token)),
+  );
+}
+
+function containedName(a: string, b: string): boolean {
+  if (a.length < 4 || b.length < 4) return false;
+  if (a === b) return true;
+  const [shorter, longer] = a.length <= b.length ? [a, b] : [b, a];
+  const at = longer.indexOf(shorter);
+  if (at < 0) return false;
+  const after = longer.slice(at + shorter.length);
+  const before = longer.slice(0, at);
+  if (after && /^\d/.test(after)) return false;
+  if (before && /\d$/.test(before)) return false;
+  return true;
+}
+
+export function shareKeywords(a: { name: string; link?: string | null }, b: { name: string; link?: string | null }): boolean {
   const x = loose(a.name);
   const y = loose(b.name);
   if (!x || !y || x.length < 4 || y.length < 4) return false;
-  if (x === y || x.includes(y) || y.includes(x)) return true;
+  if (containedName(x, y)) return true;
+  const ta = coreTokens(a.name);
+  const tb = coreTokens(b.name);
+  let overlap = 0;
+  for (const token of ta) if (tb.has(token)) overlap += 1;
+  if (overlap >= 2) return true;
   const host = (url: string | null) => {
     try {
       return url ? new URL(url).hostname.replace(/^www\./, '') : '';
@@ -335,7 +394,7 @@ export function shareKeywords(a: Found, b: Found): boolean {
   };
   const pa = pathOf(a.link);
   const pb = pathOf(b.link);
-  if (a.link && b.link && host(a.link) && host(a.link) === host(b.link) && pa && pb && pa !== '/' && (pa === pb || pa.includes(pb) || pb.includes(pa))) return true;
+  if (a.link && b.link && host(a.link) && host(a.link) === host(b.link) && pa && pb && pa !== '/' && (pa === pb || pa.startsWith(`${pb}/`) || pb.startsWith(`${pa}/`))) return true;
   return false;
 }
 

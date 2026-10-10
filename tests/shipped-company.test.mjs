@@ -141,6 +141,16 @@ test('ship names strip launch words, skip bylines, and never cut mid-word', () =
   assert.equal(changelog.shipName('Launching Codex long-running work'), 'Codex long-running work');
   assert.equal(changelog.shipName('How to make realistic VFX shots'), '');
   assert.equal(changelog.shipName('BY MARIAM BAROVA, CREATIVE DIRECTOR'), '');
+  assert.equal(changelog.shipName('The Codex app launches on macOS'), 'Codex app for macOS');
+  assert.equal(changelog.shipName('Replit introduces Free Mode'), 'Replit Free Mode');
+  assert.equal(changelog.shipName('NEW INSTANT ROLLBACK FLOW'), 'INSTANT ROLLBACK');
+  assert.equal(changelog.shipName('Replit Agent v0.213.1'), 'Replit Agent v0.213.1');
+  assert.equal(changelog.shipName('v0.213.1'), '');
+  assert.equal(changelog.shipName('2026'), '');
+  assert.equal(changelog.shipName('Launched as a desktop'), '');
+  assert.equal(changelog.shipName('Rakuten uses Codex to ship faster'), '');
+  assert.equal(changelog.shipName('Ramp engineers accelerate code review'), '');
+  assert.equal(changelog.shipName('Frontier firms are pulling ahead'), '');
   const cut = changelog.shipName('Introducing ChatGPT Small Business Program for teams everywhere', 40);
   assert.ok(!/progr$/i.test(cut), cut);
   assert.match(cut, /ChatGPT Small Business/i);

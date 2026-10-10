@@ -175,6 +175,19 @@ test('Decisions and xAI skip when the key is missing', async () => {
 test('same_ship pairs share keywords; weaker duplicate is dropped', async () => {
   assert.equal(decisions.shareKeywords(found(), found({ name: 'OpenAI Codex', link: 'https://github.com/openai/codex' })), true);
   assert.equal(decisions.shareKeywords(found(), found({ name: 'Sora', link: 'https://openai.com/sora' })), false);
+  assert.equal(
+    decisions.shareKeywords(
+      found({ name: 'Replit introduces Free Mode', link: 'https://blog.replit.com/free-mode' }),
+      found({ name: 'Replit Free Mode', link: 'https://replit.com/free-mode' }),
+    ),
+    true,
+  );
+  assert.equal(
+    decisions.shareKeywords(found({ name: 'Origin CLI', link: 'https://replit.com/origin' }), found({ name: 'Origin CLI', link: 'https://blog.replit.com/origin-cli' })),
+    true,
+  );
+  assert.equal(decisions.looksLikeNotAShip({ name: 'Ramp engineers accelerate code review', link: 'https://openai.com/index/ramp' }), true);
+  assert.equal(decisions.looksLikeNotAShip({ name: 'Frontier firms are pulling ahead' }), true);
   const same = await decisions.dedupeSameShips({
     env: {},
     items: [

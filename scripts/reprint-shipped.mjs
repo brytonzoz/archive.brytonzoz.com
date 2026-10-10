@@ -1,4 +1,4 @@
-// Reprint existing wall receipts on staging via POST /api/admin/shipped { action: 'reprint-receipt', affiliation? }.
+// Reprint wall receipts via POST /api/admin/shipped { action: 'reprint-receipt', affiliation? }.
 // Names and counts only. Never prints the admin password or receipt bodies.
 //
 //   ADMIN_PASSWORD=… node scripts/reprint-shipped.mjs [origin]

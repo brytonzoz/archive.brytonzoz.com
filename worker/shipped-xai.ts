@@ -5,7 +5,7 @@
 //
 // Billing (docs.x.ai): x_search is $5/1k posts fetched + $10/1k profiles; web_search $5/1k
 // calls; plus tokens. Exact charge is usage.cost_in_usd_ticks (1 USD = 1e10 ticks).
-import { clean, publicUrl, type Found } from './shipped-sources';
+import { cached, clean, publicUrl, type Found } from './shipped-sources';
 import type { Affiliation } from './shipped-affiliation';
 
 export const XAI_RESPONSES = 'https://api.x.ai/v1/responses';
@@ -20,11 +20,14 @@ export const XAI_WEB_MICROS = 5_000;
 export const XAI_TICKS_PER_USD = 10_000_000_000;
 export const XAI_GAP_BELOW = 10;
 export const XAI_DEFAULT_MAX_POSTS = 10;
-export const XAI_HARD_MAX_POSTS = 25;
+export const XAI_HARD_MAX_POSTS = 10;
 export const XAI_DEEP_MAX_POSTS = 40;
 export const XAI_DEEP_HARD_MAX_POSTS = 50;
 export const XAI_DEFAULT_MONTHLY_USD = 15;
 export const XAI_SALE_ALLOWANCE_USD = 0.3;
+export const XAI_SCRIPT_MAX_CALLS = 20;
+export const XAI_FREE_MAX_SEARCHES = 1;
+export const XAI_HANDLE_TTL_SEC = 7 * 24 * 60 * 60;
 
 export type XaiEnv = {
   XAI_API_KEY?: string;
@@ -36,7 +39,11 @@ export type XaiEnv = {
   XAI_MONTHLY_CAP_USD?: string;
   SHIPPED_XAI_MONTHLY_CAP_USD?: string;
   SHIPPED_FULL_ALLOWANCE_USD?: string;
+  SHIPPED_XAI_OFF?: string;
   xaiMeter?: XaiMeter;
+  /** free = at most 1 search / 10 posts. full = paid. off = never call. */
+  xaiMode?: 'free' | 'full' | 'off';
+  xaiReceipt?: { searches: number };
 };
 
 export type XaiSpend = {
@@ -54,6 +61,29 @@ export type XaiMeter = {
   record: (spend: XaiSpend) => Promise<void>;
 };
 
+export function denyXaiMeter(): XaiMeter {
+  return {
+    async allow() {
+      return false;
+    },
+    async record() {},
+  };
+}
+
+export function composeXaiMeters(...meters: XaiMeter[]): XaiMeter {
+  return {
+    async allow() {
+      for (const meter of meters) {
+        if (!(await meter.allow())) return false;
+      }
+      return meters.length > 0;
+    },
+    async record(spend) {
+      for (const meter of meters) await meter.record(spend);
+    },
+  };
+}
+
 export const emptyXaiSpend = (): XaiSpend => ({
   inputTokens: 0,
   outputTokens: 0,
@@ -65,6 +95,7 @@ export const emptyXaiSpend = (): XaiSpend => ({
 });
 
 export function xaiConfigured(env: XaiEnv): boolean {
+  if (env.xaiMode === 'off' || /^(1|true|yes|off)$/i.test(env.SHIPPED_XAI_OFF || '')) return false;
   return Boolean(env.XAI_API_KEY?.trim());
 }
 
@@ -192,6 +223,64 @@ export function d1XaiMeter(db: D1Database, env: XaiEnv): XaiMeter {
   };
 }
 
+/** Scripts/Actions: 20-call run cap + the same D1 ledger. No origin/password → fail closed. */
+export function scriptXaiMeter(opts: {
+  origin?: string;
+  password?: string;
+  env?: XaiEnv;
+  maxCalls?: number;
+  inner?: XaiMeter;
+}): XaiMeter & { calls: number } {
+  const maxCalls = Math.max(0, Math.min(XAI_SCRIPT_MAX_CALLS, opts.maxCalls ?? XAI_SCRIPT_MAX_CALLS));
+  const state = { calls: 0 };
+  const inner = opts.inner ?? (opts.origin && opts.password ? remoteD1XaiMeter(opts.origin, opts.password, opts.env) : denyXaiMeter());
+  return {
+    get calls() {
+      return state.calls;
+    },
+    async allow() {
+      if (state.calls >= maxCalls) {
+        console.log(JSON.stringify({ shipped: 'xai', skipped: 'script-call-cap', calls: state.calls, maxCalls }));
+        return false;
+      }
+      return inner.allow();
+    },
+    async record(spend) {
+      state.calls += 1;
+      await inner.record(spend);
+    },
+  };
+}
+
+export function remoteD1XaiMeter(origin: string, password: string, env?: XaiEnv): XaiMeter {
+  const base = origin.replace(/\/+$/, '');
+  const headers = { authorization: `Bearer ${password}`, 'content-type': 'application/json' };
+  const capTicks = xaiMonthlyCapUsd(env ?? {}) * XAI_TICKS_PER_USD;
+  return {
+    async allow() {
+      try {
+        const res = await fetch(`${base}/api/admin/shipped/xai-meter`, { headers, cache: 'no-store', signal: AbortSignal.timeout(5000) });
+        const body = (await res.json().catch(() => null)) as { open?: boolean; ticks?: number } | null;
+        if (!res.ok || !body) return false;
+        if (typeof body.open === 'boolean') return body.open;
+        return (body.ticks ?? 0) < capTicks;
+      } catch {
+        return false;
+      }
+    },
+    async record(spend) {
+      const ticks = spend.ticks || spend.costMicros * 10_000;
+      if (!ticks) return;
+      await fetch(`${base}/api/admin/shipped/xai-meter`, {
+        method: 'POST',
+        headers,
+        body: JSON.stringify({ ticks, posts: spend.posts, receipts: 1 }),
+        signal: AbortSignal.timeout(5000),
+      }).catch(() => undefined);
+    },
+  };
+}
+
 type ResponsesBody = {
   output?: { type?: string; content?: { type?: string; text?: string }[]; text?: string }[];
   output_text?: string;
@@ -283,19 +372,33 @@ function parseIdentity(text: string): ResolvedPerson {
   }
 }
 
+function receiptSearchCap(env: XaiEnv): number {
+  return env.xaiMode === 'full' ? 8 : XAI_FREE_MAX_SEARCHES;
+}
+
 async function xaiOpen(env: XaiEnv): Promise<boolean> {
   if (!xaiConfigured(env)) return false;
-  if (!env.xaiMeter) return true;
+  if (!env.xaiMeter) {
+    console.log(JSON.stringify({ shipped: 'xai', skipped: 'no-meter' }));
+    return false;
+  }
+  const used = env.xaiReceipt?.searches ?? 0;
+  if (used >= receiptSearchCap(env)) {
+    console.log(JSON.stringify({ shipped: 'xai', skipped: 'receipt-search-cap', used, cap: receiptSearchCap(env) }));
+    return false;
+  }
   return env.xaiMeter.allow();
 }
 
+/** THE only HTTP call to api.x.ai. Every caller must pass a D1-backed meter. */
 async function xaiResponses(env: XaiEnv, payload: Record<string, unknown>): Promise<{ body: ResponsesBody; spend: XaiSpend } | null> {
   const key = env.XAI_API_KEY?.trim();
   if (!key) return null;
   if (!(await xaiOpen(env))) {
-    console.log(JSON.stringify({ shipped: 'xai', skipped: 'monthly-cap' }));
+    if (env.xaiMeter) console.log(JSON.stringify({ shipped: 'xai', skipped: 'monthly-cap' }));
     return null;
   }
+  env.xaiReceipt = { searches: (env.xaiReceipt?.searches ?? 0) + 1 };
   const base = (env.XAI_API_BASE || 'https://api.x.ai/v1').replace(/\/+$/, '');
   const model = env.SHIPPED_XAI_MODEL || XAI_MODEL;
   const response = await fetch(`${base}/responses`, {
@@ -336,10 +439,37 @@ export async function searchXShips(opts: {
   /** Paid full run: up to ~40 posts, billed to the sale meter. */
   deep?: boolean;
 }): Promise<{ found: Found[]; spend: XaiSpend }> {
-  const cap = opts.deep ? xaiDeepMaxPosts(opts.env) : xaiMaxPosts(opts.env);
+  const cap = opts.deep ? xaiDeepMaxPosts(opts.env) : Math.min(XAI_DEFAULT_MAX_POSTS, xaiMaxPosts(opts.env));
   const posts = Math.min(cap, opts.maxPosts ?? cap);
-  const handles = [...new Set(opts.handles.map((h) => h.replace(/^@/, '')).filter(Boolean))].slice(0, 4);
+  const handles = [...new Set(opts.handles.map((h) => h.replace(/^@/, '')).filter(Boolean))].slice(0, 1);
   if (!xaiConfigured(opts.env) || posts <= 0 || !handles.length) return { found: [], spend: emptyXaiSpend() };
+  const cacheKey = `xai:ships:v1:${opts.year}:${handles[0].toLowerCase()}:${opts.deep ? 'full' : 'free'}`;
+  try {
+    return await cached<{ found: Found[]; spend: XaiSpend }>(
+      cacheKey,
+      XAI_HANDLE_TTL_SEC,
+      async () => searchXShipsFresh(opts, handles, posts),
+      (value) => value.found.length > 0 || value.spend.ticks > 0,
+    );
+  } catch {
+    return { found: [], spend: emptyXaiSpend() };
+  }
+}
+
+async function searchXShipsFresh(
+  opts: {
+    env: XaiEnv;
+    year: number;
+    handles: string[];
+    who: string;
+    company?: string | null;
+    kind: 'person' | 'company';
+    maxPosts?: number;
+    deep?: boolean;
+  },
+  handles: string[],
+  posts: number,
+): Promise<{ found: Found[]; spend: XaiSpend }> {
   const query = xaiKeywordQuery(handles[0], opts.year);
   const prompt = [
     `Gap-fill only. Run ONE x_keyword_search with this exact query (do not change it):`,
@@ -387,7 +517,7 @@ export async function resolvePersonWithXai(opts: {
   role?: string | null;
 }): Promise<ResolvedPerson & { spend: XaiSpend }> {
   const empty = { name: null, handle: null, company: null, role: null, product: null, spend: emptyXaiSpend() };
-  if (!xaiConfigured(opts.env)) return empty;
+  if (!xaiConfigured(opts.env) || opts.env.xaiMode !== 'full') return empty;
   const { identitySearchQuery } = await import('./shipped-affiliation');
   const query = identitySearchQuery(opts.who, opts.company ?? null, opts.role ?? null);
   if (!query.trim()) return empty;
@@ -475,7 +605,7 @@ export async function searchWebShips(opts: {
   who: string;
   company?: string | null;
 }): Promise<{ found: Found[]; spend: XaiSpend }> {
-  if (!xaiConfigured(opts.env)) return { found: [], spend: emptyXaiSpend() };
+  if (!xaiConfigured(opts.env) || opts.env.xaiMode !== 'full') return { found: [], spend: emptyXaiSpend() };
   const prompt = [
     `Web gap-fill only. Use web_search (at most 4 calls) for public ${opts.year} ships by ${opts.who}${opts.company ? ` or ${opts.company} while they led it` : ''}.`,
     `Each ship needs a real public URL (changelog, repo, Product Hunt, App Store, blog). No invented names.`,
@@ -508,7 +638,7 @@ export async function browseShipPage(opts: {
   year: number;
   who: string;
 }): Promise<{ found: Found[]; spend: XaiSpend }> {
-  if (!xaiConfigured(opts.env) || !publicUrl(opts.url)) return { found: [], spend: emptyXaiSpend() };
+  if (!xaiConfigured(opts.env) || opts.env.xaiMode !== 'full' || !publicUrl(opts.url)) return { found: [], spend: emptyXaiSpend() };
   const prompt = [
     `Read this public page and list every ${opts.year} product, feature, model, app, or release by ${opts.who}: ${opts.url}`,
     `Use web_search (one call) for that exact URL. Do not invent names. Skip tutorials, ads, and policy posts.`,

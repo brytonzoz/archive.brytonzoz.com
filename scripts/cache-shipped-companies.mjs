@@ -32,7 +32,7 @@ const seeds = JSON.parse(readFileSync(new URL('../data/shipped-companies.json', 
 const { harvestCompany } = await import('../worker/shipped-company.ts');
 const { offworkerPayload } = await import('../worker/shipped-company-store.ts');
 const { emptyAffiliation } = await import('../worker/shipped-affiliation.ts');
-const { memoryXaiMeter } = await import('../worker/shipped-xai.ts');
+const { denyXaiMeter } = await import('../worker/shipped-xai.ts');
 
 const tinyfishMeter = {
   async take() {
@@ -47,12 +47,11 @@ const env = {
   PRODUCTHUNT_KEY: pick('PRODUCTHUNT_KEY'),
   PRODUCTHUNT_SECRET: pick('PRODUCTHUNT_SECRET'),
   TINYFISH_API_KEY: pick('TINYFISH', 'TINYFISH_API_KEY'),
-  XAI_API_KEY: pick('XAI_KEY', 'XAI_API_KEY'),
+  XAI_API_KEY: '',
   OPENAI_API_KEY: pick('OPENAI_KEY', 'OPENAI_API_KEY'),
-  XAI_MAX_POSTS: '4',
-  SHIPPED_XAI_MAX_POSTS: '4',
-  XAI_MONTHLY_CAP_USD: pick('XAI_MONTHLY_CAP_USD', 'SHIPPED_XAI_MONTHLY_CAP_USD') || '15',
-  xaiMeter: memoryXaiMeter(Number(pick('XAI_MONTHLY_CAP_USD', 'SHIPPED_XAI_MONTHLY_CAP_USD') || 15)),
+  SHIPPED_XAI_OFF: '1',
+  xaiMode: 'off',
+  xaiMeter: denyXaiMeter(),
 };
 
 const tinyfish = env.TINYFISH_API_KEY ? { key: env.TINYFISH_API_KEY, meter: tinyfishMeter } : null;

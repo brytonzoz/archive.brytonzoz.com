@@ -37,7 +37,7 @@ import { ICON_HASH, bytesDataUri, iconDataUri, iconKey, reencodeLogo, storeIcon 
 import { houseMark } from './shipped-marks';
 import { yearCardPng, yearRolloPdf, yearRolloPng, yearTallPng, type LogoResolver } from './shipped-og';
 import { BUNDLE_KIND, FULL_KIND, PRINT_KIND, SPONSOR_KIND, isProduction, sponsorProvider, type PayEnv, type SponsorEvent } from './shipped-pay';
-import { d1XaiMeter, saleXaiMeter, xaiSaleAllowanceUsd } from './shipped-xai';
+import { composeXaiMeters, d1XaiMeter, denyXaiMeter, saleXaiMeter, xaiMonthKey, xaiMonthlyCapUsd, xaiSaleAllowanceUsd, XAI_TICKS_PER_USD } from './shipped-xai';
 import {
   BUNDLE_PRICE_CENTS,
   FULL_PRICE_CENTS,
@@ -1552,7 +1552,7 @@ async function rerunFullReceipt(db: D1Database, env: ShippedEnv, id: number): Pr
     const current = await loadReceipt(db, id);
     if (!current || current.full) return;
     const year = current.year || yearOf(env);
-    const meter = saleXaiMeter(xaiSaleAllowanceUsd(env));
+    const meter = composeXaiMeters(d1XaiMeter(db, env), saleXaiMeter(xaiSaleAllowanceUsd(env)));
     const gathered = await gather(
       current.subject,
       gatherEnv(env, db, { xaiMeter: meter }),
@@ -2137,7 +2137,13 @@ async function reprintReceipt(env: ShippedEnv, db: D1Database, id: number): Prom
   if (!slot) return json({ error: 'busy' }, 503);
   let reserved = 0;
   try {
-    const gathered = await gather(subject, gatherEnv(env, db), year, tinyfishMeter(db), { rebuild: true });
+    const gathered = await gather(
+      subject,
+      gatherEnv(env, db, { xaiMeter: denyXaiMeter(), xaiMode: 'off', SHIPPED_XAI_OFF: '1' }),
+      year,
+      tinyfishMeter(db),
+      { rebuild: true },
+    );
     if (subject.kind === 'github' && gathered.profile.name && !hasBlockedWord(gathered.profile.name)) subject.display = clean(gathered.profile.name, 60);
     let model: string | null = null;
     let usage = { input: 0, output: 0, searches: 0, cost: 0 };
@@ -2226,6 +2232,31 @@ export async function adminShipped(request: Request, env: ShippedEnv): Promise<R
     const object = bid?.logo_key && env.SHIPPED ? await env.SHIPPED.get(bid.logo_key) : null;
     if (!object) return new Response('Not found', { status: 404 });
     return png(object.body, 'no-store');
+  }
+  if (url.pathname === '/api/admin/shipped/xai-meter') {
+    const month = xaiMonthKey();
+    if (request.method === 'GET') {
+      const row = await db.prepare('SELECT ticks, posts, receipts FROM shipped_xai WHERE month = ?').bind(month).first<{ ticks: number; posts: number; receipts: number }>();
+      const ticks = row?.ticks ?? 0;
+      const cap = xaiMonthlyCapUsd(env) * XAI_TICKS_PER_USD;
+      return json({ ok: true, month, ticks, posts: row?.posts ?? 0, receipts: row?.receipts ?? 0, open: ticks < cap, capUsd: xaiMonthlyCapUsd(env) });
+    }
+    if (request.method !== 'POST') return json({ error: 'method' }, 405);
+    const body = await readJsonCapped(request, 2048);
+    if (!body) return json({ error: 'bad-request' }, 400);
+    const ticks = Math.max(0, Math.round(Number(body.ticks) || 0));
+    const posts = Math.max(0, Math.round(Number(body.posts) || 0));
+    const receipts = Math.max(0, Math.round(Number(body.receipts) || 1));
+    if (!ticks) return json({ ok: true, month, skipped: true });
+    await db
+      .prepare(
+        `INSERT INTO shipped_xai (month, ticks, posts, receipts) VALUES (?, ?, ?, ?)
+         ON CONFLICT(month) DO UPDATE SET ticks = ticks + excluded.ticks, posts = posts + excluded.posts, receipts = receipts + excluded.receipts`,
+      )
+      .bind(month, ticks, posts, receipts)
+      .run();
+    const row = await db.prepare('SELECT ticks FROM shipped_xai WHERE month = ?').bind(month).first<{ ticks: number }>();
+    return json({ ok: true, month, ticks: row?.ticks ?? ticks });
   }
   if (url.pathname === '/api/admin/shipped/company-cache') {
     if (request.method === 'GET') {

@@ -187,6 +187,21 @@ test('xAI is a keyword gap-fill with a hard post cap and monthly fail-closed', a
   });
   assert.equal(empty.found.length, 0);
   assert.equal(empty.spend.costMicros, 0);
+  const unmetered = await xai.searchXShips({
+    env: { XAI_API_KEY: 'sk-test' },
+    year: 2026,
+    handles: ['sama'],
+    who: 'sama',
+    kind: 'person',
+  });
+  assert.equal(unmetered.spend.costMicros, 0);
+  assert.equal(xai.xaiConfigured({ XAI_API_KEY: 'sk-test', SHIPPED_XAI_OFF: '1' }), false);
+  const script = xai.scriptXaiMeter({ maxCalls: 0 });
+  assert.equal(await script.allow(), false);
+  assert.equal(await xai.denyXaiMeter().allow(), false);
+  const freeIdent = await xai.resolvePersonWithXai({ env: { XAI_API_KEY: 'sk-test', xaiMeter: xai.memoryXaiMeter(15), xaiMode: 'free' }, who: 'Tibo' });
+  assert.equal(freeIdent.handle, null);
+  assert.equal(freeIdent.spend.costMicros, 0);
 });
 
 test('Decisions and xAI skip when the key is missing', async () => {

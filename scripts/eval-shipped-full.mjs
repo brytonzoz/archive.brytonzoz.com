@@ -24,7 +24,7 @@ const builders = [
 const { readQuery } = await import('../lib/shipped-year.ts');
 const { gather, inYearCount } = await import('../worker/shipped-sources.ts');
 const { assembleReceipt, demoReceipt, cashierNoteLooksCanned } = await import('../worker/shipped-ai.ts');
-const { memoryXaiMeter } = await import('../worker/shipped-xai.ts');
+const { denyXaiMeter } = await import('../worker/shipped-xai.ts');
 
 const pick = (...names) => names.map((n) => process.env[n]).find((v) => typeof v === 'string' && v.trim()) || '';
 // Eval is not on the Worker daily cap. Same always-allow meter as diagnose-shipped-research.mjs.
@@ -53,14 +53,13 @@ const env = {
   BRANDFETCH_API: pick('BRANDFETCH_API'),
   ANTHROPIC_API_KEY: pick('CLAUDE_KEY', 'ANTHROPIC_API_KEY'),
   ANTHROPIC_WORKSPACE_ID: pick('CLAUDE_WORKSPACE', 'ANTHROPIC_WORKSPACE_ID', 'ANTHROPIC_WORKSPACE_DEFAULT'),
-  XAI_API_KEY: pick('XAI_KEY', 'XAI_API_KEY'),
+  XAI_API_KEY: '',
   OPENAI_API_KEY: pick('OPENAI_KEY', 'OPENAI_API_KEY'),
   SHIPPED_MODEL: process.env.SHIPPED_MODEL || 'claude-haiku-5-5',
   SHIPPED_MAX_SEARCHES: process.env.SHIPPED_MAX_SEARCHES || '3',
-  XAI_MAX_POSTS: pick('XAI_MAX_POSTS', 'SHIPPED_XAI_MAX_POSTS') || '10',
-  SHIPPED_XAI_MAX_POSTS: pick('XAI_MAX_POSTS', 'SHIPPED_XAI_MAX_POSTS') || '10',
-  XAI_MONTHLY_CAP_USD: pick('XAI_MONTHLY_CAP_USD', 'SHIPPED_XAI_MONTHLY_CAP_USD') || '15',
-  xaiMeter: memoryXaiMeter(Number(pick('XAI_MONTHLY_CAP_USD', 'SHIPPED_XAI_MONTHLY_CAP_USD') || 15)),
+  SHIPPED_XAI_OFF: '1',
+  xaiMode: 'off',
+  xaiMeter: denyXaiMeter(),
 };
 
 const loose = (text) => String(text || '').toLowerCase().normalize('NFKD').replace(/[^a-z0-9]/g, '');

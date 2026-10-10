@@ -71,7 +71,10 @@ export interface SourceEnv {
   XAI_MONTHLY_CAP_USD?: string;
   SHIPPED_XAI_MONTHLY_CAP_USD?: string;
   SHIPPED_FULL_ALLOWANCE_USD?: string;
+  SHIPPED_XAI_OFF?: string;
   xaiMeter?: import('./shipped-xai').XaiMeter;
+  xaiMode?: 'free' | 'full' | 'off';
+  xaiReceipt?: { searches: number };
   OPENAI_API_KEY?: string;
   OPENAI_API_BASE?: string;
   companyStore?: import('./shipped-company-store').CompanyStore;
@@ -1696,6 +1699,8 @@ async function gatherFresh(
 ): Promise<Gathered> {
   const ran: string[] = [...notes.filter((n) => n.startsWith('x-profile:') || n.startsWith('github:'))];
   const failed: string[] = notes.filter((n) => n.endsWith(':miss') || n.endsWith(':unresolved'));
+  env.xaiMode = mode === 'full' ? 'full' : env.xaiMode === 'off' ? 'off' : 'free';
+  env.xaiReceipt = env.xaiReceipt ?? { searches: 0 };
 
   const ctx: SourceContext = { subject, profile, year, env, tinyfish };
   const key = tinyfish?.key ?? null;
@@ -1832,7 +1837,7 @@ async function gatherFresh(
     site: profile.site,
   });
   const identityP =
-    xaiConfigured(env) && (wantPerson || wantCompany || wantRetry || wantEnrich)
+    mode === 'full' && xaiConfigured(env) && (wantPerson || wantCompany || wantRetry || wantEnrich)
       ? (async () => {
           try {
             await applyResolved(affiliation.name || who);
@@ -2058,7 +2063,7 @@ async function gatherFresh(
       year,
       env,
       deep: mode === 'full',
-      gapFillX: mode === 'full' || found.length < 10,
+      gapFillX: mode === 'full',
       tinyfish,
       store: env.companyStore,
     });

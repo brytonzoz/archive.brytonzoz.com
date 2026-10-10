@@ -18,6 +18,7 @@
 // After c85e99e: seeded note styles, undated ownership gate, leftover Codex fragments.
 // After b2fb93f: invented few-shots so cashier notes are not copies of Tibo/Colin.
 // After f8503e1: hard-reject only; first-publish-year drops old npm; site crumbs need a description.
+// After 75284d0: own-host + blurb is not ownership (TRPC / TRANSFORM).
 // Optional SHIPPED_PRINT_SUBJECTS=handle,handle prints two fresh names via admin print-subject.
 //
 //   ADMIN_PASSWORD=… node scripts/reprint-shipped.mjs [origin]

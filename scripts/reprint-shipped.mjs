@@ -20,6 +20,7 @@
 // After f8503e1: hard-reject only; first-publish-year drops old npm; site crumbs need a description.
 // After 75284d0: own-host + blurb is not ownership (TRPC / TRANSFORM).
 // After 8f16288: one print-time gate; company cache stays raw; junk fixture in CI.
+// After de7f69d: docs/category hrefs and HTML-entity nav titles drop at print time.
 // Optional SHIPPED_PRINT_SUBJECTS=handle,handle prints two fresh names via admin print-subject.
 //
 //   ADMIN_PASSWORD=… node scripts/reprint-shipped.mjs [origin]

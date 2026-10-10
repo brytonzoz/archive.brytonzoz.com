@@ -4,7 +4,7 @@
 import { extraResearchPaths, itemsFromProjectList } from './shipped-research';
 import { looksLikeNotAShip } from './shipped-decisions';
 import { flagshipLaunchName, flagshipProbePaths, knownFlagshipDate, logFlagshipGate } from './shipped-flagship';
-import { isBlogEssayTitle, isDocsOrReferenceTitle, isPrereleaseShip, isVagueOrCutTitle, prettyBrand, versionParts } from './shipped-polish';
+import { isBlogEssayTitle, isCodeOrBugfixTitle, isDocsOrReferenceTitle, isPrereleaseShip, isVagueOrCutTitle, prettyBrand, versionParts } from './shipped-polish';
 import { companyOrgGuess, companyScope, companySlug, companyTokens, matchesLeadProduct, type Affiliation } from './shipped-affiliation';
 import { type XaiEnv, type XaiSpend, emptyXaiSpend } from './shipped-xai';
 import { stripVia, type CompanyStore } from './shipped-company-store';
@@ -259,6 +259,13 @@ export function compactCompanyFound(found: Found[], cap = COMPANY_CACHE_CAP): Fo
     const letters = item.name.replace(/[^a-zA-Z]/g, '').length;
     if (key.length < 4 || letters < 3 || seen.has(key) || out.length >= cap) return;
     if (looksLikeNotAShip(item) && !flagshipLaunchName(item) && !isCompactMustKeep(item)) return;
+    if (
+      !flagshipLaunchName(item) &&
+      !isCompactMustKeep(item) &&
+      (isVagueOrCutTitle(item.name) || isCodeOrBugfixTitle(item.name))
+    ) {
+      return;
+    }
     if (/now available on ai gateway|\/ai-gateway/i.test(`${item.name} ${item.link || ''}`) && !/new models on ai gateway/i.test(item.name)) {
       return;
     }

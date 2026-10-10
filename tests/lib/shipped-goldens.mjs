@@ -31,8 +31,17 @@ export function loose(text) {
     .replace(/[^a-z0-9]/g, '');
 }
 
-export function junkKeys() {
-  return new Set(junk.drop.map((row) => loose(row.name)).filter((key) => key.length >= 6));
+/** Company-scoped drop rows (Stripe on Vercel) are not junk on every tape. */
+export function junkKeys(ctx = {}) {
+  return new Set(
+    junk.drop
+      .filter((row) => {
+        if (row.company) return ctx.company && loose(row.company) === loose(ctx.company);
+        return true;
+      })
+      .map((row) => loose(row.name))
+      .filter((key) => key.length >= 6),
+  );
 }
 
 export function hasRequired(names, needle) {
@@ -52,7 +61,12 @@ export function realItems(items) {
 /** Same assertions the cached goldens use, against printed items + note. */
 export function evaluateGolden(spec, items, note, opts = {}) {
   const names = items.map((item) => item.name);
-  const junkHit = opts.junkHit || junkKeys();
+  const junkHit =
+    opts.junkHit ||
+    junkKeys({
+      who: spec?.who || opts.who,
+      company: spec?.profile?.affiliation?.company || opts.company,
+    });
   const endsWithCutOffWord = opts.endsWithCutOffWord;
   const isBareProductNote = opts.isBareProductNote;
   const isEmptyTapeNote = opts.isEmptyTapeNote;
@@ -96,5 +110,11 @@ export function evaluateLiveReceipt(id, receipt, helpers) {
   const note = String(receipt?.note || '');
   const specId = LIVE_RECEIPT_SPECS[id];
   const spec = specId ? { ...tapes[specId], ...(LIVE_SPEC_OVERRIDE[specId] || {}) } : { min: 1, required: [], forbidden: [] };
-  return evaluateGolden(spec || { min: 1 }, items, note, helpers);
+  return evaluateGolden(spec || { min: 1 }, items, note, {
+    ...helpers,
+    junkHit: junkKeys({
+      who: spec.who,
+      company: spec.profile?.affiliation?.company,
+    }),
+  });
 }

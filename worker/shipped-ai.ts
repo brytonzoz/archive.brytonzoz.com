@@ -768,7 +768,7 @@ export function safeNoteFromTopShip(items: DraftItem[], ctx: NoteContext = {}): 
   const does = shipWhatItDoes(notable);
   const titleWords = new Set(wordsIn(`${notable.name} ${spokenOf(notable)}`));
   const extra = wordsIn(does)
-    .filter((word) => !titleWords.has(word))
+    .filter((word) => !titleWords.has(word) && !/^(can|will|may|also|just|now|been)$/.test(word))
     .slice(0, 2)
     .join(' ');
   const candidates = [

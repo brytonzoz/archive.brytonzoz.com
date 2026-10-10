@@ -59,6 +59,18 @@ function missingRequired(spec, names, drops) {
   return missing;
 }
 
+test('company-scoped junk keys do not smear OpenAI ships onto every tape', () => {
+  const vercel = junkKeys({ company: 'Vercel' });
+  const openai = junkKeys({ company: 'OpenAI' });
+  const none = junkKeys();
+  assert.equal(vercel.has('gpt56sol'), true);
+  assert.equal(vercel.has('stripe'), true);
+  assert.equal(openai.has('gpt56sol'), false);
+  assert.equal(openai.has('stripe'), false);
+  assert.equal(none.has('gpt56sol'), false);
+  assert.equal(none.has('websearchdisabledtoremove'), true);
+});
+
 test('E2E goldens: cached raw tapes keep flagships, hit floors, and drop junk', () => {
   const helpers = {
     junkHit: junkKeys(),
@@ -82,7 +94,10 @@ test('E2E goldens: cached raw tapes keep flagships, hit floors, and drop junk', 
       });
       note = sealed.note;
     }
-    const result = evaluateGolden(spec, items, note, helpers);
+    const result = evaluateGolden(spec, items, note, {
+      ...helpers,
+      junkHit: junkKeys({ who: spec.who, company: spec.profile?.affiliation?.company }),
+    });
     report[id] = { count: items.length, names, drops: drops.slice(0, 40) };
     if (!result.ok) failures.push(`${id}: ${result.failures.join('; ')}`);
     const missing = missingRequired(spec, names, drops);

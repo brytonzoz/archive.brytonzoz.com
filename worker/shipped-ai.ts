@@ -236,7 +236,7 @@ export function noteFailsVoice(note: string): boolean {
 }
 
 const NOTE_NAME_OK =
-  /^(jan(?:uary)?|feb(?:uary)?|mar(?:ch)?|apr(?:il)?|may|jun(?:e)?|jul(?:y)?|aug(?:ust)?|sep(?:t(?:ember)?)?|oct(?:ober)?|nov(?:ember)?|dec(?:ember)?|monday|tuesday|wednesday|thursday|friday|saturday|sunday|openai|vercel|anthropic|github|chatgpt|gpt|cursor|they|them|this|that|year|just|same|weekly|public|nothing|everything|someone|anyone|desktop|spotlight|honest|receipt|launch|launches|ship|ships|update|updates|app|cli|sdk|api)$/i;
+  /^(jan(?:uary)?|feb(?:uary)?|mar(?:ch)?|apr(?:il)?|may|jun(?:e)?|jul(?:y)?|aug(?:ust)?|sep(?:t(?:ember)?)?|oct(?:ober)?|nov(?:ember)?|dec(?:ember)?|monday|tuesday|wednesday|thursday|friday|saturday|sunday|openai|vercel|anthropic|github|chatgpt|gpt|cursor|they|them|this|that|year|just|same|weekly|public|nothing|everything|someone|anyone|desktop|spotlight|honest|receipt|launch|launches|ship|ships|update|updates|app|cli|sdk|api|mcp)$/i;
 
 function spokenOf(item: { name: string; spoken?: string }): string {
   return item.spoken || spokenShipName(item.name);
@@ -524,23 +524,25 @@ function noteCopiesDescription(note: string, items: DraftItem[]): boolean {
   if (hay.length < 12) return false;
   return items.some((item) => {
     const desc = foldNote(item.description || '');
-    return desc.length >= 16 && hay.includes(desc);
+    if (desc.length < 16) return false;
+    if (hay.includes(desc)) return true;
+    const prefix = desc.split(/\s+/).slice(0, 8).join(' ');
+    return prefix.length >= 16 && hay.includes(prefix);
   });
 }
 
 const TITLE_RESTATE_WRAPPER =
-  /^(keep|an|eye|on|watch|the|this|that|year|public|ships?|landed|tape|and|which|is|are|now|live|with|for|of|a|to|plus|more|entries|lines?|\d+)$/;
+  /^(keep|an|eye|on|watch|the|this|that|year|public|ships?|landed|tape|and|which|is|are|now|live|with|for|of|a|to|plus|more|entries|lines?|rest|still|filling|in|leftover|empty|\d+)$/;
 
 function noteManglesTitleCase(note: string, items: DraftItem[]): boolean {
   const runs = note.match(/[A-Z][a-z]+(?:\s+[A-Z][a-z]+){2,}/g) || [];
   if (!runs.length) return false;
   return items.some((item) => {
-    const raw = String(item.name || '');
-    if (raw.split(/\s+/).length < 4 || raw !== raw.toUpperCase()) return false;
-    const title = foldNote(raw);
+    const title = foldNote(item.name || item.spoken || '');
+    if (title.split(/\s+/).length < 4) return false;
     return runs.some((run) => {
       const folded = foldNote(run);
-      return folded.length >= 12 && (title.startsWith(folded) || folded.startsWith(title.slice(0, folded.length)));
+      return folded.length >= 12 && (title.startsWith(folded) || folded.startsWith(title.slice(0, Math.min(folded.length, title.length))));
     });
   });
 }
@@ -722,6 +724,7 @@ export function isBareProductNote(note: string, items: DraftItem[] = []): boolea
 function shipWhatItDoes(item: DraftItem): string {
   const desc = (item.description || '').replace(/\s+/g, ' ').trim();
   if (!desc || /^(dated |linked from |listed (on|under) )/i.test(desc) || /^[a-z0-9.-]+\.[a-z]{2,}$/i.test(desc)) return '';
+  if (/see all of the latest|latest features and updates to the/i.test(desc)) return '';
   const first = desc.split(/[.!?]/)[0]?.trim() || '';
   if (first.length < 8) return '';
   return first.length > 72 ? `${first.slice(0, 72).replace(/\s+\S*$/, '')}` : first;
@@ -745,14 +748,14 @@ export function sentenceFallbackNote(items: DraftItem[], ctx: NoteContext = {}):
   const lead = does ? does.charAt(0).toLowerCase() + does.slice(1) : '';
   const next = items.length > 1 ? spokenOf(items.find((row) => spokenOf(row) !== spoken) || items[1]!) : '';
   const candidates = [
-    does && foldNote(does) !== foldNote(spoken) ? `Keep an eye on ${spoken}, which ${lead}` : '',
-    items.length === 1 && does ? `${spoken} is the one on this tape, and ${lead}` : '',
-    who && does ? `${spoken} is ${who}'s ${kind}, and ${lead}` : '',
-    items.length > 1
-      ? `Keep an eye on ${spoken}; ${items.length} public ships landed this year.`
+    does && foldNote(does) !== foldNote(spoken) && !foldNote(`which ${lead}`).includes(foldNote(does).split(/\s+/).slice(0, 8).join(' '))
+      ? `Keep an eye on ${spoken}, which ${lead}`
       : '',
-    items.length === 1 ? `${spoken} is the one public ship here, and that is the whole story.` : '',
-    `Keep an eye on ${spoken}; the rest of the tape is still filling in.`,
+    who ? `${spoken} is ${who}'s ${kind} on this year's public tape.` : '',
+    items.length > 1 && next
+      ? `${spoken} and ${next} are both on this ${items.length}-ship tape.`
+      : '',
+    items.length === 1 ? `This tape has one public ship, and ${spoken} is it.` : '',
   ].filter(Boolean);
   for (const note of candidates) {
     if (hardRejectNote(note, items, [], ctx)) continue;
@@ -760,7 +763,11 @@ export function sentenceFallbackNote(items: DraftItem[], ctx: NoteContext = {}):
     if (!printable(note)) continue;
     return clipSentence(note, 140);
   }
-  return clipSentence(`Keep an eye on ${spoken}; the rest of the tape is still filling in.`, 140);
+  const last = `${spoken} is the named product on this year's public tape.`;
+  if (!hardRejectNote(last, items, [], ctx) && printable(last) && !isBareProductNote(last, items)) {
+    return clipSentence(last, 140);
+  }
+  return POTENTIAL_NOTES[0] ?? '';
 }
 
 /** Last resort only: the notable ship name. No sentence costume. */

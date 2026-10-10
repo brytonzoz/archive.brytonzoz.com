@@ -738,6 +738,84 @@
       "date": "2026-09-01",
       "source": "changelog",
       "link": "https://openai.com/index/retire"
+    },
+    {
+      "name": "ALSO RELEASED:",
+      "date": "2026-03-05",
+      "source": "changelog",
+      "link": "https://developers.openai.com/api/docs/changelog#also"
+    },
+    {
+      "name": "UPDATED THE AGENTS SDK WITH NEW CAPABILITIES, INCLUDING:",
+      "date": "2026-04-15",
+      "source": "changelog",
+      "link": "https://developers.openai.com/api/docs/changelog#agents"
+    },
+    {
+      "name": "SUPPORT FOR ENHANCED API BUDGET ALERTS &",
+      "date": "2026-04-30",
+      "source": "changelog",
+      "link": "https://developers.openai.com/api/docs/changelog#alerts"
+    },
+    {
+      "name": "RELEASED A REDESIGNED NAVIGATION FOR THE OPENAI API",
+      "date": "2026-06-05",
+      "source": "changelog",
+      "link": "https://developers.openai.com/api/docs/changelog#nav"
+    },
+    {
+      "name": "CONNECTIONS TO API",
+      "date": "2026-09-01",
+      "source": "changelog",
+      "link": "https://developers.openai.com/api/docs/changelog#connections"
+    },
+    {
+      "name": "UPDATED CHAT-LATEST MODEL SNAPSHOT",
+      "date": "2026-10-07",
+      "source": "changelog",
+      "link": "https://openai.com/products/release-notes/"
+    },
+    {
+      "name": "DOCUMENTATION",
+      "date": "2026-10-07",
+      "source": "changelog",
+      "link": "https://learn.chatgpt.com/docs/changelog#docs-heading"
+    },
+    {
+      "name": "IMPROVEMENTS AND BUG FIXES",
+      "date": "2026-10-07",
+      "source": "changelog",
+      "link": "https://learn.chatgpt.com/docs/changelog#fixes"
+    },
+    {
+      "name": "PERFORMANCE IMPROVEMENTS AND BUG FIXES",
+      "date": "2026-07-09",
+      "source": "changelog",
+      "link": "https://learn.chatgpt.com/docs/changelog#perf"
+    },
+    {
+      "name": "FULL RELEASE ON GITHUB",
+      "date": "2026-10-08",
+      "source": "changelog",
+      "link": "https://learn.chatgpt.com/docs/changelog#github-release"
+    },
+    {
+      "name": "CHORES",
+      "date": "2026-10-08",
+      "source": "changelog",
+      "link": "https://learn.chatgpt.com/docs/changelog#chores"
+    },
+    {
+      "name": "STRONGER FOR SOFTWARE DEVELOPMENT",
+      "date": "2026-04-16",
+      "source": "changelog",
+      "link": "https://learn.chatgpt.com/docs/changelog#stronger"
+    },
+    {
+      "name": "MEM0 JOINING",
+      "date": "2026-09-16",
+      "source": "changelog",
+      "link": "https://vercel.com/changelog/mem0-joins-the-vercel-marketplace"
     }
   ],
   "keep": [

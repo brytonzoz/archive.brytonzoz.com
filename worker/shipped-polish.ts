@@ -280,6 +280,9 @@ export function isDocsOrReferenceTitle(title: string): boolean {
   if (/\bcsv export\b/i.test(text) || /^public plugin catalog\b/i.test(text)) return true;
   if (/^usage resets\b/i.test(text)) return true;
   if (/^more .+ features in the\b/i.test(text)) return true;
+  if (/^(documentation|chores)$/i.test(text)) return true;
+  if (/^(improvements?|performance improvements?) and bug fixes$/i.test(text)) return true;
+  if (/^full release on github$/i.test(text)) return true;
   return false;
 }
 
@@ -567,7 +570,15 @@ export function isVagueOrCutTitle(name: string): boolean {
   if (/^cloud work$/i.test(text) || /^new controls\b/i.test(text) || /^all\s+[a-z]+$/i.test(text)) return true;
   if (/\brolling out to all users\b/i.test(text) || /^beta and rolling\b/i.test(text)) return true;
   if (/\bin the chatgpt desktop$/i.test(text)) return true;
-  if (/^(codex joining|chatgpt|features|commands|customize|side|release|admin|members)$/i.test(text)) return true;
+  if (/^(codex joining|chatgpt|features|commands|customize|side|release|admin|members|documentation|chores)$/i.test(text)) return true;
+  if (/^(also released|connections to api):?$/i.test(text)) return true;
+  if (/joining$/i.test(text) && text.split(/\s+/).length <= 3) return true;
+  if (/including:?$/i.test(text) || /alerts\s*&?$/i.test(text)) return true;
+  if (/^(updated|released|previewing)\b/i.test(text) && /\b(including|navigation for|budget alerts|model snapshot)\b/i.test(text)) {
+    return true;
+  }
+  if (/^stronger for software development$/i.test(text)) return true;
+  if (/\bmodel snapshot\b/i.test(text)) return true;
   if (/^(work with|use)\b.+\bfrom anywhere\b/i.test(text)) return true;
   if (/\bcan now help\b/i.test(text)) return true;
   if (/^(pets|cloud|new)\s+[a-z]+$/i.test(text) && !/\b(cli|app|sdk|api|gpt|codex|cursor|chatgpt)\b/i.test(text)) return true;
@@ -763,7 +774,7 @@ export function cleanShipTitle(raw: unknown, max = TITLE_MAX): string {
   const deployFrom = text.match(/^deploy from (.+) to vercel$/i);
   if (deployFrom) text = `${deployFrom[1].trim()} deploys`;
   const tagline = text.match(/^([A-Za-z0-9][\w.+ -]{1,40}):\s+(.+)$/);
-  if (tagline && /\b(new generation|next[- ]generation|the next|a new)\b/i.test(tagline[2])) {
+  if (tagline && /\b(new generation|next[- ]generation|the next|a new|smoother|smarter|clearer|frontier intelligence|more useful)\b/i.test(tagline[2])) {
     text = tagline[1].trim();
   }
   text = text.replace(/^the new\s+/i, '').replace(/^new\s+(v\d\b)/i, '$1');

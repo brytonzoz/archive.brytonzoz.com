@@ -460,8 +460,20 @@ test('cashier note and stats are specific to the items, never stock copy', () =>
     ],
     { who: 'Guillermo Rauch' },
   );
-  assert.doesNotMatch(awsFallback, /leads \d+ ships|Aws Databases Are Now Live sits|·/i);
-  assert.match(awsFallback, /keep an eye on/i);
+  assert.doesNotMatch(awsFallback, /leads \d+ ships|Aws Databases Are Now Live sits|·|the rest of the tape/i);
+  assert.match(awsFallback, /keep an eye on|are both on this|public tape/i);
+  assert.equal(
+    ai.hardRejectNote(
+      'Keep an eye on Codex CLI; the rest of the tape is still filling in.',
+      [
+        { name: 'CODEX CLI', spoken: 'Codex CLI' },
+        { name: 'RECORD & REPLAY', spoken: 'Record & Replay' },
+      ],
+      [],
+      { who: 'Tibo' },
+    ),
+    'title-restate',
+  );
   assert.equal(
     ai.pickLeastBadNote(
       ['Frizz is a product that shipped this year.', 'Lsp4j-MCP shipped.'],

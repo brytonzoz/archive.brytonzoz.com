@@ -555,6 +555,16 @@ test('removals, docs, handles, and generic updates are not ships', () => {
   assert.equal(polish.isNotAShipTitle('GPT-5.5 AND CODEX APP UPDATES'), true);
   assert.equal(polish.isNotAShipTitle('CHATGPT FOR IOS UPDATES: REDESIGNED'), true);
   assert.equal(polish.isNotAShipTitle('Codex app · 26 updates in Feb'), false);
+  assert.equal(polish.isVagueOrCutTitle('ALSO RELEASED:'), true);
+  assert.equal(polish.isVagueOrCutTitle('UPDATED THE AGENTS SDK WITH NEW CAPABILITIES, INCLUDING:'), true);
+  assert.equal(polish.isVagueOrCutTitle('SUPPORT FOR ENHANCED API BUDGET ALERTS &'), true);
+  assert.equal(polish.isVagueOrCutTitle('MEM0 JOINING'), true);
+  assert.equal(polish.isDocsOrReferenceTitle('DOCUMENTATION'), true);
+  assert.equal(polish.isDocsOrReferenceTitle('IMPROVEMENTS AND BUG FIXES'), true);
+  assert.equal(polish.isDocsOrReferenceTitle('FULL RELEASE ON GITHUB'), true);
+  assert.equal(polish.isVagueOrCutTitle('STRONGER FOR SOFTWARE DEVELOPMENT'), true);
+  assert.match(polish.cleanShipTitle('GPT-5.3 INSTANT: SMOOTHER, MORE USEFUL EVERYDAY'), /gpt-5\.3 instant/i);
+  assert.doesNotMatch(polish.cleanShipTitle('GPT-5.3 INSTANT: SMOOTHER, MORE USEFUL EVERYDAY'), /smoother/i);
   assert.equal(polish.isJunkTitle('CODEX APP UPDATES'), true);
   assert.equal(polish.cleanShipTitle('CODEX MCP SERVER REMOVED'), '');
   assert.equal(polish.looksFragment('E ACCESS BEFORE WORKSPACE'), true);

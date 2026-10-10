@@ -18,7 +18,7 @@ const realCount = (receipt) => {
   return items.filter((item) => item && item.name && item.name !== 'YOUR POTENTIAL' && item.source !== 'none').length;
 };
 
-const TARGETS = [
+const DEFAULT_TARGETS = [
   { id: 16, who: 'Tibo from OpenAI' },
   { id: 17, who: 'Michael Truell' },
   { id: 11, who: '@thsottiaux' },
@@ -27,6 +27,13 @@ const TARGETS = [
   { id: 6, who: 'levelsio' },
   { id: 7, who: 'Guillermo Rauch' },
 ];
+
+const TARGETS =
+  FORCE_IDS.size > 0
+    ? [...FORCE_IDS]
+        .sort((a, b) => a - b)
+        .map((id) => DEFAULT_TARGETS.find((t) => t.id === id) ?? { id, who: `#${id}` })
+    : DEFAULT_TARGETS;
 
 if (!password) {
   console.error('ADMIN_PASSWORD is required to reprint.');

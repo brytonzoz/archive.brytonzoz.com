@@ -223,18 +223,6 @@ jobs:
           curl -sS -u "$STRIPE_KEY:" https://api.stripe.com/v1/payment_method_domains -d "domain_name=$domain" | head -c 400 || true
           echo
 
-      - name: Reprint wall receipts on the new pipeline
-        env:
-          ADMIN_PASSWORD: ${{ secrets.ADMIN_PASSWORD }}
-          SHIPPED_ORIGIN: https://shipped-staging.brytonzoz.com
-          SHIPPED_REPRINT_FORCE_IDS: 16,17,13,11,7,6,14
-        run: |
-          if [ -z "$ADMIN_PASSWORD" ]; then
-            echo "::error::ADMIN_PASSWORD is required to reprint staging wall receipts."
-            exit 1
-          fi
-          node --no-warnings scripts/reprint-shipped.mjs
-
       - name: Check every live song plays from staging
         env:
           CHECK_ORIGIN: ${{ steps.deploy.outputs.url }}

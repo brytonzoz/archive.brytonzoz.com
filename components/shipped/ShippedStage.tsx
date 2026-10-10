@@ -198,7 +198,7 @@ export function ShippedStage({ opening, title }: { opening: Opening; title: Reac
       return;
     }
     setJob(openingJob(opening));
-    setCurrent(opening.kind === 'loaded' ? opening.loaded : null);
+    setCurrent(null);
   }, [opening]);
 
   useEffect(() => {

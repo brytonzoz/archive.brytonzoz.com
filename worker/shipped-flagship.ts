@@ -195,6 +195,9 @@ const FLAGSHIP_LAUNCH_DAY: Record<string, string> = {
   composer2: '2026-03-19',
   bugbot: '2026-06-01',
   origin: '2026-09-14',
+  gpt6: '2026-05-01',
+  sora: '2026-03-01',
+  chatgptimages: '2026-02-01',
 };
 
 /** First-party posts the sitemap often misses (older Cursor launches live on /blog, not the latest changelog page). */
@@ -229,6 +232,9 @@ export function flagshipProbePaths(company: string | null | undefined): string[]
       '/index/chatgpt-atlas',
       '/index/chatgpt-health',
       '/index/chatgpt-images',
+      '/index/images',
+      '/index/sora',
+      '/index/sora-2',
       '/sora',
       '/device',
       '/products/release-notes',

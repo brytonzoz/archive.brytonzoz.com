@@ -371,6 +371,42 @@ test('compact force-keeps v0, Sora, Images, and Codex Cloud under a dump', () =>
   assert.ok(compact.some((item) => /codex cloud/i.test(item.name)), JSON.stringify(compact.map((i) => i.name)));
 });
 
+test('OpenAI compact reserves company-wide launches beside a Codex dump', () => {
+  const dump = Array.from({ length: 180 }, (_, i) => ({
+    name: `Codex CLI 0.${i}.0`,
+    description: '',
+    date: '2026-07-21',
+    link: `https://developers.openai.com/codex/changelog#v0-${i}`,
+    source: 'changelog',
+    status: 'LAUNCHED',
+    score: 7,
+    thisYear: true,
+  }));
+  const wide = [
+    {
+      name: 'ChatGPT Atlas',
+      date: '2026-10-01',
+      link: 'https://openai.com/index/chatgpt-atlas',
+      source: 'changelog',
+      status: 'LAUNCHED',
+      score: 6,
+      thisYear: true,
+    },
+    {
+      name: 'ChatGPT Health',
+      date: '2026-09-01',
+      link: 'https://openai.com/index/chatgpt-health',
+      source: 'changelog',
+      status: 'LAUNCHED',
+      score: 6,
+      thisYear: true,
+    },
+  ].map((row) => ({ description: '', icon: null, ...row }));
+  const compact = company.compactCompanyFound([...dump, ...wide], 20);
+  assert.ok(compact.some((item) => /atlas/i.test(item.name)), JSON.stringify(compact.map((i) => i.name)));
+  assert.ok(compact.some((item) => /health/i.test(item.name)), JSON.stringify(compact.map((i) => i.name)));
+});
+
 test('off-worker cache is preferred and scoped on read', async () => {
   const storeMod = await import('../worker/shipped-company-store.ts');
   const cached = [

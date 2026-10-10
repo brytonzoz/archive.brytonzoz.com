@@ -201,11 +201,24 @@ export function compactCompanyFound(found: Found[], cap = COMPANY_CACHE_CAP): Fo
     out.push(item);
   };
   const byWeight = (a: Found, b: Found) => weight(b) - weight(a);
+  const isWide = (item: Found) => {
+    const url = item.link || '';
+    const name = item.name || '';
+    if (isCompactMustKeep(item)) return true;
+    if (/openai\.com\/(sora|device|index)\b/i.test(url) && !/\bcodex\b/i.test(name)) return true;
+    return /\b(gpt-?\d|chatgpt|sora|atlas|v0)\b/i.test(name) && !/\bcodex\b/i.test(name);
+  };
   const must = ranked.filter(isCompactMustKeep).sort(byWeight);
-  const rest = ranked.filter((item) => !isCompactMustKeep(item)).sort(byWeight);
+  const wide = ranked.filter((item) => !isCompactMustKeep(item) && isWide(item)).sort(byWeight);
+  const rest = ranked.filter((item) => !isCompactMustKeep(item) && !isWide(item)).sort(byWeight);
   const seen = new Set<string>();
   const out: Found[] = [];
+  const wideCap = Math.min(80, Math.max(40, Math.floor(cap * 0.4)));
   for (const item of must) accept(item, seen, out);
+  for (const item of wide) {
+    if (out.filter(isWide).length >= wideCap) break;
+    accept(item, seen, out);
+  }
   for (const item of rest) accept(item, seen, out);
   return out;
 }
@@ -401,6 +414,20 @@ async function pagesForCompany(
         source: item.source === 'site' ? 'changelog' : item.source,
       })),
     );
+    const stubName = flagshipLaunchName({ name: page.title || '', link: page.url, source: 'changelog' });
+    if (stubName) {
+      found.push({
+        name: stubName,
+        description: '',
+        date: knownFlagshipDate({ name: stubName, link: page.url, source: 'changelog' }, year),
+        link: publicUrl(page.url),
+        icon: null,
+        source: 'changelog',
+        status: 'LAUNCHED',
+        score: 8,
+        thisYear: true,
+      });
+    }
     for (const feed of page.feeds) if (!feeds.includes(feed)) feeds.push(feed);
     for (const link of page.links) {
       const host = hostOf(link.url);
@@ -816,7 +843,7 @@ export async function harvestCompany(opts: {
   if (opts.storeOnly) {
     return { found: [], spend: emptyXaiSpend(), ran: ['company-store-miss'], cacheHit: false };
   }
-  const cacheKey = opts.deep ? `company:deep:v17:${year}:${slug}` : `company:v17:${year}:${slug}`;
+  const cacheKey = opts.deep ? `company:deep:v18:${year}:${slug}` : `company:v18:${year}:${slug}`;
   const load = async (): Promise<CompanyHarvest> => {
     const via = viaFor(affiliation);
     const ran: string[] = [];

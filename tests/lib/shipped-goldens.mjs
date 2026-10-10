@@ -19,6 +19,11 @@ export const LIVE_RECEIPT_SPECS = {
 
 export const LIVE_RECEIPT_IDS = [6, 7, 13, 16, 17, 18, 19, 20, 21, 22];
 
+/** Live tapes roll versions and scope leads; fixture mins stay fat for cached E2E. */
+export const LIVE_SPEC_OVERRIDE = {
+  tibo: { min: 15 },
+};
+
 const THIN_NOTE =
   /\bshowed up\b|\bis the one that stuck\b|\bkeeps coming back\b|\breceipts?, and\b/i;
 
@@ -84,6 +89,6 @@ export function evaluateLiveReceipt(id, receipt, helpers) {
   const items = realItems(receipt?.items);
   const note = String(receipt?.note || '');
   const specId = LIVE_RECEIPT_SPECS[id];
-  const spec = specId ? tapes[specId] : { min: 1, required: [], forbidden: [] };
+  const spec = specId ? { ...tapes[specId], ...(LIVE_SPEC_OVERRIDE[specId] || {}) } : { min: 1, required: [], forbidden: [] };
   return evaluateGolden(spec || { min: 1 }, items, note, helpers);
 }

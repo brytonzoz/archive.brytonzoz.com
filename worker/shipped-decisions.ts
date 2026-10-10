@@ -206,7 +206,7 @@ function scopedAttribution(item: Found, affiliation: Affiliation): Attribution {
   const hay = `${item.name} ${item.description} ${item.link ?? ''}`.toLowerCase();
   const matchesProduct = tokens.length ? tokens.some((token) => hay.includes(token)) : false;
   const isLead = affiliation.role === 'lead' || (affiliation.typedCompany && Boolean(affiliation.product));
-  if (isLead && item.via) {
+  if (isLead && item.via && tokens.length) {
     return matchesProduct ? 'company-led-by-person' : 'unrelated';
   }
   if (item.via) return defaultAttribution(affiliation.role, affiliation.typedCompany);
@@ -229,10 +229,12 @@ export function heuristicMark(item: Found, year: number, affiliation: Affiliatio
 }
 
 export function shouldKeep(mark: DecisionMark, item?: Found): boolean {
-  if (mark.attribution === 'unrelated') return false;
   const personal = item ? isPersonalShipSource(item) && !looksLikeNotAShip(item) : false;
-  if (mark.kind === 'NOT_A_SHIP' && !personal) return false;
+  // Decisions often marks an indie site/GitHub launch "unrelated" when a bio
+  // named one product. Those still belong on the person's tape.
   if (personal && (item?.thisYear || (item?.date && /^\d{4}/.test(item.date)))) return true;
+  if (mark.attribution === 'unrelated') return false;
+  if (mark.kind === 'NOT_A_SHIP' && !personal) return false;
   return mark.isRealShip * mark.inYear >= KEEP_PRODUCT;
 }
 

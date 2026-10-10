@@ -144,6 +144,22 @@ test('tutorials, case studies, and research writeups are not ships', () => {
     lead,
   );
   assert.equal(decisions.shouldKeep(virgin), false);
+  const journal = found({
+    name: 'hotelist.com',
+    date: '2026-10-05',
+    link: 'https://levels.io/#hotelist',
+    source: 'site',
+    thisYear: true,
+  });
+  const unrelated = { ...decisions.heuristicMark(journal, 2026, indie), attribution: 'unrelated', isRealShip: 0.2, inYear: 0.2 };
+  assert.equal(decisions.shouldKeep(unrelated, journal), true);
+  const leadNoProduct = { ...affiliation.emptyAffiliation(), role: 'lead', company: 'OpenAI', product: null };
+  const anyOpenAi = decisions.heuristicMark(
+    found({ name: 'Codex app', link: 'https://developers.openai.com/codex/changelog', via: 'via OpenAI' }),
+    2026,
+    leadNoProduct,
+  );
+  assert.notEqual(anyOpenAi.attribution, 'unrelated');
 });
 
 test('xAI is a keyword gap-fill with a hard post cap and monthly fail-closed', async () => {

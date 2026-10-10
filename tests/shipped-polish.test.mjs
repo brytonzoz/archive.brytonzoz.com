@@ -572,6 +572,7 @@ test('removals, docs, handles, and generic updates are not ships', () => {
 test('undated changelog phrases drop; Composer 2 keeps the March launch day', () => {
   assert.equal(polish.isChangelogPhrase('Richer JavaScript representation', null), true);
   assert.equal(polish.isChangelogPhrase('Typed middleware', null), true);
+  assert.equal(polish.isChangelogPhrase('New date', null), true);
   assert.equal(polish.isChangelogPhrase('Richer JavaScript representation', '2026-04-01'), false);
   assert.equal(polish.displayShipName('CODEX APP'), 'Codex app');
   assert.equal(polish.displayShipName('CURSOR 3'), 'Cursor 3');

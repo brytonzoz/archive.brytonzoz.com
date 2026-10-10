@@ -191,7 +191,7 @@ export function formatStats(items: { source?: string }[], sourced: SourcedStat[]
 }
 
 const TEMPLATE_NOTE =
-  /is first on the tape|led the year|closed the year|set the tone|through-line|Receipt paper running low|Someone likes the publish button|\d+\s+launches?\s+·|night shift|publish button|\bthe tape\b|\bthe register\b|stock the shelves|counted receipts|got the paperwork|rings the publish|cashier has seen worse|mostly i just|wish and a prayer|nobody asked|same maker, more skus|runs on a wish|plus 0 more|github stars (llm|blog) for |supposed to be quiet|still be quoting|earned the grin|kept the year interesting|plus \d+ more, and |\byear is\b.+\bthrough\b|\b\d+\s+public\s+(ships?|lines?)\b|\bpublic lines\b/i;
+  /is first on the tape|led the year|closed the year|set the tone|through-line|Receipt paper running low|Someone likes the publish button|\d+\s+launches?\s+·|night shift|publish button|\bthe tape\b|\bthe register\b|stock the shelves|counted receipts|got the paperwork|rings the publish|cashier has seen worse|mostly i just|wish and a prayer|nobody asked|same maker, more skus|runs on a wish|plus 0 more|github stars (llm|blog) for |supposed to be quiet|still be quoting|earned the grin|kept the year interesting|plus \d+ more, and |\byear is\b.+\bthrough\b|\b\d+\s+public\s+(ships?|lines?)\b|\bpublic lines\b|agents now stay clocked in overnight|other packages are just opening acts|treats Composer 2 like the real headline/i;
 
 /** A number in the note must be the item count, or a sourced stars/downloads figure that is labeled. */
 export function noteMisusesStats(note: string, count: number, stats: string[] = []): boolean {
@@ -499,7 +499,7 @@ function noteOnlySystem(year: number, affiliation?: Affiliation | null, count = 
     'One or two sentences. A human voice: wry, specific, a sharp friend. Max ~140 characters. Never cut a word.',
     'Name 1 or 2 real ships from the final item list, in natural case (Codex app, Cursor 3, ChatGPT Images). Never ALL CAPS product names.',
     'Never write a URL, a host, the word "lines", or a raw stat string. Prefer no number. A number is allowed only when copied from <found>.stats and labeled as stars or downloads.',
-    'Do not recap the year as "from X through Y" or "N public ships".',
+    'Do not recap the year as "from X through Y" or "N public ships". Never copy a Good example — write a new sentence about this person and this tape.',
     ceo,
     'Good: "Codex grew long-running work this year, and Tibo\'s agents now stay clocked in overnight."',
     'Good: "cn is at 8.2M weekly downloads. The other packages are just opening acts."',

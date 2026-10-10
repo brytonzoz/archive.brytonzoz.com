@@ -298,6 +298,13 @@ test('same_ship pairs share keywords; weaker duplicate is dropped', async () => 
     ),
     true,
   );
+  assert.equal(
+    decisions.shareKeywords(
+      found({ name: 'Codex Cloud', date: '2026-09-29', link: 'https://developers.openai.com/codex/cloud' }),
+      found({ name: 'GitLab Support in Codex Cloud', date: '2026-08-19', link: 'https://developers.openai.com/codex/changelog#gitlab-19' }),
+    ),
+    false,
+  );
   const typed = affiliation.parseAffiliationQuery('Tibo from OpenAI');
   const typedMark = decisions.heuristicMark(
     found({ name: 'Codex app 26.608', date: '2026-06-09', source: 'changelog', via: 'via OpenAI', link: 'https://learn.chatgpt.com/docs/changelog' }),

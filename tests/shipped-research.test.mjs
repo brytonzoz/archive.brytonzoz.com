@@ -183,7 +183,8 @@ test('cashier note and stats are specific to the items, never stock copy', () =>
   assert.equal(ai.cashierNoteLooksCanned('200/mo public revenue. Same maker, more SKUs.'), true);
   assert.equal(ai.noteFailsVoice("Tibo's year is CODEX APP through FASTER STEERING IN CODEX: 55 public lines, all theirs."), true);
   assert.equal(ai.noteFailsVoice("Jack's year lives at https://www.npmjs.com/package/postbridge-cli."), true);
-  assert.equal(ai.noteFailsVoice('Codex grew long-running work this year, and Tibo\'s agents now stay clocked in overnight.'), false);
+  assert.equal(ai.cashierNoteLooksCanned("Codex grew long-running work this year, and Tibo's agents now stay clocked in overnight."), true);
+  assert.equal(ai.noteFailsVoice('Tibo kept Codex on long-running work, then shipped GitLab support into Codex Cloud.'), false);
   assert.doesNotMatch(note, /\blines\b|https?:\/\/|CODEX APP/i);
   assert.doesNotMatch(one, /\blines\b|https?:\/\/|www\./i);
   assert.doesNotMatch(ceo, /\blines\b|https?:\/\/|\b\d+\s+public\s+ships\b/i);

@@ -280,7 +280,7 @@ export function isChangelogPhrase(name: string, date?: string | null): boolean {
   const text = tidy(name);
   if (!text || /\d/.test(text)) return false;
   if (/\b(cli|app|sdk|api|bot|kit|auth|cursor|codex|chatgpt|composer|zod|shoo)\b/i.test(text)) return false;
-  return /^(richer|typed|better|improved|faster|fuller|native|optional|simple|lightweight|advanced)\b/i.test(text);
+  return /^(richer|typed|better|improved|faster|fuller|native|optional|simple|lightweight|advanced|new)\b/i.test(text);
 }
 
 const SHIP_WORD: Record<string, string> = {
@@ -294,6 +294,8 @@ const SHIP_WORD: Record<string, string> = {
   api: 'API',
   mcp: 'MCP',
   ai: 'AI',
+  rl: 'RL',
+  ui: 'UI',
   hn: 'HN',
   npm: 'npm',
   js: 'JS',

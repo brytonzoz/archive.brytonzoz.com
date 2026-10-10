@@ -1563,6 +1563,9 @@ html.shipped-focus .shipped-board {
 
 .shipped-pill-root.is-open {
   top: 0;
+  display: flex;
+  flex-direction: column;
+  justify-content: flex-end;
 }
 
 .shipped-pill-scrim {
@@ -1584,6 +1587,14 @@ html.shipped-focus .shipped-board {
   gap: 8px;
   padding: 0 16px calc(16px + env(safe-area-inset-bottom, 0px));
   pointer-events: none;
+}
+
+.shipped-pill-root.is-open .shipped-pill-slot {
+  position: absolute;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  margin-top: auto;
 }
 
 .shipped-print-another {

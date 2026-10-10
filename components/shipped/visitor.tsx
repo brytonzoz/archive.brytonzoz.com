@@ -400,9 +400,10 @@ export function SharePill({
       if (event.key === 'Escape') close();
     };
     const onPointer = (event: PointerEvent) => {
-      const node = event.target as Node | null;
-      if (!node) return;
-      if (panel.current?.contains(node)) return;
+      const node = event.target;
+      if (!(node instanceof Element)) return;
+      if (node.closest('.shipped-pill, .shipped-print-another')) return;
+      event.preventDefault();
       close();
     };
     window.addEventListener('keydown', onKey);
@@ -484,7 +485,18 @@ export function SharePill({
 
   return (
     <div className={`shipped-pill-root${open ? ' is-open' : ''}`}>
-      {open ? <button type="button" className="shipped-pill-scrim" aria-label="Close share" onClick={close} /> : null}
+      {open ? (
+        <button
+          type="button"
+          className="shipped-pill-scrim"
+          aria-label="Close share"
+          onPointerDown={(event) => {
+            press(event);
+            close();
+          }}
+          onClick={close}
+        />
+      ) : null}
       <div className="shipped-pill-slot">
         <button type="button" className="shipped-print-another" onPointerDown={press} onClick={onPrintAnother}>
           Print another

@@ -300,6 +300,7 @@ test('blocked challenge pages are dropped; TinyFish markdown still extracts date
   assert.equal(company.looksBlockedPage('# Codex CLI 0.145.0\n2026-07-21\nReleased to users.', 'Codex changelog'), false);
   assert.equal(company.isPriorityCompanyUrl('https://openai.com/changelog'), true);
   assert.equal(company.isPriorityCompanyUrl('https://developers.openai.com/codex/changelog'), true);
+  assert.equal(company.isPriorityCompanyUrl('https://openai.com/products/release-notes'), true);
   assert.equal(company.isPriorityCompanyUrl('https://openai.com/careers'), false);
   assert.ok(company.priorityCompanyScore('https://developers.openai.com/codex/changelog') < company.priorityCompanyScore('https://openai.com/blog'));
   const page = company.companyPageFromTinyfish({

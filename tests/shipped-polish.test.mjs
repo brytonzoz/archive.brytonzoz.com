@@ -552,6 +552,10 @@ test('removals, docs, handles, and generic updates are not ships', () => {
   assert.equal(polish.isNotAShipTitle('Codex app · 26 updates in Feb'), false);
   assert.equal(polish.isJunkTitle('CODEX APP UPDATES'), true);
   assert.equal(polish.cleanShipTitle('CODEX MCP SERVER REMOVED'), '');
+  assert.equal(polish.looksFragment('E ACCESS BEFORE WORKSPACE'), true);
+  assert.equal(polish.looksFragment('ROVED WINDOW RENDERING ON SYSTEMS THAT DON’T SUPPORT'), true);
+  assert.equal(polish.looksFragment('AVAILABILITY DEPENDS ON ROLLOUT AND WORKSPACE SETTINGS'), true);
+  assert.equal(polish.looksFragment('Codex for Chrome'), false);
   const items = polish.polishCandidates(
     [
       found({ name: '@CHATGPT', date: '2026-08-01', link: 'https://openai.com/chatgpt' }),

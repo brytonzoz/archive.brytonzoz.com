@@ -51,7 +51,7 @@ const SENTENCE_VERB =
 const BARE_MODEL = /^gpt-[3-5]$/i;
 const CODE_TITLE = /^[a-z][\w-]*\.[a-z][\w-]*\.[a-z]/i;
 const MID_WORD =
-  /^(ontrol|elease|pdate|ettings|vailable|olling|espectively|ead|nounced|ntroducing|aunched|hipped|rigin)\b/i;
+  /^(ontrol|elease|pdate|ettings|vailable|olling|espectively|ead|nounced|ntroducing|aunched|hipped|rigin|roved)\b/i;
 const OLD_PRODUCT =
   /\b(gpt-?4o(?:-mini)?|gpt-?3(?:\.5)?(?:-turbo)?|text-embedding-?[123]|embedding v[123]|ada-?002|davinci|curie|babbage|turbo-0?125|whisper-1|o1|o3(?:-mini)?)\b/i;
 const CTA_NAV =
@@ -199,7 +199,10 @@ export function looksFragment(text: string): boolean {
   const trimmed = tidy(text);
   if (!trimmed) return true;
   if (!/^[A-Za-z0-9@#]/.test(trimmed) && !/^[a-z0-9-]+\.[a-z]{2,}/i.test(trimmed)) return true;
-  if (FRAGMENT_START.test(trimmed.split(/\s+/)[0] || '')) return true;
+  const first = trimmed.split(/\s+/)[0] || '';
+  if (FRAGMENT_START.test(first)) return true;
+  if (/^[A-Za-z]$/.test(first)) return true;
+  if (/^(availability depends|keep tab widths|thread, spawned|improved mobile connection)\b/i.test(trimmed)) return true;
   return looksMidWord(trimmed);
 }
 

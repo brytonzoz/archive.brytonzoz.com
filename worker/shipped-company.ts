@@ -71,7 +71,7 @@ export function isPriorityCompanyUrl(url: string): boolean {
     const path = new URL(url).pathname.replace(/\/+$/, '') || '/';
     if (path === '/' || path === '/index') return true;
     if (/\/index\/[a-z0-9-]+/i.test(path)) return true;
-    return /\/(changelog|blog|news|releases|updates|whats-new|feed|rss|atom|sitemap|sora|device)(\/|$|\.)/i.test(path);
+    return /\/(changelog|blog|news|releases?|release-notes|updates|whats-new|feed|rss|atom|sitemap|sora|device)(\/|$|\.)/i.test(path);
   } catch {
     return false;
   }
@@ -82,7 +82,7 @@ export function priorityCompanyScore(url: string): number {
   try {
     const path = new URL(url).pathname.replace(/\/+$/, '') || '/';
     if (/\/changelog\b/i.test(path)) return 0;
-    if (/\/(releases?|updates?|whats-new|index\/|sora|device)\b/i.test(path)) return 1;
+    if (/\/(releases?|release-notes|updates?|whats-new|index\/|sora|device)\b/i.test(path)) return 1;
     if (path === '/' || path === '/index') return 2;
     if (/\/(feed|rss|atom|sitemap)/i.test(path)) return 3;
     if (/\/(blog|news)\b/i.test(path)) return 4;

@@ -4,7 +4,7 @@
     {
       "company": "OpenAI",
       "products": ["Codex", "ChatGPT"],
-      "sites": ["https://openai.com/", "https://openai.com/index", "https://developers.openai.com/", "https://developers.openai.com/codex/changelog", "https://learn.chatgpt.com/", "https://learn.chatgpt.com/docs/changelog"]
+      "sites": ["https://openai.com/", "https://openai.com/index", "https://openai.com/products/release-notes", "https://developers.openai.com/", "https://developers.openai.com/codex/changelog", "https://learn.chatgpt.com/", "https://learn.chatgpt.com/docs/changelog"]
     },
     { "company": "Anthropic", "products": ["Claude"], "sites": ["https://www.anthropic.com/", "https://docs.anthropic.com/"] },
     { "company": "Cursor", "products": ["Cursor"], "sites": ["https://cursor.com/", "https://docs.cursor.com/"] },

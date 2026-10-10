@@ -199,6 +199,9 @@ export function looksLikeNotAShip(item: { name?: string; description?: string; l
 }
 
 function scopedAttribution(item: Found, affiliation: Affiliation): Attribution {
+  // Personal repos, packages, and site products stay on the tape even when a bio
+  // named one of many companies (TrustMRR, Readmake). Company harvest still scopes leads.
+  if (isPersonalShipSource(item)) return 'personal';
   const tokens = leadProductTokens(affiliation.product, affiliation.company).map((t) => t.toLowerCase());
   const hay = `${item.name} ${item.description} ${item.link ?? ''}`.toLowerCase();
   const matchesProduct = tokens.length ? tokens.some((token) => hay.includes(token)) : false;

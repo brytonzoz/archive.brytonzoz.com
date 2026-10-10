@@ -7,17 +7,47 @@ import { ITEM_STATUSES } from '../lib/shipped-year';
 export const TITLE_MAX = 38;
 
 const DOCS_NAV =
-  /^(overview|prompting|pool|security|browser|search|terminal|settings|plugins?|hooks?|cli|api|faq|guides?|reference|getting started|quickstart|quick start|installation|install|usage|examples?|changelog|release notes|acting as users|builds|context|rules|modes?|models?|indexing|privacy|enterprise|teams|billing|account|authentication|auth|docs|home|index)$/i;
+  /^(overview|prompting|pool|security|browser|search|terminal|settings|plugins?|hooks?|cli|api|faq|guides?|reference|getting started|quickstart|quick start|installation|install|usage|examples?|changelog|release notes|acting as users|builds|context|rules|modes?|models?|indexing|privacy|enterprise|teams|billing|account|authentication|auth|docs|home|index|support)$/i;
 const BYLINE = /^(authors?\s*[:\-–—]|written by\b|posted by\b|byline\s*:)/i;
-const ROUNDUP = /^(week of|this week in|monthly roundup|what we shipped (this|the) week)\b/i;
-const READ_THE = /^(read the|see the|check out the|learn more)\b/i;
-const TRAILING_PREP = /\b(of|in|to|for|and|or|the|a|an|with|on|as|by|from|into|longer|kind|new|our|your)$/i;
+const ROUNDUP =
+  /^(week of|this week in|monthly roundup|what we shipped (this|the) week)\b|updates?\s+(jan(?:uary)?|feb(?:ruary)?|mar(?:ch)?|apr(?:il)?|may|jun(?:e)?|jul(?:y)?|aug(?:ust)?|sep(?:t(?:ember)?)?|oct(?:ober)?|nov(?:ember)?|dec(?:ember)?)\s+20\d\d/i;
+const READ_THE = /^(read the|see the|check out the|learn more|if you\b|those\b|your agent can\b|prepare for\b|choose \w+ for complex)\b/i;
+const INSTRUCTIONAL = /^(if you|those |your agent can|you can|you don|use \w[\w.-]* for complex)\b/i;
+const RESEARCH_GERUND = /^(improving|bootstrapping|deprecating|continually|reward hacking|evaluating)\b/i;
+const ACQUISITION = /\b(is joining|joins)\b/i;
+const CUSTOMER_STORY = /\bships\s+[\d.,]+[×x]\s+faster\b/i;
+const TRAILING_PREP =
+  /\b(of|in|to|for|and|or|the|a|an|with|on|as|by|from|into|longer|kind|new|our|your|through|their|its|vs|lower|higher|more|less|day|days|managed)$/i;
 const MID_WORD =
   /^(ontrol|elease|pdate|ettings|vailable|olling|espectively|ead|nounced|ntroducing|aunched|hipped)\b/i;
 const OLD_PRODUCT =
-  /\b(gpt-?3(?:\.5)?(?:-turbo)?|text-embedding-?[123]|embedding v[123]|ada-?002|davinci|curie|babbage|turbo-0?125|whisper-1)\b/i;
+  /\b(gpt-?3(?:\.5)?(?:-turbo)?|text-embedding-?[123]|embedding v[123]|ada-?002|davinci|curie|babbage|turbo-0?125|whisper-1|o1|o3(?:-mini)?)\b/i;
 const MONTHS_SHORT = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
-const META_DESC = /^(sitemap lastmod|dated |linked from )/i;
+const META_DESC = /sitemap lastmod|^(dated |linked from )/i;
+const HOST_ONLY = /^(https?:\/\/)?([a-z0-9-]+\.)+[a-z]{2,}$/i;
+const PERSONAL_SOURCE = /^(github|npm|producthunt|appstore)$/;
+const HOST_BRAND: Record<string, string> = {
+  'cursor.com': 'Cursor',
+  'openai.com': 'OpenAI',
+  'chatgpt.com': 'OpenAI',
+  'learn.chatgpt.com': 'OpenAI',
+  'developers.openai.com': 'OpenAI',
+  'platform.openai.com': 'OpenAI',
+  'vercel.com': 'Vercel',
+  'replit.com': 'Replit',
+  'anthropic.com': 'Anthropic',
+  'x.ai': 'xAI',
+};
+const KNOWN_BRAND: Record<string, string> = {
+  cursor: 'Cursor',
+  anysphere: 'Cursor',
+  openai: 'OpenAI',
+  vercel: 'Vercel',
+  replit: 'Replit',
+  anthropic: 'Anthropic',
+  xai: 'xAI',
+  higgsfield: 'Higgsfield',
+};
 
 export type Polishable = {
   name: string;
@@ -99,8 +129,9 @@ export function looksMidWord(text: string): boolean {
 export function looksCutOff(text: string): boolean {
   const trimmed = text.trim();
   if (/[,;]\s*$/.test(trimmed)) return true;
-  if (TRAILING_PREP.test(trimmed) && trimmed.split(/\s+/).length >= 4) return true;
-  if (/\b(turn on enable|enable full)\b/i.test(trimmed)) return true;
+  if (/\([^)]*$/.test(trimmed)) return true;
+  if (TRAILING_PREP.test(trimmed) && trimmed.split(/\s+/).length >= 3) return true;
+  if (/\b(turn on enable|enable full|at lower|on ai)$/i.test(trimmed)) return true;
   return false;
 }
 
@@ -118,10 +149,17 @@ export function isAboutPerson(title: string, who: string | null | undefined): bo
   return title.split(/\s+/).length <= words.length + 2;
 }
 
+function isAcquisitionNews(title: string): boolean {
+  if (!ACQUISITION.test(title)) return false;
+  if (/\b(app|desktop|cli|api|sdk)\b/i.test(title)) return false;
+  return true;
+}
+
 export function isJunkTitle(title: string, opts: { who?: string | null; company?: string | null } = {}): boolean {
   const text = tidy(title);
   if (!text || text.length < 3) return true;
-  if (BYLINE.test(text) || ROUNDUP.test(text) || READ_THE.test(text)) return true;
+  if (BYLINE.test(text) || ROUNDUP.test(text) || READ_THE.test(text) || INSTRUCTIONAL.test(text)) return true;
+  if (RESEARCH_GERUND.test(text) || CUSTOMER_STORY.test(text) || isAcquisitionNews(text)) return true;
   if (/^respectively\.?$/i.test(text)) return true;
   if (DOCS_NAV.test(text)) return true;
   if (isAboutPerson(text, opts.who)) return true;
@@ -143,13 +181,25 @@ function normalizeVersionTokens(text: string): string {
     .replace(/\b([A-Za-z][A-Za-z0-9.+-]{1,20})\s+(\d)\s+(\d)\b/g, '$1 $2.$3');
 }
 
-export function versionParts(name: string): { product: string; version: string } | null {
-  const text = tidy(name);
-  const match = text.match(/^(.+?)\s+v?(\d{1,3}(?:\.\d+){1,3})$/i);
+const VERSION = String.raw`v?\d{1,3}(?:\.\d+){1,3}`;
+
+export function versionParts(name: string): { product: string; version: string; extra?: number } | null {
+  const text = tidy(name)
+    .replace(/\s+(reconnects?|released?|shipped|available)$/i, '')
+    .trim();
+  const comma = text.match(new RegExp(`^(.+?)\\s+(${VERSION})(?:\\s*,\\s*${VERSION})+$`, 'i'));
+  if (comma) {
+    const product = comma[1].replace(/\s+/g, ' ').trim();
+    const versions = text.match(new RegExp(VERSION, 'gi')) ?? [];
+    if (product.length >= 2 && /[a-z]/i.test(product) && product.split(/\s+/).length <= 4) {
+      return { product, version: comma[2], extra: versions.length };
+    }
+  }
+  const match = text.match(new RegExp(`^(.+?)\\s+(${VERSION})$`, 'i'));
   if (!match) return null;
   const product = match[1].replace(/\s+/g, ' ').trim();
   if (product.length < 2 || !/[a-z]/i.test(product)) return null;
-  if (product.split(/\s+/).length > 3) return null;
+  if (product.split(/\s+/).length > 4) return null;
   return { product, version: match[2] };
 }
 
@@ -158,8 +208,11 @@ export function cleanShipTitle(raw: unknown, max = TITLE_MAX): string {
   let text = normalizeVersionTokens(tidy(raw));
   if (!text) return '';
   text = text
-    .replace(/^(introducing|launching|announcing|presenting|meet|say hello to|now available[:\s]+|how to|read the)\s+/i, '')
+    .replace(/^(introducing|launching|announcing|presenting|meet|say hello to|now available[:\s]+|how to|read the|launched)\s+/i, '')
+    .replace(/\s+launched as\b.*$/i, '')
+    .replace(/\s+(is )?(now |generally )?available( today| in\b.*)?$/i, '')
     .replace(/\s+release notes\.?$/i, '')
+    .replace(/\s+reconnects?$/i, '')
     .replace(/\s+,/g, ',')
     .replace(/[,\s.]+$/g, '')
     .replace(/\s+/g, ' ')
@@ -181,6 +234,15 @@ export function otherYearProduct(name: string, year: number): boolean {
   return false;
 }
 
+export function isFutureDate(value: unknown, now = new Date()): boolean {
+  const match = String(value || '').match(/^(\d{4})-(\d{2})(?:-(\d{2}))?/);
+  if (!match) return false;
+  const day = match[3] ? Number(match[3]) : 1;
+  const then = Date.UTC(Number(match[1]), Number(match[2]) - 1, day);
+  const today = Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), now.getUTCDate());
+  return then > today;
+}
+
 export function inYearDate(value: unknown, year: number): string | null {
   if (value === null || value === undefined || value === '') return null;
   const match = String(value).match(/^(\d{4})-(\d{2})(?:-(\d{2}))?/);
@@ -193,6 +255,7 @@ export function inYearStrict(item: Polishable, year: number): boolean {
   if (otherYearProduct(item.name, year)) return false;
   const raw = item.date ? String(item.date) : '';
   if (/^\d{4}/.test(raw) && !raw.startsWith(String(year))) return false;
+  if (isFutureDate(item.date)) return false;
   const company = item.source === 'changelog' || item.source === 'company';
   if (company && !inYearDate(item.date, year)) return false;
   return true;
@@ -208,14 +271,17 @@ export function cleanStatus(value: unknown): ItemStatus {
 
 export function cleanDescription(value: unknown): string {
   const text = tidy(value);
-  if (!text || META_DESC.test(text)) return '';
+  if (!text || META_DESC.test(text) || HOST_ONLY.test(text)) return '';
   return text;
 }
 
-export function viaBrand(company: string | null | undefined, host: string | null | undefined): string {
+export function prettyBrand(company: string | null | undefined, host?: string | null): string {
+  if (host && HOST_BRAND[host]) return HOST_BRAND[host];
   const paren = tidy(company).match(/\(([^)]+)\)/)?.[1];
-  if (paren) return tidy(paren);
-  if (company) return tidy(company).replace(/\s*\([^)]+\)\s*/g, '').trim();
+  const raw = tidy(paren || company || '').replace(/\s*\([^)]+\)\s*/g, '').trim();
+  const key = raw.toLowerCase().replace(/[^a-z0-9]+/g, '');
+  if (KNOWN_BRAND[key]) return KNOWN_BRAND[key];
+  if (raw) return raw.replace(/\b([a-z])/g, (letter) => letter.toUpperCase());
   if (host) {
     const leaf = host.split('.')[0] || '';
     return leaf ? leaf[0].toUpperCase() + leaf.slice(1) : '';
@@ -223,17 +289,34 @@ export function viaBrand(company: string | null | undefined, host: string | null
   return '';
 }
 
+export function viaBrand(company: string | null | undefined, host: string | null | undefined): string {
+  return prettyBrand(company, host);
+}
+
+function isPersonalItem(item: Polishable): boolean {
+  if (PERSONAL_SOURCE.test(item.source ?? '')) return true;
+  if ((item.source === 'site' || item.source === 'web') && item.link) {
+    try {
+      const path = new URL(item.link).pathname.replace(/\/+$/, '');
+      if (!path) return true;
+    } catch {
+      /* ignore */
+    }
+    return item.source === 'site';
+  }
+  return false;
+}
+
 export function sourceVia(item: Polishable, affiliation?: Affiliation | null): string | null {
   const host = hostOf(item.link ?? null);
-  const existing = tidy(item.via);
-  if (existing && /^via\s+/i.test(existing) && /·/.test(existing) && !META_DESC.test(existing.replace(/^via\s+/i, ''))) {
-    return existing;
-  }
-  const brand = viaBrand(affiliation?.company, host);
+  if (isPersonalItem(item)) return host ? `via ${host}` : null;
+  const brand = prettyBrand(affiliation?.company, host);
+  const product = affiliation?.product && affiliation.role === 'lead' ? tidy(affiliation.product) : '';
+  if (brand && product) return `via ${brand} · ${product}`;
   if (brand && host) return `via ${brand} · ${host}`;
   if (brand) return `via ${brand}`;
   if (host) return `via ${host}`;
-  return existing || null;
+  return null;
 }
 
 function titleScore(item: Polishable): number {
@@ -267,6 +350,10 @@ export function collapseSameHref<T extends Polishable>(items: T[]): T[] {
   return [...none, ...indexCards, ...best.values()];
 }
 
+function versionCount(item: Polishable): number {
+  return versionParts(item.name)?.extra ?? 1;
+}
+
 export function rollupVersions<T extends Polishable>(items: T[]): T[] {
   const groups = new Map<string, T[]>();
   const kept: T[] = [];
@@ -283,8 +370,18 @@ export function rollupVersions<T extends Polishable>(items: T[]): T[] {
     groups.set(key, list);
   }
   for (const [key, list] of groups) {
-    if (list.length < 3) {
-      kept.push(...list);
+    const count = list.reduce((sum, item) => sum + versionCount(item), 0);
+    const comma = list.some((item) => (versionParts(item.name)?.extra ?? 1) > 1);
+    if (list.length < 3 && !(comma && count >= 2)) {
+      kept.push(
+        ...list.map((item) => {
+          const parts = versionParts(item.name);
+          if (parts && (parts.extra ?? 1) > 1) {
+            return { ...item, name: `${parts.product} ${parts.version}`, description: '' };
+          }
+          return item;
+        }),
+      );
       continue;
     }
     const product = versionParts(list[0].name)?.product || list[0].name;
@@ -293,7 +390,7 @@ export function rollupVersions<T extends Polishable>(items: T[]): T[] {
     const latest = list.slice().sort((a, b) => (b.date ?? '').localeCompare(a.date ?? ''))[0]!;
     kept.push({
       ...latest,
-      name: `${product} · ${list.length} updates in ${mon}`,
+      name: `${product} · ${count} updates in ${mon}`,
       description: '',
     });
   }
@@ -301,7 +398,7 @@ export function rollupVersions<T extends Polishable>(items: T[]): T[] {
 }
 
 export function noteCountMismatch(note: string, count: number): boolean {
-  const mention = /\b(\d{1,4})\s+(public\s+)?(ships?|lines?|launches?|things?)\b/i.exec(note);
+  const mention = /\b(\d{1,4})\s+(public\s+)?(ships?|lines?|launches?|things?|updates?|items?)\b/i.exec(note);
   if (!mention) return false;
   return Number(mention[1]) !== count;
 }

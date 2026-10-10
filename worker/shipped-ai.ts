@@ -9,7 +9,7 @@ import { REQUIRED_MODULES, sanitizeLayout, type ModuleId } from '../lib/shipped-
 import { clean, hostOf, inYearCount, publicUrl, type Found, type Gathered } from './shipped-sources';
 import { shipName } from './shipped-changelog';
 import { shareKeywords } from './shipped-decisions';
-import { cleanShipTitle, cleanStatus, noteCountMismatch, polishCandidates } from './shipped-polish';
+import { cleanDescription, cleanShipTitle, cleanStatus, noteCountMismatch, polishCandidates, prettyBrand } from './shipped-polish';
 import type { Affiliation } from './shipped-affiliation';
 import { RECEIPT_BUDGET_MICROS, formatReceiptStats, searchBudget, type SourcedStat } from './shipped-research';
 
@@ -236,7 +236,7 @@ export function groundedNote(items: DraftItem[], seed: number, profileName = '',
   const pool = short.length ? short : real;
   const loud = pool[(seed + first.length) % pool.length] ?? real[0];
   const who = profileName.split(/\s+/)[0] ?? '';
-  const company = (ctx.company || '').trim();
+  const company = prettyBrand(ctx.company, null) || (ctx.company || '').trim();
   if ((ctx.role === 'ceo' || ctx.role === 'founder') && real.length >= 4) {
     const label = company || who || 'They';
     const variants = [
@@ -294,14 +294,15 @@ export const potentialItem = (): DraftItem => ({
 });
 
 function toDraftItem(item: Found, year: number): DraftItem | null {
-  const name = cleanShipTitle(item.name) || shipName(item.name, 38);
+  const name = cleanShipTitle(item.name);
   if (!name || !ok(name) || !publicUrl(item.link)) return null;
   if (yearDate(item.date, year) === false) return null;
   const dated = yearDate(item.date, year);
   if (dated === null && (item.source === 'changelog' || item.source === 'company')) return null;
+  const description = cleanDescription(item.description);
   return {
     name: name.toUpperCase(),
-    description: ok(item.description) ? item.description : '',
+    description: description && ok(description) ? description : '',
     date: (dated as string | null) ?? (item.source === 'changelog' || item.source === 'company' ? null : item.date),
     status: cleanStatus(item.status),
     link: item.link,

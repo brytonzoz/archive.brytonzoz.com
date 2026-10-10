@@ -53,6 +53,8 @@ test('typed queries become person → role → company', () => {
   assert.equal(affiliation.companyScope(lead), 'product');
   assert.equal(affiliation.shouldInferCompany(affiliation.emptyAffiliation()), false);
   assert.equal(affiliation.shouldInferCompany(tibo), true);
+  assert.equal(affiliation.shouldInferCompany({ ...affiliation.emptyAffiliation(), role: 'founder' }), false);
+  assert.equal(affiliation.shouldInferCompany({ ...affiliation.emptyAffiliation(), role: 'ceo' }), true);
   assert.deepEqual(affiliation.leadProductTokens('ChatGPT & Codex', 'OpenAI'), ['Codex']);
   assert.equal(affiliation.primaryProduct('ChatGPT & Codex', 'OpenAI'), 'Codex');
   assert.equal(affiliation.viaLabel({ ...affiliation.emptyAffiliation(), company: 'OpenAI', product: 'Codex', role: 'lead' }, 'company-led-by-person'), 'via OpenAI · Codex');
@@ -112,6 +114,19 @@ test('tutorials, case studies, and research writeups are not ships', () => {
   );
   assert.equal(codex.attribution, 'company-led-by-person');
   assert.ok(decisions.shouldKeep(codex), JSON.stringify(codex));
+  const indie = { ...affiliation.emptyAffiliation(), company: 'Readmake', role: 'founder' };
+  const photo = found({
+    name: 'PhotoAI',
+    description: 'Listed under 2026',
+    date: '2026-03-01',
+    link: 'https://github.com/levelsio/photo-ai',
+    source: 'github',
+    via: 'via Readmake',
+  });
+  const photoMark = decisions.heuristicMark(photo, 2026, indie);
+  assert.equal(photoMark.attribution, 'personal');
+  assert.equal(decisions.shouldKeep(photoMark, photo), true);
+
   const story = decisions.heuristicMark(
     found({ name: 'Datadog uses Codex for system-level work', description: 'customer', link: 'https://openai.com/index/datadog', via: 'via OpenAI · Codex' }),
     2026,

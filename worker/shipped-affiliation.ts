@@ -203,9 +203,10 @@ export function companyScope(roleOrAff: ScopeHint): 'all' | 'product' | 'none' {
   return 'none';
 }
 
-/** Infer a company from a personal site or GitHub org only for CEOs/founders or typed-company queries. */
+/** Infer a company from a personal site or GitHub org only for CEOs or typed-company queries.
+ *  Indie founders (levelsio, Marc Lou) run many products; one site must not become THE company. */
 export function shouldInferCompany(affiliation: Pick<Affiliation, 'role' | 'typedCompany'>): boolean {
-  return affiliation.role === 'ceo' || affiliation.role === 'founder' || Boolean(affiliation.typedCompany);
+  return affiliation.role === 'ceo' || Boolean(affiliation.typedCompany);
 }
 
 /** Cheap xAI / web identity when the typed query has no handle yet. */

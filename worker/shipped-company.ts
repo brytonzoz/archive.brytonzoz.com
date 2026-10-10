@@ -3,6 +3,7 @@
 // releases, and App Store version rows. No per-company URL tables.
 import { extraResearchPaths, itemsFromProjectList } from './shipped-research';
 import { looksLikeNotAShip } from './shipped-decisions';
+import { prettyBrand } from './shipped-polish';
 import { companyOrgGuess, companyScope, companySlug, companyTokens, leadProductTokens, type Affiliation } from './shipped-affiliation';
 import { type XaiEnv, type XaiSpend, emptyXaiSpend } from './shipped-xai';
 import { stripVia, type CompanyStore } from './shipped-company-store';
@@ -123,10 +124,11 @@ function prefixHosts(apex: string): string[] {
 
 function viaFor(affiliation: Affiliation): string | null {
   if (!affiliation.company) return null;
+  const brand = prettyBrand(affiliation.company) || affiliation.company;
   if (companyScope(affiliation) === 'product' && affiliation.product) {
-    return `via ${affiliation.company} · ${affiliation.product}`;
+    return `via ${brand} · ${affiliation.product}`;
   }
-  if (companyScope(affiliation) === 'all') return `via ${affiliation.company}`;
+  if (companyScope(affiliation) === 'all') return `via ${brand}`;
   return null;
 }
 

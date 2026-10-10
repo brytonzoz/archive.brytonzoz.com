@@ -238,9 +238,25 @@ function isOwnedPin(
   item: { name?: string; date?: string | null; link?: string | null; source?: string; description?: string },
   owner?: OwnerContext | null,
 ): boolean {
-  if (item.date) return false;
   if (item.source !== 'site' && item.source !== 'web') return false;
   return ownedByBuilder(item, owner);
+}
+
+/** After a pin is proven pre-`year`, drop leftover npm/web lines with the same loose name (POST BRIDGE, not POSTBRIDGE-CLI). */
+export function dropSameNameLeftovers<T extends { name: string; source?: string }>(
+  items: T[],
+  preYearNames: string[],
+): { items: T[]; drops: { name: string; reason: string; source: string | null }[] } {
+  const banned = new Set(preYearNames.map(loose).filter(Boolean));
+  if (!banned.size) return { items, drops: [] };
+  const drops: { name: string; reason: string; source: string | null }[] = [];
+  const kept = items.filter((item) => {
+    if (item.source === 'changelog' || item.source === 'company') return true;
+    if (!banned.has(loose(item.name))) return true;
+    drops.push({ name: item.name, reason: 'same-name-pre-2026', source: item.source ?? null });
+    return false;
+  });
+  return { items: kept, drops };
 }
 
 export async function dateOwnedPins<T extends { name: string; date: string | null; link?: string | null; source?: string; description?: string; thisYear?: boolean }>(
@@ -301,5 +317,9 @@ export async function dateOwnedPins<T extends { name: string; date: string | nul
     }
   }
   kept.push(...leftover);
-  return { items: kept, drops };
+  const leftoverDrop = dropSameNameLeftovers(
+    kept,
+    drops.filter((row) => row.reason === 'pre-2026').map((row) => row.name),
+  );
+  return { items: leftoverDrop.items, drops: [...drops, ...leftoverDrop.drops] };
 }

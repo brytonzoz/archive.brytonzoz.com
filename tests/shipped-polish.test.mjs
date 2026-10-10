@@ -393,6 +393,22 @@ test('owned pin dates keep 2026 first launches and drop pre-2026 evidence', () =
   assert.ok(lovelee.some((url) => /lovelee-app/.test(url)), JSON.stringify(lovelee));
   const wacko = dates.productUrlsForPin({ name: 'wacko' }, { pageText: 'no product url here' });
   assert.equal(wacko.some((url) => /wacko\.com/.test(url)), false);
+  const leftover = dates.dropSameNameLeftovers(
+    [
+      { name: 'POST BRIDGE', source: 'npm', date: '2026-09-09' },
+      { name: 'POSTBRIDGE-CLI', source: 'npm', date: '2026-09-09' },
+      { name: 'SHIP OR DIE', source: 'site', date: '2026-06-09' },
+      { name: 'POST BRIDGE CHATGPT PLUGIN', source: 'web', date: '2026-09-11' },
+    ],
+    ['Post Bridge'],
+  );
+  assert.deepEqual(
+    leftover.items.map((item) => item.name),
+    ['POSTBRIDGE-CLI', 'SHIP OR DIE', 'POST BRIDGE CHATGPT PLUGIN'],
+  );
+  assert.equal(leftover.drops.length, 1);
+  assert.equal(leftover.drops[0].name, 'POST BRIDGE');
+  assert.equal(leftover.drops[0].reason, 'same-name-pre-2026');
 });
 
 test('undated sitemap flagships survive harvest (the gate that dropped Cursor 3)', () => {

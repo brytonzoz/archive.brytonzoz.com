@@ -19,10 +19,12 @@ const receipt = {
   listed: true,
 };
 
-test('a print ack with only id is finished; provisional / pending / upgrading stay open', () => {
+test('a print ack with only id is finished; growing / provisional / pending / upgrading stay open', () => {
   assert.equal(isReceiptOpen({ id: 17, pile: 'x' }), false);
+  assert.equal(isReceiptOpen({ id: 17, growing: true }), true);
   assert.equal(isReceiptOpen({ id: 17, provisional: true }), true);
   assert.equal(isReceiptOpen({ id: 17, pending: true }), true);
+  assert.equal(isReceiptOpen({ receipt: { ...receipt, growing: true }, sponsors: { slots: [], frozen: false } }), true);
   assert.equal(isReceiptOpen({ receipt: { ...receipt, upgrading: true }, sponsors: { slots: [], frozen: false } }), true);
   assert.equal(isReceiptOpen({ receipt: { ...receipt, provisional: true }, sponsors: { slots: [], frozen: false } }), true);
   assert.equal(isReceiptOpen({ id: 17, done: true, provisional: true }), false);

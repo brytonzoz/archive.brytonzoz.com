@@ -9,6 +9,8 @@ export type PrintChunk = {
   pile?: string;
   error?: string;
   cached?: boolean;
+  /** Pipeline: first lines are on the tape, more items still appending. */
+  growing?: boolean;
   provisional?: boolean;
   pending?: boolean;
   done?: boolean;
@@ -23,8 +25,8 @@ export function isReceiptOpen(value: PrintChunk | StreamedLoad | YearReceipt | n
   const receipt = 'receipt' in value ? value.receipt : 'items' in value && 'subject' in value ? (value as YearReceipt) : undefined;
   const flags = value as PrintChunk;
   if (flags.done === true || flags.complete === true) return false;
-  if (flags.provisional === true || flags.pending === true) return true;
-  return Boolean(receipt?.provisional || receipt?.pending || receipt?.upgrading);
+  if (flags.growing === true || flags.provisional === true || flags.pending === true) return true;
+  return Boolean(receipt?.growing || receipt?.provisional || receipt?.pending || receipt?.upgrading);
 }
 
 export function applyPrintChunk(prev: StreamedLoad | null, chunk: PrintChunk): StreamedLoad | null {
@@ -35,6 +37,7 @@ export function applyPrintChunk(prev: StreamedLoad | null, chunk: PrintChunk): S
     receipt: {
       ...receipt,
       items: chunk.items ?? receipt.items,
+      growing: closed ? false : Boolean(chunk.growing ?? receipt.growing),
       provisional: closed ? false : Boolean(chunk.provisional ?? receipt.provisional),
       pending: closed ? false : Boolean(chunk.pending ?? receipt.pending),
       upgrading: closed ? false : Boolean(receipt.upgrading),

@@ -55,6 +55,12 @@ test('handle-only CEOs resolve a company; unknown builders stay free', () => {
   assert.equal(skipSelf, null);
 });
 
+test('seed host map resolves cursor.com to Cursor', () => {
+  const seedFile = JSON.parse(readFileSync(new URL('../data/shipped-companies.json', import.meta.url), 'utf8'));
+  const cursor = seedFile.companies.find((row) => row.company === 'Cursor');
+  assert.ok(cursor?.sites?.some((u) => u.includes('cursor.com')));
+});
+
 test('bio CEO patterns and host guesses cover OpenAI / Cursor / Vercel', () => {
   const openai = affiliation.affiliationFromBio('CEO, OpenAI', affiliation.emptyAffiliation());
   assert.equal(openai.role, 'ceo');

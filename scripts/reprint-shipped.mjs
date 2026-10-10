@@ -18,6 +18,12 @@ const realCount = (receipt) => {
   return items.filter((item) => item && item.name && item.name !== 'YOUR POTENTIAL' && item.source !== 'none').length;
 };
 
+/** Wall CEOs whose public bios are misleading; admin reprints attach the warm company-cache tape. */
+const AFFILIATION_BY_ID = {
+  17: { company: 'Cursor', role: 'ceo' },
+  13: { company: 'OpenAI', role: 'ceo' },
+};
+
 const DEFAULT_TARGETS = [
   { id: 16, who: 'Tibo from OpenAI' },
   { id: 17, who: 'Michael Truell' },
@@ -50,10 +56,11 @@ async function readReceipt(id) {
 }
 
 async function reprint(id) {
+  const affiliation = AFFILIATION_BY_ID[id];
   const res = await fetch(`${origin}/api/admin/shipped`, {
     method: 'POST',
     headers,
-    body: JSON.stringify({ action: 'reprint-receipt', id }),
+    body: JSON.stringify({ action: 'reprint-receipt', id, ...(affiliation ? { affiliation } : {}) }),
   });
   const text = await res.text();
   let body = {};

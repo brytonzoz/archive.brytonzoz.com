@@ -1404,7 +1404,7 @@ async function followSitesForGithub(urls: string[], notes: string[]): Promise<st
   return logins.slice(0, 6);
 }
 
-async function resolveIdentityFresh(subject: Subject, env: SourceEnv, tinyfish: TinyfishAccess): Promise<ResolvedIdentity> {
+export async function resolveIdentityFresh(subject: Subject, env: SourceEnv, tinyfish: TinyfishAccess): Promise<ResolvedIdentity> {
   const notes: string[] = [];
   const profile = emptyProfile();
   if (subject.kind === 'github') profile.github = subject.id;
@@ -1663,18 +1663,24 @@ export async function gather(
   env: SourceEnv,
   year: number,
   meter: TinyfishMeter | null = null,
-  opts?: { mode?: GatherMode; rebuild?: boolean; onPartial?: (gathered: Gathered) => void },
+  opts?: {
+    mode?: GatherMode;
+    rebuild?: boolean;
+    onPartial?: (gathered: Gathered) => void;
+    affiliation?: Partial<import('./shipped-affiliation').Affiliation>;
+  },
 ): Promise<Gathered> {
   const tinyfish = tinyfishAccess(env, meter);
+  const identityP = opts?.rebuild ? resolveIdentityFresh(subject, env, tinyfish) : resolveIdentity(subject, env, tinyfish);
   const resolved = await raceTimeout(
-    resolveIdentity(subject, env, tinyfish),
+    identityP,
     SOURCE_TIMEOUT_MS,
     { profile: emptyProfile(), cacheKey: `name:${subject.id}`, notes: ['identity:timeout'] },
   );
   if (!resolved.profile.name) resolved.profile.name = subject.display || subject.id;
   const mode: GatherMode = opts?.mode === 'full' ? 'full' : 'free';
   const load = () =>
-    gatherFresh(subject, resolved.profile, env, year, meter, tinyfish, resolved.notes, mode, opts?.onPartial);
+    gatherFresh(subject, resolved.profile, env, year, meter, tinyfish, resolved.notes, mode, opts?.onPartial, opts?.affiliation);
   if (opts?.rebuild && !opts.onPartial) return load();
   if (opts?.rebuild) return load();
   const key = mode === 'full' ? `gather:full:v26:${year}:${resolved.cacheKey}` : `gather:v35:${year}:${resolved.cacheKey}`;
@@ -1696,6 +1702,7 @@ async function gatherFresh(
   notes: string[],
   mode: GatherMode = 'free',
   onPartial?: (gathered: Gathered) => void,
+  affiliationHint?: Partial<import('./shipped-affiliation').Affiliation>,
 ): Promise<Gathered> {
   const ran: string[] = [...notes.filter((n) => n.startsWith('x-profile:') || n.startsWith('github:'))];
   const failed: string[] = notes.filter((n) => n.endsWith(':miss') || n.endsWith(':unresolved'));
@@ -1734,16 +1741,30 @@ async function gatherFresh(
     cleanGithubCompany,
     shouldInferCompany,
     primaryProduct,
+    emptyAffiliation,
   } = await import('./shipped-affiliation');
   const typed = parseAffiliationQuery(subject.display || subject.id);
   let affiliation = mergeAffiliation(typed, affiliationFromBio(profile.bio || '', typed));
+  if (affiliationHint) {
+    const hint = { ...emptyAffiliation(), ...affiliationHint };
+    if (affiliationHint.company) hint.typedCompany = true;
+    affiliation = mergeAffiliation(affiliation, hint);
+  }
   if (!affiliation.name) affiliation.name = who;
+  const { companyFromSeedSites } = await import('./shipped-company-seeds');
   const applyCompanyHints = () => {
     const infer = shouldInferCompany(affiliation);
     const fromSites = companyFromSites(sitesOf(profile), { name: affiliation.name || profile.name, handle: profile.x });
     if (infer && fromSites && !affiliation.company) {
       affiliation.company = fromSites.company;
       affiliation.companySite ||= fromSites.site;
+    }
+    if (infer && !affiliation.company) {
+      const fromSeed = companyFromSeedSites(sitesOf(profile));
+      if (fromSeed) {
+        affiliation.company = fromSeed.company;
+        affiliation.companySite ||= fromSeed.site;
+      }
     }
     const fromGithub = cleanGithubCompany(profile.company);
     if (infer && fromGithub && !affiliation.company) affiliation.company = fromGithub;

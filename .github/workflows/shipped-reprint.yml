@@ -8,6 +8,10 @@ on:
     paths:
       - .github/workflows/shipped-reprint.yml
       - scripts/reprint-shipped.mjs
+      - worker/shipped.ts
+      - worker/shipped-sources.ts
+      - worker/shipped-affiliation.ts
+      - worker/shipped-company-seeds.ts
   workflow_dispatch:
     inputs:
       ids:

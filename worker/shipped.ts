@@ -2116,7 +2116,12 @@ function subjectFromReceipt(data: YearReceipt): Subject | null {
 }
 
 /** Re-run gather + assemble for an existing row. Same id; listed/hidden stay as they are. */
-async function reprintReceipt(env: ShippedEnv, db: D1Database, id: number): Promise<Response> {
+async function reprintReceipt(
+  env: ShippedEnv,
+  db: D1Database,
+  id: number,
+  affiliationHint?: Partial<import('./shipped-affiliation').Affiliation>,
+): Promise<Response> {
   const row = await db
     .prepare('SELECT id, data, listed, hidden, login_key, mode FROM shipped_receipts WHERE id = ?')
     .bind(id)
@@ -2142,7 +2147,7 @@ async function reprintReceipt(env: ShippedEnv, db: D1Database, id: number): Prom
       gatherEnv(env, db, { xaiMeter: denyXaiMeter(), xaiMode: 'off', SHIPPED_XAI_OFF: '1' }),
       year,
       tinyfishMeter(db),
-      { rebuild: true },
+      { rebuild: true, affiliation: affiliationHint },
     );
     if (subject.kind === 'github' && gathered.profile.name && !hasBlockedWord(gathered.profile.name)) subject.display = clean(gathered.profile.name, 60);
     let model: string | null = null;
@@ -2315,7 +2320,13 @@ export async function adminShipped(request: Request, env: ShippedEnv): Promise<R
       await dropListedCache(env, id);
       return json({ ok: true, listed: listed === 1 });
     }
-    if (body.action === 'reprint-receipt') return reprintReceipt(env, db, id);
+    if (body.action === 'reprint-receipt') {
+      const hint =
+        body.affiliation && typeof body.affiliation === 'object' && !Array.isArray(body.affiliation)
+          ? (body.affiliation as Partial<import('./shipped-affiliation').Affiliation>)
+          : undefined;
+      return reprintReceipt(env, db, id, hint);
+    }
     if (body.action === 'remove-takedown' || body.action === 'dismiss-takedown') {
       const ask = await db.prepare(`SELECT * FROM shipped_takedowns WHERE id = ?`).bind(id).first<{ receipt_id: number; subject_key: string; status: string }>();
       if (!ask) return json({ error: 'not-found' }, 404);

@@ -18,7 +18,14 @@ async function measureOne(page, query) {
   await page.goto(`${origin}/`, { waitUntil: 'domcontentloaded', timeout: 60_000 });
   await page.waitForSelector('#shipped-query', { timeout: 30_000 });
   await page.fill('#shipped-query', query);
-  await page.waitForTimeout(300);
+  await page.waitForTimeout(500);
+  await page.click('button.is-print', { timeout: 15_000 }).catch(() => undefined);
+  const turnstile = page.locator('.shipped-turnstile-hit, .shipped-turnstile iframe');
+  if (await turnstile.first().isVisible({ timeout: 3_000 }).catch(() => false)) {
+    await turnstile.first().click({ timeout: 5_000 }).catch(() => undefined);
+    const frame = page.frameLocator('iframe[src*="challenges.cloudflare.com"]').first();
+    await frame.locator('body').click({ timeout: 8_000, force: true }).catch(() => undefined);
+  }
 
   const t0 = Date.now();
   const [printRes] = await Promise.all([
@@ -60,8 +67,9 @@ async function measureOne(page, query) {
   return { query, id, items: 0, ms: Date.now() - t0, error: 'first-line-timeout' };
 }
 
+const headed = process.env.SHIPPED_MEASURE_HEADED === '1' || process.env.DISPLAY;
 const browser = await chromium.launch({
-  headless: true,
+  headless: !headed,
   channel: 'chrome',
   args: ['--disable-blink-features=AutomationControlled'],
 });

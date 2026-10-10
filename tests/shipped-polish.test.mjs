@@ -320,7 +320,7 @@ test('flagship company launches survive the title gate with a logged keep', () =
   const names = items.map((item) => item.name);
   assert.ok(names.some((name) => /cursor 3/i.test(name)), JSON.stringify(names));
   assert.ok(names.some((name) => /composer 2/i.test(name)), JSON.stringify(names));
-  assert.ok(names.some((name) => /graphite joining cursor/i.test(name)), JSON.stringify(names));
+  assert.equal(names.filter((name) => /graphite/i.test(name)).length, 0, JSON.stringify(names));
   assert.ok(names.some((name) => /^bugbot$/i.test(name)), JSON.stringify(names));
   assert.ok(names.some((name) => /^origin$/i.test(name)), JSON.stringify(names));
   assert.ok(names.some((name) => /cursor web/i.test(name) && !/sep/i.test(name)), JSON.stringify(names));
@@ -342,7 +342,7 @@ test('flagship company launches survive the title gate with a logged keep', () =
   const tape = harvested.map((item) => item.name);
   assert.ok(tape.some((name) => /CURSOR 3/i.test(name)), JSON.stringify(tape));
   assert.ok(tape.some((name) => /COMPOSER 2/i.test(name)), JSON.stringify(tape));
-  assert.ok(tape.some((name) => /GRAPHITE/i.test(name)), JSON.stringify(tape));
+  assert.equal(tape.filter((name) => /GRAPHITE/i.test(name)).length, 0, JSON.stringify(tape));
   assert.ok(tape.some((name) => /BUGBOT/i.test(name)), JSON.stringify(tape));
 });
 
@@ -410,7 +410,7 @@ test('undated sitemap flagships survive harvest (the gate that dropped Cursor 3)
   const tape = ai.harvestItems(gathered, 2026).map((item) => item.name);
   assert.ok(tape.some((name) => /CURSOR 3/i.test(name)), JSON.stringify(tape));
   assert.ok(tape.some((name) => /COMPOSER 2/i.test(name)), JSON.stringify(tape));
-  assert.ok(tape.some((name) => /GRAPHITE/i.test(name)), JSON.stringify(tape));
+  assert.equal(tape.filter((name) => /GRAPHITE/i.test(name)).length, 0, JSON.stringify(tape));
   assert.ok(tape.some((name) => /BUGBOT/i.test(name)), JSON.stringify(tape));
 });
 
@@ -424,7 +424,7 @@ test('sitemap slugs become flagship names and june-2026 slugs get a day', () => 
   const items = changelog.itemsFromSitemap(xml, 2026);
   assert.ok(items.some((item) => /cursor 3/i.test(item.name)), JSON.stringify(items.map((i) => i.name)));
   assert.ok(items.some((item) => /composer 2/i.test(item.name)));
-  assert.ok(items.some((item) => /graphite joining cursor/i.test(item.name)));
+  assert.equal(items.filter((item) => /graphite/i.test(item.name)).length, 0);
   const bugbot = items.find((item) => /bugbot/i.test(item.name));
   assert.ok(bugbot);
   assert.equal(bugbot.date, '2026-06-01');

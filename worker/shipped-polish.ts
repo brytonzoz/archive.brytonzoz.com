@@ -7,6 +7,7 @@ import {
   flagshipLaunchName,
   isCursorModelNote,
   isFlagshipYearKeep,
+  isJoinOrAcquire,
   logFlagshipGate,
   stripDateSuffix,
 } from './shipped-flagship';
@@ -400,6 +401,7 @@ export function inYearDate(value: unknown, year: number): string | null {
 
 export function inYearStrict(item: Polishable, year: number): boolean {
   if (otherYearProduct(item.name, year) && !flagshipLaunchName(item)) return false;
+  if (isJoinOrAcquire(item) && !String(item.date ?? '').startsWith(String(year))) return false;
   const raw = item.date ? String(item.date) : '';
   if (/^\d{4}/.test(raw) && !raw.startsWith(String(year))) {
     if (isFlagshipYearKeep(item, year)) return true;

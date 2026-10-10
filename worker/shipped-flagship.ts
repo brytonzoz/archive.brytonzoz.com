@@ -131,14 +131,22 @@ export function flagshipLaunchName(item: FlagshipItem): string | null {
   return null;
 }
 
-/** Join/acquire announced in December of last year still belongs on this year's company tape. */
+export function isJoinOrAcquire(item: FlagshipItem): boolean {
+  const flagship = flagshipLaunchName(item);
+  return /joining|joins|acquired/i.test(`${item.name ?? ''} ${flagship ?? ''}`);
+}
+
+/**
+ * Flagships may keep an undated 2026 sitemap row (Cursor 3). They must never
+ * override the year rule: a 2025 join (Graphite) is not a 2026 ship.
+ */
 export function isFlagshipYearKeep(item: FlagshipItem, year: number): boolean {
   const flagship = flagshipLaunchName(item);
   if (!flagship || !isCompanyShip(item)) return false;
+  if (isJoinOrAcquire(item)) return String(item.date ?? '').startsWith(String(year));
   const raw = item.date ? String(item.date) : '';
-  if (!raw || raw.startsWith(String(year))) return true;
-  if (/joining|joins|acquired/i.test(`${item.name ?? ''} ${flagship}`) && raw.startsWith(`${year - 1}-12`)) return true;
-  return false;
+  if (raw && !raw.startsWith(String(year))) return false;
+  return !raw || raw.startsWith(String(year));
 }
 
 /** `bugbot-updates-june-2026` / `.../2026-04-02-cursor-3` → a day when the slug carries one. */

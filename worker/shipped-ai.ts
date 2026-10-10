@@ -9,6 +9,7 @@ import { REQUIRED_MODULES, sanitizeLayout, type ModuleId } from '../lib/shipped-
 import { clean, hostOf, inYearCount, publicUrl, type Found, type Gathered } from './shipped-sources';
 import { shipName } from './shipped-changelog';
 import { shareKeywords } from './shipped-decisions';
+import { ownerFromProfile } from './shipped-ownership';
 import { cleanDescription, cleanShipTitle, cleanStatus, noteCountMismatch, polishCandidates, prettyBrand } from './shipped-polish';
 import type { Affiliation } from './shipped-affiliation';
 import { RECEIPT_BUDGET_MICROS, formatReceiptStats, searchBudget, type SourcedStat } from './shipped-research';
@@ -350,6 +351,7 @@ export function harvestItems(gathered: Gathered, year: number): DraftItem[] {
     who: gathered.profile.name || gathered.profile.affiliation?.name,
     handle: gathered.profile.x,
     affiliation: gathered.profile.affiliation,
+    owner: ownerFromProfile(gathered.profile, gathered.profile.affiliation),
   });
   for (const item of polished) {
     const draft = toDraftItem(item, year);

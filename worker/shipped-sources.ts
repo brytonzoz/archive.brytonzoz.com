@@ -38,6 +38,7 @@ import {
   urlsFromText,
   type XProfile,
 } from './shipped-identity';
+import { hostNamesOwner, ownerFromProfile, ownerTokens } from './shipped-ownership';
 import {
   compactNumber,
   describeWithStat,
@@ -1572,6 +1573,7 @@ export function itemsFromWebEvidence(opts: {
 }): Found[] {
   const { profile, site, pages, web, year } = opts;
   const own = new Set([hostOf(profile.site), ...sitesOf(profile).map((u) => hostOf(u))].filter((h): h is string => Boolean(h)));
+  const owner = ownerFromProfile(profile);
   const found: Found[] = [];
   const add = (item: Found) => {
     if (!item.name || hasBlockedWord(item.name)) return;
@@ -1586,9 +1588,15 @@ export function itemsFromWebEvidence(opts: {
     const name = clean(cut, 40) || productNameFromHost(host);
     if (!name || name.length < 2 || NAV_LINK.test(name) || JUNK_ITEM.test(name) || GENERIC_NAME.test(name)) return;
     if (profile.name && loose(name) === loose(profile.name)) return;
+    const ownedHost = own.has(host) || hostNamesOwner(host, owner);
+    if (!ownedHost && source === 'site') return;
+    if (!ownedHost && source === 'web') {
+      const hay = `${name} ${url}`.toLowerCase().normalize('NFKD').replace(/[^a-z0-9]/g, '');
+      if (!ownerTokens(owner).some((token) => token.length >= 5 && hay.includes(token))) return;
+    }
     add({
       name,
-      description: own.has(host) ? clean(`Listed on ${hostOf(profile.site) ?? 'their site'}`, 140) : clean(`Public page on ${host}`, 140),
+      description: ownedHost ? clean(`Listed on ${hostOf(profile.site) ?? 'their site'}`, 140) : clean(`Public page on ${host}`, 140),
       date,
       dateConfidence: date ? 'exact' : confidence,
       link: url,
@@ -1685,7 +1693,7 @@ export async function gather(
     gatherFresh(subject, resolved.profile, env, year, meter, tinyfish, resolved.notes, mode, opts?.onPartial, opts?.affiliation);
   if (opts?.rebuild && !opts.onPartial) return load();
   if (opts?.rebuild) return load();
-  const key = mode === 'full' ? `gather:full:v26:${year}:${resolved.cacheKey}` : `gather:v35:${year}:${resolved.cacheKey}`;
+  const key = mode === 'full' ? `gather:full:v27:${year}:${resolved.cacheKey}` : `gather:v36:${year}:${resolved.cacheKey}`;
   return cached(
     key,
     1440 * MIN,
@@ -1942,24 +1950,6 @@ async function gatherFresh(
   if (extraSites.some(Boolean)) ran.push('sites');
   ran.push('research-pass:harvest');
 
-  const seenHome = new Set([hostOf(homepage), ...extraHomes.map((u) => hostOf(u))].filter((h): h is string => Boolean(h)));
-  const productHomes = (site?.links ?? [])
-    .map((link) => publicUrl(link.url))
-    .filter((url): url is string => {
-      const host = hostOf(url);
-      if (!url || !host || seenHome.has(host) || SKIP_PAGES.test(host)) return false;
-      if (host === hostOf(homepage)) return false;
-      return true;
-    })
-    .filter((url, i, all) => all.findIndex((u) => hostOf(u) === hostOf(url)) === i)
-    .slice(0, 8);
-  const productPages: SiteInfo[] = [];
-  if (productHomes.length) {
-    const more = await Promise.all(productHomes.map((url) => raceTimeout(readSite(url).catch(() => null), SOURCE_TIMEOUT_MS, null)));
-    productPages.push(...more.filter((page): page is SiteInfo => Boolean(page)));
-    if (productPages.length) ran.push('product-sites');
-  }
-
   const web: WebResult[] = [];
   for (const row of searched.flat()) {
     const hit = result(row.title, row.url, row.snippet, row.date);
@@ -1988,7 +1978,7 @@ async function gatherFresh(
   }
 
   const ownPages = extraSites.filter((page): page is SiteInfo => Boolean(page));
-  for (const extra of [...ownPages, ...productPages]) {
+  for (const extra of ownPages) {
     found.push(
       ...itemsFromWebEvidence({
         profile,
@@ -2036,12 +2026,19 @@ async function gatherFresh(
 
   applyCompanyHints();
   profile.affiliation = affiliation;
+  const polishOpts = () => ({
+    year,
+    who,
+    handle: profile.x,
+    affiliation,
+    owner: ownerFromProfile(profile, affiliation),
+  });
   const viaNow = viaLabel(affiliation, defaultAttribution(affiliation.role, affiliation.typedCompany));
   const { polishCandidates } = await import('./shipped-polish');
   const { heuristicVerify } = await import('./shipped-decisions');
   const emitPartial = (items: Found[], tag: string) => {
-    const polished = polishCandidates(items, { year, who, handle: profile.x, affiliation });
-    const verified = heuristicVerify(polished, year, affiliation, viaNow);
+    const polished = polishCandidates(items, polishOpts());
+    const verified = heuristicVerify(polished, year, affiliation, viaNow, polishOpts().owner);
     const snap: Gathered = {
       found: verified,
       web: web.slice(0, 12),
@@ -2125,22 +2122,30 @@ async function gatherFresh(
 
   deduped = polishCandidates(
     dedupeFound(found).map((item) => ({ ...item, description: describeWithStat(item) })),
-    { year, who, handle: profile.x, affiliation },
+    polishOpts(),
   );
   emitPartial(deduped, 'partial:company');
   const via = viaLabel(affiliation, defaultAttribution(affiliation.role, affiliation.typedCompany));
   try {
     const { verifyCandidates, dedupeSameShips, sortByDate } = await import('./shipped-decisions');
-    const verified = await verifyCandidates({ env, items: deduped, year, who, affiliation, via });
+    const verified = await verifyCandidates({
+      env,
+      items: deduped,
+      year,
+      who,
+      affiliation,
+      via,
+      owner: polishOpts().owner,
+    });
     decisionsMicros += verified.spend.costMicros;
     ran.push(verified.usedDecisions ? 'decisions' : 'decisions:heuristic');
     const same = await dedupeSameShips({ env, items: verified.items });
     decisionsMicros += same.spend.costMicros;
-    deduped = polishCandidates(sortByDate(same.items), { year, who, handle: profile.x, affiliation });
+    deduped = polishCandidates(sortByDate(same.items), polishOpts());
   } catch {
     failed.push('decisions');
     ran.push('decisions:heuristic');
-    deduped = polishCandidates(deduped, { year, who, handle: profile.x, affiliation });
+    deduped = polishCandidates(deduped, polishOpts());
   }
 
   const prolific = Boolean(profile.github || profile.site || affiliation.company || (profile.bio && profile.bio.length > 20));
@@ -2179,16 +2184,17 @@ async function gatherFresh(
         const { verifyCandidates, dedupeSameShips, sortByDate } = await import('./shipped-decisions');
         const extra = await verifyCandidates({
           env,
-          items: polishCandidates([...sweep.found, ...web.found], { year, who, handle: profile.x, affiliation }),
+          items: polishCandidates([...sweep.found, ...web.found], polishOpts()),
           year,
           who,
           affiliation,
           via,
+          owner: polishOpts().owner,
         });
         decisionsMicros += extra.spend.costMicros;
         const same = await dedupeSameShips({ env, items: [...deduped, ...extra.items] });
         decisionsMicros += same.spend.costMicros;
-        deduped = polishCandidates(sortByDate(same.items), { year, who, handle: profile.x, affiliation });
+        deduped = polishCandidates(sortByDate(same.items), polishOpts());
       }
       const cap = xaiDeepMaxPosts(env);
       if (xaiPosts >= cap && cap > 0) ran.push('xai-capped:deep');
@@ -2213,16 +2219,17 @@ async function gatherFresh(
         const { verifyCandidates, dedupeSameShips, sortByDate } = await import('./shipped-decisions');
         const extra = await verifyCandidates({
           env,
-          items: polishCandidates(personX.found, { year, who, handle: profile.x, affiliation }),
+          items: polishCandidates(personX.found, polishOpts()),
           year,
           who,
           affiliation,
           via,
+          owner: polishOpts().owner,
         });
         decisionsMicros += extra.spend.costMicros;
         const same = await dedupeSameShips({ env, items: [...deduped, ...extra.items] });
         decisionsMicros += same.spend.costMicros;
-        deduped = polishCandidates(sortByDate(same.items), { year, who, handle: profile.x, affiliation });
+        deduped = polishCandidates(sortByDate(same.items), polishOpts());
       }
       const cap = xaiMaxPosts(env);
       if (xaiPosts >= cap && cap > 0) ran.push('xai-capped:free');
@@ -2235,7 +2242,7 @@ async function gatherFresh(
     failed.push(deep ? 'xai-deep' : 'xai-gapfill');
   }
 
-  deduped = polishCandidates(deduped, { year, who, handle: profile.x, affiliation });
+  deduped = polishCandidates(deduped, polishOpts());
   stats = mergeStats([pageStats, deduped.flatMap((item) => item.metrics ?? [])]);
   const finalGaps = detectGaps({ ...draft, found: deduped, stats, profile });
   // Never invent a leftover count. A number only when we sliced a unique list past MAX_ITEMS.

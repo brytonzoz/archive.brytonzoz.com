@@ -58,6 +58,36 @@ test('title cleaner extracts a short product name or drops the line', () => {
   assert.equal(polish.isJunkTitle('USE A WEBSITE’S TOOLS: WITH SITE'), true);
   const cli = polish.cleanShipTitle('CODEX CLI CAN ALSO IMPORT SUPPORTED');
   assert.ok(!cli || /^codex cli$/i.test(cli));
+  assert.equal(polish.cleanShipTitle('USE WINDOWS APPS AND CONTROL CODEX'), '');
+  assert.match(polish.cleanShipTitle('IN THE CHATGPT MOBILE APP'), /chatgpt mobile app/i);
+  assert.equal(polish.cleanShipTitle('LINES OF CODE IN TWO WEEKS WITH CURSOR'), '');
+  assert.equal(polish.cleanShipTitle('START FROM SCRATCH, WITHOUT A REPO'), '');
+  assert.equal(polish.cleanShipTitle('CURSOR BUILT A FLEET OF SECURITY'), '');
+  assert.match(polish.cleanShipTitle('CURSOR ROUTER WORKS'), /cursor router/i);
+  assert.equal(polish.cleanShipTitle('GPT-5'), '');
+  assert.equal(polish.cleanShipTitle('GPT-5.4 MINI'), 'GPT-5.4 MINI');
+  assert.equal(polish.isProductNounPhrase('ChatGPT Mobile App'), true);
+  assert.equal(polish.isProductNounPhrase('USE WINDOWS APPS'), false);
+});
+
+test('undated crumbs sort last and stay under a quarter of a dated tape', () => {
+  const dated = ['Alpha', 'Beta', 'Gamma'].map((name, i) =>
+    found({ name, date: `2026-0${i + 1}-01`, source: 'github', link: `https://github.com/ada/${name.toLowerCase()}` }),
+  );
+  const crumbs = Array.from({ length: 10 }, (_, i) =>
+    found({ name: `Crumb ${i}`, date: null, source: 'site', link: `https://ada.dev/#c${i}`, thisYear: true }),
+  );
+  const inherited = polish.inheritDates([
+    found({ name: 'Post Bridge CLI', date: null, source: 'site', link: 'https://jackfriks.com/#post-bridge' }),
+    found({ name: 'postbridge-cli', date: '2026-09-09', source: 'github', link: 'https://github.com/jackfriks/postbridge-cli' }),
+  ]);
+  assert.equal(inherited.find((item) => /post bridge/i.test(item.name))?.date, '2026-09-09');
+  const capped = polish.capUndated([...dated, ...crumbs]);
+  assert.equal(capped.filter((item) => item.date).length, 3);
+  assert.equal(capped.filter((item) => !item.date).length, 1);
+  assert.ok(capped.slice(0, 3).every((item) => item.date));
+  const onlyUndated = polish.capUndated(crumbs);
+  assert.equal(onlyUndated.length, 10);
 });
 
 test('same article href collapses to the best title; changelog index cards stay distinct', () => {

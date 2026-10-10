@@ -101,6 +101,25 @@ test('undated own-site products become found items; other years do not', () => {
   });
   assert.ok(items.some((item) => /photoai/i.test(item.name)));
   assert.equal(items.some((item) => /old thing/i.test(item.name)), false);
+  const jackSite = sources.itemsFromWebEvidence({
+    profile: { name: 'Jack Friks', bio: '', site: 'https://jackfriks.com/', x: 'jackfriks', github: 'jackfriks', sites: ['https://jackfriks.com/'] },
+    site: {
+      url: 'https://jackfriks.com/',
+      title: 'Jack Friks',
+      description: '',
+      icon: null,
+      text: 'tools I use',
+      links: [
+        { text: 'DataFast', url: 'https://datafa.st/' },
+        { text: 'ShipFast', url: 'https://shipfa.st/' },
+        { text: 'Lovelee', url: 'https://jackfriks.com/#lovelee' },
+      ],
+    },
+    pages: [],
+    web: [{ title: 'ShipFast — The NextJS boilerplate', url: 'https://shipfa.st/', snippet: '', date: null }],
+    year: 2026,
+  });
+  assert.equal(jackSite.some((item) => /datafast|shipfast|unicorne|codefast|indiepage|gamifylist/i.test(item.name)), false);
   const photo = items.find((item) => /photoai/i.test(item.name));
   assert.equal(photo.date, null);
   assert.ok(photo.dateConfidence === 'unknown' || photo.thisYear);
@@ -282,6 +301,13 @@ test('a /projects page dated 2026 becomes found items', () => {
   assert.ok(tight.some((item) => /post bridge/i.test(item.name)), JSON.stringify(tight.map((i) => i.name)));
   assert.ok(tight.some((item) => /deep work depot/i.test(item.name)));
   assert.equal(tight.some((item) => /you talk to/i.test(item.name)), false);
+  const friends = research.itemsFromProjectList({
+    text: "things i'm working on\n📌 lovelee (couples app)\n\ntools I use\nDataFast (analytics for makers)\nShipFast (nextjs boilerplate)\nIndiePage (portfolio)",
+    url: 'https://jackfriks.com/',
+    year: 2026,
+  });
+  assert.ok(friends.some((item) => /lovelee/i.test(item.name)));
+  assert.equal(friends.some((item) => /datafast|shipfast|indiepage/i.test(item.name)), false);
   assert.equal(identity.guessHandleDotCom('jackfriks'), 'https://jackfriks.com/');
   assert.equal(identity.guessHandleDotCom('www'), null);
 });

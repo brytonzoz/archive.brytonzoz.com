@@ -3,6 +3,7 @@
 // Docs: https://platform.openai.com/docs/guides/decisions
 import type { Attribution, Affiliation } from './shipped-affiliation';
 import { defaultAttribution, leadProductTokens } from './shipped-affiliation';
+import { ownedByBuilder, ownershipEvidence, type OwnerContext } from './shipped-ownership';
 import type { Found } from './shipped-sources';
 import { clean } from './shipped-sources';
 
@@ -14,17 +15,26 @@ export const KEEP_PRODUCT = 0.7;
 
 const PERSONAL_SHIP_SOURCE = /^(github|npm|producthunt|appstore)$/;
 
-export function isPersonalShipSource(item: { source?: string; link?: string | null }): boolean {
+export function isPersonalShipSource(
+  item: { name?: string; description?: string; source?: string; link?: string | null },
+  owner?: OwnerContext | null,
+): boolean {
   if (PERSONAL_SHIP_SOURCE.test(item.source ?? '')) return true;
   if ((item.source === 'site' || item.source === 'web') && item.link) {
     if (/\/(blog|posts?|news|articles?|p|index|customers|topic|resources|support)\//i.test(item.link)) return false;
     try {
       const path = new URL(item.link).pathname.replace(/\/+$/, '');
-      if (!path) return true;
+      if (!path) {
+        if (owner && !ownedByBuilder(item, owner)) return false;
+        return true;
+      }
     } catch {
       /* ignore */
     }
-    return item.source === 'site';
+    if (item.source === 'site') {
+      if (owner && !ownedByBuilder(item, owner)) return false;
+      return true;
+    }
   }
   return false;
 }
@@ -111,9 +121,15 @@ const CANDIDATE_QUESTIONS = [
     choices: SHIP_KINDS,
   },
   {
+    type: 'predicate',
+    name: 'owned_by_person',
+    instructions:
+      "Did THIS person ship this? Yes only with ownership evidence: it is on their own 'my projects/portfolio' list (not 'tools I use', affiliate links, or friends' products), OR the product domain/footer/about names them, OR the GitHub/npm/App Store developer matches them. Tools they use and other builders' products are no.",
+  },
+  {
     type: 'choice',
     name: 'attribution',
-    instructions: 'Who does this ship belong to, given the person and their role? A product lead only gets their product plus things they personally posted that they shipped. A CEO gets company-wide ships.',
+    instructions: 'Who does this ship belong to, given the person and their role? A product lead only gets their product plus things they personally posted that they shipped. A CEO gets company-wide ships. Another builder\'s product is unrelated.',
     choices: ATTRIBUTION_CHOICES,
   },
   {
@@ -124,7 +140,8 @@ const CANDIDATE_QUESTIONS = [
   },
 ];
 
-function evidenceOf(item: Found, who: string, affiliation: Affiliation, year: number): string {
+function evidenceOf(item: Found, who: string, affiliation: Affiliation, year: number, owner?: OwnerContext | null): string {
+  const ownership = ownershipEvidence(item, owner);
   return [
     `Person: ${who}`,
     affiliation.company ? `Company: ${affiliation.company}` : '',
@@ -140,6 +157,10 @@ function evidenceOf(item: Found, who: string, affiliation: Affiliation, year: nu
     item.date ? `Date: ${item.date}` : 'Date: unknown',
     item.link ? `Source: ${item.link}` : '',
     `Harvest source: ${item.source}`,
+    `Ownership evidence: ${ownership}`,
+    ownership === 'none'
+      ? "No ownership evidence. If this is a tool they use, an affiliate link, or a friend's product, it is unrelated."
+      : '',
   ]
     .filter(Boolean)
     .join('\n');
@@ -198,10 +219,11 @@ export function looksLikeNotAShip(item: { name?: string; description?: string; l
   return false;
 }
 
-function scopedAttribution(item: Found, affiliation: Affiliation): Attribution {
+function scopedAttribution(item: Found, affiliation: Affiliation, owner?: OwnerContext | null): Attribution {
+  if (owner && !ownedByBuilder(item, owner)) return 'unrelated';
   // Personal repos, packages, and site products stay on the tape even when a bio
   // named one of many companies (TrustMRR, Readmake). Company harvest still scopes leads.
-  if (isPersonalShipSource(item)) return 'personal';
+  if (isPersonalShipSource(item, owner)) return 'personal';
   const tokens = leadProductTokens(affiliation.product, affiliation.company).map((t) => t.toLowerCase());
   const hay = `${item.name} ${item.description} ${item.link ?? ''}`.toLowerCase();
   const matchesProduct = tokens.length ? tokens.some((token) => hay.includes(token)) : false;
@@ -213,7 +235,7 @@ function scopedAttribution(item: Found, affiliation: Affiliation): Attribution {
   return 'personal';
 }
 
-export function heuristicMark(item: Found, year: number, affiliation: Affiliation): DecisionMark {
+export function heuristicMark(item: Found, year: number, affiliation: Affiliation, owner?: OwnerContext | null): DecisionMark {
   const name = `${item.name} ${item.description}`.toLowerCase();
   const tease = /\b(teas(e|ing)|coming soon|hiring|we.?re hiring|roadmap|soon|maybe|thinking about|retweet|rt @)\b/i.test(name);
   const article = looksLikeNotAShip(item);
@@ -222,34 +244,42 @@ export function heuristicMark(item: Found, year: number, affiliation: Affiliatio
   const isRealShip = article ? 0.08 : tease ? 0.15 : item.link ? 0.88 : 0.4;
   const changelogYear = (item.source === 'changelog' || item.source === 'company') && thisYear;
   const inYear = dated ? 0.9 : changelogYear ? 0.86 : thisYear ? 0.82 : item.date ? 0.15 : 0.45;
-  const attribution = scopedAttribution(item, affiliation);
+  const attribution = scopedAttribution(item, affiliation, owner);
   const significance = Math.min(4, Math.max(0, Math.round(Math.log10(1 + (item.score ?? 1)) * 2)));
   const kind: ShipKind = article || tease ? 'NOT_A_SHIP' : changelogYear || dated ? 'release_version' : 'feature';
   return { isRealShip, inYear, attribution, significance, kind, confidence: isRealShip * inYear };
 }
 
-export function shouldKeep(mark: DecisionMark, item?: Found): boolean {
-  const personal = item ? isPersonalShipSource(item) && !looksLikeNotAShip(item) : false;
-  // Decisions often marks an indie site/GitHub launch "unrelated" when a bio
-  // named one product. Those still belong on the person's tape.
-  if (personal && (item?.thisYear || (item?.date && /^\d{4}/.test(item.date)))) return true;
+export function shouldKeep(mark: DecisionMark, item?: Found, owner?: OwnerContext | null): boolean {
+  const evidence = item ? ownershipEvidence(item, owner) : 'none';
+  const personal = item ? isPersonalShipSource(item, owner) && !looksLikeNotAShip(item) : false;
+  const thisYear = Boolean(item?.thisYear || (item?.date && /^\d{4}/.test(item.date)));
+  if (owner && item && evidence === 'none') return false;
+  // First-party repos, packages, and the person's own project list stay even when
+  // Decisions marks a bio-company mismatch "unrelated". Friend-site links do not.
+  if (personal && thisYear && (evidence === 'developer' || evidence === 'company' || evidence === 'portfolio' || !owner)) {
+    return true;
+  }
   if (mark.attribution === 'unrelated') return false;
   if (mark.kind === 'NOT_A_SHIP' && !personal) return false;
   return mark.isRealShip * mark.inYear >= KEEP_PRODUCT;
 }
 
-function markFromAnswers(answers: Answer[], fallback: DecisionMark, item?: Found): DecisionMark {
+function markFromAnswers(answers: Answer[], fallback: DecisionMark, item?: Found, owner?: OwnerContext | null): DecisionMark {
   const real = pick(answers, 'is_real_ship');
   const year = pick(answers, 'in_2026');
+  const owned = pick(answers, 'owned_by_person');
   const attr = pick(answers, 'attribution');
   const sig = pick(answers, 'significance');
   const kindAns = pick(answers, 'kind');
   let isRealShip = real?.type === 'predicate' ? real.probability : fallback.isRealShip;
   const inYear = year?.type === 'predicate' ? year.probability : fallback.inYear;
-  const attribution = attr?.type === 'choice' && ATTRIBUTION_CHOICES.some((c) => c.value === attr.choice) ? (attr.choice as Attribution) : fallback.attribution;
+  let attribution = attr?.type === 'choice' && ATTRIBUTION_CHOICES.some((c) => c.value === attr.choice) ? (attr.choice as Attribution) : fallback.attribution;
+  if (owned?.type === 'predicate' && owned.probability < 0.55) attribution = 'unrelated';
+  if (item && owner && !ownedByBuilder(item, owner)) attribution = 'unrelated';
   const significance = sig?.type === 'score' ? sig.score : fallback.significance;
   let kind = kindAns?.type === 'choice' && SHIP_KINDS.some((c) => c.value === kindAns.choice) ? (kindAns.choice as ShipKind) : fallback.kind;
-  if (item && kind === 'NOT_A_SHIP' && isPersonalShipSource(item) && !looksLikeNotAShip(item)) {
+  if (item && kind === 'NOT_A_SHIP' && isPersonalShipSource(item, owner) && !looksLikeNotAShip(item)) {
     kind = 'release_version';
     if (isRealShip < 0.75) isRealShip = 0.8;
   }
@@ -287,13 +317,14 @@ export async function verifyCandidates(opts: {
   who: string;
   affiliation: Affiliation;
   via: string | null;
+  owner?: OwnerContext | null;
 }): Promise<{ items: Found[]; spend: DecisionsSpend; usedDecisions: boolean }> {
   const spend = emptyDecisionsSpend();
   if (!opts.items.length) return { items: [], spend, usedDecisions: false };
   if (!decisionsEnabled(opts.env)) {
     const kept = opts.items
-      .map((item) => applyMark(item, heuristicMark(item, opts.year, opts.affiliation), opts.via))
-      .filter((item) => shouldKeep(heuristicMark(item, opts.year, opts.affiliation), item));
+      .map((item) => applyMark(item, heuristicMark(item, opts.year, opts.affiliation, opts.owner), opts.via))
+      .filter((item) => shouldKeep(heuristicMark(item, opts.year, opts.affiliation, opts.owner), item, opts.owner));
     return { items: kept, spend, usedDecisions: false };
   }
 
@@ -304,24 +335,24 @@ export async function verifyCandidates(opts: {
   const toDecide = queue.slice(0, 100);
   const heuristicRest = queue.slice(100);
   for (const item of heuristicRest) {
-    const mark = heuristicMark(item, opts.year, opts.affiliation);
-    if (shouldKeep(mark, item)) kept.push(applyMark(item, mark, opts.via));
+    const mark = heuristicMark(item, opts.year, opts.affiliation, opts.owner);
+    if (shouldKeep(mark, item, opts.owner)) kept.push(applyMark(item, mark, opts.via));
   }
   for (let i = 0; i < toDecide.length; i += batch) {
     const chunk = toDecide.slice(i, i + batch);
     const rows = await Promise.all(
       chunk.map(async (item) => {
-        const fallback = heuristicMark(item, opts.year, opts.affiliation);
+        const fallback = heuristicMark(item, opts.year, opts.affiliation, opts.owner);
         if (looksLikeNotAShip(item)) return { item, mark: fallback };
-        const result = await decide(opts.env, evidenceOf(item, opts.who, opts.affiliation, opts.year), CANDIDATE_QUESTIONS);
+        const result = await decide(opts.env, evidenceOf(item, opts.who, opts.affiliation, opts.year, opts.owner), CANDIDATE_QUESTIONS);
         if (!result) return { item, mark: fallback };
         spend.inputTokens += result.inputTokens;
         spend.requests += 1;
-        return { item, mark: markFromAnswers(result.answers, fallback, item) };
+        return { item, mark: markFromAnswers(result.answers, fallback, item, opts.owner) };
       }),
     );
     for (const row of rows) {
-      if (!shouldKeep(row.mark, row.item)) continue;
+      if (!shouldKeep(row.mark, row.item, opts.owner)) continue;
       kept.push(applyMark(row.item, row.mark, opts.via));
     }
   }
@@ -482,11 +513,17 @@ export function sortByDate(items: Found[]): Found[] {
 }
 
 /** Fast verify for the first-paint tape. Decisions still run on the full pass. */
-export function heuristicVerify(items: Found[], year: number, affiliation: Affiliation, via: string | null): Found[] {
+export function heuristicVerify(
+  items: Found[],
+  year: number,
+  affiliation: Affiliation,
+  via: string | null,
+  owner?: OwnerContext | null,
+): Found[] {
   return items
     .map((item) => {
-      const mark = heuristicMark(item, year, affiliation);
-      return shouldKeep(mark, item) ? applyMark(item, mark, via) : null;
+      const mark = heuristicMark(item, year, affiliation, owner);
+      return shouldKeep(mark, item, owner) ? applyMark(item, mark, via) : null;
     })
     .filter((item): item is Found => Boolean(item));
 }

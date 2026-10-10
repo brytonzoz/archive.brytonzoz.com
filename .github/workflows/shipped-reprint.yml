@@ -17,6 +17,8 @@ on:
       - worker/shipped-research.ts
       - worker/shipped-ai.ts
       - worker/shipped-identity.ts
+      - worker/shipped-ownership.ts
+      - worker/shipped-decisions.ts
   workflow_dispatch:
     inputs:
       ids:

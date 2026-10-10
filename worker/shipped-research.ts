@@ -151,11 +151,12 @@ export function itemsFromProjectList(opts: { text: string; url: string; year: nu
   );
   for (const match of text.matchAll(namedDate)) add(match[1], null, `Dated ${year} on ${hostOf(url) ?? 'their site'}`);
 
-  const pins = text.matchAll(/([A-Za-z][A-Za-z0-9 .'-]{1,32})\s*\(([^)]{3,80})\)/g);
+  const pins = portfolioText(text).matchAll(/([A-Za-z][A-Za-z0-9 .'-]{1,32})\s*\(([^)]{3,80})\)/g);
   for (const match of pins) {
     const name = match[1].trim();
     if (name.split(/\s+/).length > 4) continue;
     if (/^(you |from the |get |download |how i |available )/i.test(name)) continue;
+    if (/\b(tools i use|affiliat|friends?|recommended|i use|made by|from the maker)\b/i.test(match[2])) continue;
     add(name, null, clean(match[2], 80) || `Listed on ${hostOf(url) ?? 'their site'}`);
   }
 
@@ -164,6 +165,19 @@ export function itemsFromProjectList(opts: { text: string; url: string; year: nu
   }
 
   return found.slice(0, 80);
+}
+
+const PORTFOLIO_HEADING =
+  /(?:^|\n)\s*#{0,3}\s*(📌\s*)?(things i(?:['’]m| am) working on|things i(?:['’]ve| have) built|working on|my projects|portfolio)\b/i;
+const TOOLS_HEADING =
+  /(?:^|\n)\s*#{0,3}\s*(tools i use|affiliates?|friends?(?:\s+and\s+makers)?|recommended(?: tools)?|i use these)\b/i;
+
+/** `Name (blurb)` pins only from the builder's own project list, never a tools/friends block. */
+export function portfolioText(text: string): string {
+  const toolsAt = text.search(TOOLS_HEADING);
+  const body = toolsAt >= 0 ? text.slice(0, toolsAt) : text;
+  const portAt = body.search(PORTFOLIO_HEADING);
+  return portAt >= 0 ? body.slice(portAt) : body;
 }
 
 const MONTH_NAME =

@@ -1,6 +1,7 @@
 // Hard pre-filters + title cleanup for the SHIPPED tape. Runs BEFORE Decisions
 // so bylines, docs nav, roundups, and cut-off headings never get scored as ships.
 import type { Affiliation } from './shipped-affiliation';
+import { ownedByBuilder, type OwnerContext } from './shipped-ownership';
 import type { ItemStatus } from '../lib/shipped-year';
 import { ITEM_STATUSES } from '../lib/shipped-year';
 
@@ -19,7 +20,12 @@ const RESEARCH_GERUND = /^(improving|bootstrapping|deprecating|continually|rewar
 const ACQUISITION = /\b(is joining|joins)\b/i;
 const CUSTOMER_STORY = /\bships\s+[\d.,]+[×x]\s+faster\b|·\s*\d+[kmb]\s*$/i;
 const TRAILING_PREP =
-  /\b(of|in|to|for|and|or|the|a|an|with|on|as|by|from|into|longer|kind|new|our|your|through|their|its|vs|lower|higher|more|less|day|days|managed)$/i;
+  /\b(of|in|to|for|and|or|the|a|an|with|on|as|by|from|into|longer|kind|new|our|your|through|their|its|vs|lower|higher|more|less|day|days|managed|security)$/i;
+const TITLE_START_BAD =
+  /^(in|on|at|for|with|from|to|of|by|as|use|using|start|starting|lines|line|built|build|building|control|give|let|take|work|choose|scan|create|organize|talk|try|visit|explore|download|get|see|read|learn|join|follow|watch|make|making|how|when|while|after|before|without|inside|beyond|under|over)\b/i;
+const TITLE_END_BAD = /\b(of|a|an|the|with|and|or|security)\s*$/i;
+const TITLE_VERB = /^(built|builds|building|works|working|uses|using|used|launched|ships|shipped|released|added|created|makes|made|lets|can|will)\b/i;
+const BARE_MODEL = /^gpt-\d+$/i;
 const MID_WORD =
   /^(ontrol|elease|pdate|ettings|vailable|olling|espectively|ead|nounced|ntroducing|aunched|hipped)\b/i;
 const OLD_PRODUCT =
@@ -77,6 +83,7 @@ export type PolishOpts = {
   who?: string | null;
   handle?: string | null;
   affiliation?: Affiliation | null;
+  owner?: OwnerContext | null;
   onDrop?: (drop: PolishDrop) => void;
 };
 
@@ -295,7 +302,35 @@ export function cleanShipTitle(raw: unknown, max = TITLE_MAX): string {
   const keepVersion = Boolean(versionParts(text));
   const clamped = wordClamp(text, keepVersion ? Math.max(max, 56) : max);
   if (!clamped || isJunkTitle(clamped) || looksMidWord(clamped) || looksCutOff(clamped) || looksFragment(clamped)) return '';
-  return clamped;
+  return gateShipTitle(String(raw ?? ''), clamped);
+}
+
+/** Product / feature / model noun phrase. Sentence fragments and dangling preps fail. */
+export function isProductNounPhrase(title: string): boolean {
+  const text = tidy(title);
+  if (!text) return false;
+  if (TITLE_START_BAD.test(text) || TITLE_END_BAD.test(text)) return false;
+  if (BARE_MODEL.test(text.replace(/\s+/g, ''))) return false;
+  const words = text.split(/\s+/);
+  if (words.length >= 2 && TITLE_VERB.test(words[1] || '')) return false;
+  return true;
+}
+
+/** Final title gate: rewrite a heading into a noun phrase, or drop the line. */
+export function gateShipTitle(raw: string, cleaned = ''): string {
+  let text = tidy(cleaned || raw);
+  if (!text) return '';
+  text = text.replace(/^(in the|on the|in|on|at the|at)\s+/i, '').trim();
+  const works = text.match(/^(.{4,36}?)\s+works$/i);
+  if (works && works[1].trim().split(/\s+/).length >= 2) text = works[1].trim();
+  text = text.replace(/\s+\b(of|a|an|the|with|and|or|security)\s*$/i, '').trim();
+  if (!text) return '';
+  if (BARE_MODEL.test(text.replace(/\s+/g, ''))) return '';
+  if (/^use\b/i.test(tidy(raw)) || /^use\b/i.test(text)) return '';
+  if (isProductNounPhrase(text)) return text;
+  const phrase = nounPhraseFromSentence(raw);
+  if (phrase && isProductNounPhrase(phrase) && !/^use\b/i.test(tidy(raw))) return phrase;
+  return '';
 }
 
 export function otherYearProduct(name: string, year: number): boolean {
@@ -545,6 +580,45 @@ export function noteCountMismatch(note: string, count: number): boolean {
   return Number(mention[1]) !== count;
 }
 
+const DATE_DONOR = /^(github|npm|x|producthunt|appstore)$/;
+
+function canInheritDate(undated: Polishable, dated: Polishable): boolean {
+  if (!DATE_DONOR.test(dated.source ?? '')) return false;
+  const a = loose(undated.name);
+  const b = loose(dated.name);
+  if (!a || !b) return false;
+  if (a === b) return true;
+  const strip = (value: string) => value.replace(/(cli|app|sdk)$/g, '');
+  if (strip(a) && strip(a) === strip(b)) return true;
+  if (a.length >= 6 && b.length >= 6 && (a.includes(b) || b.includes(a))) return true;
+  return false;
+}
+
+/** Copy a first-party date onto the same undated product so pins can sort with the ship. */
+export function inheritDates<T extends Polishable>(items: T[]): T[] {
+  const dated = items.filter((item) => item.date);
+  return items.map((item) => {
+    if (item.date) return item;
+    const donor = dated.find((other) => canInheritDate(item, other));
+    return donor ? { ...item, date: donor.date, thisYear: true } : item;
+  });
+}
+
+/** Undated lines sort last and may not lead. When anything is dated, crumb undated stay ≤ 25% of the tape (U ≤ D/3). Company/changelog cards without a day stay — they are ships, not leftover links. */
+export function capUndated<T extends Polishable>(items: T[], onDrop?: (drop: PolishDrop) => void): T[] {
+  const dated = items.filter((item) => item.date);
+  const companyUndated = items.filter(
+    (item) => !item.date && (item.source === 'changelog' || item.source === 'company'),
+  );
+  const undated = items.filter((item) => !item.date && item.source !== 'changelog' && item.source !== 'company');
+  if (!dated.length) return items;
+  const maxUndated = Math.floor(dated.length / 3);
+  if (undated.length > maxUndated) {
+    for (const item of undated.slice(maxUndated)) onDrop?.({ name: item.name, reason: 'undated-cap' });
+  }
+  return [...dated, ...companyUndated, ...undated.slice(0, maxUndated)];
+}
+
 export function polishCandidates<T extends Polishable>(items: T[], opts: PolishOpts): T[] {
   const year = opts.year;
   const who = opts.who || opts.affiliation?.name || '';
@@ -578,6 +652,10 @@ export function polishCandidates<T extends Polishable>(items: T[], opts: PolishO
       drop(item, 'junk-title');
       continue;
     }
+    if (opts.owner && !ownedByBuilder({ ...item, name }, opts.owner)) {
+      drop(item, 'not-owned');
+      continue;
+    }
     const date = inYearDate(item.date, year);
     out.push({
       ...item,
@@ -603,10 +681,12 @@ export function polishCandidates<T extends Polishable>(items: T[], opts: PolishO
   const beforePkg = versioned.length;
   const rolled = rollupPlatformPackages(versioned);
   if (rolled.length < beforePkg) drop({ name: `${beforePkg - rolled.length} platform packages` }, 'platform-rollup');
+  const inherited = inheritDates(rolled);
+  const capped = capUndated(inherited, drop);
   if ((shouldLogIndieDrops(who, opts.handle) || shouldLogIndieDrops(opts.who, opts.handle)) && drops.length) {
-    console.log(JSON.stringify({ shipped: 'polish-drops', who, handle: opts.handle || null, kept: rolled.length, drops: drops.slice(0, 80) }));
+    console.log(JSON.stringify({ shipped: 'polish-drops', who, handle: opts.handle || null, kept: capped.length, drops: drops.slice(0, 80) }));
   }
-  return rolled
+  return capped
     .map((item) => ({ ...item, name: versionParts(item.name) ? item.name : wordClamp(item.name, TITLE_MAX) }))
     .sort((a, b) => (a.date ?? '9999').localeCompare(b.date ?? '9999'));
 }

@@ -138,6 +138,35 @@ test('tutorials, case studies, and research writeups are not ships', () => {
   assert.ok(decisions.shouldKeep(repoMark, repo), 'personal github repos stay on the tape');
   const homepage = found({ name: 'Feather', source: 'web', link: 'https://feather.so/', date: null, thisYear: true });
   assert.equal(decisions.isPersonalShipSource(homepage), true);
+  const jack = { name: 'Jack Friks', github: 'jackfriks', x: 'jackfriks', site: 'https://jackfriks.com/', sites: ['https://jackfriks.com/'] };
+  assert.equal(decisions.isPersonalShipSource(found({ name: 'ShipFast', source: 'web', link: 'https://shipfa.st/', description: 'Public page on shipfa.st' }), jack), false);
+  const datafast = found({
+    name: 'DataFast',
+    description: 'Public page on datafa.st',
+    date: null,
+    thisYear: true,
+    link: 'https://datafa.st/',
+    source: 'site',
+  });
+  const datafastMark = decisions.heuristicMark(datafast, 2026, indie, jack);
+  assert.equal(datafastMark.attribution, 'unrelated');
+  assert.equal(decisions.shouldKeep(datafastMark, datafast, jack), false);
+  const lovelee = found({
+    name: 'Lovelee',
+    description: 'Pinned on jackfriks.com',
+    date: null,
+    thisYear: true,
+    link: 'https://jackfriks.com/#lovelee',
+    source: 'site',
+  });
+  assert.equal(decisions.shouldKeep(decisions.heuristicMark(lovelee, 2026, indie, jack), lovelee, jack), true);
+  const repoJack = found({
+    name: 'postbridge-cli',
+    source: 'github',
+    link: 'https://github.com/jackfriks/postbridge-cli',
+    date: '2026-09-09',
+  });
+  assert.equal(decisions.shouldKeep(decisions.heuristicMark(repoJack, 2026, indie, jack), repoJack, jack), true);
   const virgin = decisions.heuristicMark(
     found({ name: 'Virgin Atlantic ships faster with Codex', link: 'https://openai.com/index/virgin', via: 'via OpenAI · Codex' }),
     2026,

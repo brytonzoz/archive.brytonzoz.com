@@ -435,7 +435,8 @@ export function isNotAShipTitle(name: string): boolean {
   if (!text) return true;
   if (/^@[\w.-]+$/.test(text)) return true;
   if (CHOPPED_GATEWAY.test(text) || CUSTOMER_STORY.test(text)) return true;
-  if (/\b(removed|retired|retires|deprecated|sunsetting|sunset|deleted|discontinued)\b/i.test(text)) return true;
+  if (/\b(removed|retired|retires|deprecated|sunsetting|sunset|deleted|discontinued|shut down|shutting down)\b/i.test(text)) return true;
+  if (/^key changes\b|\bwhen migrating\b/i.test(text)) return true;
   if (/\b(docs?|documentation|readme|governance docs)\b/i.test(text) && /\b(update|updated|updates)\b/i.test(text)) return true;
   if (/\bmodels? for model availability\b/i.test(text) || /\bmodel availability update\b/i.test(text)) return true;
   if (/\binto the\b/i.test(text)) return true;

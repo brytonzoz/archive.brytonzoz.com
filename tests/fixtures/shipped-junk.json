@@ -511,6 +511,18 @@
       "date": "2026-10-08",
       "source": "changelog",
       "link": "https://vercel.com/changelog/skip-sending-request-bodies-to-routing-middleware"
+    },
+    {
+      "name": "ASSISTANTS API SHUT DOWN",
+      "date": "2026-08-01",
+      "source": "changelog",
+      "link": "https://openai.com/index/assistants-api"
+    },
+    {
+      "name": "KEY CHANGES TO CONSIDER WHEN MIGRATING:",
+      "date": "2026-08-01",
+      "source": "changelog",
+      "link": "https://openai.com/index/migrate"
     }
   ],
   "keep": [

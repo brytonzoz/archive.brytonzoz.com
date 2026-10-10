@@ -766,6 +766,11 @@ test('undated crumbs need ownership plus a description', async () => {
   assert.ok(names.some((name) => /^zod$/i.test(name)), JSON.stringify(names));
 });
 
+test('OpenAI shutdown and migration leftovers drop', () => {
+  assert.equal(polish.isNotAShipTitle('ASSISTANTS API SHUT DOWN'), true);
+  assert.equal(polish.isNotAShipTitle('KEY CHANGES TO CONSIDER WHEN MIGRATING:'), true);
+});
+
 test('OpenAI index essays drop; named flagships stay', () => {
   assert.equal(polish.isBlogEssayTitle('Customer journeys in the intelligence age'), true);
   assert.equal(polish.isBlogEssayTitle('OpenAI Delivers low-latency Voice AI at Scale Engineering'), true);

@@ -42,7 +42,7 @@ permissions:
   contents: read
 
 concurrency:
-  group: shipped-reprint-${{ github.run_id }}
+  group: shipped-company-cache
   cancel-in-progress: false
 
 jobs:

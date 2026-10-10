@@ -134,15 +134,21 @@ function mergeSeeds(list) {
 async function harvestOne(seed) {
   const slug = slugOf(seed.company);
   console.log(`Harvest ${seed.company} (${slug})…`);
-  const harvested = await harvestCompany({
-    affiliation: affiliationFor(seed),
-    year,
-    env,
-    rebuild: true,
-    extraSites: (seed.sites || []).slice(1),
-    tinyfish,
-    gapFillX: false,
-  });
+  let harvested;
+  try {
+    harvested = await harvestCompany({
+      affiliation: affiliationFor(seed),
+      year,
+      env,
+      rebuild: true,
+      extraSites: (seed.sites || []).slice(1),
+      tinyfish,
+      gapFillX: false,
+    });
+  } catch (error) {
+    console.error(`  ${seed.company}: harvest crashed: ${error?.stack || error}`);
+    throw error;
+  }
   const payload = offworkerPayload({ slug, year, found: harvested.found, ran: harvested.ran });
   if (!payload) {
     console.warn(`  ${seed.company}: 0 usable ships (${harvested.ran.join(', ') || 'no sources'})`);

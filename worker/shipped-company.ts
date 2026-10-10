@@ -959,9 +959,9 @@ export async function harvestCompany(opts: {
       return true;
     };
 
-    const firstSeeds = companySeedUrls(seeds);
+    const firstSeeds = companySeedUrls(seeds, 6);
     const prefixed = firstSeeds[0] ? prefixHosts(firstSeeds[0]) : [];
-    await Promise.all(firstSeeds.map((site) => takePages(site, 'company-site')));
+    await mapLimit(firstSeeds, 3, (site) => takePages(site, 'company-site'));
     await Promise.all([...prefixed, ...discoveredHosts].map((extra) => takePages(extra, 'company-site')));
 
     const feedOrigins = [...new Set([firstSeeds[0], affiliation.companySite, ...liveOrigins].filter(Boolean))] as string[];

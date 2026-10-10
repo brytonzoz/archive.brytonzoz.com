@@ -7,6 +7,7 @@
 // After 1f2b408: tighter title gate (verb/article/cutoff leftovers).
 // After 3f41609: flagship 2026 keep, Graphite 2025 drop, pin dates, GitHub junk.
 // After 48897bb: Graphite never stays on a 2026 tape; YES/T3DOTGG drop on npm too.
+// After 0003ca8: pre-2026 pin evidence also drops same-name leftover npm lines (POST BRIDGE).
 //
 //   ADMIN_PASSWORD=… node scripts/reprint-shipped.mjs [origin]
 const RECEIPT_PATH = (id) => `/r/${id}/`;

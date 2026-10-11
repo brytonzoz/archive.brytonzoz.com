@@ -373,7 +373,8 @@ export async function dateOwnedPins<T extends { name: string; date: string | nul
   const pending: T[] = [];
   const drops: { name: string; reason: string; source: string | null }[] = [];
   for (const item of items) {
-    if (isOwnedPin(item, opts.owner)) pending.push(item);
+    if (String((item as { kind?: string }).kind || '') === 'journal-ship') kept.push(item);
+    else if (isOwnedPin(item, opts.owner)) pending.push(item);
     else kept.push(item);
   }
   const batch = pending.slice(0, 24);

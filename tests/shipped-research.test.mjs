@@ -883,6 +883,16 @@ August 2026
   assert.ok(research.extraResearchPaths('https://levels.io').some((url) => /\/blog$/.test(url)));
   assert.ok(research.extraResearchPaths('https://levels.io').some((url) => /\/rss$/.test(url)));
   assert.match(research.extraResearchPaths('https://levels.io')[0], /\/rss$/);
+  const liveHtml = `<div class="datesep"><a href="/2026/october">October 2026</a></div>
+    <ul><li><time>5 Oct</time><a class="cover-link" href="/booking-site-ratings"></a>
+    <a href="/booking-site-ratings" title="I analyzed booking site ratings">I analyzed booking site ratings</a></li>
+    <li><time>5 Oct</time><a class="cover-link" href="/hotelist-fixes-airbnb-ratings"></a>
+    <a href="/hotelist-fixes-airbnb-ratings" title="I made hotelist.com to fix Airbnb&#039;s 4.5 to 5.0 rating scale">I made hotelist.com</a></li></ul>`;
+  const copied = research.journalCopyFromHtml(liveHtml);
+  assert.match(copied, /October 2026/);
+  assert.match(copied, /hotelist\.com/);
+  const fromHtml = research.itemsFromDatedJournal({ text: copied, url: 'https://levels.io/', year: 2026 });
+  assert.ok(fromHtml.some((item) => /hotelist/i.test(item.name)), fromHtml.map((item) => item.name).join(' | '));
 });
 
 test('Indie Page __NEXT_DATA__ keeps 2026 startups and drops older ones', () => {

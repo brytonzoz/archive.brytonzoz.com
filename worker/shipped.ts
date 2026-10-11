@@ -646,12 +646,16 @@ async function generate(
   try {
     let full: Awaited<ReturnType<typeof gather>> | null = null;
     let first: Awaited<ReturnType<typeof gather>> | null = null;
+    let latest: Awaited<ReturnType<typeof gather>> | null = null;
     const fullP = gather(subject, gatherEnv(env, db, { xaiMeter: d1XaiMeter(db, env) }), year, tinyfishMeter(db), {
       onPartial: (partial) => {
-        if (!first && partial.found.length) first = partial;
+        if (!partial.found.length) return;
+        latest = partial;
+        if (!first) first = partial;
       },
     }).then((gathered) => {
       full = gathered;
+      latest = gathered;
       return gathered;
     });
     const pause = (ms: number) => new Promise((ok) => setTimeout(ok, ms));
@@ -728,7 +732,24 @@ async function generate(
       ctx.waitUntil(
         (async () => {
           try {
+            let lastCount = draft.items.length;
+            const flushGrowing = async () => {
+              const snap = latest;
+              if (!snap || full) return;
+              const next = demoReceipt(snap, year, seed);
+              if (next.items.length <= lastCount) return;
+              lastCount = next.items.length;
+              await persist(snap, next, { growing: true, model: null, usage: { input: 0, output: 0, searches: 0, cost: 0 }, id: inserted.id });
+            };
+            const ticker = (async () => {
+              while (!full) {
+                await pause(1500);
+                await flushGrowing();
+              }
+            })();
             const gathered = await fullP;
+            await ticker;
+            await flushGrowing();
             let model: string | null = null;
             let usage = { input: 0, output: 0, searches: 0, cost: 0 };
             let grown = demoReceipt(gathered, year, seed);

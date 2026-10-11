@@ -930,6 +930,7 @@ function toDraftItem(item: Found, year: number): DraftItem | null {
   const flagship = flagshipLaunchName(item);
   const journal = isJournalShip(item) && looksLikePersonalShip(item.name);
   let name = journal ? cleanShipTitle(journalShipName(item.name) || item.name) : cleanShipTitle(item.name);
+  if (!name && isJournalShip(item)) name = journalShipName(item.name) || item.name;
   if (flagship && (!name || name.split(/\s+/).length <= 1)) name = flagship;
   if (!name || !ok(name) || !publicUrl(item.link)) {
     if (flagship) logFlagshipGate(item, !name ? 'draft-title' : 'draft-link', null);

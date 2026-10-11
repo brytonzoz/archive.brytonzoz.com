@@ -95,6 +95,87 @@ test('empty pins still harvest a profile HTML pin', async () => {
   assert.ok(found.some((item) => /nub/i.test(item.name)), JSON.stringify(found.map((item) => item.name)));
 });
 
+test('handle pins still merge a pinned org repo from profile HTML', async () => {
+  const get = async (path) => {
+    if (path.startsWith('/users/colinhacks/repos')) return [];
+    if (path.startsWith('/users/colinhacks/orgs')) return [{ login: 'colinhacks' }];
+    if (path.startsWith('/users/colinhacks/events')) return [];
+    if (path.startsWith('/orgs/colinhacks/repos')) {
+      return [{ name: 'zod', html_url: 'https://github.com/colinhacks/zod', stargazers_count: 38000, fork: false, pushed_at: '2026-09-01T00:00:00Z' }];
+    }
+    if (path === '/repos/nubjs/nub') {
+      return { name: 'nub', html_url: 'https://github.com/nubjs/nub', stargazers_count: 400, fork: false, pushed_at: '2026-10-06T00:00:00Z' };
+    }
+    if (path.includes('/nubjs/nub/releases')) {
+      return [
+        {
+          tag_name: 'v0.9.6-canary.20261006.547',
+          published_at: '2026-10-06T12:00:00Z',
+          prerelease: true,
+          html_url: 'https://github.com/nubjs/nub/releases/tag/v0.9.6-canary.20261006.547',
+        },
+      ];
+    }
+    return [];
+  };
+  const { found, ran } = await oss.harvestOss({
+    login: 'colinhacks',
+    year: 2026,
+    get,
+    bio: 'Author of Zod.',
+    orgs: ['colinhacks'],
+    pins: [
+      { owner: 'colinhacks', name: 'zod' },
+      { owner: 'colinhacks', name: 'notes' },
+      { owner: 'colinhacks', name: 'foo' },
+      { owner: 'colinhacks', name: 'bar' },
+      { owner: 'colinhacks', name: 'baz' },
+    ],
+    readText: async (url) => {
+      if (!/github\.com\/colinhacks\/?$/i.test(url)) return null;
+      return `<span data-hydro-click='{"event_type":"user_profile.click","payload":{"target":"PINNED_REPO"}}' href="/nubjs/nub" class="Link">nub</span>`;
+    },
+  });
+  assert.ok(ran.some((tag) => /oss-pins-html:nubjs\/nub/i.test(tag)), JSON.stringify(ran));
+  assert.ok(ran.some((tag) => /oss-pin:nubjs\/nub/.test(tag)), JSON.stringify(ran));
+  assert.ok(found.some((item) => /nub/i.test(item.name)), JSON.stringify(found.map((item) => item.name)));
+});
+
+test('founder org harvest skips eslint-plugin repos the subject does not own', async () => {
+  const get = async (path) => {
+    if (path.startsWith('/users/yyx990803/repos')) return [];
+    if (path.startsWith('/users/yyx990803/orgs')) return [{ login: 'vuejs' }];
+    if (path.startsWith('/users/yyx990803/events')) return [];
+    if (path.startsWith('/orgs/vuejs/repos')) {
+      return [
+        { name: 'core', html_url: 'https://github.com/vuejs/core', stargazers_count: 48000, fork: false, pushed_at: '2026-09-01T00:00:00Z' },
+        { name: 'eslint-plugin-vue', html_url: 'https://github.com/vuejs/eslint-plugin-vue', stargazers_count: 4500, fork: false, pushed_at: '2026-09-02T00:00:00Z' },
+      ];
+    }
+    if (path.includes('/vuejs/core/releases')) {
+      return [{ tag_name: 'v3.5.0', name: 'Vue 3.5', published_at: '2026-09-01T12:00:00Z', body: 'Vue 3.5', html_url: 'https://github.com/vuejs/core/releases/tag/v3.5.0' }];
+    }
+    if (path.includes('/vuejs/eslint-plugin-vue/releases')) {
+      return [{ tag_name: 'v10.7.0', name: 'eslint-plugin-vue 10.7', published_at: '2026-04-01T12:00:00Z', body: 'plugin', html_url: 'https://github.com/vuejs/eslint-plugin-vue/releases/tag/v10.7.0' }];
+    }
+    return [];
+  };
+  const { found, ran } = await oss.harvestOss({
+    login: 'yyx990803',
+    year: 2026,
+    get,
+    bio: 'Creator of Vue and Vite.',
+    affiliation: { company: 'VoidZero', role: 'founder', product: 'Vue' },
+    orgs: ['vuejs'],
+  });
+  assert.ok(ran.some((tag) => /oss-skip-plugin:vuejs\/eslint-plugin-vue/i.test(tag)), JSON.stringify(ran));
+  assert.equal(
+    found.some((item) => /eslint-plugin-vue/i.test(item.name)),
+    false,
+    JSON.stringify(found.map((item) => item.name)),
+  );
+});
+
 test('prefixed tags still parse as semver', () => {
   assert.deepEqual(oss.parseSemver('bun-v1.4.0'), { major: 1, minor: 4, patch: 0 });
   assert.deepEqual(oss.parseSemver('svelte@5.20.0'), { major: 5, minor: 20, patch: 0 });

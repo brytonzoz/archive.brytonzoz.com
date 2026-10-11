@@ -36,7 +36,7 @@ export function sourceHarvestKey(source: string, year: number, subject: string):
     .replace(/^@/, '')
     .replace(/[^a-z0-9._-]+/g, '-')
     .slice(0, 80);
-  return `src:${source}:v1:${year}:${who || 'unknown'}`;
+  return `src:${source}:v2:${year}:${who || 'unknown'}`;
 }
 
 export function githubEtagCacheKey(auth: string, path: string): string {

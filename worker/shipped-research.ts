@@ -297,6 +297,37 @@ export function itemsFromDatedJournal(opts: { text: string; url: string; year: n
   return found.slice(0, 80);
 }
 
+/** levels.io markup: `<div>October 2026</div>` then `<time>5 Oct</time> title="I made hotelist.com…"`. */
+export function journalCopyFromHtml(html: string): string {
+  if (!html || html.length < 40) return '';
+  const decodeEntities = (value: string) =>
+    value
+      .replace(/&amp;/g, '&')
+      .replace(/&quot;/g, '"')
+      .replace(/&#0*39;|&apos;/g, "'")
+      .replace(/&lt;/g, '<')
+      .replace(/&gt;/g, '>')
+      .replace(/&#(\d+);/g, (_, code: string) => String.fromCharCode(Number(code)))
+      .replace(/&#x([0-9a-f]+);/gi, (_, code: string) => String.fromCharCode(parseInt(code, 16)));
+  const marks: { at: number; line: string }[] = [];
+  const headingRe = new RegExp(`>(\\s*)(${MONTH_NAME.replace(/\|/g, '|')})\\s+(20\\d\\d)\\s*<`, 'gi');
+  for (const match of html.matchAll(headingRe)) {
+    const month = match[2] || '';
+    if (!/^(January|February|March|April|May|June|July|August|September|October|November|December)$/i.test(month)) continue;
+    marks.push({ at: match.index ?? 0, line: `${month} ${match[3]}` });
+  }
+  const timeRe = new RegExp(
+    `<time[^>]*>\\s*(\\d{1,2})\\s+(${MONTH_NAME})\\s*</time>[\\s\\S]{0,900}?title="([^"]+)"`,
+    'gi',
+  );
+  for (const match of html.matchAll(timeRe)) {
+    marks.push({ at: match.index ?? 0, line: `- ${match[1]} ${match[2]} ${decodeEntities(match[3])}` });
+  }
+  if (!marks.some((row) => row.line.startsWith('- '))) return '';
+  marks.sort((a, b) => a.at - b.at);
+  return marks.map((row) => row.line).join('\n');
+}
+
 const SKIP_PRODUCT_HOST =
   /substack|twitter|x\.com|youtube|amazonaws|googleusercontent|facebook|linkedin|gravatar|github\.com|producthunt|cdn\.|cloudfront/i;
 

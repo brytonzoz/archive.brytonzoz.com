@@ -404,6 +404,11 @@ test('harvest wins when Claude keeps a highlight reel of a fat company tape', ()
   );
   assert.ok(journalRewritten.some((item) => /hotelist/i.test(item.name)), JSON.stringify(journalRewritten));
   assert.ok(journalRewritten.every((item) => item.name.trim().split(/\s+/).length < 8), JSON.stringify(journalRewritten));
+  const hotelistVsList = curate.unionJournalShips(
+    [{ name: 'List', link: 'https://example.com/list', source: 'github' }],
+    [{ name: 'hotelist.com', link: 'https://levels.io/#hotelist-com', source: 'site', kind: 'journal-ship' }],
+  );
+  assert.ok(hotelistVsList.some((item) => /hotelist/i.test(item.name)), JSON.stringify(hotelistVsList));
   const essayRss = [
     { name: 'Luxury hotels are mathematically bad value', kind: 'oss-blog', link: 'https://levels.io/luxury-hotels' },
     { name: "I've been coding almost solely on my VPS", kind: 'oss-blog', link: 'https://levels.io/vps' },

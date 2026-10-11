@@ -783,13 +783,17 @@ export async function harvestOss(opts: {
   };
 
   const pins = [...(opts.pins || [])];
-  if (!pins.length && opts.readText) {
+  if (opts.readText) {
     const html = await memo(`oss:pinhtml:${login.toLowerCase()}`, 360 * 60, () =>
       opts.readText!(`https://github.com/${login}`).catch(() => null),
     );
     if (html) {
-      pins.push(...pinnedReposFromHtml(html));
-      if (pins.length) ran.push(`oss-pins-html:${pins.map((pin) => `${pin.owner}/${pin.name}`).slice(0, 8).join(',')}`);
+      const htmlPins = pinnedReposFromHtml(html);
+      for (const pin of htmlPins) {
+        const key = `${pin.owner}/${pin.name}`.toLowerCase();
+        if (!pins.some((row) => `${row.owner}/${row.name}`.toLowerCase() === key)) pins.push(pin);
+      }
+      if (htmlPins.length) ran.push(`oss-pins-html:${htmlPins.map((pin) => `${pin.owner}/${pin.name}`).slice(0, 8).join(',')}`);
     }
   }
 
@@ -858,7 +862,15 @@ export async function harvestOss(opts: {
   for (const page of orgPages) {
     if (!page) continue;
     if (page.founder || page.mentioned.length) {
-      for (const repo of page.founder ? page.repos.slice(0, 20) : page.mentioned) takeRepo(repo);
+      for (const repo of page.founder ? page.repos.slice(0, 20) : page.mentioned) {
+        const ownRepo = repo.owner.toLowerCase() === login.toLowerCase();
+        const plugin = /^eslint-plugin-/i.test(repo.name);
+        if (page.founder && plugin && !ownRepo && !bioMentionsRepo(opts.bio, repo)) {
+          ran.push(`oss-skip-plugin:${page.org}/${repo.name}`);
+          continue;
+        }
+        takeRepo(repo);
+      }
       ran.push(page.founder ? `oss-founder:${page.org}` : `oss-bio:${page.org}/${page.mentioned.map((row) => row.name).slice(0, 4).join(',')}`);
       continue;
     }
@@ -877,8 +889,7 @@ export async function harvestOss(opts: {
     .filter((pin) => {
       const key = `${pin.owner.toLowerCase()}/${pin.name.toLowerCase()}`;
       return !orgRepos.some((row) => `${row.owner.toLowerCase()}/${row.name.toLowerCase()}` === key);
-    })
-    .slice(0, 4);
+    });
 
   const pinKeys = new Set(pins.map((pin) => `${pin.owner}/${pin.name}`.toLowerCase()));
   const productKeys = [...(opts.products || []), opts.affiliation?.product]
@@ -1020,7 +1031,7 @@ export async function harvestOss(opts: {
 
   const pinName = (pin: { name: string }) => pin.name.toLowerCase().replace(/[^a-z0-9-]/g, '');
   const flagshipPins = leftoverPins.filter((pin) => OSS_FLAGSHIP_REPOS.includes(pinName(pin)));
-  const laterPins = leftoverPins.filter((pin) => !OSS_FLAGSHIP_REPOS.includes(pinName(pin)));
+  const laterPins = leftoverPins.filter((pin) => !OSS_FLAGSHIP_REPOS.includes(pinName(pin))).slice(0, 4);
   // Flagship leftover pins (Nub) before a fat founder tape spends the harvest budget.
   // Personal leftover pins (notes) stay after so Vite / Vitest are not starved.
   await loadPins(flagshipPins);

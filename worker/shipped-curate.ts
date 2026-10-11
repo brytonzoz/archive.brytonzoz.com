@@ -374,8 +374,8 @@ function harvestAlreadyHas<T extends { name?: string; link?: string | null }>(ta
   return tape.some((row) => {
     const rowKey = harvestWinKey(row);
     const rowName = looseName(row.name || '');
-    if (rowKey && (rowKey === key || rowKey.includes(key) || key.includes(rowKey))) return true;
-    return Boolean(rowName && (rowName === key || rowName.includes(key) || (key.length >= 6 && key.includes(rowName))));
+    if (rowKey && (rowKey === key || rowKey.includes(key) || (rowKey.length >= 6 && key.includes(rowKey)))) return true;
+    return Boolean(rowName && (rowName === key || rowName.includes(key) || (rowName.length >= 6 && key.includes(rowName))));
   });
 }
 

@@ -1790,6 +1790,7 @@ export function polishCandidates<T extends Polishable>(items: T[], opts: PolishO
       date: item.date,
     };
     let name = isJournalShip(item) && looksLikePersonalShip(item.name) ? cleanShipTitle(journalShipName(item.name) || item.name) : cleanShipTitle(item.name);
+    if (!name && isJournalShip(item)) name = journalShipName(item.name) || String(item.name || '').trim();
     if (name) name = shortenWordyTitle(name);
     if (name) name = reconcileTitleWithHref(name, item.link);
     if (!name && (item.source === 'changelog' || isChangelogEntryHref(item.link))) {

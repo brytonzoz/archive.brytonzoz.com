@@ -52,6 +52,7 @@ import {
   formatReceiptStats,
   githubContributions,
   itemsFromDatedJournal,
+  journalCopyFromHtml,
   itemsFromEmbeddedPortfolio,
   itemsFromPersonalFeed,
   itemsFromProjectList,
@@ -66,6 +67,7 @@ import {
   cachePut,
   githubEtagCacheKey,
   githubRequestHeaders,
+  harvestItemKey,
   isFreshSourceHarvest,
   preferJournalHarvest,
   preferSourceHarvest,
@@ -1244,7 +1246,8 @@ export async function readSite(siteUrl: string, timeoutMs = TIMEOUT): Promise<Si
   const isXmlFeed = feed || /<(rss|feed)\b/i.test(html.slice(0, 2000));
   const rawText = isXmlFeed && /<item\b|<entry\b/i.test(html) ? html.slice(0, 200_000) : linedText(html, 48_000);
   const dated = isXmlFeed ? '' : (rawText.match(/(?:^|\n).{0,20}20\d\d[-/.]\d{1,2}.{0,80}/g) ?? []).join('\n');
-  const text = `${dated}\n${rawText}`.trim().slice(0, isXmlFeed ? 200_000 : 48_000);
+  const journal = isXmlFeed ? '' : journalCopyFromHtml(html);
+  const text = `${journal}\n${dated}\n${rawText}`.trim().slice(0, isXmlFeed ? 200_000 : 80_000);
   const embedded = nextData || (isXmlFeed ? html.slice(0, 200_000) : '');
   return {
     url: base,
@@ -1871,7 +1874,7 @@ export async function gather(
     gatherFresh(subject, resolved.profile, env, year, meter, tinyfish, resolved.notes, mode, opts?.onPartial, opts?.affiliation);
   if (opts?.rebuild && !opts.onPartial) return load();
   if (opts?.rebuild) return load();
-  const key = mode === 'full' ? `gather:full:v39:${year}:${resolved.cacheKey}` : `gather:v49:${year}:${resolved.cacheKey}`;
+  const key = mode === 'full' ? `gather:full:v40:${year}:${resolved.cacheKey}` : `gather:v50:${year}:${resolved.cacheKey}`;
   return cached(
     key,
     1440 * MIN,
@@ -2201,49 +2204,115 @@ async function gatherFresh(
     harvestOwnProductSites(ownProducts, year, [profile.site, ...sitesOf(profile)]).catch(() => []),
     OSS_TIMEOUT_MS,
   ).then((row) => row.found);
-  const [results, site, extraSites, searched, storeHarvest, githubOverview] = await Promise.all([
-    Promise.allSettled(
-      SOURCES.filter((source) => source.enabled(ctx)).map(async (source) => {
-        const cached = await harvestOrCache(env, sourceHarvestKey(source.id, year, ossSubject), source.run(ctx), SOURCE_TIMEOUT_MS);
-        return { id: source.id, found: cached.found, from: cached.from };
-      }),
-    ),
-    homepage ? raceTimeout(readSite(homepage, HOME_TIMEOUT_MS).catch(() => null), HOME_TIMEOUT_MS, null) : Promise.resolve(null),
-    Promise.all(
-      extraHomes.map((url) => {
-        const feed = /\/(rss|feed)(\.xml)?$/i.test(url);
-        const ms = feed ? HOME_TIMEOUT_MS : SOURCE_TIMEOUT_MS;
-        return raceTimeout(readSite(url, ms).catch(() => null), ms, null);
-      }),
-    ),
-    Promise.all(
-      queries.map((query) =>
-        raceTimeout(
-          tinyfishSearch(query, year, key!, meter!).catch((error) => {
-            failed.push(`tinyfish-search:${(error as Error).message}`);
-            return [];
-          }),
-          SOURCE_TIMEOUT_MS,
-          [],
-        ),
+  applyCompanyHints();
+  profile.affiliation = affiliation;
+  const polishOpts = () => ({
+    year,
+    who,
+    handle: profile.x,
+    affiliation,
+    owner: ownerFromProfile(profile, affiliation),
+  });
+  const viaNow = viaLabel(affiliation, defaultAttribution(affiliation.role, affiliation.typedCompany));
+  const { polishCandidates } = await import('./shipped-polish');
+  const { heuristicVerify } = await import('./shipped-decisions');
+  const found: Found[] = [];
+  const web: WebResult[] = [];
+  let pages: PageInfo[] = [];
+  let site: SiteInfo | null = null;
+  const emitPartial = (items: Found[], tag: string) => {
+    const polished = polishCandidates(items, polishOpts());
+    const verified = heuristicVerify(polished, year, affiliation, viaNow, polishOpts().owner);
+    const snap: Gathered = {
+      found: verified.length ? verified : polished.length ? polished : items,
+      rawFound: items,
+      web: web.slice(0, 12),
+      pages,
+      site,
+      profile,
+      ran: [...ran, tag],
+      failed,
+      stats: mergeStats([verified.flatMap((item) => item.metrics ?? [])]),
+    };
+    if (snap.found.length) onPartial?.(snap);
+    return snap;
+  };
+  let ingestP = Promise.resolve();
+  const ingest = (items: Found[], tag: string) => {
+    ingestP = ingestP.then(() => {
+      if (!items.length) return;
+      found.push(...items);
+      emitPartial(found, tag);
+    });
+    return ingestP;
+  };
+  const homepageP = homepage ? raceTimeout(readSite(homepage, HOME_TIMEOUT_MS).catch(() => null), HOME_TIMEOUT_MS, null) : Promise.resolve(null);
+  const sourceP = Promise.allSettled(
+    SOURCES.filter((source) => source.enabled(ctx)).map(async (source) => {
+      const cached = await harvestOrCache(env, sourceHarvestKey(source.id, year, ossSubject), source.run(ctx), SOURCE_TIMEOUT_MS);
+      await ingest(cached.found, `partial:${source.id}`);
+      return { id: source.id, found: cached.found, from: cached.from };
+    }),
+  );
+  const extraP = Promise.all(
+    extraHomes.map((url) => {
+      const feed = /\/(rss|feed)(\.xml)?$/i.test(url);
+      const ms = feed ? HOME_TIMEOUT_MS : SOURCE_TIMEOUT_MS;
+      return raceTimeout(readSite(url, ms).catch(() => null), ms, null);
+    }),
+  );
+  const searchP = Promise.all(
+    queries.map((query) =>
+      raceTimeout(
+        tinyfishSearch(query, year, key!, meter!).catch((error) => {
+          failed.push(`tinyfish-search:${(error as Error).message}`);
+          return [];
+        }),
+        SOURCE_TIMEOUT_MS,
+        [],
       ),
     ),
+  );
+  site = await homepageP;
+  if (site) {
+    ran.push('site');
+    const text = `${site.title}\n${site.description}\n${site.text}`;
+    await ingest(
+      [
+        ...itemsFromProjectList({ text, url: site.url, year }),
+        ...itemsFromDatedJournal({ text, url: site.url, year }),
+        ...itemsFromPersonalFeed({
+          text: site.embedded && /<item\b|<entry\b/i.test(site.embedded) ? site.embedded : text,
+          url: site.url,
+          year,
+        }),
+        ...itemsFromEmbeddedPortfolio({ html: site.embedded || text, url: site.url, year }),
+      ],
+      'partial:home',
+    );
+  }
+  {
+    const cachedOss = await ossCachedP;
+    if (cachedOss?.found.length) emitPartial([...found, ...cachedOss.found], 'partial:oss-cache');
+  }
+  const [results, extraSites, searched, storeHarvest, githubOverview] = await Promise.all([
+    sourceP,
+    extraP,
+    searchP,
     companyStoreP,
     raceTimeout(githubOverviewP, SOURCE_TIMEOUT_MS, null),
     raceTimeout(identityP, SOURCE_TIMEOUT_MS, undefined).then(() => undefined),
   ]);
-  if (site) ran.push('site');
+  await ingestP;
   if (extraSites.some(Boolean)) ran.push('sites');
   ran.push('research-pass:harvest');
 
-  const web: WebResult[] = [];
   for (const row of searched.flat()) {
     const hit = result(row.title, row.url, row.snippet, row.date);
     if (hit && !web.some((w) => w.url === hit.url)) web.push(hit);
   }
   if (queries.length) ran.push('tinyfish-search');
 
-  let pages: PageInfo[] = [];
   const crawlTargets = [
     homepage,
     ...(homepage ? extraResearchPaths(homepage) : []),
@@ -2255,12 +2324,9 @@ async function gatherFresh(
     .filter((url): url is string => Boolean(url) && !SKIP_PAGES.test(hostOf(url) ?? ''))
     .filter((url, i, all) => all.findIndex((u) => hostOf(u) === hostOf(url) && u.replace(/\/+$/, '') === url.replace(/\/+$/, '')) === i);
 
-  const found: Found[] = [];
   for (const settled of results) {
-    if (settled.status === 'fulfilled') {
-      ran.push(settled.value.id);
-      found.push(...settled.value.found);
-    } else failed.push(settled.reason instanceof SourceError ? settled.reason.code : 'error');
+    if (settled.status === 'fulfilled') ran.push(settled.value.id);
+    else failed.push(settled.reason instanceof SourceError ? settled.reason.code : 'error');
   }
   const mergeSlowHarvest = (ossHarvest: { found: Found[]; ran: string[]; orgs?: string[] }, ownHarvest: Found[]) => {
     if (ossHarvest.orgs?.length) {
@@ -2335,7 +2401,7 @@ async function gatherFresh(
     journalWarm = isFreshSourceHarvest(journalCached) && (journalCached?.found.length ?? 0) > 0;
     const journal = preferJournalHarvest(journalLive, journalCached?.found);
     if (journal.from !== 'live') {
-      const extra = journal.items.filter((item) => !found.some((row) => row.link && item.link && row.link === item.link));
+      const extra = journal.items.filter((item) => !found.some((row) => harvestItemKey(row) === harvestItemKey(item)));
       if (extra.length) {
         found.push(...extra);
         ran.push(`journal-${journal.from}:${extra.length}`);
@@ -2375,36 +2441,8 @@ async function gatherFresh(
 
   applyCompanyHints();
   profile.affiliation = affiliation;
-  const polishOpts = () => ({
-    year,
-    who,
-    handle: profile.x,
-    affiliation,
-    owner: ownerFromProfile(profile, affiliation),
-  });
-  const viaNow = viaLabel(affiliation, defaultAttribution(affiliation.role, affiliation.typedCompany));
-  const { polishCandidates } = await import('./shipped-polish');
-  const { heuristicVerify } = await import('./shipped-decisions');
-  const emitPartial = (items: Found[], tag: string) => {
-    const polished = polishCandidates(items, polishOpts());
-    const verified = heuristicVerify(polished, year, affiliation, viaNow, polishOpts().owner);
-    const snap: Gathered = {
-      found: verified,
-      web: web.slice(0, 12),
-      pages,
-      site,
-      profile,
-      ran: [...ran, tag],
-      failed,
-      stats: mergeStats([pageStats, verified.flatMap((item) => item.metrics ?? [])]),
-    };
-    if (verified.length) onPartial?.(snap);
-    return snap;
-  };
   emitPartial(found, 'partial:first-wave');
   {
-    const cachedOss = await ossCachedP;
-    if (cachedOss?.found.length) emitPartial([...found, ...cachedOss.found], 'partial:oss-cache');
     const [ossHarvest, ownHarvest] = await Promise.all([ossP, ownP]);
     mergeSlowHarvest(ossHarvest, ownHarvest);
     emitPartial(found, 'partial:oss');

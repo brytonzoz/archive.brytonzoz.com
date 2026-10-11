@@ -11,7 +11,7 @@ import { shipName } from './shipped-changelog';
 import { shareKeywords } from './shipped-decisions';
 import { isOssHarvestItem, ownerFromProfile, type OwnerContext } from './shipped-ownership';
 import { flagshipLaunchName, isFlagshipYearKeep, isJoinOrAcquire, isPriorYearJoin, logFlagshipGate } from './shipped-flagship';
-import { cheapHardFilter, cleanDescription, cleanShipTitle, cleanStatus, gateReceiptItems, isChangelogEntryHref, isJournalShip, isOpenAiCompanyWide, noteCountMismatch, rewriteShipTitle, spokenShipName, titleSanityOk } from './shipped-polish';
+import { cheapHardFilter, cleanDescription, cleanShipTitle, cleanStatus, gateReceiptItems, isChangelogEntryHref, isJournalShip, isNpmPackageItem, isOpenAiCompanyWide, noteCountMismatch, orderReceiptItems, printedDescription, rewriteShipTitle, spokenShipName, titleSanityOk } from './shipped-polish';
 import { emptyAffiliation, type Affiliation } from './shipped-affiliation';
 import { looksLikePersonName } from './shipped-repos';
 import { RECEIPT_BUDGET_MICROS, formatReceiptStats, journalShipName, looksLikePersonalShip, searchBudget, type SourcedStat } from './shipped-research';
@@ -948,7 +948,7 @@ function toDraftItem(item: Found, year: number): DraftItem | null {
   if (dated === null && (item.source === 'changelog' || item.source === 'company') && !flagship && !isOssHarvestItem(item)) {
     if (!isChangelogEntryHref(item.link)) return null;
   }
-  const description = cleanDescription(item.description);
+  const description = printedDescription(item);
   const printed = name.toUpperCase();
   return {
     name: printed,
@@ -980,14 +980,16 @@ function toDraftItem(item: Found, year: number): DraftItem | null {
 function boostCeoFlagship(draft: DraftItem | null, affiliation?: Affiliation | null): DraftItem | null {
   if (!draft) return null;
   if (!affiliation || (affiliation.role !== 'ceo' && affiliation.role !== 'founder')) return draft;
-  if (!/openai/i.test(affiliation.company || '')) return draft;
-  if (isOpenAiCompanyWide(draft.name, draft.link)) {
-    return { ...draft, significance: Math.max(draft.significance ?? 0, 80) };
+  if (isNpmPackageItem(draft) && !flagshipLaunchName(draft)) {
+    return { ...draft, significance: Math.min(draft.significance ?? 1, 1), description: '' };
   }
   if (flagshipLaunchName(draft) && !/\bcodex\b/i.test(draft.name)) {
-    return { ...draft, significance: Math.max(draft.significance ?? 0, 70) };
+    return { ...draft, significance: Math.max(draft.significance ?? 0, 80) };
   }
-  if (/\bcodex\b/i.test(draft.name) || /\/codex\b/i.test(draft.link || '')) {
+  if (/openai/i.test(affiliation.company || '') && isOpenAiCompanyWide(draft.name, draft.link)) {
+    return { ...draft, significance: Math.max(draft.significance ?? 0, 80) };
+  }
+  if (/openai/i.test(affiliation.company || '') && (/\bcodex\b/i.test(draft.name) || /\/codex\b/i.test(draft.link || ''))) {
     return { ...draft, significance: Math.min(draft.significance ?? 20, 12) };
   }
   return draft;
@@ -1021,7 +1023,7 @@ export async function hydrateItemDescriptions<T extends { name?: string; descrip
 ): Promise<T[]> {
   const need = items
     .map((item, index) => ({ item, index }))
-    .filter(({ item }) => !cleanDescription(item.description) && item.link)
+    .filter(({ item }) => !cleanDescription(item.description) && item.link && !isNpmPackageItem(item))
     .slice(0, 16);
   if (!need.length) return items;
   const out = items.slice();
@@ -1106,7 +1108,7 @@ export function finish(items: DraftItem[], note: string, seed: number, modulesRa
   if (!gated.length) {
     return { items: [], note: POTENTIAL_NOTES[seed % POTENTIAL_NOTES.length], stats: [], potential: true, layout };
   }
-  const sorted = gated.slice(0, MAX_ITEMS).sort(byDate);
+  const sorted = orderReceiptItems(gated.slice(0, MAX_ITEMS));
   const stats = Array.isArray(statsRaw)
     ? statsRaw
         .filter((line): line is string => typeof line === 'string' && !hasBlockedWord(line) && !/[<>{}`\\]/.test(line))

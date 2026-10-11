@@ -1485,6 +1485,138 @@ function isNotableOssVersion(version: string): boolean {
   return major <= 25 && minor <= 40;
 }
 
+const NAMED_OSS_MAJOR =
+  /^(bun|vite|vue|react|svelte|sveltekit|rolldown|rails|preact|oxc|nitro|tanstack query|code hike|partykit)$/i;
+const PACKAGE_ROLLUP = /·\s*\d+\s+(updates?|releases?)(?:\s+in\s+\w+)?$/i;
+const VERSION_RANGE = /\s+v?\d+(?:\.\d+){1,3}\s*[–-]\s*v?\d+(?:\.\d+){1,3}$/i;
+
+function parseSemver(version: string): [number, number, number] {
+  const parts = version.replace(/^v/i, '').split('.').map((part) => Number(part) || 0);
+  return [parts[0] || 0, parts[1] || 0, parts[2] || 0];
+}
+
+function cmpSemver(a: string, b: string): number {
+  const left = parseSemver(a);
+  const right = parseSemver(b);
+  return left[0] - right[0] || left[1] - right[1] || left[2] - right[2];
+}
+
+/** npm registry rows and npmjs.com package pages — never print their readme blurb. */
+export function isNpmPackageItem(item: { source?: string | null; link?: string | null }): boolean {
+  if ((item.source || '') === 'npm') return true;
+  return /(?:^|\/\/)(?:www\.)?npmjs\.com\b/i.test(item.link || '');
+}
+
+const CEO_NPM_KEEP = /^(next(?:\.?js)?|vercel|swr|ai|ai-sdk|ncc|@ai-sdk\/|@vercel\/)/i;
+
+/** One-word npm utilities (serve, canvas, botid) do not lead a CEO tape. */
+export function isCeoNpmUtility(
+  item: { name?: string; source?: string | null; link?: string | null },
+  affiliation?: Affiliation | null,
+): boolean {
+  const role = affiliation?.role;
+  if (role !== 'ceo' && role !== 'founder') return false;
+  if (!isNpmPackageItem(item)) return false;
+  if (flagshipLaunchName(item)) return false;
+  const raw = tidy(item.name || '');
+  if (!raw || PACKAGE_ROLLUP.test(raw) || VERSION_RANGE.test(raw)) return false;
+  const pkg = raw.replace(/^@/, '').split(/[\s/]+/)[0] || raw;
+  if (CEO_NPM_KEEP.test(raw) || CEO_NPM_KEEP.test(pkg)) return false;
+  const company = loose(affiliation?.company || '');
+  const product = loose(affiliation?.product || '');
+  if (company && (loose(pkg) === company || loose(raw) === company)) return false;
+  if (product && (loose(pkg) === product || loose(raw).includes(product))) return false;
+  return true;
+}
+
+export function printedDescription(item: { description?: string; source?: string | null; link?: string | null }): string {
+  if (isNpmPackageItem(item)) return '';
+  return cleanDescription(item.description);
+}
+
+/** Significance-3 / named flagships print first (top ~5), then the rest by date. */
+export function isHeadlinerItem(item: Polishable): boolean {
+  if (flagshipLaunchName(item)) return true;
+  return (item.significance ?? 0) >= 3;
+}
+
+export function orderReceiptItems<T extends Polishable>(items: T[]): T[] {
+  const ranked = items.slice().sort((a, b) => {
+    const headA = isHeadlinerItem(a);
+    const headB = isHeadlinerItem(b);
+    if (headA !== headB) return headA ? -1 : 1;
+    if (headA && headB) {
+      const sig = (b.significance ?? 0) - (a.significance ?? 0);
+      if (sig) return sig;
+    }
+    return (a.date ?? '9999').localeCompare(b.date ?? '9999');
+  });
+  const head = ranked.filter(isHeadlinerItem).slice(0, 5);
+  const seen = new Set(head);
+  const rest = ranked.filter((item) => !seen.has(item)).sort((a, b) => (a.date ?? '9999').localeCompare(b.date ?? '9999'));
+  return [...head, ...rest];
+}
+
+/**
+ * Year-wide rollup: ≥3 patch/minor lines of one package become one tape line.
+ * Named majors (Vite 7 / Vite 8) and flagships stay separate.
+ */
+export function rollupSamePackageVersions<T extends Polishable>(items: T[]): T[] {
+  const groups = new Map<string, { item: T; product: string; version: string | null; count: number }[]>();
+  const kept: T[] = [];
+  for (const item of items) {
+    if (VERSION_RANGE.test(item.name) || flagshipLaunchName(item)) {
+      kept.push(item);
+      continue;
+    }
+    const rolled = tidy(item.name).match(PACKAGE_ROLLUP);
+    if (rolled) {
+      const product = tidy(item.name).replace(PACKAGE_ROLLUP, '').trim() || item.name;
+      if (NAMED_OSS_MAJOR.test(product) || flagshipLaunchName({ ...item, name: product })) {
+        kept.push(item);
+        continue;
+      }
+      const count = Number(item.name.match(/·\s*(\d+)\s+(?:updates?|releases?)/i)?.[1]) || 1;
+      const key = loose(product);
+      const list = groups.get(key) ?? [];
+      list.push({ item, product, version: null, count });
+      groups.set(key, list);
+      continue;
+    }
+    const parts = versionParts(item.name);
+    if (!parts || NAMED_OSS_MAJOR.test(parts.product)) {
+      kept.push(item);
+      continue;
+    }
+    const key = loose(parts.product);
+    const list = groups.get(key) ?? [];
+    list.push({ item, product: parts.product, version: parts.version, count: versionCount(item) });
+    groups.set(key, list);
+  }
+  for (const list of groups.values()) {
+    const count = list.reduce((sum, row) => sum + row.count, 0);
+    if (count < 3) {
+      kept.push(...list.map((row) => row.item));
+      continue;
+    }
+    const latest = list.slice().sort((a, b) => (b.item.date ?? '').localeCompare(a.item.date ?? ''))[0]!.item;
+    const versions = list
+      .map((row) => row.version?.replace(/^v/i, '') || '')
+      .filter(Boolean)
+      .sort(cmpSemver);
+    const product = list[0]!.product;
+    const majors = new Set(versions.map((version) => version.split('.')[0]));
+    const first = versions[0] || '';
+    const last = versions[versions.length - 1] || first;
+    const name =
+      majors.size === 1 && first && last && first !== last && list.every((row) => row.version)
+        ? `${product} ${first}–${last}`
+        : `${product} · ${count} releases`;
+    kept.push({ ...latest, name, description: '' });
+  }
+  return kept;
+}
+
 function versionFamily(item: Polishable): { product: string; count: number } | null {
   if (isOssHarvestItem(item) || item.kind === 'oss-release' || item.kind === 'oss-launch' || item.kind === 'oss-blog') return null;
   if (/·\s*\d+\s+releases?\s+in\s+/i.test(item.name)) return null;
@@ -1496,12 +1628,7 @@ function versionFamily(item: Polishable): { product: string; count: number } | n
   if (flagshipLaunchName(item)) return null;
   if (/^(grok|claude|gemini)$/i.test(parts.product)) return null;
   if (isNotableOssVersion(parts.version) && !parts.extra) return null;
-  if (
-    /^(bun|vite|vue|react|svelte|sveltekit|rolldown|rails|preact|oxc|nitro|tanstack query|code hike|partykit)\b/i.test(
-      parts.product,
-    ) &&
-    !parts.extra
-  ) {
+  if (NAMED_OSS_MAJOR.test(parts.product) && !parts.extra) {
     return null;
   }
   return { product: parts.product, count: versionCount(item) };
@@ -1758,6 +1885,10 @@ export function polishCandidates<T extends Polishable>(items: T[], opts: PolishO
       drop(item, 'ceo-api-minutiae');
       continue;
     }
+    if (isCeoNpmUtility(item, opts.affiliation)) {
+      drop(item, 'ceo-npm-utility');
+      continue;
+    }
     if (
       !flagship &&
       !isJournalShip(item) &&
@@ -1926,13 +2057,23 @@ export function polishCandidates<T extends Polishable>(items: T[], opts: PolishO
       drop(item, 'undated-unowned');
       continue;
     }
+    const role = opts.affiliation?.role;
+    const ceo = role === 'ceo' || role === 'founder';
+    const npmRow = isNpmPackageItem({ ...item, name });
+    let significance = item.significance;
+    if (ceo && flagship && !/\bcodex\b/i.test(name)) {
+      significance = Math.max(significance ?? 0, 80);
+    } else if (ceo && npmRow && !flagship) {
+      significance = Math.min(significance ?? 1, 1);
+    }
     out.push({
       ...item,
       name,
-      description: cleanDescription(item.description),
+      description: printedDescription({ ...item, name }),
       date,
       via: sourceVia({ ...item, name }, opts.affiliation),
       status: cleanStatus(item.status),
+      significance,
       thisYear: Boolean(item.thisYear) || Boolean(date && (String(date).startsWith(String(year)) || isFlagshipYearKeep(item, year))),
     });
   }
@@ -1945,7 +2086,7 @@ export function polishCandidates<T extends Polishable>(items: T[], opts: PolishO
     }
   }
   const beforeRoll = collapsed.length;
-  const versioned = rollupVersions(collapsed);
+  const versioned = rollupSamePackageVersions(rollupVersions(collapsed));
   if (versioned.length < beforeRoll) drop({ name: `${beforeRoll - versioned.length} version rows` }, 'version-rollup');
   const beforePkg = versioned.length;
   const packaged = rollupPlatformPackages(versioned);
@@ -1966,7 +2107,7 @@ export function polishCandidates<T extends Polishable>(items: T[], opts: PolishO
   const rolled = rollupCeoLeadCrumbs(capped, opts.affiliation);
   if (rolled.length < capped.length) drop({ name: `${capped.length - rolled.length} ceo-lead crumbs` }, 'ceo-rollup');
   const sane = rolled.flatMap((item) => {
-    if (/·\s*\d+\s+(updates?|releases?)\s+in\s+/i.test(item.name)) return [item];
+    if (/·\s*\d+\s+(updates?|releases?)/i.test(item.name) || VERSION_RANGE.test(item.name)) return [item];
     if (isJournalShip(item) && item.name) return [item];
     if (titleSanityOk(item.name)) return [item];
     const short = rewriteShipTitle(item.name, item.link);

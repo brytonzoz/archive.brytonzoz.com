@@ -1378,3 +1378,133 @@ test('print-time polish rewrites 8+ word changelog sentences and drops junk', ()
   assert.ok(names.some((name) => /vercel agent/i.test(name)), JSON.stringify(names));
   assert.ok(names.some((name) => /chat sdk/i.test(name)), JSON.stringify(names));
 });
+
+test('CEO tapes drop tiny npm utilities, strip npm blurbs, and lead with flagships', () => {
+  const affiliation = { name: 'Guillermo Rauch', company: 'Vercel', role: 'ceo', product: null, companyX: null, companyGithub: null, companySite: 'https://vercel.com', typedCompany: true };
+  const kept = polish.polishCandidates(
+    [
+      found({
+        name: 'serve',
+        description: 'Static file serving and directory listing',
+        date: '2026-01-08',
+        source: 'npm',
+        link: 'https://www.npmjs.com/package/serve',
+        significance: 4,
+      }),
+      found({
+        name: 'botid',
+        description: 'BotID invisible CAPTCHA for bots',
+        date: '2026-02-01',
+        source: 'npm',
+        link: 'https://www.npmjs.com/package/botid',
+        significance: 4,
+      }),
+      found({
+        name: 'canvas',
+        description: 'Canvas implementation for Node.js',
+        date: '2026-03-01',
+        source: 'npm',
+        link: 'https://www.npmjs.com/package/canvas',
+        significance: 4,
+      }),
+      found({
+        name: 'AI Gateway',
+        date: '2026-08-12',
+        source: 'changelog',
+        link: 'https://vercel.com/changelog/ai-gateway',
+        significance: 2,
+      }),
+      found({
+        name: 'Vercel Agent',
+        date: '2026-09-30',
+        source: 'changelog',
+        link: 'https://vercel.com/changelog/vercel-agent',
+        significance: 2,
+      }),
+      found({
+        name: 'v0',
+        date: '2026-04-02',
+        source: 'changelog',
+        link: 'https://vercel.com/changelog/introducing-the-new-v0',
+        significance: 2,
+      }),
+    ],
+    { year: 2026, who: 'Guillermo Rauch', handle: 'rauchg', affiliation },
+  );
+  const names = kept.map((item) => item.name);
+  assert.equal(names.some((name) => /^(serve|botid|canvas)$/i.test(name)), false, JSON.stringify(names));
+  assert.ok(names.some((name) => /ai gateway/i.test(name)), JSON.stringify(names));
+  assert.ok(names.some((name) => /vercel agent/i.test(name)), JSON.stringify(names));
+  assert.ok(names.some((name) => /^v0$/i.test(name)), JSON.stringify(names));
+  assert.equal(
+    kept.some((item) => /static file serving|invisible captcha|implementation for node/i.test(item.description || '')),
+    false,
+    JSON.stringify(kept.map((item) => item.description)),
+  );
+  assert.equal(polish.printedDescription({ source: 'npm', description: 'Static file serving and directory listing' }), '');
+  assert.equal(polish.isCeoNpmUtility({ name: 'serve', source: 'npm', link: 'https://www.npmjs.com/package/serve' }, affiliation), true);
+  const ordered = polish.orderReceiptItems(kept);
+  assert.match(ordered[0].name, /ai gateway|vercel agent|^v0$/i);
+  const draft = ai.finish(
+    kept.map((item) => ({
+      name: item.name.toUpperCase(),
+      spoken: item.name,
+      description: item.description || '',
+      date: item.date,
+      status: 'LAUNCHED',
+      link: item.link,
+      icon: null,
+      source: item.source,
+      significance: item.significance,
+    })),
+    'Vercel Agent is the one that belongs on this tape.',
+    1,
+    undefined,
+    [],
+    { who: 'Guillermo Rauch', handle: 'rauchg', year: 2026, affiliation, company: 'Vercel', role: 'ceo' },
+  );
+  assert.equal(draft.items.some((item) => /^(SERVE|BOTID|CANVAS)$/i.test(item.name)), false, JSON.stringify(draft.items.map((item) => item.name)));
+  assert.match(draft.items[0].name, /AI GATEWAY|VERCEL AGENT|^V0$/i);
+});
+
+test('patch and minor lines of one package roll into a single tape line', () => {
+  const rolled = polish.rollupSamePackageVersions([
+    found({ name: 'TRPC 10.45.4', date: '2026-01-12', source: 'npm', link: 'https://www.npmjs.com/package/@trpc/server' }),
+    found({ name: 'TRPC 11.9', date: '2026-06-01', source: 'npm', link: 'https://www.npmjs.com/package/@trpc/server' }),
+    found({ name: 'TRPC 11.10', date: '2026-07-01', source: 'npm', link: 'https://www.npmjs.com/package/@trpc/server' }),
+    found({ name: 'TRPC 11.11', date: '2026-08-01', source: 'npm', link: 'https://www.npmjs.com/package/@trpc/server' }),
+    found({ name: 'TRPC 11.12', date: '2026-09-01', source: 'npm', link: 'https://www.npmjs.com/package/@trpc/server' }),
+  ]);
+  assert.equal(rolled.length, 1, JSON.stringify(rolled.map((item) => item.name)));
+  assert.match(rolled[0].name, /trpc · 5 releases/i);
+  const range = polish.rollupSamePackageVersions([
+    found({ name: 'TRPC 11.9', date: '2026-06-01' }),
+    found({ name: 'TRPC 11.10', date: '2026-07-01' }),
+    found({ name: 'TRPC 11.11', date: '2026-08-01' }),
+    found({ name: 'TRPC 11.12', date: '2026-09-01' }),
+  ]);
+  assert.equal(range.length, 1);
+  assert.match(range[0].name, /trpc 11\.9–11\.12/i);
+  const vite = polish.rollupSamePackageVersions([
+    found({ name: 'Vite 7', date: '2026-01-01' }),
+    found({ name: 'Vite 8', date: '2026-06-01' }),
+    found({ name: 'Zod 4.1', date: '2026-03-01' }),
+  ]);
+  assert.deepEqual(
+    vite.map((item) => item.name).sort(),
+    ['Vite 7', 'Vite 8', 'Zod 4.1'].sort(),
+  );
+  const printed = polish.polishCandidates(
+    [
+      found({ name: 'tRPC 10.45.4', date: '2026-01-12', source: 'github', link: 'https://github.com/trpc/trpc/releases/tag/v10.45.4', kind: 'oss-release' }),
+      found({ name: 'tRPC 11.9', date: '2026-06-01', source: 'github', link: 'https://github.com/trpc/trpc/releases/tag/v11.9.0', kind: 'oss-release' }),
+      found({ name: 'tRPC 11.10', date: '2026-07-01', source: 'github', link: 'https://github.com/trpc/trpc/releases/tag/v11.10.0', kind: 'oss-release' }),
+      found({ name: 'tRPC 11.11', date: '2026-08-01', source: 'github', link: 'https://github.com/trpc/trpc/releases/tag/v11.11.0', kind: 'oss-release' }),
+      found({ name: 'tRPC 11.12', date: '2026-09-01', source: 'github', link: 'https://github.com/trpc/trpc/releases/tag/v11.12.0', kind: 'oss-release' }),
+      found({ name: 'TRPC · 3 RELEASES IN MAR', date: '2026-03-20', source: 'github', link: 'https://github.com/trpc/trpc/releases', kind: 'oss-release' }),
+    ],
+    { year: 2026, who: 'colinhacks', handle: 'colinhacks' },
+  );
+  assert.equal(printed.length, 1, JSON.stringify(printed.map((item) => item.name)));
+  assert.match(printed[0].name, /trpc · 8 releases/i);
+});

@@ -1586,6 +1586,16 @@ export async function assembleReceipt(
     const draft = finish(tape, note, seed, undefined, stats, { ...noteCtx, apiDown });
     const cost = spent();
     console.log(JSON.stringify({ shipped: 'ai', model, mode: 'note-only', items: tape.length, inputTokens: usage.input, outputTokens: usage.output, costMicros: cost }));
+    if (!apiDown) {
+      console.log(
+        JSON.stringify({
+          shipped: 'note-writer',
+          who: gathered.profile.name || subject.display,
+          fallback: !note || isBareProductNote(draft.note, tape) || isEmptyTapeNote(draft.note),
+          note: draft.note,
+        }),
+      );
+    }
     return { ...draft, model, inputTokens: usage.input, outputTokens: usage.output, searches: 0, costMicros: cost, noteCandidates };
   }
 

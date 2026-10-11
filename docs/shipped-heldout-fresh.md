@@ -23,3 +23,5 @@ None of these queries appear in `docs/shipped-eval-builders.md`, the original he
 | 15 | `pomber` | OSS |
 
 Pass bar (every receipt): zero third-party products, zero cut titles, zero junk-fixture hits, a non-fallback note, and ≥3 real items when `knownLaunches` is true.
+
+Major OSS maintainers must get ≥10 lines from the GitHub OSS harvest (owned repos + founder/top-3 org repos → 2026 releases/tags, blog RSS, new ≥100-star repos). Evan You and Jarred Sumner must get ≥15. CI uses cached GitHub-shaped releases in `tests/fixtures/shipped-heldout/oss.json`; live prints hit the GitHub API with `SHIPPED_GITHUB_TOKEN`. Held-out notes in CI use the sentence fallback (no Claude); live prints call the cashier writer.

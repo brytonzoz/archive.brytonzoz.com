@@ -395,6 +395,20 @@ test('same_ship pairs share keywords; weaker duplicate is dropped', async () => 
     ),
     false,
   );
+  assert.equal(
+    decisions.shareKeywords(
+      found({ name: 'Bun 1.2', date: '2026-01-08', link: 'https://github.com/oven-sh/bun/releases/tag/v1.2.0' }),
+      found({ name: 'Bun 1.3', date: '2026-04-02', link: 'https://github.com/oven-sh/bun/releases/tag/v1.3.0' }),
+    ),
+    false,
+  );
+  assert.equal(
+    decisions.shareKeywords(
+      found({ name: 'htm', date: '2026-01-30', link: 'https://github.com/developit/htm' }),
+      found({ name: 'htm 4', date: '2026-01-30', link: 'https://github.com/developit/htm/releases/tag/v4.0.0' }),
+    ),
+    false,
+  );
   const typed = affiliation.parseAffiliationQuery('Tibo from OpenAI');
   const typedMark = decisions.heuristicMark(
     found({ name: 'Codex app 26.608', date: '2026-06-09', source: 'changelog', via: 'via OpenAI', link: 'https://learn.chatgpt.com/docs/changelog' }),

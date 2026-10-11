@@ -2429,7 +2429,12 @@ async function printFreshSubject(env: ShippedEnv, db: D1Database, raw: string): 
     if (!state.demo) await recordSpend(db, true, usage.input, usage.output, usage.searches);
     await dropShareImages(env, inserted.id).catch(() => undefined);
     await dropListedCache(env, inserted.id);
-    return json({ ok: true, id: inserted.id });
+    return json({
+      ok: true,
+      id: inserted.id,
+      note: draft.note,
+      noteCandidates: 'noteCandidates' in draft ? draft.noteCandidates ?? [] : [],
+    });
   } catch (error) {
     if (error instanceof PrintError) return json({ error: error.code }, error.status);
     console.error('shipped: print-subject failed', error instanceof Error ? error.message : 'unknown');

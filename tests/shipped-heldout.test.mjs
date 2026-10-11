@@ -5,6 +5,7 @@ import { test } from 'node:test';
 import { evaluateGolden, junkKeys } from './lib/shipped-goldens.mjs';
 
 const held = JSON.parse(readFileSync(new URL('./fixtures/shipped-heldout/builders.json', import.meta.url), 'utf8'));
+const ossHeld = JSON.parse(readFileSync(new URL('./fixtures/shipped-heldout/oss.json', import.meta.url), 'utf8'));
 const evalList = readFileSync(new URL('../docs/shipped-eval-builders.md', import.meta.url), 'utf8');
 const oldHeld = readFileSync(new URL('../docs/shipped-heldout-builders.md', import.meta.url), 'utf8');
 const identitySrc = readFileSync(new URL('../worker/shipped-identity.ts', import.meta.url), 'utf8');
@@ -13,6 +14,7 @@ const ai = await import('../worker/shipped-ai.ts');
 const polish = await import('../worker/shipped-polish.ts');
 const year = await import('../lib/shipped-year.ts');
 const modules = await import('../lib/shipped-modules.ts');
+const oss = await import('../worker/shipped-oss.ts');
 
 const THIRD_PARTY = /^(canva|stripe|amazon|wordpress|capterra|optimizely)$/i;
 const EXCLUDED = new Set((held.excluded || []).map((q) => q.toLowerCase()));
@@ -120,9 +122,35 @@ const JUNK_FETCH = [
     significance: 0,
     thisYear: true,
   },
+  {
+    name: 'SPEED INSIGHTS NOW HAS',
+    date: '2026-04-11',
+    link: 'https://vercel.com/changelog/speed-insights-now-has',
+    source: 'changelog',
+    status: 'LAUNCHED',
+    thisYear: true,
+  },
+  {
+    name: 'NOKIA ANALYZES 50M+ NETWORK EVENTS WITH CURSOR',
+    date: '2026-06-02',
+    link: 'https://cursor.com/blog/nokia',
+    source: 'changelog',
+    status: 'LAUNCHED',
+    thisYear: true,
+  },
+  {
+    name: 'TEAMS &',
+    date: '2026-06-04',
+    link: 'https://cursor.com/blog/teams',
+    source: 'changelog',
+    status: 'LAUNCHED',
+    thisYear: true,
+  },
 ];
 
 function ownerOf(builder) {
+  const spec = ossHeld.repos[builder.query];
+  const orgs = [...new Set((spec?.repos || []).map((repo) => repo.owner).filter((org) => org && org.toLowerCase() !== String(builder.github || '').toLowerCase()))];
   return {
     name: builder.who,
     github: builder.github,
@@ -130,6 +158,7 @@ function ownerOf(builder) {
     site: builder.site,
     company: builder.company,
     companyGithub: builder.companyGithub,
+    orgs,
   };
 }
 
@@ -141,8 +170,10 @@ function printBuilder(builder) {
     companyGithub: builder.companyGithub,
     role: builder.role || 'unknown',
   };
+  const spec = ossHeld.repos[builder.query];
+  const ossLines = (spec?.repos || []).flatMap((repo) => oss.expandOssFixture(repo, held.year, builder.company ? 'company' : 'github'));
   const gathered = {
-    found: [...(builder.found || []), ...JUNK_FETCH],
+    found: [...(builder.found || []), ...ossLines, ...JUNK_FETCH],
     web: [],
     pages: [],
     site: builder.site || null,
@@ -152,6 +183,7 @@ function printBuilder(builder) {
       site: builder.site,
       x: builder.handle,
       github: builder.github,
+      orgs: owner.orgs,
       affiliation,
     },
     ran: ['heldout-cache'],
@@ -216,7 +248,7 @@ test('free pipeline on cached held-out fetches: no third-party, no cuts, no junk
     const spec = {
       who: builder.who,
       handle: builder.handle,
-      min: builder.knownLaunches ? 3 : 0,
+      min: ossHeld.repos[builder.query]?.min || (builder.knownLaunches ? 3 : 0),
       required: builder.required || [],
       forbidden: [],
       profile: { affiliation: { company: builder.company } },
@@ -255,6 +287,26 @@ test('free pipeline on cached held-out fetches: no third-party, no cuts, no junk
     report.push(row);
     if (!row.ok) failures.push(`${builder.query}: ${row.failures.join('; ')}`);
   }
-  console.log(JSON.stringify({ heldOut: report.map((row) => ({ query: row.query, count: row.count, score: row.score, note: row.note, names: row.names, ok: row.ok })) }, null, 2));
-  assert.deepEqual(failures, [], JSON.stringify({ failures, report }, null, 2));
+  const extras = [];
+  for (const builder of ossHeld.extra || []) {
+    const { draft, printed } = printBuilder(builder);
+    extras.push({
+      query: builder.query,
+      count: printed.length,
+      names: printed.map((item) => item.name),
+      note: draft.note,
+      ok: printed.length >= (ossHeld.repos[builder.query]?.min || 15),
+    });
+    if (printed.length < (ossHeld.repos[builder.query]?.min || 15)) {
+      failures.push(`${builder.query}: count ${printed.length} < ${ossHeld.repos[builder.query]?.min || 15}`);
+    }
+  }
+  const summary = [...report, ...extras].map((row) => ({
+    query: row.query,
+    count: row.count,
+    samples: (row.names || []).slice(0, 5),
+    ok: row.ok,
+  }));
+  console.log(JSON.stringify({ heldOut: summary }, null, 2));
+  assert.deepEqual(failures, [], JSON.stringify({ failures, report, extras }, null, 2));
 });

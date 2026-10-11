@@ -38,11 +38,11 @@ const PLATFORM_POLICY =
   /\b(deployment retention|default to \d+[-\s]?day|retain(?:s|ed|ing)? (fewer )?deployments|skip sending|request bodies|routing middleware|billing begins|spend management|per-user budgets|hobby projects now retain|edge requests are now called|no longer caches|timestamp attributes are now supported)\b/i;
 const CHOPPED_GATEWAY = /^microsoft decision[- ]?1$/i;
 const TRAILING_PREP =
-  /\b(of|in|to|for|and|or|the|a|an|with|on|as|by|from|into|longer|kind|new|our|your|through|their|its|vs|lower|higher|more|less|day|days|every|managed|security|controlled|trusted|general|advanced|remote|task|chat|now|key|third|are|image|usage|delay|preview|zero)$/i;
+  /\b(of|in|to|for|and|or|the|a|an|with|on|as|by|from|into|longer|kind|new|our|your|through|their|its|vs|lower|higher|more|less|day|days|every|managed|security|controlled|trusted|general|advanced|remote|task|chat|now|key|third|are|image|usage|delay|preview|zero|has|accepts|service)$/i;
 export const CUT_OFF_ENDINGS =
-  /^(now|and|with|for|of|the|on|key|third|are|image|usage|delay|preview|zero)$/i;
+  /^(now|and|with|for|of|the|on|key|third|are|image|usage|delay|preview|zero|has|accepts|service)$/i;
 const TITLE_START_BAD =
-  /^(in|on|at|for|with|from|to|of|by|as|a|an|the|and|or|use|using|start|starting|lines|line|built|build|building|run|running|join|joining|announce|announces|announcing|added|add|fixed|fix|connect|review|share|more|ways|preview|control|give|let|take|work|choose|scan|create|organize|talk|try|visit|explore|download|get|see|read|learn|follow|watch|make|making|how|when|while|after|before|without|inside|beyond|under|over|my|our|your|quitting)\b/i;
+  /^(in|on|at|for|with|from|to|of|by|as|a|an|the|and|or|so|both|use|using|start|starting|lines|line|built|build|building|run|running|join|joining|announce|announces|announcing|added|add|fixed|fix|connect|review|share|more|ways|preview|control|give|let|take|work|choose|scan|create|organize|talk|try|visit|explore|download|get|see|read|learn|follow|watch|make|making|how|when|while|after|before|without|inside|beyond|under|over|my|our|your|quitting)\b/i;
 const TITLE_END_BAD = /\b(of|a|an|the|with|and|or|security|controlled|trusted|general|advanced|remote|task|chat)\s*$/i;
 const TITLE_VERB =
   /^(announces|announce|announced|connects|connect|built|builds|building|works|working|uses|using|used|launched|ships|shipped|released|added|adds|created|makes|made|lets|can|will|is|are|was|were|gives|reaches|joins|keeps|combines|deprecated)$/i;
@@ -100,6 +100,7 @@ export type Polishable = {
   thisYear?: boolean;
   score?: number;
   significance?: number;
+  kind?: string;
 };
 
 export type PolishOpts = {
@@ -191,7 +192,7 @@ export function isShipListHref(url: string | null | undefined): boolean {
 export function looksMidWord(text: string): boolean {
   const first = (text.trim().split(/\s+/)[0] || '');
   if (MID_WORD.test(first) || FRAGMENT_START.test(first)) return true;
-  if (/^(is|are|was|were|can|will|to)\s+/i.test(text.trim())) return true;
+  if (/^(is|are|was|were|can|will|to|so|both)\s+/i.test(text.trim())) return true;
   return false;
 }
 
@@ -214,7 +215,7 @@ export function endsWithCutOffWord(text: string): boolean {
   const words = tidy(text).split(/\s+/).filter(Boolean);
   const last = words[words.length - 1] || '';
   if (/^[A-Za-z]$/.test(last) && words.length >= 2) return true;
-  if (/^(now|and|with|for|of|the|on|key|third|are|zero)$/i.test(last) && words.length >= 2) return true;
+  if (/^(now|and|with|for|of|the|on|key|third|are|zero|has|accepts)$/i.test(last) && words.length >= 2) return true;
   if (/^(image|usage|delay|preview)$/i.test(last) && words.length >= 4) return true;
   if (words.length >= 5 && /^[A-Za-z]{3,4}$/.test(last) && !KEEP_TAIL_ACRONYM.test(last) && !/\d/.test(last)) {
     return true;
@@ -234,7 +235,8 @@ export function endsWithCutOffWord(text: string): boolean {
 
 export function looksCutOff(text: string): boolean {
   const trimmed = text.trim();
-  if (/[,;·|]\s*$/.test(trimmed)) return true;
+  if (/[,;·|&]\s*$/.test(trimmed)) return true;
+  if (/\bnow\s+(has|accepts)(\s+\w+){0,2}$/i.test(trimmed) && trimmed.split(/\s+/).length >= 3) return true;
   if (/[A-Za-z0-9]-$/.test(trimmed)) return true;
   if (/\([^)]*$/.test(trimmed)) return true;
   if (TRAILING_PREP.test(trimmed) && trimmed.split(/\s+/).length >= 3) return true;
@@ -297,7 +299,29 @@ export function isDocsOrReferenceTitle(title: string): boolean {
   return false;
 }
 
+/** The bio company/product itself is not a 2026 ship unless it has a day in this year. */
+export function isStaleBioProduct(
+  item: { name?: string; date?: string | null },
+  affiliation?: Affiliation | null,
+  year?: number,
+): boolean {
+  if (!affiliation || !year) return false;
+  const name = loose(item.name || '');
+  if (!name) return false;
+  const company = loose(affiliation.company || '');
+  const product = loose(affiliation.product || '');
+  if ((company && name === company) || (product && name === product)) {
+    const date = item.date ? String(item.date) : '';
+    if (date && date.startsWith(String(year))) return false;
+    return true;
+  }
+  return false;
+}
+
 /** A customer used the product — not the company's own ship. */
+const COMPANY_METRIC =
+  /^[A-Z][A-Za-z0-9.&'’-]+(?:\s+[A-Z][A-Za-z0-9.&'’-]+){0,2}\s+(analyzes?|processes?|handles?|serves?|ships?|scales?|cuts?|boosts?|saves?|runs?)\b.+\b(\d[\d,.]*\s*[MKB%+]|million|billion|\d{2,}m\+)/i;
+
 export function isCustomerStoryTitle(title: string): boolean {
   const text = tidy(title);
   if (!text) return false;
@@ -308,6 +332,7 @@ export function isCustomerStoryTitle(title: string): boolean {
     return true;
   }
   if (/\bbig bet\b/i.test(text)) return true;
+  if (COMPANY_METRIC.test(text)) return true;
   return false;
 }
 
@@ -332,6 +357,8 @@ export function isBlogEssayTitle(title: string): boolean {
   if (/\bships agent-written code\b|\bbug bounty program\b/i.test(text)) return true;
   if (/\b(helping (older adults|small businesses)|supporting the blind|big air tour|expand(?:s|ing) (access|their partnership)|academy with)\b/i.test(text)) return true;
   if (/^(towards|disrupting|advancing|acceleration|daybreak|eternal|path to|publication|overview)\b/i.test(text)) return true;
+  if (/^[A-Za-z][\w.-]*\s+is an?\s+(applied research|engineering|product|research) team\b/i.test(text)) return true;
+  if (/^both are available\b|^available today on\b/i.test(text)) return true;
   if (/^(latest|top|best)\s+(articles?|posts?|stories|news)\b/i.test(text)) return true;
   if (/\barticles? about\b/i.test(text)) return true;
   if (/^openai delivers\b/i.test(text) || /\b(at scale|in production)\s+engineering\b/i.test(text)) return true;
@@ -486,9 +513,10 @@ export function isPricingOrMetricNote(name: string): boolean {
 export function isPrereleaseShip(name: string): boolean {
   const text = tidy(name);
   if (!text) return false;
-  if (/\bv?\d+\.\d+[\w.-]*-(canary|alpha|beta|rc)(?:\.|$)/i.test(text)) return true;
-  if (/\b(canary|alpha|rc)\.\d+\b/i.test(text)) return true;
-  if (/\b(canary|alpha|beta|rc)\s+\d/i.test(text) && /\bv?\d+\.\d+/i.test(text)) return true;
+  if (/\bv?\d+\.\d+[\w.-]*-(canary|alpha|beta|rc|nightly)(?:\.|$)/i.test(text)) return true;
+  if (/\b(canary|alpha|rc|nightly)\.\d+\b/i.test(text)) return true;
+  if (/\b(canary|alpha|beta|rc|nightly)\s+\d/i.test(text) && /\bv?\d+\.\d+/i.test(text)) return true;
+  if (/\bnightly\b/i.test(text) && !/\bnow in\b/i.test(text)) return true;
   return false;
 }
 
@@ -520,10 +548,18 @@ export function isGatewayModelListing(name: string, link?: string | null, descri
 }
 
 /** Company-org GitHub repo roots that never earned a homepage / launch post. */
-export function isUnnotableCompanyRepo(item: { name?: string; link?: string | null; source?: string | null; description?: string }): boolean {
+export function isUnnotableCompanyRepo(item: {
+  name?: string;
+  link?: string | null;
+  source?: string | null;
+  description?: string;
+  kind?: string;
+}): boolean {
+  if (/^(oss-release|oss-launch|oss-blog)$/.test(item.kind || '')) return false;
   const source = item.source || '';
   if (source !== 'company') return false;
   const link = item.link || '';
+  if (/\/releases\/tag\//i.test(link)) return false;
   if (!/^https?:\/\/github\.com\/[^/]+\/[^/#?]+\/?$/i.test(link)) return false;
   if (/\/(changelog|blog)\//i.test(link)) return false;
   return true;
@@ -574,7 +610,7 @@ export function isNotAShipTitle(name: string): boolean {
   if (/\bupdates\s*:/i.test(text)) return true;
   if (/\bslugs?\b/i.test(text) && /\b(point|alias|latest|chat-latest)\b/i.test(text)) return true;
   if (/\balias(es)?\b/i.test(text) && /\b(point|slug|latest)\b/i.test(text)) return true;
-  if (/·\s*\d+\s+updates?\s+in\s+/i.test(text)) return false;
+  if (/·\s*\d+\s+(updates?|releases?)\s+in\s+/i.test(text)) return false;
   if (/^(?:[A-Za-z][\w.+-]*\s+and\s+)?.+\s+updates$/i.test(text)) return true;
   return false;
 }
@@ -1178,9 +1214,22 @@ export function rollupPlatformPackages<T extends Polishable>(items: T[]): T[] {
   return kept;
 }
 
-const MONTH_LINE = /^(.+?)\s*·\s*(\d+)\s+updates?\s+in\s+(Jan|Feb|Mar|Apr|May|Jun|Jul|Aug|Sep|Oct|Nov|Dec)\s*$/i;
+const MONTH_LINE = /^(.+?)\s*·\s*(\d+)\s+(?:updates?|releases?)\s+in\s+(Jan|Feb|Mar|Apr|May|Jun|Jul|Aug|Sep|Oct|Nov|Dec)\s*$/i;
+
+function isNotableOssVersion(version: string): boolean {
+  const ver = version.replace(/^v/i, '');
+  if (/^\d{4}\.\d/.test(ver)) return false;
+  if (/^\d+$/.test(ver)) return true;
+  const pair = ver.match(/^(\d+)\.(\d+)$/);
+  if (!pair) return false;
+  const major = Number(pair[1]);
+  const minor = Number(pair[2]);
+  return major <= 25 && minor <= 40;
+}
 
 function versionFamily(item: Polishable): { product: string; count: number } | null {
+  if (item.kind === 'oss-release' || item.kind === 'oss-launch' || item.kind === 'oss-blog') return null;
+  if (/·\s*\d+\s+releases?\s+in\s+/i.test(item.name)) return null;
   if (isCursorModelNote(item) || /^(grok|claude|gemini)[-.\s]?\d/i.test(item.name)) return null;
   const rolled = tidy(item.name).match(MONTH_LINE);
   if (rolled) return { product: rolled[1].trim(), count: Number(rolled[2]) || 1 };
@@ -1188,6 +1237,7 @@ function versionFamily(item: Polishable): { product: string; count: number } | n
   if (!parts) return null;
   if (flagshipLaunchName(item)) return null;
   if (/^(grok|claude|gemini)$/i.test(parts.product)) return null;
+  if (isNotableOssVersion(parts.version) && !parts.extra) return null;
   return { product: parts.product, count: versionCount(item) };
 }
 
@@ -1470,6 +1520,8 @@ export function polishCandidates<T extends Polishable>(items: T[], opts: PolishO
         fallback.split(/\s+/).length >= 3 &&
         !looksCutOff(fallback) &&
         !looksMidWord(fallback) &&
+        !looksFragment(fallback) &&
+        !TITLE_START_BAD.test(fallback) &&
         !isPrereleaseShip(fallback) &&
         !isNeverShipKind(fallback) &&
         !isDocsOrReferenceTitle(fallback) &&
@@ -1501,6 +1553,10 @@ export function polishCandidates<T extends Polishable>(items: T[], opts: PolishO
     }
     if (isForeignProductOnCompanyTape(name, opts.affiliation?.company || junkOpts.company)) {
       drop(item, 'foreign-vendor');
+      continue;
+    }
+    if (isStaleBioProduct({ name, date: item.date }, opts.affiliation, year)) {
+      drop(item, 'stale-bio-product');
       continue;
     }
     if (isJunkProductName(name, opts.handle || opts.owner?.github, who)) {

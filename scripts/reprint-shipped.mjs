@@ -176,7 +176,14 @@ async function printSubject(q) {
   } catch {
     body = { error: text.slice(0, 160) };
   }
-  return { ok: res.ok && body.ok === true, status: res.status, error: body.error || null, id: Number(body.id) || 0 };
+  return {
+    ok: res.ok && body.ok === true,
+    status: res.status,
+    error: body.error || null,
+    id: Number(body.id) || 0,
+    note: typeof body.note === 'string' ? body.note : null,
+    noteCandidates: Array.isArray(body.noteCandidates) ? body.noteCandidates : [],
+  };
 }
 
 for (const q of PRINT_SUBJECTS) {
@@ -199,9 +206,22 @@ for (const q of PRINT_SUBJECTS) {
   }
   const who = after?.subject?.display || after?.login || `@${q}`;
   const items = realCount(after);
+  const note = last.note || after?.note || null;
   const url = last.id ? `${origin}${RECEIPT_PATH(last.id)}` : origin;
   console.log(`#${last.id} ${who} → ${items} items ${url}`);
-  rows.push({ id: last.id, who, items, url, skipped: false, fresh: true, q });
+  if (note) {
+    console.log(
+      JSON.stringify({
+        shipped: 'note-writer',
+        q,
+        who,
+        note,
+        fallback: /is the (first line|only ship|named product) printed on this receipt/i.test(note),
+        candidates: last.noteCandidates,
+      }),
+    );
+  }
+  rows.push({ id: last.id, who, items, url, skipped: false, fresh: true, q, note, noteCandidates: last.noteCandidates });
 }
 
 console.log(JSON.stringify({ origin, receipts: rows }, null, 2));

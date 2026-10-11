@@ -1,0 +1,276 @@
+{
+  "year": 2026,
+  "extra": [
+    {
+      "query": "jarredsumner",
+      "who": "Jarred Sumner",
+      "handle": "jarredsumner",
+      "github": "jarredsumner",
+      "site": "https://jarredsumner.com/",
+      "company": "Bun",
+      "companyGithub": "oven-sh",
+      "role": "founder",
+      "bio": "Creator of Bun. https://bun.sh",
+      "knownLaunches": true,
+      "majorOss": true,
+      "min": 15,
+      "required": ["bun"],
+      "found": [
+        {
+          "name": "Bun 1.3",
+          "description": "I shipped the runtime.",
+          "date": "2026-04-02",
+          "link": "https://bun.sh/blog/bun-v1.3",
+          "source": "company",
+          "status": "SHIPPED",
+          "thisYear": true
+        }
+      ]
+    }
+  ],
+  "repos": {
+    "yyx990803": {
+      "min": 15,
+      "majorOss": true,
+      "repos": [
+        {
+          "owner": "vitejs",
+          "name": "vite",
+          "homepage": "https://vite.dev",
+          "stars": 72000,
+          "majors": [
+            ["v7.0.0", "2026-01-16", "Vite 7"],
+            ["v7.1.0", "2026-03-04", "Vite 7.1"],
+            ["v8.0.0", "2026-06-12", "Vite 8"]
+          ],
+          "patches": { "2026-01": 6, "2026-03": 8, "2026-04": 5, "2026-06": 4 }
+        },
+        {
+          "owner": "vuejs",
+          "name": "core",
+          "homepage": "https://vuejs.org",
+          "stars": 48000,
+          "majors": [["v3.6.0", "2026-02-11", "Vue 3.6"]],
+          "patches": { "2026-02": 5, "2026-05": 3 }
+        },
+        {
+          "owner": "voidzero-dev",
+          "name": "voidzero",
+          "homepage": "https://voidzero.dev",
+          "stars": 2100,
+          "created": "2026-03-12",
+          "description": "Toolchain studio",
+          "majors": [["v0.2.0", "2026-04-18", "VoidZero studio"]]
+        },
+        {
+          "owner": "oxc-project",
+          "name": "oxc",
+          "homepage": "https://oxc.rs",
+          "stars": 15000,
+          "majors": [["v1.0.0", "2026-02-02", "Oxc 1"], ["v1.2.0", "2026-05-20", "Oxc 1.2"]],
+          "patches": { "2026-02": 4 }
+        }
+      ]
+    },
+    "Rich-Harris": {
+      "min": 10,
+      "majorOss": true,
+      "repos": [
+        {
+          "owner": "sveltejs",
+          "name": "svelte",
+          "homepage": "https://svelte.dev",
+          "stars": 83000,
+          "majors": [
+            ["v5.20.0", "2026-01-09", "Svelte 5.20"],
+            ["v5.21.0", "2026-02-14", "Svelte 5.21"],
+            ["v6.0.0", "2026-04-08", "Svelte 6"]
+          ],
+          "patches": { "2026-01": 7, "2026-02": 4, "2026-03": 6, "2026-04": 5, "2026-05": 4 }
+        },
+        {
+          "owner": "sveltejs",
+          "name": "kit",
+          "homepage": "https://svelte.dev",
+          "stars": 19000,
+          "majors": [["v3.0.0", "2026-06-01", "SvelteKit 3"]],
+          "patches": { "2026-06": 4 }
+        }
+      ]
+    },
+    "dhh": {
+      "min": 10,
+      "majorOss": true,
+      "repos": [
+        {
+          "owner": "rails",
+          "name": "rails",
+          "homepage": "https://rubyonrails.org",
+          "stars": 56000,
+          "majors": [["v8.1.0", "2026-01-10", "Rails 8.1"], ["v8.2.0", "2026-07-02", "Rails 8.2"]],
+          "patches": { "2026-01": 5, "2026-02": 3, "2026-03": 4, "2026-05": 3, "2026-07": 3 }
+        },
+        {
+          "owner": "basecamp",
+          "name": "kamal",
+          "homepage": "https://kamal-deploy.org",
+          "stars": 12000,
+          "majors": [["v2.8.0", "2026-03-03", "Kamal 2.8"]],
+          "patches": { "2026-03": 4, "2026-05": 3 }
+        }
+      ]
+    },
+    "developit": {
+      "min": 10,
+      "majorOss": true,
+      "repos": [
+        {
+          "owner": "preactjs",
+          "name": "preact",
+          "homepage": "https://preactjs.com",
+          "stars": 37000,
+          "majors": [["v11.0.0", "2026-03-19", "Preact 11"], ["v11.1.0", "2026-06-08", "Preact 11.1"]],
+          "patches": { "2026-03": 6, "2026-04": 5, "2026-05": 3, "2026-06": 4 }
+        },
+        {
+          "owner": "developit",
+          "name": "htm",
+          "homepage": "https://github.com/developit/htm",
+          "stars": 8700,
+          "majors": [["v4.0.0", "2026-01-30", "htm 4"], ["v4.1.0", "2026-03-12", "htm 4.1"]],
+          "patches": { "2026-02": 3, "2026-03": 3 }
+        }
+      ]
+    },
+    "pi0": {
+      "min": 10,
+      "majorOss": true,
+      "repos": [
+        {
+          "owner": "unjs",
+          "name": "nitro",
+          "homepage": "https://nitro.build",
+          "stars": 8000,
+          "majors": [["v3.0.0", "2026-04-02", "Nitro 3"], ["v3.1.0", "2026-07-11", "Nitro 3.1"]],
+          "patches": { "2026-04": 5, "2026-05": 4, "2026-06": 3, "2026-07": 3, "2026-08": 3 }
+        },
+        {
+          "owner": "unjs",
+          "name": "listhen",
+          "homepage": "https://unjs.io",
+          "stars": 1200,
+          "majors": [["v2.0.0", "2026-02-09", "listhen 2"]],
+          "patches": { "2026-02": 3 }
+        }
+      ]
+    },
+    "TkDodo": {
+      "min": 10,
+      "majorOss": true,
+      "repos": [
+        {
+          "owner": "TanStack",
+          "name": "query",
+          "homepage": "https://tanstack.com/query",
+          "stars": 45000,
+          "majors": [["v6.0.0", "2026-04-17", "TanStack Query 6"], ["v6.1.0", "2026-06-22", "Query 6.1"], ["v6.2.0", "2026-08-19", "Query 6.2"]],
+          "patches": { "2026-04": 6, "2026-05": 5, "2026-06": 4, "2026-07": 3, "2026-08": 3, "2026-09": 3 }
+        }
+      ]
+    },
+    "gaearon": {
+      "min": 10,
+      "majorOss": true,
+      "repos": [
+        {
+          "owner": "facebook",
+          "name": "react",
+          "homepage": "https://react.dev",
+          "stars": 230000,
+          "majors": [["v20.0.0", "2026-03-11", "React 20"], ["v20.1.0", "2026-06-03", "React 20.1"]],
+          "patches": { "2026-03": 5, "2026-04": 4, "2026-05": 3, "2026-06": 4, "2026-07": 3 }
+        }
+      ]
+    },
+    "spolu": {
+      "min": 10,
+      "majorOss": true,
+      "repos": [
+        {
+          "owner": "dust-tt",
+          "name": "dust",
+          "homepage": "https://dust.tt",
+          "stars": 4200,
+          "majors": [["v2.0.0", "2026-04-14", "Dust Agents"], ["v2.1.0", "2026-07-01", "Dust Platform"]],
+          "patches": { "2026-04": 5, "2026-05": 4, "2026-06": 3, "2026-07": 3, "2026-08": 3 }
+        }
+      ]
+    },
+    "threepointone": {
+      "min": 10,
+      "majorOss": true,
+      "repos": [
+        {
+          "owner": "threepointone",
+          "name": "partykit",
+          "homepage": "https://www.partykit.io",
+          "stars": 5100,
+          "majors": [["v1.0.0", "2026-02-26", "PartyKit"], ["v1.1.0", "2026-05-11", "PartyKit 1.1"]],
+          "patches": { "2026-02": 4, "2026-03": 4, "2026-04": 3, "2026-05": 3, "2026-06": 3, "2026-07": 3 }
+        }
+      ]
+    },
+    "pomber": {
+      "min": 10,
+      "majorOss": true,
+      "repos": [
+        {
+          "owner": "code-hike",
+          "name": "codehike",
+          "homepage": "https://codehike.org",
+          "stars": 4600,
+          "majors": [["v2.0.0", "2026-03-11", "Code Hike 2"], ["v2.1.0", "2026-06-02", "Code Hike 2.1"]],
+          "patches": { "2026-03": 5, "2026-04": 4, "2026-05": 3, "2026-06": 3, "2026-07": 3, "2026-08": 3 }
+        }
+      ]
+    },
+    "jarredsumner": {
+      "min": 15,
+      "majorOss": true,
+      "repos": [
+        {
+          "owner": "oven-sh",
+          "name": "bun",
+          "homepage": "https://bun.sh",
+          "stars": 78000,
+          "majors": [
+            ["v1.2.0", "2026-01-08", "Bun 1.2"],
+            ["v1.3.0", "2026-04-02", "Bun 1.3"],
+            ["v1.4.0", "2026-07-16", "Bun 1.4"]
+          ],
+          "patches": {
+            "2026-01": 9,
+            "2026-02": 8,
+            "2026-03": 9,
+            "2026-04": 7,
+            "2026-05": 6,
+            "2026-06": 5,
+            "2026-07": 4,
+            "2026-08": 6,
+            "2026-09": 5,
+            "2026-10": 4
+          }
+        },
+        {
+          "owner": "oven-sh",
+          "name": "bun-vscode",
+          "homepage": "https://bun.sh",
+          "stars": 420,
+          "created": "2026-02-11",
+          "description": "Bun editor extension",
+          "majors": [["v0.3.0", "2026-03-18", "Bun VSCode"]]
+        }
+      ]
+    }
+  }
+}

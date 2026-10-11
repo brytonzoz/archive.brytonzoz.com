@@ -95,6 +95,8 @@ const ARTICLE_TITLE =
   /\b(how to|tutorial|case stud(?:y|ies)|customer stor(?:y|ies)|deep dive|event recap|what we learned|behind the scenes|lessons? from|research paper|whitepaper|customer spotlight|success stor(?:y|ies))\b/i;
 const CUSTOMER_STORY =
   /\b(engineers? (accelerate|adopt|use|used|build|built)|frontier firms|pulling ahead|what i ship(?:ped)? here|ships faster with|customer spotlight)\b/i;
+const COMPANY_METRIC =
+  /^[A-Z][A-Za-z0-9.&'’-]+(?:\s+[A-Z][A-Za-z0-9.&'’-]+){0,2}\s+(analyzes?|processes?|handles?|serves?|ships?|scales?|cuts?|boosts?|saves?|runs?)\b.+\b(\d[\d,.]*\s*[MKB%+]|million|billion|\d{2,}m\+)/i;
 const SHIP_PREFIX = /^(introducing|launching|announcing|presenting|meet|say hello to|now available[:\s]+|how to|how|the)\s+/i;
 const BARE_VERSION = /^v?\d+(?:\.\d+){1,4}[a-z0-9.-]*$/i;
 const BARE_YEAR = /^20\d\d(?:-\d{2}){0,2}$/;
@@ -135,7 +137,7 @@ function isNoiseTitle(text: string): boolean {
   if ((text.replace(/[^a-zA-Z]/g, '').length < 3) && /\d/.test(text)) return true;
   if (/^by\s+\S/i.test(text)) return true;
   if (/\bmin(?:ute)?s?\s+read\b/i.test(text)) return true;
-  if (ARTICLE_TITLE.test(text) || CUSTOMER_STORY.test(text)) return true;
+  if (ARTICLE_TITLE.test(text) || CUSTOMER_STORY.test(text) || COMPANY_METRIC.test(text)) return true;
   if (/^how\s+\w+\s+is\b/i.test(text)) return true;
   if (/\baccelerating\b/i.test(text) && !/\b(launch|released?|version|v\d)\b/i.test(text)) return true;
   if (/^[A-Za-z0-9][\w.-]{1,40}\s+(builds|engineers?)\b/i.test(text)) return true;

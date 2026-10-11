@@ -931,6 +931,16 @@ test('prereleases, starters, and Gateway model listings are not ships', () => {
   assert.equal(polish.isCustomerStoryTitle('Airbnb widens access to GPT-6 Astra and OpenAI frontier'), true);
   assert.equal(polish.isCustomerStoryTitle('GPT-6.1 Sol'), false);
   assert.equal(polish.isCustomerStoryTitle("Warp's big bet on building open source with GPT-5.5"), true);
+  assert.equal(polish.isCustomerStoryTitle('Nokia analyzes 50M+ network events with Cursor'), true);
+  assert.equal(polish.looksCutOff('SPEED INSIGHTS NOW HAS'), true);
+  assert.equal(polish.looksCutOff('VERCEL CONNECT NOW ACCEPTS SERVICE'), true);
+  assert.equal(polish.looksCutOff('TEAMS &'), true);
+  assert.equal(polish.looksMidWord('SO VISIBLE-TAB ROUTING AND ANNOTATIONS PERSIST'), true);
+  assert.equal(polish.isJunkTitle('SO VISIBLE-TAB ROUTING AND ANNOTATIONS PERSIST'), true);
+  assert.equal(polish.cleanShipTitle('SO VISIBLE-TAB ROUTING AND ANNOTATIONS PERSIST'), '');
+  assert.equal(polish.isBlogEssayTitle('Cursor is an applied research team building the best'), true);
+  assert.equal(polish.isBlogEssayTitle('Both are available today on Teams and Enterprise'), true);
+  assert.equal(polish.isStaleBioProduct({ name: 'HeadshotPro' }, { company: 'HeadshotPro' }, 2026), true);
   assert.match(polish.cleanShipTitle('GPT-REALTIME-2, A NEW REALTIME VOICE MODEL'), /gpt-realtime-2$/i);
   assert.match(polish.cleanShipTitle('RELEASED THE DECISIONS API IN BETA WITH GPT-6-LUNA'), /^decisions api$/i);
   assert.match(polish.cleanShipTitle('AGENTS API IN PUBLIC BETA'), /agents api in public beta/i);
@@ -1077,4 +1087,41 @@ test('cut titles, changelog ids, jan-1 scrape dates, and minor fixes drop', () =
   const names = gated.map((item) => item.name);
   assert.equal(names.some((name) => /canva|cial harbor|minor fix|changelog goal|latest articles|photogr/i.test(name)), false, JSON.stringify(names));
   assert.ok(names.some((name) => /flowjam/i.test(name)), JSON.stringify(names));
+});
+
+test('undated HeadshotPro drops; leftover cut-offs and customer-story metrics drop', () => {
+  const gated = polish.gateReceiptItems(
+    [
+      found({ name: 'HeadshotPro', date: null, source: 'site', link: 'https://www.headshotpro.com/' }),
+      found({
+        name: 'AgentBar',
+        description: 'I made a launch bar. Listed on dannypostma.com',
+        date: '2026-03-18',
+        source: 'site',
+        link: 'https://dannypostma.com/agentbar',
+      }),
+      found({ name: 'SPEED INSIGHTS NOW HAS', date: '2026-04-11', source: 'changelog', link: 'https://vercel.com/changelog/speed' }),
+      found({ name: 'NOKIA ANALYZES 50M+ NETWORK EVENTS WITH CURSOR', date: '2026-06-02', source: 'changelog', link: 'https://cursor.com/blog/nokia' }),
+      found({ name: 'TEAMS &', date: '2026-06-04', source: 'changelog', link: 'https://cursor.com/blog/teams' }),
+    ],
+    {
+      year: 2026,
+      who: 'Danny Postma',
+      handle: 'dannypostmaa',
+      affiliation: {
+        name: 'Danny Postma',
+        company: 'HeadshotPro',
+        role: 'founder',
+        product: null,
+        companyX: null,
+        companyGithub: null,
+        companySite: 'https://www.headshotpro.com/',
+        typedCompany: false,
+      },
+      owner: { name: 'Danny Postma', handle: 'dannypostmaa', site: 'https://dannypostma.com', github: 'dannypostma' },
+    },
+  );
+  const names = gated.map((item) => item.name);
+  assert.equal(names.some((name) => /headshotpro|speed insights|nokia|teams\s*&/i.test(name)), false, JSON.stringify(names));
+  assert.ok(names.some((name) => /agentbar/i.test(name)), JSON.stringify(names));
 });

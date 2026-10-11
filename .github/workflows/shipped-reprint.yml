@@ -22,6 +22,7 @@ on:
       - worker/shipped-flagship.ts
       - worker/shipped-company.ts
       - worker/shipped-repos.ts
+      - worker/shipped-oss.ts
       - worker/shipped-dates.ts
       - scripts/check-shipped-live-goldens.mjs
       - tests/lib/shipped-goldens.mjs
@@ -101,8 +102,13 @@ jobs:
             if [ -n "$PARSED" ]; then
               export SHIPPED_REPRINT_FORCE_IDS="$PARSED"
             fi
+            PRINT=$(printf '%s\n' "$MSG" | sed -n 's/.*\[shipped-print \([A-Za-z0-9_,-]*\)\].*/\1/p' | head -n1)
+            if [ -n "$PRINT" ]; then
+              export SHIPPED_PRINT_SUBJECTS="$PRINT"
+            fi
           fi
           echo "Reprint ids: $SHIPPED_REPRINT_FORCE_IDS"
+          echo "Print subjects: $SHIPPED_PRINT_SUBJECTS"
           node --no-warnings scripts/reprint-shipped.mjs
 
       - name: Assert live goldens

@@ -5,6 +5,7 @@ import { extraResearchPaths, itemsFromProjectList } from './shipped-research';
 import { looksLikeNotAShip } from './shipped-decisions';
 import { flagshipLaunchName, flagshipProbePaths, knownFlagshipDate, logFlagshipGate } from './shipped-flagship';
 import { isBlogEssayTitle, isCodeOrBugfixTitle, isDocsOrReferenceTitle, isPrereleaseShip, isVagueOrCutTitle, prettyBrand, versionParts } from './shipped-polish';
+import { blogFeedUrls, linesFromBlogFeed, linesFromOssRepo, type OssRelease } from './shipped-oss';
 import { companyOrgGuess, companyScope, companySlug, companyTokens, matchesLeadProduct, type Affiliation } from './shipped-affiliation';
 import { type XaiEnv, type XaiSpend, emptyXaiSpend } from './shipped-xai';
 import { stripVia, type CompanyStore } from './shipped-company-store';
@@ -729,7 +730,7 @@ async function githubOrgShips(org: string, env: SourceEnv, year: number): Promis
   const own = repos.filter((repo) => !repo.fork);
   const notable = own.filter((repo) => {
     if (typeof repo.created_at !== 'string' || !repo.created_at.startsWith(String(year))) return false;
-    if ((repo.stargazers_count ?? 0) < 200) return false;
+    if ((repo.stargazers_count ?? 0) < 100) return false;
     const home = String(repo.homepage || '').trim();
     if (!home || /github\.com/i.test(home)) return false;
     const name = clean(repo.name, 60);
@@ -754,6 +755,7 @@ async function githubOrgShips(org: string, env: SourceEnv, year: number): Promis
         status: 'SHIPPED',
         score: 4 + Math.log10(1 + (repo.stargazers_count ?? 0)),
         thisYear: true,
+        kind: 'oss-launch',
       };
     })
     .filter((item) => item.name && item.link);
@@ -762,55 +764,65 @@ async function githubOrgShips(org: string, env: SourceEnv, year: number): Promis
 
 async function githubOrgReleases(
   org: string,
-  repos: { name?: string; stargazers_count?: number }[],
+  repos: { name?: string; stargazers_count?: number; homepage?: string | null; html_url?: string; description?: string; created_at?: string }[],
   env: SourceEnv,
   year: number,
 ): Promise<Found[]> {
   const targets = [...repos]
     .sort((a, b) => (b.stargazers_count ?? 0) - (a.stargazers_count ?? 0))
-    .map((repo) => repo.name)
-    .filter((name): name is string => Boolean(name))
+    .filter((repo): repo is typeof repo & { name: string } => Boolean(repo.name))
     .slice(0, 20);
+  const headers = {
+    'user-agent': 'brytonzoz.com-shipped (+https://shipped.brytonzoz.com/)',
+    accept: 'application/vnd.github+json',
+    ...(env.GITHUB_TOKEN ? { authorization: `Bearer ${env.GITHUB_TOKEN}` } : {}),
+  };
   const pages = await Promise.all(
-    targets.map((name) =>
-      fetch(`https://api.github.com/repos/${encodeURIComponent(org)}/${encodeURIComponent(name)}/releases?per_page=15`, {
-        headers: {
-          'user-agent': 'brytonzoz.com-shipped (+https://shipped.brytonzoz.com/)',
-          accept: 'application/vnd.github+json',
-          ...(env.GITHUB_TOKEN ? { authorization: `Bearer ${env.GITHUB_TOKEN}` } : {}),
-        },
+    targets.map((repo) =>
+      fetch(`https://api.github.com/repos/${encodeURIComponent(org)}/${encodeURIComponent(repo.name)}/releases?per_page=40`, {
+        headers,
         signal: AbortSignal.timeout(7000),
       })
-        .then(async (response) =>
-          response.ok
-            ? ((await response.json()) as { name?: string; tag_name?: string; html_url?: string; published_at?: string; body?: string; prerelease?: boolean }[])
-            : [],
-        )
-        .catch(() => [] as { name?: string; tag_name?: string; html_url?: string; published_at?: string; body?: string; prerelease?: boolean }[]),
+        .then(async (response) => (response.ok ? ((await response.json()) as OssRelease[]) : []))
+        .catch(() => [] as OssRelease[]),
     ),
   );
   const found: Found[] = [];
-  for (const releases of pages) {
-    if (!Array.isArray(releases)) continue;
-    for (const release of releases) {
-      const published = typeof release.published_at === 'string' ? release.published_at : '';
-      if (!published.startsWith(String(year))) continue;
-      const name = clean(release.name || release.tag_name, 60);
-      const link = publicUrl(release.html_url);
-      if (!name || !link) continue;
-      if (isPrereleaseShip(name) || (release as { prerelease?: boolean }).prerelease) continue;
-      found.push({
-        name,
-        description: clean(release.body, 140),
-        date: published.slice(0, 10),
-        dateConfidence: 'exact',
-        link,
-        icon: null,
-        source: 'company',
-        status: 'RELEASED',
-        score: 7,
-        thisYear: true,
-      });
+  const homes = new Set<string>();
+  targets.forEach((repo, i) => {
+    const releases = Array.isArray(pages[i]) ? pages[i]! : [];
+    found.push(
+      ...linesFromOssRepo(
+        {
+          owner: org,
+          name: repo.name,
+          homepage: repo.homepage,
+          html_url: repo.html_url || `https://github.com/${org}/${repo.name}`,
+          description: repo.description,
+          created_at: repo.created_at,
+          stargazers_count: repo.stargazers_count,
+          readme: true,
+        },
+        releases,
+        [],
+        year,
+        'company',
+      ),
+    );
+    const home = publicUrl(String(repo.homepage || '').trim());
+    if (home) homes.add(home);
+  });
+  for (const home of [...homes].slice(0, 4)) {
+    for (const feed of blogFeedUrls(home).slice(0, 3)) {
+      const page = await fetch(feed, {
+        headers: { 'user-agent': 'brytonzoz.com-shipped (+https://shipped.brytonzoz.com/)', accept: 'application/rss+xml, application/atom+xml, text/xml, */*' },
+        signal: AbortSignal.timeout(7000),
+      }).catch(() => null);
+      if (!page?.ok) continue;
+      const xml = (await page.text()).slice(0, 400_000);
+      if (!/<item\b|<entry\b/i.test(xml)) continue;
+      found.push(...linesFromBlogFeed(xml, year, 'changelog'));
+      break;
     }
   }
   return found;

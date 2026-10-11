@@ -203,6 +203,7 @@ export interface SourceProvider {
 
 const UA = 'brytonzoz.com-shipped (+https://shipped.brytonzoz.com/)';
 export const SOURCE_TIMEOUT_MS = 6000;
+const OSS_TIMEOUT_MS = 16_000;
 const TIMEOUT = SOURCE_TIMEOUT_MS;
 
 export async function raceTimeout<T>(work: Promise<T>, ms: number, fallback: T): Promise<T> {
@@ -1800,7 +1801,7 @@ export async function gather(
     gatherFresh(subject, resolved.profile, env, year, meter, tinyfish, resolved.notes, mode, opts?.onPartial, opts?.affiliation);
   if (opts?.rebuild && !opts.onPartial) return load();
   if (opts?.rebuild) return load();
-  const key = mode === 'full' ? `gather:full:v29:${year}:${resolved.cacheKey}` : `gather:v38:${year}:${resolved.cacheKey}`;
+  const key = mode === 'full' ? `gather:full:v30:${year}:${resolved.cacheKey}` : `gather:v39:${year}:${resolved.cacheKey}`;
   return cached(
     key,
     1440 * MIN,
@@ -2049,7 +2050,30 @@ async function gatherFresh(
   ]
     .filter((url, i, all) => all.findIndex((u) => u.replace(/\/+$/, '') === url.replace(/\/+$/, '')) === i)
     .slice(0, 18);
-  const [results, site, extraSites, searched, storeHarvest, githubOverview] = await Promise.all([
+  const ossHarvestP =
+    profile.github && apiOpen(env)
+      ? (async () => {
+          const { harvestOss } = await import('./shipped-oss');
+          return harvestOss({
+            login: profile.github!,
+            year,
+            affiliation,
+            bio: profile.bio,
+            orgs: profile.orgs,
+            get: (path) => githubApi(path, env),
+            cache: (cacheKey, ttl, load) => cached(cacheKey, ttl, load),
+            readText: async (url) => {
+              const response = await fetch(url, {
+                headers: { 'user-agent': UA, accept: 'application/rss+xml, application/atom+xml, text/xml, */*' },
+                signal: AbortSignal.timeout(8000),
+              }).catch(() => null);
+              if (!response?.ok) return null;
+              return (await response.text()).slice(0, 400_000);
+            },
+          }).catch(() => ({ found: [] as Found[], ran: [] as string[] }));
+        })()
+      : Promise.resolve({ found: [] as Found[], ran: [] as string[] });
+  const [results, site, extraSites, searched, storeHarvest, githubOverview, ossHarvest] = await Promise.all([
     Promise.allSettled(SOURCES.filter((source) => source.enabled(ctx)).map(async (source) => ({ id: source.id, found: await raceTimeout(source.run(ctx), SOURCE_TIMEOUT_MS, []) }))),
     homepage ? raceTimeout(readSite(homepage).catch(() => null), SOURCE_TIMEOUT_MS, null) : Promise.resolve(null),
     Promise.all(extraHomes.map((url) => raceTimeout(readSite(url).catch(() => null), SOURCE_TIMEOUT_MS, null))),
@@ -2067,6 +2091,7 @@ async function gatherFresh(
     ),
     companyStoreP,
     raceTimeout(githubOverviewP, SOURCE_TIMEOUT_MS, null),
+    raceTimeout(ossHarvestP, OSS_TIMEOUT_MS, { found: [] as Found[], ran: [] as string[] }),
     raceTimeout(identityP, SOURCE_TIMEOUT_MS, undefined),
   ]);
   if (site) ran.push('site');
@@ -2098,6 +2123,12 @@ async function gatherFresh(
       ran.push(settled.value.id);
       found.push(...settled.value.found);
     } else failed.push(settled.reason instanceof SourceError ? settled.reason.code : 'error');
+  }
+  if (ossHarvest.found.length) {
+    found.push(...ossHarvest.found);
+    ran.push(...ossHarvest.ran, 'oss-harvest');
+  } else if (profile.github) {
+    ran.push(...ossHarvest.ran, 'oss-harvest:empty');
   }
 
   const ownPages = extraSites.filter((page): page is SiteInfo => Boolean(page));

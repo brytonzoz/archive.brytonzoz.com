@@ -9,6 +9,8 @@ export type OwnerContext = {
   sites?: string[];
   company?: string | null;
   companyGithub?: string | null;
+  /** Public GitHub orgs the person belongs to (founder / top-3 harvest). */
+  orgs?: string[];
 };
 
 export type OwnershipKind = 'developer' | 'portfolio' | 'named' | 'company' | 'none';
@@ -115,20 +117,27 @@ function githubOwned(url: string | null | undefined, owner: OwnerContext | null 
 }
 
 function githubOrgOwned(url: string | null | undefined, owner: OwnerContext | null | undefined): boolean {
-  const org = owner?.companyGithub?.replace(/^@/, '');
-  if (!org || !url) return false;
-  return new RegExp(`github\\.com/${org}(/|$)`, 'i').test(url);
+  if (!url) return false;
+  const orgs = [owner?.companyGithub, ...(owner?.orgs || [])]
+    .map((value) => String(value || '').replace(/^@/, ''))
+    .filter((org) => /^[A-Za-z0-9-]{1,39}$/.test(org));
+  return orgs.some((org) => new RegExp(`github\\.com/${org}(/|$)`, 'i').test(url));
+}
+
+export function isOssHarvestItem(item: { kind?: string } | null | undefined): boolean {
+  return /^(oss-release|oss-launch|oss-blog)$/.test(item?.kind || '');
 }
 
 /** Why this line may appear on the person's receipt. `none` means drop it. */
 export function ownershipEvidence(
-  item: { name?: string; description?: string; link?: string | null; source?: string },
+  item: { name?: string; description?: string; link?: string | null; source?: string; kind?: string },
   owner?: OwnerContext | null,
 ): OwnershipKind {
   const source = item.source ?? '';
   const desc = item.description ?? '';
   if (isForeignProduct(item, owner)) return 'none';
   if (TOOLS_HINT.test(desc) || PUBLIC_PAGE.test(desc)) return 'none';
+  if (isOssHarvestItem(item)) return 'developer';
   if (COMPANY_SOURCE.test(source) && owner?.company) return 'company';
   if (githubOwned(item.link, owner) || githubOrgOwned(item.link, owner)) return 'developer';
   if (source === 'github') return 'none';
@@ -185,7 +194,9 @@ export function undatedPassesGate(
 /** A display name or X handle alone cannot prove ownership. Need a site, GitHub, or company. */
 export function ownerCanProve(owner?: OwnerContext | null): boolean {
   if (!owner) return false;
-  return Boolean(owner.github || owner.site || owner.company || owner.companyGithub || (owner.sites && owner.sites.length));
+  return Boolean(
+    owner.github || owner.site || owner.company || owner.companyGithub || (owner.sites && owner.sites.length) || (owner.orgs && owner.orgs.length),
+  );
 }
 
 export function ownerFromProfile(
@@ -196,6 +207,7 @@ export function ownerFromProfile(
     site?: string | null;
     sites?: string[];
     company?: string | null;
+    orgs?: string[];
   } | null,
   affiliation?: { name?: string | null; company?: string | null; companyGithub?: string | null } | null,
 ): OwnerContext {
@@ -207,5 +219,6 @@ export function ownerFromProfile(
     sites: profile?.sites,
     company: affiliation?.company,
     companyGithub: affiliation?.companyGithub || profile?.company,
+    orgs: profile?.orgs,
   };
 }

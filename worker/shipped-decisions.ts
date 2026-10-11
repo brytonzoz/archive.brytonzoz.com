@@ -476,6 +476,11 @@ export function shareKeywords(
   if (day(a.date) && day(b.date) && day(a.date) !== day(b.date) && x !== y) return false;
   const pa = pathOf(a.link);
   const pb = pathOf(b.link);
+  const releaseTag = (path: string) => /\/releases\/tag\//i.test(path);
+  if ((releaseTag(pa) || releaseTag(pb)) && pa !== pb && x !== y) return false;
+  if (/·\s*\d+\s+releases?\s+in\s+/i.test(a.name) && /·\s*\d+\s+releases?\s+in\s+/i.test(b.name) && x !== y) {
+    return false;
+  }
   if (a.link && b.link && host(a.link) && host(a.link) === host(b.link) && (changelogIndex(pa) || changelogIndex(pb))) {
     const ha = hashOf(a.link);
     const hb = hashOf(b.link);

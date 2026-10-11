@@ -930,6 +930,48 @@
       "who": "Sam Altman",
       "company": "OpenAI",
       "role": "ceo"
+    },
+    {
+      "name": "SPEED INSIGHTS NOW HAS",
+      "date": "2026-04-11",
+      "source": "changelog",
+      "link": "https://vercel.com/changelog/speed-insights-now-has"
+    },
+    {
+      "name": "VERCEL CONNECT NOW ACCEPTS SERVICE",
+      "date": "2026-04-12",
+      "source": "changelog",
+      "link": "https://vercel.com/changelog/vercel-connect-now-accepts-service"
+    },
+    {
+      "name": "SO VISIBLE-TAB ROUTING AND ANNOTATIONS PERSIST",
+      "date": "2026-05-08",
+      "source": "changelog",
+      "link": "https://developers.openai.com/codex/changelog"
+    },
+    {
+      "name": "NOKIA ANALYZES 50M+ NETWORK EVENTS WITH CURSOR",
+      "date": "2026-06-02",
+      "source": "changelog",
+      "link": "https://cursor.com/blog/nokia"
+    },
+    {
+      "name": "CURSOR IS AN APPLIED RESEARCH TEAM BUILDING THE BEST",
+      "date": "2026-06-03",
+      "source": "changelog",
+      "link": "https://cursor.com/blog/research"
+    },
+    {
+      "name": "TEAMS &",
+      "date": "2026-06-04",
+      "source": "changelog",
+      "link": "https://cursor.com/blog/teams"
+    },
+    {
+      "name": "BOTH ARE AVAILABLE TODAY ON TEAMS AND ENTERPRISE",
+      "date": "2026-06-05",
+      "source": "changelog",
+      "link": "https://cursor.com/blog/teams-enterprise"
     }
   ],
   "keep": [

@@ -188,6 +188,36 @@ export function Machine({ job, display, tone, onPrinted, onTorn, tearSignal = 0,
 
   const ticketFace = () => pull.current?.querySelector('.shipped-ticket') as HTMLElement | null;
 
+  const clearTearPaint = useCallback(() => {
+    stop.current?.();
+    stop.current = null;
+    pos.current = { x: 0, y: 0, r: 0 };
+    const p = pull.current;
+    const t = tilt.current;
+    const f = feed.current;
+    const ticket = ticketFace();
+    if (p) p.style.transform = '';
+    if (t) t.style.transform = '';
+    if (f) {
+      f.style.transform = '';
+      f.style.clipPath = '';
+      f.style.removeProperty('-webkit-clip-path');
+    }
+    if (ticket) {
+      ticket.style.transform = '';
+      ticket.style.opacity = '';
+      ticket.style.filter = '';
+      ticket.style.clipPath = '';
+      ticket.style.removeProperty('-webkit-clip-path');
+    }
+  }, []);
+
+  useEffect(() => {
+    if (!focus && !hero) return;
+    setLifting(false);
+    clearTearPaint();
+  }, [focus, hero, clearTearPaint]);
+
   const applyRip = useCallback(
     (progress: number, fromLeft: boolean) => {
       const ticket = ticketFace();
@@ -233,12 +263,14 @@ export function Machine({ job, display, tone, onPrinted, onTorn, tearSignal = 0,
       if (reducedMotion()) {
         pos.current = rest;
         if (pull.current) pull.current.style.transform = transformOf(rest);
+        clearTearPaint();
         setPhase('torn');
         setLifting(false);
         callbacks.current.onTorn?.(key);
         return;
       }
       settle(rest, throwV, lift ? FLY : SETTLE, () => {
+        clearTearPaint();
         setPhase('torn');
         setLifting(false);
         callbacks.current.onTorn?.(key);
@@ -368,7 +400,7 @@ export function Machine({ job, display, tone, onPrinted, onTorn, tearSignal = 0,
     const hidden = height - fedHeight.current;
     if (hidden < 12) return;
     fedHeight.current = height;
-    if (phaseRef.current === 'printing' || phaseRef.current === 'tearing' || reducedMotion()) return;
+    if (focus || hero || phaseRef.current === 'printing' || phaseRef.current === 'tearing' || reducedMotion()) return;
     const clip = (left: number) => {
       const value = left <= 0 ? '' : `inset(0 0 ${left}px 0)`;
       el.style.clipPath = value;
@@ -414,7 +446,7 @@ export function Machine({ job, display, tone, onPrinted, onTorn, tearSignal = 0,
       timers.forEach((t) => window.clearTimeout(t));
       motorOff();
     };
-  }, [live, shown.key, shown.kind, revision]);
+  }, [live, shown.key, shown.kind, revision, focus, hero]);
 
   // Hanging: a small nudge so it reads as loose paper, and the hint.
   useEffect(() => {
@@ -510,7 +542,7 @@ export function Machine({ job, display, tone, onPrinted, onTorn, tearSignal = 0,
   useEffect(() => {
     const el = tilt.current;
     const outer = pull.current;
-    if (phase !== 'torn' || !el || !outer || reducedMotion() || !finePointer()) return;
+    if (phase !== 'torn' || focus || hero || !el || !outer || reducedMotion() || !finePointer()) return;
     let target = { x: 0, y: 0 };
     let cur = { x: 0, y: 0, vx: 0, vy: 0 };
     let frame = 0;
@@ -553,7 +585,7 @@ export function Machine({ job, display, tone, onPrinted, onTorn, tearSignal = 0,
       cancelAnimationFrame(frame);
       el.style.transform = '';
     };
-  }, [phase]);
+  }, [phase, focus, hero]);
 
   // A receipt taller than the window fades out at the bottom until it's scrolled to the end.
   useEffect(() => {

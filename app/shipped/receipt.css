@@ -1912,6 +1912,7 @@ button.shipped-lcd-text {
 .shipped-printer.is-focus .shipped-hint,
 .shipped-printer.is-hero .shipped-hint {
   display: none;
+  pointer-events: none;
 }
 
 .shipped-printer.is-focus .shipped-out,
@@ -1922,6 +1923,21 @@ button.shipped-lcd-text {
   clip-path: none;
   -webkit-clip-path: none;
   overflow: visible;
+  opacity: 1;
+  visibility: visible;
+  pointer-events: auto;
+}
+
+.shipped-printer.is-focus .shipped-feed,
+.shipped-printer.is-hero .shipped-feed,
+.shipped-printer.is-focus .shipped-pull,
+.shipped-printer.is-hero .shipped-pull {
+  opacity: 1;
+  visibility: visible;
+  transform: none;
+  clip-path: none;
+  -webkit-clip-path: none;
+  pointer-events: auto;
 }
 
 .shipped-printer.is-focus .shipped-tilt,
@@ -1932,6 +1948,10 @@ button.shipped-lcd-text {
   overflow: visible;
   overscroll-behavior: auto;
   padding-bottom: calc(var(--shipped-pill-stack) + env(safe-area-inset-bottom, 0px));
+  opacity: 1;
+  visibility: visible;
+  transform: none;
+  pointer-events: auto;
 }
 
 .shipped-printer.is-focus .shipped-tilt.is-more::after,
@@ -1942,7 +1962,27 @@ button.shipped-lcd-text {
 .shipped-printer.is-focus .shipped-ticket,
 .shipped-printer.is-hero .shipped-ticket {
   width: 100%;
-  transform: none;
+  transform: translate3d(0, 0, 0);
+  opacity: 1;
+  visibility: visible;
+  clip-path: none;
+  -webkit-clip-path: none;
+  filter: drop-shadow(0 2px 2px rgba(0, 0, 0, 0.42)) drop-shadow(0 22px 32px rgba(0, 0, 0, 0.52));
+}
+
+.shipped-printer.is-focus .shipped-paper,
+.shipped-printer.is-hero .shipped-paper,
+.shipped-printer.is-focus .shipped-ink,
+.shipped-printer.is-hero .shipped-ink {
+  opacity: 1;
+  visibility: visible;
+}
+
+html.shipped-focus .shipped-turnstile,
+.shipped-printer.is-focus .shipped-turnstile,
+.shipped-printer.is-hero .shipped-turnstile {
+  display: none;
+  pointer-events: none;
 }
 
 .shipped-printer.is-focus .shipped-paper,

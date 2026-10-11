@@ -552,7 +552,7 @@ export function ShippedStage({ opening, title }: { opening: Opening; title: Reac
                   },
                   closed,
                   invalid: Boolean(error),
-                  under: shared ? null : (
+                  under: shared || focus ? null : (
                     <HumanCheck ref={human} check={generator?.human ?? FALLBACK_HUMAN} onToken={() => undefined} theme="dark" appearance="execute" />
                   ),
                 }

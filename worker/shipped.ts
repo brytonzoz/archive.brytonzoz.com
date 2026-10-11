@@ -2466,7 +2466,6 @@ async function printFreshSubject(env: ShippedEnv, db: D1Database, raw: string): 
         ? { kind: isGithubLogin(query.value) && !isXHandle(query.value) ? 'github' : 'x', id: query.value, display: `@${query.value}` }
         : { kind: 'name', id: query.value, display: query.value };
   const key = subjectKey(subject);
-  if (await blocked(db, key)) return json({ error: 'taken-down' }, 410);
   const year = yearOf(env);
   const mode = modeOf(year);
   const state = await generatorState(env, db);
@@ -2547,12 +2546,25 @@ async function printFreshSubject(env: ShippedEnv, db: D1Database, raw: string): 
       inserted = await db
         .prepare(
           `UPDATE shipped_receipts SET login = ?, data = ?, demo = ?, model = ?, input_tokens = ?, output_tokens = ?, searches = ?, cost_micros = ?, listed = 1, hidden = 0, created_at = ?
-           WHERE login_key = ? AND day = ? AND mode = ? AND hidden = 1 RETURNING id`,
+           WHERE id = (SELECT id FROM shipped_receipts WHERE login_key = ? AND mode = ? AND hidden != 0 ORDER BY id DESC LIMIT 1) RETURNING id`,
         )
-        .bind(subjectLabel(subject), JSON.stringify(receipt), state.demo ? 1 : 0, model, usage.input, usage.output, usage.searches, usage.cost, now, key, day, mode)
+        .bind(subjectLabel(subject), JSON.stringify(receipt), state.demo ? 1 : 0, model, usage.input, usage.output, usage.searches, usage.cost, now, key, mode)
         .first<{ id: number }>();
     }
-    if (!inserted) return json({ error: 'taken-down' }, 410);
+    if (!inserted) {
+      inserted = await db
+        .prepare(
+          `INSERT INTO shipped_receipts (login, login_key, day, mode, data, demo, model, input_tokens, output_tokens, searches, cost_micros, listed, created_at)
+           VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?) RETURNING id`,
+        )
+        .bind(subjectLabel(subject), `${key}:admin:${now}`, day, mode, JSON.stringify(receipt), state.demo ? 1 : 0, model, usage.input, usage.output, usage.searches, usage.cost, 1, now)
+        .first<{ id: number }>();
+    }
+    if (!inserted) return json({ error: 'jammed' }, 503);
+    await db
+      .prepare(`UPDATE shipped_takedowns SET status = 'dismissed', reviewed_at = ? WHERE subject_key = ? AND status = 'removed'`)
+      .bind(now, key)
+      .run();
     await db.prepare('UPDATE shipped_receipts SET hidden = 0 WHERE id = ? AND hidden = 2').bind(inserted.id).run();
     if (!replaces) await bump(db, 'printed');
     if (!state.demo) await recordSpend(db, true, usage.input, usage.output, usage.searches);

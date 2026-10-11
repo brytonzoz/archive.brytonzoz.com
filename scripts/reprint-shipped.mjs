@@ -361,10 +361,13 @@ if (WALL) {
     const titles = (row.items || []).map((item) => item.name);
     const twins = byWho.get(looseWho(row.who)) || [];
     const newerTwin = twins.some((other) => Number(other.id) > id);
-    if (tapeLooksBroken(titles) || newerTwin) {
+    const empty = !titles.length || Number(row.count) === 0;
+    const hasLiveTwin = twins.some((other) => Number(other.id) !== id && Number(other.count) > 0);
+    if (tapeLooksBroken(titles) || newerTwin || (empty && hasLiveTwin)) {
+      const why = tapeLooksBroken(titles) ? 'broken' : empty && hasLiveTwin ? 'empty-duplicate' : 'duplicate';
       const ok = await hideReceipt(id);
-      hidden.push({ id, who: row.who, count: row.count, why: tapeLooksBroken(titles) ? 'broken' : 'duplicate', ok });
-      console.log(`hide #${id} ${row.who} (${tapeLooksBroken(titles) ? 'broken' : 'older duplicate'}) ${ok ? 'ok' : 'failed'}`);
+      hidden.push({ id, who: row.who, count: row.count, why, ok });
+      console.log(`hide #${id} ${row.who} (${why}) ${ok ? 'ok' : 'failed'}`);
     }
   }
 }

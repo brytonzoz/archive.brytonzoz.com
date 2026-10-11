@@ -21,6 +21,8 @@ export type XProfile = {
   site: string | null;
   urls: string[];
   github: string[];
+  /** Public verified / blue-verified badge when the profile JSON carries it. */
+  verified?: boolean;
 };
 
 /** x.com interstitial / cookie wall — not a real bio. */
@@ -312,6 +314,7 @@ function finishXProfile(partial: Omit<XProfile, 'github' | 'urls'> & { urls?: st
     ...partial,
     urls: uniqueUrls(partial.urls ?? []),
     github: githubLoginsFromText(blob).slice(0, 4),
+    verified: Boolean(partial.verified),
   };
 }
 
@@ -349,6 +352,9 @@ type XUserFields = {
   description?: string;
   website?: { url?: string; display_url?: string } | string;
   url?: string;
+  verified?: boolean;
+  is_blue_verified?: boolean;
+  isBlueVerified?: boolean;
 };
 
 /** FxTwitter nests `{ user }`; VxTwitter puts the same fields on the root. */
@@ -375,6 +381,7 @@ async function profileFromXUser(handle: string, user: XUserFields): Promise<XPro
     bio,
     site: urls[0] ?? (site && !PROFILE_HOSTS.test(hostOf(site) ?? '') && !SHORTENERS.test(hostOf(site) ?? '') ? site : null),
     urls,
+    verified: Boolean(user.verified || user.is_blue_verified || user.isBlueVerified),
   });
 }
 

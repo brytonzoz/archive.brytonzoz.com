@@ -204,15 +204,27 @@ export function companyScope(roleOrAff: ScopeHint): 'all' | 'product' | 'none' {
   return 'none';
 }
 
+const EMPLOYER_WORKS_FOR = /^(vercel|openai|cursor|anthropic|anysphere)$/i;
+
+function looksLikeEmployerWorksFor(raw: string | null | undefined): boolean {
+  const slug = String(raw || '')
+    .replace(/^@/, '')
+    .toLowerCase()
+    .replace(/[^a-z0-9]/g, '');
+  return EMPLOYER_WORKS_FOR.test(slug);
+}
+
 /** Infer a company from a personal site or GitHub org only for CEOs or typed-company queries.
- *  Indie founders (levelsio, Marc Lou) run many products; one site must not become THE company. */
+ *  Indie founders (levelsio, Marc Lou) run many products; one site must not become THE company.
+ *  A GitHub `worksFor` of Vercel/OpenAI/Cursor is an employer, not their product. */
 export function shouldInferCompany(
   affiliation: Pick<Affiliation, 'role' | 'typedCompany'>,
   hint?: { githubCompany?: string | null; orgs?: string[] | null },
 ): boolean {
-  if (affiliation.role === 'ceo' || Boolean(affiliation.typedCompany)) return true;
-  if (hint?.githubCompany) return true;
-  if (affiliation.role === 'founder' && (hint?.orgs?.length || hint?.githubCompany)) return true;
+  if (Boolean(affiliation.typedCompany) || affiliation.role === 'ceo') return true;
+  if (affiliation.role !== 'founder') return false;
+  if (hint?.orgs?.length) return true;
+  if (hint?.githubCompany && !looksLikeEmployerWorksFor(hint.githubCompany)) return true;
   return false;
 }
 

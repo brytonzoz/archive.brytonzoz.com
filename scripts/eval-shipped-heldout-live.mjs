@@ -34,6 +34,29 @@ function essayTitle(name) {
   return words.length >= 12;
 }
 
+const VERIFIED_BUILDERS = new Set(
+  'steventey,shadcn,swyx,levelsio,jarredsumner,yyx990803,dannypostmaa,nico_jeannen,rich-harris,rich_harris,leerob,mckaywrigley,pontusab'
+    .split(',')
+    .map((value) => value.toLowerCase()),
+);
+
+function isVerifiedBuilder(query) {
+  const key = String(query || '')
+    .replace(/^@/, '')
+    .toLowerCase();
+  return VERIFIED_BUILDERS.has(key);
+}
+
+function employerSpill(query, titles) {
+  const who = String(query || '')
+    .replace(/^@/, '')
+    .toLowerCase();
+  if (/^(rauchg|guillermo)$/.test(who)) return [];
+  return (titles || []).filter(
+    (name) => /^(VERCEL|OPENAI|NEXT\.?JS|TURBO)\b/i.test(name) && /·\s*\d+\s+(UPDATES?|RELEASES?)/i.test(name),
+  );
+}
+
 function realItems(receipt) {
   return (receipt?.items || []).filter((item) => item && item.name && item.name !== 'YOUR POTENTIAL' && item.source !== 'none');
 }
@@ -94,11 +117,18 @@ async function printOne(query) {
     note,
     echoNote: echoNote(note, items),
     junk,
-    costMicros: printed.costMicros ?? loaded.cost_micros ?? loaded.costMicros ?? null,
+    emptyVerified: isVerifiedBuilder(query) && items.length === 0,
+    employerSpill: employerSpill(query, titles),
+    costMicros: printed.costMicros ?? loaded.cost_micros ?? loaded.costMicros ?? null;
     inputTokens: printed.inputTokens ?? loaded.input_tokens ?? loaded.inputTokens ?? null,
     outputTokens: printed.outputTokens ?? loaded.output_tokens ?? loaded.outputTokens ?? null,
     ms: Date.now() - started,
-    ok: !junk.length && !echoNote(note, items) && (wall == null || wall === items.length),
+    ok:
+      !junk.length &&
+      !echoNote(note, items) &&
+      (wall == null || wall === items.length) &&
+      !(isVerifiedBuilder(query) && items.length === 0) &&
+      !employerSpill(query, titles).length,
   };
 }
 
@@ -131,7 +161,9 @@ const summary = {
     note: row.note,
     echoNote: row.echoNote,
     junk: row.junk,
-    costMicros: row.costMicros,
+    emptyVerified: row.emptyVerified,
+    employerSpill: row.employerSpill,
+    costMicros: row.costMicros;
     inputTokens: row.inputTokens,
     outputTokens: row.outputTokens,
     ms: row.ms,

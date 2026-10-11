@@ -15,10 +15,13 @@ import {
 } from './shipped-flagship';
 import { isLegacyNpmFamily } from './shipped-dates';
 import { isOssHarvestItem, ownedByBuilder, ownerCanProve, undatedPassesGate, type OwnerContext } from './shipped-ownership';
+import { isEmployerSpill } from './shipped-products';
 import type { ItemStatus } from '../lib/shipped-year';
 import { ITEM_STATUSES } from '../lib/shipped-year';
 
-export const TITLE_MAX = 60;
+export const TITLE_MAX = 48;
+/** Already-clean noun phrases may keep one extra token; sentences stay at TITLE_MAX. */
+export const TITLE_HARD_MAX = 56;
 /** Cheap harvest cap before the one LLM curation call. */
 export const CHEAP_CANDIDATE_CAP = 150;
 /** Printed tape cap after curation roll-ups. */
@@ -51,7 +54,7 @@ const TITLE_END_BAD = /\b(of|a|an|the|with|and|or|security|controlled|trusted|ge
 const TITLE_VERB =
   /^(announces|announce|announced|connects|connect|built|builds|building|works|working|uses|using|used|launched|ships|shipped|released|added|adds|created|makes|made|lets|can|will|is|are|was|were|gives|reaches|joins|keeps|combines|deprecated)$/i;
 const SENTENCE_VERB =
-  /\b(announces|announce|announced|connects|gives|reaches|joins|keeps|combines|deprecated|also added|is now|now keeps)\b/i;
+  /\b(announces|announce|announced|connects|gives|reaches|joins|keeps|combines|deprecated|also added|is now|are now|now live|now keeps|now display)\b/i;
 const BARE_MODEL = /^gpt-[3-5]$/i;
 const CODE_TITLE = /^[a-z][\w-]*\.[a-z][\w-]*\.[a-z]/i;
 const MID_WORD =
@@ -866,8 +869,10 @@ export function nounPhraseFromSentence(raw: string): string {
   }
   const lets = text.match(/^([A-Za-z][\w. -]{1,32}?)\s+(lets?|can also|can now|will)\b/i);
   if (lets) return tidy(lets[1]);
-  const isNow = text.match(/^([A-Za-z][\w.-]{1,32})\s+is now\b/i);
+  const isNow = text.match(/^([A-Za-z][\w.-]{1,32}(?:\s+[A-Za-z][\w.-]{1,24}){0,3})\s+(?:is|are) now\b/i);
   if (isNow) return tidy(isNow[1]);
+  const nowDoes = text.match(/^([A-Za-z][\w.-]{1,32}(?:\s+[A-Za-z][\w.-]{1,24}){0,3})\s+now (?:display|shows?|includes?|accepts?)\b/i);
+  if (nowDoes) return tidy(nowDoes[1]);
   const joining = text.match(/^([A-Za-z][\w.-]{1,32})\s+(?:is joining|joins)\s+([A-Za-z][\w.-]{1,32})/i);
   if (joining) return `${tidy(joining[1])} joining ${tidy(joining[2])}`;
   const report = text.match(/^a technical report on\s+(.+)$/i);
@@ -899,8 +904,11 @@ export function dateFromLabeledTitle(raw: unknown, year: number): string | null 
 
 export function cleanShipTitle(raw: unknown, max = TITLE_MAX): string {
   if (/[A-Za-z0-9]-$/.test(tidy(raw))) return '';
+  if (/including:?\s*$/i.test(tidy(raw))) return '';
   let text = normalizeVersionTokens(stripDateSuffix(tidy(raw)));
   if (!text) return '';
+  const nowLive = text.match(/^(.{2,48}?)\s+(?:is|are) now\b/i);
+  if (nowLive?.[1] && nowLive[1].trim().split(/\s+/).length <= 6) text = nowLive[1].trim();
   if (isNotAShipTitle(text) || isDocsOrReferenceTitle(text) || isVagueOrCutTitle(text) || isCodeOrBugfixTitle(text)) return '';
   const labeled = text.match(LABELED_VERSION);
   if (labeled) text = `Cursor ${labeled[1]}`;
@@ -954,8 +962,13 @@ export function cleanShipTitle(raw: unknown, max = TITLE_MAX): string {
     text = text.split(/\s+/).slice(0, -1).join(' ').trim();
   }
   if (!text) return '';
-  const sentence = /\b(released|lets?|can also|can now|in the api|use a |with site)\b/i.test(text);
-  if (sentence) {
+  const changelogSentence = /\b(are now|is now|now live|now display)\b/i.test(text);
+  if (changelogSentence) {
+    const phrase = nounPhraseFromSentence(text);
+    const words = phrase ? phrase.split(/\s+/).filter(Boolean) : [];
+    if (phrase && words.length >= 2 && words.length <= 6 && !isJunkTitle(phrase) && !SENTENCE_VERB.test(phrase)) text = phrase;
+    else if (text.split(/\s+/).filter(Boolean).length >= 8) return '';
+  } else if (/\b(can also|can now)\b/i.test(text)) {
     const phrase = nounPhraseFromSentence(text);
     const words = phrase ? phrase.split(/\s+/).filter(Boolean) : [];
     if (phrase && words.length >= 2 && words.length <= 6 && !isJunkTitle(phrase)) text = phrase;
@@ -963,7 +976,8 @@ export function cleanShipTitle(raw: unknown, max = TITLE_MAX): string {
   if (!text) return '';
   if (isJunkTitle(text)) return '';
   const keepVersion = Boolean(versionParts(text));
-  const clamped = wordClamp(text, keepVersion ? Math.max(max, 56) : max);
+  const clampTo = changelogSentence ? TITLE_MAX : keepVersion ? Math.max(max, TITLE_HARD_MAX) : TITLE_HARD_MAX;
+  const clamped = wordClamp(text, clampTo);
   if (!clamped || isJunkTitle(clamped) || looksMidWord(clamped) || looksCutOff(clamped) || looksFragment(clamped)) return '';
   return gateShipTitle(String(raw ?? ''), clamped);
 }
@@ -1156,7 +1170,9 @@ export function looksLikeMonthlyRoundup(title: string): boolean {
   if (!text) return false;
   if (/^what[’']s new in\b/i.test(text)) return true;
   if (/^building\b.+,?\s+part\s+\d/i.test(text)) return true;
+  if (/\b(year in review|annual recap|wrapped|recap)\b/i.test(text) && !/\d+\.\d+/.test(text)) return true;
   if (/^[A-Za-z]{3}\s+\d{1,2},\s+\d{4}\b/.test(text) && text.split(/\s+/).length <= 8) return true;
+  if (/^[A-Z]{3}\s+\d{1,2},\s+\d{4}$/.test(text)) return true;
   return false;
 }
 
@@ -1173,6 +1189,8 @@ export function titleSanityOk(title: string): boolean {
   }
   const words = text.split(/\s+/).filter(Boolean);
   if (words.length >= 8 && !/\d+\.\d+/.test(text) && !/·\s*\d+\s+(updates?|releases?)/i.test(text)) return false;
+  if (SENTENCE_VERB.test(text) && !/\d+\.\d+/.test(text)) return false;
+  if (text.length > TITLE_HARD_MAX && !/·\s*\d+\s+(updates?|releases?)/i.test(text)) return false;
   return true;
 }
 
@@ -1599,6 +1617,10 @@ export function polishCandidates<T extends Polishable>(items: T[], opts: PolishO
   };
   for (const item of items) {
     const flagship = flagshipLaunchName(item);
+    if (isEmployerSpill(item, opts.affiliation)) {
+      drop(item, 'employer-spill');
+      continue;
+    }
     if (
       (opts.affiliation?.role === 'ceo' || opts.affiliation?.role === 'founder') &&
       isCeoApiMinutiae(item.name, item.link)
@@ -1644,6 +1666,9 @@ export function polishCandidates<T extends Polishable>(items: T[], opts: PolishO
         !looksMidWord(fallback) &&
         !looksFragment(fallback) &&
         !TITLE_START_BAD.test(fallback) &&
+        !isVagueOrCutTitle(item.name) &&
+        !isVagueOrCutTitle(fallback) &&
+        !/including:?$/i.test(String(item.name || '')) &&
         !isPrereleaseShip(fallback) &&
         !isNeverShipKind(fallback) &&
         !isDocsOrReferenceTitle(fallback) &&

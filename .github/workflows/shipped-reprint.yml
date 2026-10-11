@@ -24,6 +24,7 @@ on:
       - worker/shipped-company.ts
       - worker/shipped-repos.ts
       - worker/shipped-oss.ts
+      - worker/shipped-products.ts
       - worker/shipped-dates.ts
       - scripts/check-shipped-live-goldens.mjs
       - scripts/eval-shipped-heldout-live.mjs

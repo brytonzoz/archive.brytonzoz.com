@@ -39,6 +39,7 @@ import {
   type XProfile,
 } from './shipped-identity';
 import { hostNamesOwner, ownerFromProfile, ownerTokens } from './shipped-ownership';
+import { harvestOwnProductSites, isEmployerSpill, pinnedReposFromHtml, productsFromSurfaces } from './shipped-products';
 import { isFirstPublishBeforeYear, npmCreatedYear } from './shipped-dates';
 import { isJunkProductName, isJunkRepoName, isKnownPackageFamily, isShipRepo, looksLikeCodeIdentifier, looksLikePersonName, looksLikeProductReadme } from './shipped-repos';
 import {
@@ -143,6 +144,10 @@ export type Profile = {
   company?: string | null;
   /** Public GitHub org memberships (`/users/{login}/orgs`). */
   orgs?: string[];
+  /** Pinned repos from the GitHub profile page. */
+  pinned?: { owner: string; name: string }[];
+  /** X verified / blue-verified when the profile JSON said so. */
+  xVerified?: boolean;
 };
 
 export const emptyProfile = (): Profile => ({
@@ -820,6 +825,7 @@ const npm: SourceProvider = {
         if (!inYear(day(entry.package.date), year)) return false;
         const name = String(entry.package.name ?? '');
         const desc = String(entry.package.description ?? '');
+        if (isEmployerSpill({ name, source: 'npm', link: `https://www.npmjs.com/package/${name}` }, profile.affiliation)) return false;
         if (isKnownPackageFamily(name)) return true;
         if (isJunkProductName(name, users[0], profile.name)) return false;
         if (looksLikeCodeIdentifier(name) || looksLikePersonName(name, profile.name)) return false;
@@ -1242,6 +1248,7 @@ export type GithubUser = {
   repos: number;
   company: string | null;
   orgs?: string[];
+  pinned?: { owner: string; name: string }[];
 };
 
 export async function githubUserOrgs(login: string, env: SourceEnv): Promise<string[]> {
@@ -1290,6 +1297,7 @@ function parseProfile(html: string, login: string): GithubUser | null {
     x: xFrom(me),
     repos: count(html.match(/Repositories\s*<span title="([\d,]+)"/)?.[1]),
     company: clean(decode(html.match(/itemprop="worksFor"[\s\S]*?<div>([^<]+)</)?.[1] ?? html.match(/aria-label="Organization:\s*([^"]+)"/)?.[1] ?? ''), 40) || null,
+    pinned: pinnedReposFromHtml(html),
   };
 }
 
@@ -1383,7 +1391,7 @@ function finishProfile(profile: Profile): Profile {
 }
 
 export function identityCacheKey(profile: Profile, subject: Subject): string {
-  return [subject.kind, subject.id, profile.github, profile.x, hostOf(profile.site), loose(profile.name)]
+  return [subject.kind, subject.id, profile.github, profile.x, hostOf(profile.site), loose(profile.name), (profile.pinned || []).map((p) => p.name).join(',')]
     .filter(Boolean)
     .join('|')
     .toLowerCase();
@@ -1433,7 +1441,7 @@ async function githubRepoOwners(product: string, env: SourceEnv): Promise<string
 
 /** Expand a typed subject to GitHub, X, sites, PH/npm usernames. Cached 24h. */
 export async function resolveIdentity(subject: Subject, env: SourceEnv, tinyfish: TinyfishAccess = null): Promise<ResolvedIdentity> {
-  return cached(`id:v8:${subject.kind}:${subject.id.toLowerCase()}:${loose(subject.display)}:${subject.x || ''}`, 1440 * MIN, () => resolveIdentityFresh(subject, env, tinyfish));
+  return cached(`id:v9:${subject.kind}:${subject.id.toLowerCase()}:${loose(subject.display)}:${subject.x || ''}`, 1440 * MIN, () => resolveIdentityFresh(subject, env, tinyfish));
 }
 
 async function resolveProductMaker(
@@ -1542,6 +1550,7 @@ export async function resolveIdentityFresh(subject: Subject, env: SourceEnv, tin
     profile.name ||= xProfile.name;
     profile.bio ||= xProfile.bio;
     profile.site ||= xProfile.site;
+    profile.xVerified = xProfile.verified || profile.xVerified;
     profile.sites = mergeSites(profile.sites, xProfile.urls, [xProfile.site]);
   } else if (xHandle) notes.push('x-profile:miss');
 
@@ -1602,6 +1611,7 @@ export async function resolveIdentityFresh(subject: Subject, env: SourceEnv, tin
     profile.x ||= matched.user.x;
     profile.company ||= matched.user.company;
     if (matched.user.orgs?.length) profile.orgs = matched.user.orgs;
+    if (matched.user.pinned?.length) profile.pinned = matched.user.pinned;
     if (matched.user.blog) {
       profile.site = matched.user.blog;
       profile.sites = mergeSites(profile.sites, [matched.user.blog]);
@@ -1620,6 +1630,7 @@ export async function resolveIdentityFresh(subject: Subject, env: SourceEnv, tin
       profile.x ||= user.x;
       profile.company ||= user.company;
       if (user.orgs?.length) profile.orgs = user.orgs;
+      if (user.pinned?.length) profile.pinned = user.pinned;
       if (user.blog) profile.sites = mergeSites(profile.sites, [user.blog]);
     } else notes.push('github-profile:miss');
   } else notes.push('github:unresolved');
@@ -1811,7 +1822,7 @@ export async function gather(
     gatherFresh(subject, resolved.profile, env, year, meter, tinyfish, resolved.notes, mode, opts?.onPartial, opts?.affiliation);
   if (opts?.rebuild && !opts.onPartial) return load();
   if (opts?.rebuild) return load();
-  const key = mode === 'full' ? `gather:full:v32:${year}:${resolved.cacheKey}` : `gather:v41:${year}:${resolved.cacheKey}`;
+  const key = mode === 'full' ? `gather:full:v33:${year}:${resolved.cacheKey}` : `gather:v42:${year}:${resolved.cacheKey}`;
   return cached(
     key,
     1440 * MIN,
@@ -1913,6 +1924,24 @@ async function gatherFresh(
     if (affiliation.product) affiliation.product = primaryProduct(affiliation.product, affiliation.company) || affiliation.product;
   };
   applyCompanyHints();
+  const ownProducts = productsFromSurfaces({
+    bio: profile.bio,
+    urls: sitesOf(profile),
+    orgs: profile.orgs,
+    pins: profile.pinned,
+    github: profile.github,
+  });
+  for (const product of ownProducts) {
+    if (product.site) profile.sites = mergeSites(profile.sites, [product.site]);
+    else {
+      const guess = productHostGuesses(product.name)[0];
+      if (guess) profile.sites = mergeSites(profile.sites, [guess]);
+    }
+  }
+  if (ownProducts.length) {
+    ran.push(`own-products:${ownProducts.map((row) => row.name).slice(0, 6).join(',')}`);
+    ctx.extraUrls = [...new Set([...(ctx.extraUrls ?? []), ...ownProducts.map((row) => row.site).filter((url): url is string => Boolean(url))])];
+  }
   if (!affiliation.companyGithub && profile.orgs?.length && affiliation.company && apiOpen(env)) {
     const owned = await orgOwningProduct(profile.orgs, affiliation.company, env).catch(() => null);
     if (owned) {
@@ -2071,6 +2100,8 @@ async function gatherFresh(
             bio: profile.bio,
             orgs: profile.orgs,
             sites: sitesOf(profile),
+            pins: profile.pinned,
+            products: ownProducts.map((row) => row.name),
             get: (path) => githubApi(path, env),
             cache: (cacheKey, ttl, load) => cached(cacheKey, ttl, load),
             readText: async (url) => {
@@ -2084,7 +2115,7 @@ async function gatherFresh(
           }).catch(() => ({ found: [] as Found[], ran: [] as string[], orgs: [] as string[] }));
         })()
       : Promise.resolve({ found: [] as Found[], ran: [] as string[], orgs: [] as string[] });
-  const [results, site, extraSites, searched, storeHarvest, githubOverview, ossHarvest] = await Promise.all([
+  const [results, site, extraSites, searched, storeHarvest, githubOverview, ossHarvest, ownHarvest] = await Promise.all([
     Promise.allSettled(SOURCES.filter((source) => source.enabled(ctx)).map(async (source) => ({ id: source.id, found: await raceTimeout(source.run(ctx), SOURCE_TIMEOUT_MS, []) }))),
     homepage ? raceTimeout(readSite(homepage).catch(() => null), SOURCE_TIMEOUT_MS, null) : Promise.resolve(null),
     Promise.all(extraHomes.map((url) => raceTimeout(readSite(url).catch(() => null), SOURCE_TIMEOUT_MS, null))),
@@ -2103,6 +2134,7 @@ async function gatherFresh(
     companyStoreP,
     raceTimeout(githubOverviewP, SOURCE_TIMEOUT_MS, null),
     raceTimeout(ossHarvestP, OSS_TIMEOUT_MS, { found: [] as Found[], ran: [] as string[], orgs: [] as string[] }),
+    raceTimeout(harvestOwnProductSites(ownProducts, year).catch(() => []), SOURCE_TIMEOUT_MS, []),
     raceTimeout(identityP, SOURCE_TIMEOUT_MS, undefined),
   ]);
   if (site) ran.push('site');
@@ -2143,6 +2175,10 @@ async function gatherFresh(
     ran.push(...ossHarvest.ran, 'oss-harvest');
   } else if (profile.github) {
     ran.push(...ossHarvest.ran, 'oss-harvest:empty');
+  }
+  if (ownHarvest.length) {
+    found.push(...ownHarvest);
+    ran.push(`own-product-harvest:${ownHarvest.length}`);
   }
 
   const ownPages = extraSites.filter((page): page is SiteInfo => Boolean(page));
@@ -2458,9 +2494,11 @@ async function gatherFresh(
   const meanConfidence =
     deduped.length > 0 ? deduped.reduce((sum, item) => sum + (item.confidence ?? 0), 0) / deduped.length : 0;
   const capped = ran.some((tag) => tag.startsWith('xai-capped')) || leftover > 0;
+  const thinVerified = !deep && Boolean(profile.x) && deduped.length < 5;
   const incomplete =
     !deep &&
-    (finalGaps.includes('thin-for-prolific') ||
+    (thinVerified ||
+      finalGaps.includes('thin-for-prolific') ||
       ran.includes('xai-skipped:no-handle') ||
       (deduped.length > 0 && meanConfidence > 0 && meanConfidence < 0.85));
   return {

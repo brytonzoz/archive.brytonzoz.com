@@ -51,7 +51,9 @@ test('title cleaner extracts a short product name or drops the line', () => {
   assert.equal(polish.cleanShipTitle('TRUSTMRR REVENUECAT INTEGRATION (API'), '');
   assert.ok(polish.cleanShipTitle('Remote control for local agents').length <= 60);
   assert.match(polish.cleanShipTitle('Vercel Terraform Provider now available'), /vercel terraform provider/i);
-  assert.match(polish.cleanShipTitle('Deployment Pages now display key metrics'), /deployment pages now display key metrics/i);
+  assert.match(polish.cleanShipTitle('Deployment Pages now display key metrics'), /deployment pages/i);
+  assert.ok(!/\bnow display\b/i.test(polish.cleanShipTitle('Deployment Pages now display key metrics')));
+  assert.ok(polish.cleanShipTitle('AWS DATABASES ARE NOW LIVE ON THE VERCEL MARKETPLACE AND V0').length <= 48);
   assert.equal(polish.endsWithCutOffWord('Vercel Terraform Provider Now'), true);
   assert.equal(polish.endsWithCutOffWord('Observability Dashboard for Image'), true);
   assert.equal(polish.endsWithCutOffWord('FLUX 3 Image'), false);

@@ -58,6 +58,8 @@ test('typed queries become person → role → company', () => {
   assert.equal(affiliation.shouldInferCompany({ ...affiliation.emptyAffiliation(), role: 'ceo' }), true);
   assert.equal(affiliation.shouldInferCompany({ ...affiliation.emptyAffiliation(), role: 'founder' }, { orgs: ['oven-sh'] }), true);
   assert.equal(affiliation.shouldInferCompany({ ...affiliation.emptyAffiliation(), role: 'founder' }, { githubCompany: 'oven-sh' }), true);
+  assert.equal(affiliation.shouldInferCompany({ ...affiliation.emptyAffiliation(), role: 'founder' }, { githubCompany: 'vercel' }), false);
+  assert.equal(affiliation.shouldInferCompany({ ...affiliation.emptyAffiliation(), role: 'unknown' }, { githubCompany: 'vercel' }), false);
   const bun = affiliation.affiliationFromBio('Creator of Bun. https://bun.sh', affiliation.emptyAffiliation());
   assert.equal(bun.role, 'founder');
   assert.equal(bun.company, 'Bun');

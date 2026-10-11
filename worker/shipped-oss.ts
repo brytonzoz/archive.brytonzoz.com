@@ -665,6 +665,8 @@ export async function harvestOss(opts: {
   bio?: string;
   orgs?: string[];
   sites?: string[];
+  pins?: { owner: string; name: string }[];
+  products?: string[];
 }): Promise<{ found: OssFound[]; ran: string[]; orgs: string[] }> {
   const login = opts.login.replace(/^@/, '');
   const year = opts.year;
@@ -713,6 +715,33 @@ export async function harvestOss(opts: {
     if (orgRepos.some((row) => `${row.owner.toLowerCase()}/${row.name.toLowerCase()}` === key)) return;
     orgRepos.push(repo);
   };
+
+  const pins = [...(opts.pins || [])];
+  for (const pin of pins.slice(0, 8)) {
+    if (isEmployerOrg(pin.owner) && !isOrgFounder({
+      org: pin.owner,
+      bio: opts.bio,
+      company: opts.affiliation?.company,
+      companyGithub: opts.affiliation?.companyGithub,
+      role: opts.affiliation?.role,
+      product: opts.affiliation?.product,
+    })) {
+      continue;
+    }
+    const meta = await memo(`oss:repo:${pin.owner}/${pin.name}`, 360 * 60, () =>
+      opts.get<Record<string, unknown>>(`/repos/${encodeURIComponent(pin.owner)}/${encodeURIComponent(pin.name)}`).catch(() => null),
+    );
+    const repo =
+      asRepo(pin.owner, meta || { name: pin.name, html_url: `https://github.com/${pin.owner}/${pin.name}`, stargazers_count: 1 }) ||
+      ({
+        owner: pin.owner,
+        name: pin.name,
+        html_url: `https://github.com/${pin.owner}/${pin.name}`,
+        stargazers_count: 1,
+      } satisfies OssRepo);
+    takeRepo(repo);
+    ran.push(`oss-pin:${pin.owner}/${pin.name}`);
+  }
 
   for (const hit of eventHits.slice(0, 8)) {
     if (isEmployerOrg(hit.owner) && !isOrgFounder({
@@ -909,7 +938,9 @@ export async function harvestOss(opts: {
   await harvestBlogs(earlyHomes.slice(0, 6));
 
   let bio = opts.bio || '';
-  const products = [opts.affiliation?.product, opts.affiliation?.company].filter((value): value is string => Boolean(value));
+  const products = [...(opts.products || []), opts.affiliation?.product, opts.affiliation?.company].filter(
+    (value): value is string => Boolean(value),
+  );
   const probeHomes = [...(opts.sites || [])].filter((url, i, all) => url && all.indexOf(url) === i);
   if (opts.readText && !overBudget()) {
     const extraHomes = found.length ? 2 : 4;
@@ -975,8 +1006,14 @@ export async function harvestOss(opts: {
     for (const product of products.slice(0, 2)) {
       const q = product.replace(/[^A-Za-z0-9._-]+/g, ' ').trim();
       if (q.length < 2) continue;
-      const data = await memo(`oss:search:${q.toLowerCase()}`, 180 * 60, () =>
-        opts.get<{ items?: Record<string, unknown>[] }>(`/search/repositories?q=${encodeURIComponent(`${q} in:name stars:>500`)}&per_page=5`).catch(() => null),
+      const data = await memo(`oss:search:${q.toLowerCase()}:${login.toLowerCase()}`, 180 * 60, () =>
+        opts
+          .get<{ items?: Record<string, unknown>[] }>(
+            `/search/repositories?q=${encodeURIComponent(`${q} in:name user:${login}`)}&per_page=5`,
+          )
+          .catch(() =>
+            opts.get<{ items?: Record<string, unknown>[] }>(`/search/repositories?q=${encodeURIComponent(`${q} in:name stars:>200`)}&per_page=5`).catch(() => null),
+          ),
       );
       for (const row of data?.items || []) {
         const repo = asRepo(String((row.owner as { login?: string } | undefined)?.login || ''), row);

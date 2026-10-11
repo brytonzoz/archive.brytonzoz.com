@@ -198,6 +198,13 @@
   line-height: 1.1em;
 }
 
+.shipped-odo.is-wait .shipped-odo-cell {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: rgba(243, 234, 216, 0.42);
+}
+
 .shipped-proof-skel {
   display: flex;
   flex-direction: column;
@@ -757,13 +764,12 @@
   min-width: 0;
   font-size: 13.5px;
   text-wrap: balance;
-  overflow-wrap: break-word;
+  overflow-wrap: anywhere;
   word-break: break-word;
-  display: -webkit-box;
-  -webkit-box-orient: vertical;
-  -webkit-line-clamp: 2;
-  line-clamp: 2;
-  overflow: hidden;
+}
+
+.shipped-year-item .shipped-lead {
+  align-items: flex-start;
 }
 
 .shipped-item-status,
@@ -901,6 +907,18 @@
   outline-offset: 3px;
 }
 
+.shipped-item-name .shipped-link,
+.shipped-item-name .shipped-link:hover {
+  text-decoration: none;
+}
+
+.shipped-item-name .shipped-link:active,
+.shipped-item-name .shipped-link:focus-visible {
+  text-decoration: underline dotted;
+  text-decoration-color: rgba(29, 27, 25, 0.45);
+  text-underline-offset: 3px;
+}
+
 .shipped-barcode {
   display: flex;
   align-items: stretch;
@@ -913,9 +931,8 @@
   flex: none;
 }
 
-/* 1-bit logos stay crisp, like thermal print. Color favicons get knocked to ink. */
-.shipped-logo,
-.shipped-item-logo {
+/* Sponsor wordmarks stay 1-bit. Item marks are a dithered canvas — hide the tile if it does not survive. */
+.shipped-logo {
   image-rendering: pixelated;
   height: auto;
   filter: grayscale(1) contrast(3.4) brightness(0.55);
@@ -923,13 +940,35 @@
 }
 
 .shipped-logo[hidden],
-.shipped-item-logo[hidden] {
-  display: none;
+.shipped-thermal[hidden] {
+  display: none !important;
 }
 
-.shipped-item-logo {
+.shipped-thermal {
   display: block;
-  max-width: 100%;
+  width: 48px;
+  height: 20px;
+  margin: 0 0 0.25rem;
+  image-rendering: pixelated;
+  mix-blend-mode: multiply;
+}
+
+.shipped-group-head {
+  display: flex;
+  align-items: center;
+  gap: 0.45rem;
+  margin: 0.75rem 0 0.2rem;
+  font-size: 10.5px;
+  font-weight: 600;
+  letter-spacing: 0.16em;
+  opacity: 0.62;
+}
+
+.shipped-group-head .shipped-thermal,
+.shipped-group-mark {
+  margin: 0;
+  width: 36px;
+  height: 15px;
 }
 
 .shipped-year {
@@ -1477,6 +1516,19 @@ button.shipped-lcd-text {
 .shipped-key:focus-visible {
   outline: 2px solid var(--cream);
   outline-offset: 2px;
+}
+
+.shipped-key.is-icon {
+  width: 44px;
+  padding: 0;
+  letter-spacing: 0;
+}
+
+.shipped-key-icon {
+  display: block;
+  width: 18px;
+  height: 18px;
+  margin: 0 auto;
 }
 
 /* The mouth: a dark slot, and the serrated steel tear bar in front of it. */

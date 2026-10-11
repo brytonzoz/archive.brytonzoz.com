@@ -8,7 +8,9 @@ import Link from 'next/link';
 import { qr } from '../../lib/shipped-qr';
 import { HERO_SLOT } from '../../lib/shipped-sponsors';
 import { QR_PATH, groupItemsBySignificance, type SponsorBlock, type SponsorSlot } from '../../lib/shipped-year';
+import { logoPlacement } from '../../lib/shipped-mark';
 import { Barcode, Line, Rule, Tall, ExternalLink } from './paper';
+import { ThermalMark } from './ThermalMark';
 
 export type ViewItem = {
   key: string;
@@ -132,24 +134,10 @@ export function SponsorBlockView({ block }: { block: SponsorBlock | null }) {
   );
 }
 
-function ItemRow({ item, compact }: { item: ViewItem; compact?: boolean }) {
+function ItemRow({ item, compact, mark }: { item: ViewItem; compact?: boolean; mark?: boolean }) {
   return (
     <li className="shipped-year-item">
-      {item.logo ? (
-        // eslint-disable-next-line @next/next/no-img-element
-        <img
-          src={item.logo.src}
-          width={item.logo.width}
-          height={item.logo.height}
-          alt=""
-          loading="lazy"
-          decoding="async"
-          className="shipped-item-logo shipped-logo mb-1"
-          onError={(event) => {
-            event.currentTarget.hidden = true;
-          }}
-        />
-      ) : null}
+      {mark && item.logo ? <ThermalMark src={item.logo.src} className="shipped-item-logo" /> : null}
       <div className="shipped-lead">
         <h3 className="shipped-item-name min-w-0 font-semibold leading-snug">
           <ItemName item={item} />
@@ -192,16 +180,24 @@ function ItemList({ props }: { props: YearReceiptProps }) {
         <span className="shipped-item-status">STATUS</span>
       </p>
       <div className="mt-1">
-        {groups.map((group) => (
-          <div key={group.key}>
-            {group.label ? <p className="mt-3 mb-1 text-[10px] tracking-[0.14em] opacity-45">{group.label}</p> : null}
-            <ol>
-              {group.items.map((item) => (
-                <ItemRow key={item.key} item={item} compact={props.compact} />
-              ))}
-            </ol>
-          </div>
-        ))}
+        {groups.map((group) => {
+          const place = logoPlacement(group.items);
+          return (
+            <div key={group.key}>
+              {group.label ? (
+                <p className="shipped-group-head">
+                  {place.headerSrc ? <ThermalMark src={place.headerSrc} className="shipped-group-mark" /> : null}
+                  <span>{group.label}</span>
+                </p>
+              ) : null}
+              <ol>
+                {group.items.map((item) => (
+                  <ItemRow key={item.key} item={item} compact={props.compact} mark={place.itemKeys.includes(item.key)} />
+                ))}
+              </ol>
+            </div>
+          );
+        })}
       </div>
       <Rule heavy />
       <div className="shipped-lead items-baseline py-1 text-[13px] font-semibold">

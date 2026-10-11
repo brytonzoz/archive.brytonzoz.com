@@ -25,6 +25,25 @@ export type Job =
   | (JobBase & { kind: 'feed' })
   | (JobBase & { kind: 'idle' });
 
+function SpeakerIcon({ on }: { on: boolean }) {
+  return (
+    <svg className="shipped-key-icon" viewBox="0 0 24 24" aria-hidden="true">
+      <path d="M3.5 9h4.2L13 4.6v14.8L7.7 15H3.5z" fill="currentColor" />
+      {on ? (
+        <path
+          d="M16.2 9.2c1.3 1.1 1.3 4.5 0 5.6M19 6.8c2.4 2.1 2.4 8.3 0 10.4"
+          fill="none"
+          stroke="currentColor"
+          strokeWidth="1.7"
+          strokeLinecap="round"
+        />
+      ) : (
+        <path d="M16.2 9.2l5.2 5.2M21.4 9.2l-5.2 5.2" fill="none" stroke="currentColor" strokeWidth="1.7" strokeLinecap="round" />
+      )}
+    </svg>
+  );
+}
+
 export type Tone = 'ready' | 'busy' | 'error' | 'empty';
 
 /** The name field and Print live on the printer itself. */
@@ -592,24 +611,24 @@ export function Machine({ job, display, tone, onPrinted, onTorn, tearSignal = 0,
     <div className="shipped-keys">
       <button
         type="button"
-        className="shipped-key"
+        className="shipped-key is-icon"
         aria-pressed={sound}
         aria-label={sound ? 'Sound on. Turn printer sound off' : 'Sound off. Turn printer sound on'}
         onPointerDown={press}
         onClick={toggleSound}
       >
-        <span aria-hidden="true">{sound ? 'SND ON' : 'SND OFF'}</span>
+        <SpeakerIcon on={sound} />
       </button>
       {desk ? (
         <button
           type="button"
           className="shipped-key"
-          aria-pressed={!desk.listed}
-          aria-label={desk.listed ? 'Keep it off the wall' : 'Kept off the wall. Tap to pin it'}
+          aria-pressed={desk.listed}
+          aria-label={desk.listed ? 'On the wall. Tap to keep this receipt off the wall' : 'Off the wall. Tap to pin it'}
           onPointerDown={press}
           onClick={() => desk.onListed(!desk.listed)}
         >
-          <span aria-hidden="true">KEEP OFF</span>
+          <span aria-hidden="true">{desk.listed ? 'ON WALL' : 'OFF WALL'}</span>
         </button>
       ) : null}
       <span className="shipped-keys-space" aria-hidden="true" />

@@ -301,7 +301,7 @@ test('the wall crumples only in this browser and pages from the listed pile', as
   assert.match(admin, /Off the wall/);
   assert.match(admin, /Reprint/);
   const machine = fs.readFileSync(new URL('../components/shipped/Machine.tsx', import.meta.url), 'utf8');
-  assert.match(machine, /Keep it off the wall/);
+  assert.match(machine, /keep this receipt off the wall/);
   const visitor = fs.readFileSync(new URL('../components/shipped/visitor.tsx', import.meta.url), 'utf8');
   assert.match(visitor, /Unpin from the wall/);
   const home = fs.readFileSync(new URL('../app/shipped/page.tsx', import.meta.url), 'utf8');

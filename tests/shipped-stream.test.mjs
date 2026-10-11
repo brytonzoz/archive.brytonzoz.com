@@ -225,3 +225,31 @@ test('shared receipt pages are the hero; DATE/RECEIPT pairs do not collide; chec
   assert.match(sound, /allowSound/);
   assert.match(sound, /!gestured/);
 });
+
+test('item titles wrap, marks do not tile, keys read in one second, counters stay dotted until live', () => {
+  const css = fs.readFileSync(new URL('../app/shipped/receipt.css', import.meta.url), 'utf8');
+  const name = css.match(/\.shipped-item-name \{[^}]+\}/)?.[0] ?? '';
+  assert.doesNotMatch(name, /line-clamp/);
+  assert.doesNotMatch(name, /-webkit-box/);
+  assert.match(css, /\.shipped-odo\.is-wait/);
+  assert.match(css, /\.shipped-item-name \.shipped-link:active/);
+  assert.match(css, /underline dotted/);
+  assert.match(css, /\.shipped-thermal\[hidden\]/);
+  assert.match(css, /\.shipped-group-head/);
+
+  const year = fs.readFileSync(new URL('../components/shipped/YearReceipt.tsx', import.meta.url), 'utf8');
+  assert.match(year, /logoPlacement/);
+  assert.match(year, /ThermalMark/);
+  assert.doesNotMatch(year, /<img[^>]*shipped-item-logo/);
+
+  const machine = fs.readFileSync(new URL('../components/shipped/Machine.tsx', import.meta.url), 'utf8');
+  assert.match(machine, /SpeakerIcon/);
+  assert.match(machine, /ON WALL/);
+  assert.match(machine, /OFF WALL/);
+  assert.doesNotMatch(machine, /SND ON|SND OFF|KEEP OFF/);
+
+  const ticker = fs.readFileSync(new URL('../components/shipped/Ticker.tsx', import.meta.url), 'utf8');
+  assert.match(ticker, /is-wait/);
+  assert.match(ticker, /ready \? state\.printed : null/);
+  assert.doesNotMatch(ticker, /state\?\.printed \?\? 0/);
+});

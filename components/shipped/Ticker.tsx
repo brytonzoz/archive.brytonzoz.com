@@ -1,7 +1,7 @@
 'use client';
 
 // Mechanical counters pinned above the printer: printed first (odometer), then shared / mailed / views.
-// They start at 0 and only ever show numbers the Worker has confirmed. Tap to open the proof sheet.
+// They stay dotted until the Worker confirms a number, then only ever show that count. Tap to open the proof sheet.
 import React, { useEffect, useRef, useState } from 'react';
 import { moneyShort } from '../../lib/shipped-receipt';
 import { slotLabel } from '../../lib/shipped-sponsors';
@@ -20,16 +20,17 @@ const LABELS: { key: keyof TickerCounts; label: string }[] = [
   { key: 'views', label: 'VIEWS' },
 ];
 
-/** Ease toward `target` in a finite time, never showing more than the confirmed number. Reduced motion snaps. */
-function useConfirmedCount(target: number): number {
-  const confirmed = wholeCount(target);
-  const value = useRef(0);
-  const [shown, setShown] = useState(0);
+/** Ease toward a confirmed count. `null` means we have no Worker number yet — keep the dotted wait. First value snaps so zeros never flash. */
+function useConfirmedCount(target: number | null): number | null {
+  const confirmed = target == null ? null : wholeCount(target);
+  const value = useRef<number | null>(null);
+  const [shown, setShown] = useState<number | null>(null);
 
   useEffect(() => {
+    if (confirmed == null) return;
     const reduced = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
     const from = value.current;
-    if (reduced || confirmed <= from) {
+    if (from == null || reduced || confirmed <= from) {
       value.current = confirmed;
       setShown(confirmed);
       return;
@@ -39,12 +40,13 @@ function useConfirmedCount(target: number): number {
     const tick = (now: number) => {
       value.current = stepCount(from, confirmed, (now - start) / 1000);
       setShown(displayCount(value.current, confirmed));
-      if (value.current < confirmed) raf = window.requestAnimationFrame(tick);
+      if ((value.current ?? 0) < confirmed) raf = window.requestAnimationFrame(tick);
     };
     raf = window.requestAnimationFrame(tick);
     return () => window.cancelAnimationFrame(raf);
   }, [confirmed]);
 
+  if (confirmed == null || shown == null) return null;
   return Math.min(shown, confirmed);
 }
 
@@ -168,7 +170,18 @@ function Digit({ n }: { n: number }) {
   );
 }
 
-function Odometer({ value, places, size = 'md' }: { value: number; places: number; size?: 'md' | 'sm' }) {
+function Odometer({ value, places, size = 'md', wait = false }: { value: number | null; places: number; size?: 'md' | 'sm'; wait?: boolean }) {
+  if (wait || value == null) {
+    return (
+      <span className={`shipped-odo is-${size} is-wait`} aria-hidden="true">
+        {Array.from({ length: places }, (_, i) => (
+          <span key={i} className="shipped-odo-cell">
+            ·
+          </span>
+        ))}
+      </span>
+    );
+  }
   const padded = String(Math.max(0, Math.floor(value))).padStart(places, '0').slice(-places);
   return (
     <span className={`shipped-odo is-${size}`} aria-hidden="true">
@@ -182,37 +195,37 @@ function Odometer({ value, places, size = 'md' }: { value: number; places: numbe
 export function Ticker({ compact = false }: { compact?: boolean }) {
   const state = useShippedState();
   const [open, setOpen] = useState(false);
-  const [live, setLive] = useState(false);
-  useEffect(() => setLive(true), []);
-  const printed = useConfirmedCount(live ? (state?.printed ?? 0) : 0);
-  const shared = useConfirmedCount(live ? (state?.shared ?? 0) : 0);
-  const shipped = useConfirmedCount(live ? (state?.shipped ?? 0) : 0);
-  const views = useConfirmedCount(live ? (state?.views ?? 0) : 0);
-  const places = Math.max(4, String(Math.max(0, printed)).length);
+  const ready = state != null;
+  const printed = useConfirmedCount(ready ? state.printed : null);
+  const shared = useConfirmedCount(ready ? state.shared : null);
+  const shipped = useConfirmedCount(ready ? state.shipped : null);
+  const views = useConfirmedCount(ready ? state.views : null);
+  const waiting = !ready;
+  const places = Math.max(4, String(Math.max(0, printed ?? 0)).length);
 
   return (
     <>
       <button
         type="button"
         className={`shipped-ticker${compact ? ' is-slim' : ''}`}
-        aria-label={live && state ? `Printed ${fmt(printed)}, shared ${fmt(shared)}, mailed ${fmt(shipped)}, views ${fmt(views)}. Open proof.` : 'Open proof.'}
+        aria-label={ready && printed != null ? `Printed ${fmt(printed)}, shared ${fmt(shared ?? 0)}, mailed ${fmt(shipped ?? 0)}, views ${fmt(views ?? 0)}. Open proof.` : 'Open proof.'}
         onPointerDown={press}
         onClick={() => setOpen(true)}
       >
         <span className="shipped-ticker-primary">
-          <Odometer value={printed} places={places} />
+          <Odometer value={printed} places={places} wait={waiting} />
           <span className="shipped-ticker-k">printed</span>
         </span>
         {compact ? null : (
           <span className="shipped-ticker-rest">
             <span>
-              <Odometer value={shared} places={3} size="sm" /> shared
+              <Odometer value={shared} places={3} size="sm" wait={waiting} /> shared
             </span>
             <span>
-              <Odometer value={shipped} places={3} size="sm" /> mailed
+              <Odometer value={shipped} places={3} size="sm" wait={waiting} /> mailed
             </span>
             <span>
-              <Odometer value={views} places={3} size="sm" /> views
+              <Odometer value={views} places={3} size="sm" wait={waiting} /> views
             </span>
           </span>
         )}

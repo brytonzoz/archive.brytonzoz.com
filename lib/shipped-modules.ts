@@ -1,7 +1,7 @@
 // Modular receipt: a short thermal tape. Only the bands a real receipt needs print.
 // Older stored layouts and leftover AI ids are dropped, never shown.
 
-import { receiptNumber, type ItemSource, type YearItem, type YearReceipt } from './shipped-year';
+import { realReceiptItems, receiptNumber, type ItemSource, type YearItem, type YearReceipt } from './shipped-year';
 
 export type Rarity = 'first-run' | 'rare' | 'uncommon' | 'common';
 
@@ -99,8 +99,8 @@ export function seededLayout(_seed: number, _opts?: { hasDeepCut?: boolean }): M
  * Never views, bids, or made-up ranks. Potential receipts score 0.
  */
 export function shipScore(receipt: Pick<YearReceipt, 'items' | 'potential'>): number {
-  if (receipt.potential) return 0;
-  const items = receipt.items;
+  const items = realReceiptItems(receipt.items);
+  if (receipt.potential || !items.length) return 0;
   const sourced = items.filter((item) => item.source !== 'none' && item.link).length;
   const dated = items.filter((item) => item.date).length;
   const platforms = new Set(items.map((item) => item.source).filter((source) => source !== 'none')).size;
@@ -156,7 +156,7 @@ export type ModuleContext = {
 };
 
 export function catalogModules({ receipt, printed }: ModuleContext): ReceiptModule[] {
-  const items = receipt.potential ? [] : receipt.items;
+  const items = receipt.potential ? [] : realReceiptItems(receipt.items);
   const firstRun = isFirstRun(receipt.id);
   const serial = receiptNumber(receipt.id);
   const of = printed && printed >= receipt.id ? ` of ${printed.toLocaleString('en-US')}` : '';
@@ -167,7 +167,7 @@ export function catalogModules({ receipt, printed }: ModuleContext): ReceiptModu
     {
       id: 'items',
       title: 'ITEMS',
-      lines: items.length ? items.map((item) => `${item.name} · ${item.status}`) : ['YOUR POTENTIAL'],
+      lines: items.length ? items.map((item) => `${item.name} · ${item.status}`) : [],
       rarity: 'common',
       badge: null,
     },

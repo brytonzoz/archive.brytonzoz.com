@@ -14,7 +14,7 @@ import {
   stripDateSuffix,
 } from './shipped-flagship';
 import { isLegacyNpmFamily } from './shipped-dates';
-import { ownedByBuilder, undatedPassesGate, type OwnerContext } from './shipped-ownership';
+import { ownedByBuilder, ownerCanProve, undatedPassesGate, type OwnerContext } from './shipped-ownership';
 import type { ItemStatus } from '../lib/shipped-year';
 import { ITEM_STATUSES } from '../lib/shipped-year';
 
@@ -51,13 +51,13 @@ const SENTENCE_VERB =
 const BARE_MODEL = /^gpt-[3-5]$/i;
 const CODE_TITLE = /^[a-z][\w-]*\.[a-z][\w-]*\.[a-z]/i;
 const MID_WORD =
-  /^(ontrol|elease|pdate|ettings|vailable|olling|espectively|ead|nounced|ntroducing|aunched|hipped|rigin|roved)\b/i;
+  /^(ontrol|elease|pdate|ettings|vailable|olling|espectively|ead|nounced|ntroducing|aunched|hipped|rigin|roved|cial)\b/i;
 const OLD_PRODUCT =
   /\b(gpt-?4o(?:-mini)?|gpt-?3(?:\.5)?(?:-turbo)?|text-embedding-?[123]|embedding v[123]|ada-?002|davinci|curie|babbage|turbo-0?125|whisper-1|o1|o3(?:-mini)?)\b/i;
 const CTA_NAV =
   /^(visit our|try .{0,24} now|explore (enterprise|pricing|docs|plans)|watch (on )?youtube|subscribe|follow us|join (us|now)|get started|sign up|sign in\b|learn more|see more|read more|contact (us|sales|contact)|book a (demo|call)|youtube channel)\b/i;
 const CTA_TRAIL = /[↗→⬅︎↵]\s*$|youtube channel|try cursor now|explore enterprise/i;
-const FRAGMENT_START = /^(ies|ing|ted|ated|nced|trol|elease|pdate|ontrol|espectively)\b/i;
+const FRAGMENT_START = /^(ies|ing|ted|ated|nced|trol|elease|pdate|ontrol|espectively|cial|mercial)\b/i;
 const PLATFORM_LEAF =
   /(?:^|[-_/])(linux|darwin|win32|windows|freebsd|android|macos|ios)[-_]?(x64|arm64|armv7|ia32|x86_64|aarch64)?[-_]?(musl|gnu)?$/i;
 const SCOPE_SUBPACKAGE =
@@ -213,9 +213,20 @@ const KEEP_TAIL_ACRONYM =
 export function endsWithCutOffWord(text: string): boolean {
   const words = tidy(text).split(/\s+/).filter(Boolean);
   const last = words[words.length - 1] || '';
+  if (/^[A-Za-z]$/.test(last) && words.length >= 2) return true;
   if (/^(now|and|with|for|of|the|on|key|third|are|zero)$/i.test(last) && words.length >= 2) return true;
   if (/^(image|usage|delay|preview)$/i.test(last) && words.length >= 4) return true;
   if (words.length >= 5 && /^[A-Za-z]{3,4}$/.test(last) && !KEEP_TAIL_ACRONYM.test(last) && !/\d/.test(last)) {
+    return true;
+  }
+  if (
+    words.length >= 3 &&
+    last.length >= 8 &&
+    !/\d/.test(last) &&
+    !/(tion|sion|ment|ness|ship|ware|work|ings|able|ible|ical|ular|ers?|ors?|ies|ous|ive|est|ing|ted|als?|ects|ity|ance|ence|ator|ency|graphy)$/i.test(
+      last,
+    )
+  ) {
     return true;
   }
   return false;
@@ -321,6 +332,8 @@ export function isBlogEssayTitle(title: string): boolean {
   if (/\bships agent-written code\b|\bbug bounty program\b/i.test(text)) return true;
   if (/\b(helping (older adults|small businesses)|supporting the blind|big air tour|expand(?:s|ing) (access|their partnership)|academy with)\b/i.test(text)) return true;
   if (/^(towards|disrupting|advancing|acceleration|daybreak|eternal|path to|publication|overview)\b/i.test(text)) return true;
+  if (/^(latest|top|best)\s+(articles?|posts?|stories|news)\b/i.test(text)) return true;
+  if (/\barticles? about\b/i.test(text)) return true;
   if (/^openai delivers\b/i.test(text) || /\b(at scale|in production)\s+engineering\b/i.test(text)) return true;
   if (/\bhelps run\b.+\bexperiments\b/i.test(text) || /\bquantum computing experiments\b/i.test(text)) return true;
   if (/^(how|helping)\b/i.test(text) && !/\b(chatgpt|codex|gpt-?\d)\b/i.test(text.split(/\s+/).slice(0, 3).join(' '))) {
@@ -425,7 +438,7 @@ export function isJunkTitle(
   if (RESEARCH_GERUND.test(text) || CUSTOMER_STORY.test(text) || CHOPPED_GATEWAY.test(text) || isAcquisitionNews(text)) return true;
   if (CTA_NAV.test(text) || CTA_TRAIL.test(text)) return true;
   if (/^(download on the|get it on|get the app|affiliates|analytics|available on|filed under|quitting)\b/i.test(text)) return true;
-  if (CODE_TITLE.test(text) || isCodeOrBugfixTitle(text) || /^(object|query|router|number|string|boolean|date|type|value|array|null|undefined|any)$/i.test(text)) return true;
+  if (CODE_TITLE.test(text) || isCodeOrBugfixTitle(text) || isChangelogIdOrHostCrumb(text) || /^(object|query|router|number|string|boolean|date|type|value|array|null|undefined|any)$/i.test(text)) return true;
   if (isVagueOrCutTitle(text)) return true;
   if (/\bgithub stars\b|\bweekly downloads\b/i.test(text) && !/\b(zod|nub|tsc|cli|app)\b/i.test(text)) return true;
   if (/^respectively\.?$/i.test(text)) return true;
@@ -556,7 +569,7 @@ export function isNotAShipTitle(name: string): boolean {
   if (/\b(removed|retired|retires|retire|deprecated|sunsetting|sunset|deleted|discontinued|shut down|shutting down)\b/i.test(text)) return true;
   if (/^key changes\b|\bwhen migrating\b/i.test(text)) return true;
   if (/\b(docs?|documentation|readme|governance docs)\b/i.test(text) && /\b(update|updated|updates)\b/i.test(text)) return true;
-  if (/\bmodels? for model availability\b/i.test(text) || /\bmodel availability update\b/i.test(text)) return true;
+  if (/\bmodels? for model availability\b/i.test(text) || /\bmodel availability update\b/i.test(text) || /\bmodel availability\b/i.test(text)) return true;
   if (/\binto the\b/i.test(text)) return true;
   if (/\bupdates\s*:/i.test(text)) return true;
   if (/\bslugs?\b/i.test(text) && /\b(point|alias|latest|chat-latest)\b/i.test(text)) return true;
@@ -572,7 +585,7 @@ export function isVagueOrCutTitle(name: string): boolean {
   if (!text) return true;
   if (/\b or \b/i.test(text) && !/\b(ship or die|marketing or die)\b/i.test(text)) return true;
   if (/^cloud work$/i.test(text) || /^new controls\b/i.test(text) || /^all\s+[a-z]+$/i.test(text)) return true;
-  if (/\brolling out to all users\b/i.test(text) || /^beta and rolling\b/i.test(text)) return true;
+  if (/\brolling out to all users\b/i.test(text) || /^beta and rolling\b/i.test(text) || /\bis rolling out\b/i.test(text) || /\brolling out$/i.test(text)) return true;
   if (/\bin the chatgpt desktop$/i.test(text)) return true;
   if (/^(codex joining|chatgpt|features|commands|customize|side|release|admin|members|documentation|chores)$/i.test(text)) return true;
   if (/^(also released|connections to api):?$/i.test(text)) return true;
@@ -599,7 +612,42 @@ export function isCodeOrBugfixTitle(name: string): boolean {
   const text = tidy(name);
   if (!text) return false;
   if (/=/.test(text) || /["“”]/.test(text)) return true;
-  return /\b(flaky|bug ?fix(?:es)?|known issues?|will continue to scale)\b/i.test(text);
+  return /\b(flaky|bug ?fix(?:es)?|minor fix(?:es)?|hotfix(?:es)?|known issues?|will continue to scale)\b/i.test(text);
+}
+
+/** Changelog row ids, R2 host crumbs, and "latest articles about…" are not ships. */
+export function isChangelogIdOrHostCrumb(name: string, link?: string | null): boolean {
+  const text = tidy(name);
+  if (!text) return true;
+  if (/\b(latest articles? about|changelog goal)\b/i.test(text)) return true;
+  if (/^(latest|top|best)\s+(articles?|posts?|stories|news)\b/i.test(text)) return true;
+  const tokens = text.split(/\s+/).filter(Boolean);
+  if (
+    tokens.some((token) => {
+      if (/[-.]/.test(token) && /[a-z]/i.test(token)) return false;
+      const compact = token.replace(/[^A-Za-z0-9]/g, '');
+      return compact.length >= 18 && /^[A-Z0-9]+$/i.test(compact);
+    })
+  ) {
+    return true;
+  }
+  if (/^(public|www|cdn|static|assets|blob|media)$/i.test(text)) return true;
+  const href = String(link || '');
+  if (/\.(r2\.dev|vercel-storage\.com)(\/|$)/i.test(href) || /\/blob\//i.test(href)) return true;
+  return false;
+}
+
+/** `2026 08 13 …` or `2026-08-13` in a title — used when the card date is a Jan 1 scrape. */
+export function dateFromNumericTitle(title: string, year: number): string | null {
+  const iso = tidy(title).match(/\b(20\d{2})[/-](\d{1,2})[/-](\d{1,2})\b/);
+  const spaced = tidy(title).match(/\b(20\d{2})\s+(\d{1,2})\s+(\d{1,2})\b/);
+  const match = iso || spaced;
+  if (!match) return null;
+  const y = Number(match[1]);
+  const m = Number(match[2]);
+  const d = Number(match[3]);
+  if (y !== year || m < 1 || m > 12 || d < 1 || d > 31) return null;
+  return `${y}-${String(m).padStart(2, '0')}-${String(d).padStart(2, '0')}`;
 }
 
 /** Undated adjective phrases ("Richer JavaScript representation") are changelog copy, not products. */
@@ -785,6 +833,7 @@ export function cleanShipTitle(raw: unknown, max = TITLE_MAX): string {
   if (/[A-Za-z0-9]-$/.test(tidy(raw))) return '';
   let text = normalizeVersionTokens(stripDateSuffix(tidy(raw)));
   if (!text) return '';
+  if (isNotAShipTitle(text) || isDocsOrReferenceTitle(text) || isVagueOrCutTitle(text) || isCodeOrBugfixTitle(text)) return '';
   const labeled = text.match(LABELED_VERSION);
   if (labeled) text = `Cursor ${labeled[1]}`;
   const join = text.match(/^([A-Za-z][\w.-]{1,32})\s+(?:is joining|joins)\s+([A-Za-z][\w.-]{1,32})/i);
@@ -807,6 +856,7 @@ export function cleanShipTitle(raw: unknown, max = TITLE_MAX): string {
   if (/^(released|updated|added)\s+/i.test(text)) {
     text = text.replace(/^(released|updated|added)\s+/i, '').replace(/^the\s+/i, '').trim();
   }
+  text = text.replace(/\b(\w+)\s+\1\b/gi, '$1');
   text = text.replace(/,\s+a new\b.*$/i, '').trim();
   text = text.replace(/\s+in (public )?beta with\b.*$/i, '').trim();
   text = text.replace(/-+$/, '').trim();
@@ -855,9 +905,16 @@ const NAMED_PRODUCT = /\b(codex|chatgpt|cursor|v0|gpt-?\d|sora|atlas|appshots|si
 const SOFT_NAMED_START = /^(use|build|building|work|more)\b/i;
 const SOFT_CONCRETE_START = /^(share|pin|open)\b/i;
 
+/** `use-sound`, `@scope/pkg` — a package id, not a "use X" sentence. */
+function isHyphenatedPackage(title: string): boolean {
+  const text = tidy(title);
+  return /^@[\w.-]+\/[\w.-]+$/.test(text) || /^[A-Za-z][\w]*[-_][\w.-]+$/.test(text);
+}
+
 export function isProductNounPhrase(title: string): boolean {
   const text = tidy(title);
   if (!text) return false;
+  if (isHyphenatedPackage(text)) return true;
   if (TITLE_START_BAD.test(text)) {
     const namedOk = SOFT_NAMED_START.test(text) && NAMED_PRODUCT.test(text);
     const concreteOk = SOFT_CONCRETE_START.test(text) && text.split(/\s+/).length >= 3;
@@ -882,7 +939,7 @@ export function gateShipTitle(raw: string, cleaned = ''): string {
   text = text.replace(/\s+\b(of|a|an|the|with|and|or|security|controlled|trusted|general|advanced|remote|task|chat)\s*$/i, '').trim();
   if (!text) return '';
   if (BARE_MODEL.test(text.replace(/\s+/g, ''))) return '';
-  if (/^use\b/i.test(tidy(raw)) || /^use\b/i.test(text)) {
+  if (!isHyphenatedPackage(text) && !isHyphenatedPackage(tidy(raw)) && (/^use\b/i.test(tidy(raw)) || /^use\b/i.test(text))) {
     if (!/^use\s+(codex|chatgpt|cursor|v0|gpt-?\d)\b/i.test(text) && !/^use\s+(codex|chatgpt|cursor|v0|gpt-?\d)\b/i.test(tidy(raw))) {
       return '';
     }
@@ -988,10 +1045,11 @@ export function cleanDescription(value: unknown): string {
     /<\/?[a-z]|align=["']|^(p|h[1-6]|div|span|img|ul|ol|li|picture|source)\b|\b(srcset|prefers-color-scheme|media=["'])/i.test(text)
   )
     return '';
+  text = text.replace(/\b(\w+)\s+\1\b/gi, '$1');
   if (text.length <= DESC_MAX) return text;
   const cut = wordClamp(text, DESC_MAX);
-  if (!cut) return '';
-  return /[.!?…]$/.test(cut) ? cut : `${cut}…`;
+  if (!cut || looksCutOff(cut) || looksMidWord(cut)) return '';
+  return cut;
 }
 
 export function prettyBrand(company: string | null | undefined, host?: string | null): string {
@@ -1428,6 +1486,10 @@ export function polishCandidates<T extends Polishable>(items: T[], opts: PolishO
       drop(item, isJunkTitle(item.name, junkOpts) ? 'junk-title' : 'title-empty');
       continue;
     }
+    if (isChangelogIdOrHostCrumb(name, item.link) || isChangelogIdOrHostCrumb(item.name, item.link)) {
+      drop(item, 'changelog-id');
+      continue;
+    }
     if (isJunkTitle(name, junkOpts)) {
       if (flagship) {
         logFlagshipGate(item, 'junk-title', flagship);
@@ -1466,17 +1528,23 @@ export function polishCandidates<T extends Polishable>(items: T[], opts: PolishO
       drop(item, 'company-github');
       continue;
     }
-    if (opts.owner && !ownedByBuilder({ ...item, name }, opts.owner)) {
+    if (opts.owner && ownerCanProve(opts.owner) && !ownedByBuilder({ ...item, name }, opts.owner)) {
       if (flagship) logFlagshipGate(item, 'not-owned', flagship);
       else {
         drop(item, 'not-owned');
         continue;
       }
     }
+    const titledDate = dateFromNumericTitle(item.name, year) || dateFromNumericTitle(name, year);
+    const rawDate = String(item.date || '');
+    const scrapeJan1 = /^20\d{2}-01-01$/.test(rawDate);
     const date =
-      knownFlagshipDate({ ...item, name }, year) ??
-      (isFlagshipYearKeep(item, year) && item.date ? String(item.date).slice(0, 10) : inYearDate(item.date, year)) ??
-      dateFromLabeledTitle(item.name, year);
+      titledDate && scrapeJan1
+        ? titledDate
+        : knownFlagshipDate({ ...item, name }, year) ??
+          (isFlagshipYearKeep(item, year) && item.date ? String(item.date).slice(0, 10) : inYearDate(item.date, year)) ??
+          dateFromLabeledTitle(item.name, year) ??
+          titledDate;
     if (isChangelogPhrase(name, date)) {
       drop(item, 'changelog-phrase');
       continue;
@@ -1485,7 +1553,11 @@ export function polishCandidates<T extends Polishable>(items: T[], opts: PolishO
       drop(item, 'date-mismatch');
       continue;
     }
-    if (opts.owner && !undatedPassesGate({ ...item, name, date }, opts.owner)) {
+    if ((item.significance ?? 1) <= 0 && !flagship) {
+      drop(item, 'minor-fix');
+      continue;
+    }
+    if (opts.owner && ownerCanProve(opts.owner) && !undatedPassesGate({ ...item, name, date }, opts.owner)) {
       drop(item, 'undated-unowned');
       continue;
     }

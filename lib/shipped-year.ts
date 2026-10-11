@@ -147,17 +147,32 @@ export function itemDate(date: string | null): string | null {
   return match[3] ? `${month} ${Number(match[3])}` : `${month} ${match[1]}`;
 }
 
-export const itemsShipped = (receipt: Pick<YearReceipt, 'items' | 'potential'>) => (receipt.potential ? 1 : receipt.items.length);
+/** Lines that actually printed. The empty-receipt placeholder is not an item. */
+export function realReceiptItems<T extends { name?: string; source?: string }>(items: T[] | null | undefined): T[] {
+  return (Array.isArray(items) ? items : []).filter(
+    (item) => item && item.name && item.name !== 'YOUR POTENTIAL' && item.source !== 'none',
+  );
+}
+
+export const itemsShipped = (receipt: Pick<YearReceipt, 'items' | 'potential'>) => realReceiptItems(receipt.items).length;
 
 const MONTHS_LONG = ['JANUARY', 'FEBRUARY', 'MARCH', 'APRIL', 'MAY', 'JUNE', 'JULY', 'AUGUST', 'SEPTEMBER', 'OCTOBER', 'NOVEMBER', 'DECEMBER'];
 
 export const SIGNIFICANCE_LABELS = ['MINOR FIX', 'FEATURE', 'NOTABLE LAUNCH', 'MAJOR PRODUCT', 'LANDMARK'] as const;
 
-/** Group a long tape by Decisions significance (landmark first). */
+/** Decisions uses 0–4; CEO flagships use 0–100. Never invent a second copy of the same label. */
+export function significanceBand(value?: number | null): number | null {
+  if (value == null || Number.isNaN(value)) return 2;
+  if (value <= 4) return Math.max(0, Math.min(4, Math.round(value)));
+  return Math.max(0, Math.min(4, Math.round(value / 20)));
+}
+
+/** Group a long tape by Decisions significance (landmark first). Minor-fix rows stay off the receipt. */
 export function groupItemsBySignificance<T extends { significance?: number }>(items: T[]): { key: string; label: string; items: T[] }[] {
   const buckets = new Map<number, T[]>();
   for (const item of items) {
-    const band = Math.max(0, Math.min(4, Math.round(item.significance ?? 0)));
+    const band = significanceBand(item.significance);
+    if (band == null || band <= 0) continue;
     const list = buckets.get(band) ?? [];
     list.push(item);
     buckets.set(band, list);
@@ -194,8 +209,8 @@ export function subjectLabel(subject: Subject): string {
 
 /** What "Post to X" and Web Share prefill: first person, the image carries the rest. */
 export function shareText(receipt: Pick<YearReceipt, 'items' | 'potential' | 'subject' | 'year' | 'id'>): string {
-  if (receipt.potential) return `I shipped nothing public in ${receipt.year} — the receipt itemized my potential instead. Print yours:`;
-  const n = receipt.items.length;
+  if (receipt.potential || !itemsShipped(receipt)) return `I shipped nothing public in ${receipt.year} — the receipt itemized my potential instead. Print yours:`;
+  const n = itemsShipped(receipt);
   return `I shipped ${n} thing${n === 1 ? '' : 's'} in ${receipt.year}. Receipt attached.`;
 }
 
@@ -226,7 +241,7 @@ export function subjectKicker(subject: Subject): { text: string; href: string } 
 /** POST TO X prefills this. Tags the person when the receipt has a resolved handle. */
 export function shareTweet(receipt: Pick<YearReceipt, 'items' | 'potential' | 'subject' | 'year'>): string {
   const n = itemsShipped(receipt);
-  const things = receipt.potential ? 'nothing public' : `${n} thing${n === 1 ? '' : 's'}`;
+  const things = receipt.potential || n === 0 ? 'nothing public' : `${n} thing${n === 1 ? '' : 's'}`;
   const handle = xHandle(receipt);
   const who = handle ? `@${handle}` : subjectLabel(receipt.subject);
   return `${who} shipped ${things} in ${receipt.year} 🧾`;
@@ -236,7 +251,7 @@ export function shareTweet(receipt: Pick<YearReceipt, 'items' | 'potential' | 's
 export function receiptPageTitle(receipt: Pick<YearReceipt, 'items' | 'potential' | 'subject' | 'year'>): string {
   const who = subjectLabel(receipt.subject);
   const n = itemsShipped(receipt);
-  return receipt.potential
+  return receipt.potential || n === 0
     ? `${who}: shipped in ${receipt.year} (potential) | Shipped`
     : `${who} shipped ${n} thing${n === 1 ? '' : 's'} in ${receipt.year} | Shipped`;
 }

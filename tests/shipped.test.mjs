@@ -100,10 +100,19 @@ test('item dates and the share text', () => {
   assert.equal(itemDate('2026-11'), 'NOV 2026');
   assert.equal(itemDate(null), null);
   assert.equal(itemDate('soon'), null);
-  const receipt = { year: 2026, potential: false, subject: { kind: 'x', id: 'levelsio', display: '@levelsio' }, items: [{}, {}, {}] };
+  const receipt = {
+    year: 2026,
+    potential: false,
+    subject: { kind: 'x', id: 'levelsio', display: '@levelsio' },
+    items: [
+      { name: 'Photo AI', source: 'site' },
+      { name: 'Interior AI', source: 'site' },
+      { name: 'Remote OK', source: 'site' },
+    ],
+  };
   assert.equal(shareText(receipt), 'I shipped 3 things in 2026. Receipt attached.');
   assert.doesNotMatch(shareText(receipt), /@/, 'sharing never tags the person on the receipt');
-  assert.equal(itemsShipped({ ...receipt, potential: true, items: [{}] }), 1);
+  assert.equal(itemsShipped({ ...receipt, potential: true, items: [{}] }), 0);
   assert.match(shareText({ ...receipt, potential: true, items: [{}] }), /potential/);
   assert.equal(receiptPageTitle(receipt), '@levelsio shipped 3 things in 2026 | Shipped');
   assert.equal(receiptPageTitle({ ...receipt, potential: true, items: [{}] }), '@levelsio: shipped in 2026 (potential) | Shipped');
@@ -119,6 +128,15 @@ test('item dates and the share text', () => {
   const typedHandle = { ...receipt, subject: { kind: 'name', id: 'nicolashug', display: 'Nico' } };
   assert.equal(xHandle(typedHandle), 'nicolashug');
   assert.equal(shareTweet(typedHandle), '@nicolashug shipped 3 things in 2026 🧾');
+  const empty = {
+    year: 2026,
+    potential: true,
+    subject: { kind: 'x', id: 'jarredsumner', display: '@jarredsumner' },
+    items: [{ name: 'YOUR POTENTIAL', source: 'none', status: 'PRE-ORDER' }],
+  };
+  assert.equal(itemsShipped(empty), 0);
+  assert.match(shareText(empty), /potential/);
+  assert.match(receiptPageTitle(empty), /potential/);
 });
 
 test('kickers are links or they are hidden', () => {

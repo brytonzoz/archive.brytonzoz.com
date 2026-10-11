@@ -1015,3 +1015,66 @@ test('prereleases, starters, and Gateway model listings are not ships', () => {
   assert.ok(names.some((name) => /new models on ai gateway/i.test(name)), JSON.stringify(names));
   assert.equal(names.some((name) => /liquid ai|grok imagine/i.test(name)), false, JSON.stringify(names));
 });
+
+test('cut titles, changelog ids, jan-1 scrape dates, and minor fixes drop', () => {
+  assert.equal(polish.isChangelogIdOrHostCrumb('LATEST ARTICLES ABOUT HEADSHOT PHOTOGR'), true);
+  assert.equal(polish.isBlogEssayTitle('LATEST ARTICLES ABOUT HEADSHOT PHOTOGR'), true);
+  assert.equal(polish.isChangelogIdOrHostCrumb('PUBLIC', 'https://pub-abc.r2.dev/shot.jpg'), true);
+  assert.equal(polish.isChangelogIdOrHostCrumb('2026 08 13 CHANGELOG GOAL CPDECEWLXHBDQRA131C8YZJHDDOGZB'), true);
+  assert.equal(polish.isChangelogIdOrHostCrumb('Cursor 3', 'https://cursor.com/changelog/cursor-3'), false);
+  assert.equal(polish.looksMidWord('CIAL HARBOR EVALUATION FRAMEWORK'), true);
+  assert.equal(polish.dateFromNumericTitle('2026 08 13 CHANGELOG GOAL X', 2026), '2026-08-13');
+  assert.match(polish.cleanDescription('The most most capable model in the API.'), /most capable/i);
+  assert.doesNotMatch(polish.cleanDescription('The most most capable model in the API.'), /most most/i);
+  assert.equal(polish.isChangelogIdOrHostCrumb('AWS DATABASES ARE NOW LIVE ON THE VERCEL MARKETPLACE AND V0'), false);
+  assert.equal(polish.isChangelogIdOrHostCrumb('CHATGPT IMAGES'), false);
+  const nico = { name: 'Nico Jeannen', x: 'nico_jeannen', site: 'https://nicojeannen.com' };
+  const gated = polish.gateReceiptItems(
+    [
+      found({
+        name: 'Canva',
+        description: 'Listed on blog.go-publicly.com',
+        date: '2026-03-01',
+        source: 'site',
+        link: 'https://www.canva.com/',
+      }),
+      found({
+        name: 'CIAL HARBOR EVALUATION FRAMEWORK',
+        date: '2026-08-13',
+        source: 'changelog',
+        link: 'https://cursor.com/changelog/cial',
+        significance: 2,
+      }),
+      found({
+        name: 'MINOR FIX FOR LOGIN',
+        date: '2026-04-01',
+        source: 'changelog',
+        link: 'https://example.com/changelog/login',
+        significance: 0,
+      }),
+      found({
+        name: '2026 08 13 CHANGELOG GOAL CPDECEWLXHBDQRA131C8YZJHDDOGZB',
+        date: '2026-01-01',
+        source: 'changelog',
+        link: 'https://github.com/cursor/cursor/blob/main/CHANGELOG.md',
+      }),
+      found({
+        name: 'LATEST ARTICLES ABOUT HEADSHOT PHOTOGR',
+        date: '2026-06-01',
+        source: 'site',
+        link: 'https://headshotpro.com/blog',
+      }),
+      found({
+        name: 'Flowjam',
+        description: 'I made a canvas for founders. Listed on nicojeannen.com',
+        date: '2026-04-12',
+        source: 'site',
+        link: 'https://flowjam.com/',
+      }),
+    ],
+    { year: 2026, who: 'Nico Jeannen', handle: 'nico_jeannen', owner: nico },
+  );
+  const names = gated.map((item) => item.name);
+  assert.equal(names.some((name) => /canva|cial harbor|minor fix|changelog goal|latest articles|photogr/i.test(name)), false, JSON.stringify(names));
+  assert.ok(names.some((name) => /flowjam/i.test(name)), JSON.stringify(names));
+});

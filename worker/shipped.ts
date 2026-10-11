@@ -133,6 +133,7 @@ import {
   isGithubLogin,
   isXHandle,
   itemsShipped,
+  realReceiptItems,
   readQuery,
   receiptNumber,
   receiptPageTitle,
@@ -1015,9 +1016,9 @@ function pileEntry(row: PileRow): PileReceipt | null {
     id: row.id,
     who: subjectLabel(receipt.subject),
     count: itemsShipped(receipt),
-    potential: receipt.potential,
+    potential: receipt.potential || itemsShipped(receipt) === 0,
     full: Boolean(receipt.full),
-    items: receipt.items.slice(0, 6).map((item) => ({ name: item.name, status: item.status })),
+    items: realReceiptItems(receipt.items).slice(0, 6).map((item) => ({ name: item.name, status: item.status })),
     printedAt: receipt.printedAt,
   };
 }

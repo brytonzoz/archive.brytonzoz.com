@@ -131,7 +131,7 @@ test('nothing found prints YOUR POTENTIAL, never invented items; garbage replies
   for (const raw of [null, 'not json', [], { items: 'nope' }, { items: [{ name: 42 }, null, [], { name: 'x'.repeat(500) }] }]) {
     const draft = ai.validateDraft(raw, gathered([]), [], 2026);
     assert.equal(draft.potential, true);
-    assert.deepEqual(draft.items.map((item) => item.name), ['YOUR POTENTIAL']);
+    assert.deepEqual(draft.items, []);
   }
 });
 

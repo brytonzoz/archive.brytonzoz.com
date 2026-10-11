@@ -78,9 +78,13 @@ const NOT_A_PERSON_WORD = new Set([
   'images',
   'models',
   'model',
+  'platform',
+  'factory',
+  'runtime',
+  'engine',
 ]);
 
-const CODE_TLD = /\.(com|io|ai|dev|app|org|net|co|xyz|me|so|gg)\b/i;
+const CODE_TLD = /\.(com|io|ai|dev|app|org|net|co|xyz|me|so|gg|is|rs|tt|to)\b/i;
 const CODE_KEYWORD = /\b(await|async|const|function)\b/i;
 
 /** `greeting.query`, `Await AsyncCodec.encodeAsync`, `createHttpServer`, `bun-types`. */

@@ -8,14 +8,16 @@ export type OwnerContext = {
   site?: string | null;
   sites?: string[];
   company?: string | null;
+  companyGithub?: string | null;
 };
 
 export type OwnershipKind = 'developer' | 'portfolio' | 'named' | 'company' | 'none';
 
-const DEVELOPER_SOURCE = /^(github|npm|producthunt|appstore|x)$/;
+const MAKER_SOURCE = /^(npm|producthunt|appstore|x)$/;
 const COMPANY_SOURCE = /^(changelog|company)$/;
 const PORTFOLIO_HINT =
   /\b(pinned on|listed under|listed on|things i.?ve built|working on|my projects|portfolio)\b/i;
+const MADE_IT = /\b(i made|i built|i launched|i shipped|i released|my (app|product|game|site|tool))\b/i;
 const TOOLS_HINT =
   /\b(tools i use|affiliat|friends?|recommended|i use|made by|from the maker|founder community)\b/i;
 const PUBLIC_PAGE = /^public page on /i;
@@ -83,6 +85,22 @@ export function ownHosts(owner: OwnerContext | null | undefined): Set<string> {
   return hosts;
 }
 
+/** Own domain or a subdomain of it. blog.go-publicly.com is not Nico's just because he was listed there. */
+export function hostOwnedByBuilder(host: string | null | undefined, owner: OwnerContext | null | undefined): boolean {
+  if (!host) return false;
+  const own = ownHosts(owner);
+  if (own.has(host)) return true;
+  for (const known of own) {
+    if (host === known || host.endsWith(`.${known}`) || known.endsWith(`.${host}`)) return true;
+  }
+  return false;
+}
+
+export function listingHost(description: string | null | undefined): string | null {
+  const match = String(description || '').match(/\blisted on\s+([a-z0-9.-]+\.[a-z]{2,})\b/i);
+  return match?.[1] ? match[1].replace(/^www\./, '').toLowerCase() : null;
+}
+
 export function hostNamesOwner(host: string | null | undefined, owner: OwnerContext | null | undefined): boolean {
   if (!host) return false;
   if (ownHosts(owner).has(host)) return true;
@@ -96,25 +114,33 @@ function githubOwned(url: string | null | undefined, owner: OwnerContext | null 
   return new RegExp(`github\\.com/${login}(/|$)`, 'i').test(url);
 }
 
+function githubOrgOwned(url: string | null | undefined, owner: OwnerContext | null | undefined): boolean {
+  const org = owner?.companyGithub?.replace(/^@/, '');
+  if (!org || !url) return false;
+  return new RegExp(`github\\.com/${org}(/|$)`, 'i').test(url);
+}
+
 /** Why this line may appear on the person's receipt. `none` means drop it. */
 export function ownershipEvidence(
   item: { name?: string; description?: string; link?: string | null; source?: string },
   owner?: OwnerContext | null,
 ): OwnershipKind {
   const source = item.source ?? '';
-  if (isForeignProduct(item, owner)) return 'none';
-  if (COMPANY_SOURCE.test(source)) return 'company';
-  if (DEVELOPER_SOURCE.test(source)) return 'developer';
-  if (githubOwned(item.link, owner)) return 'developer';
-  const host = hostOf(item.link ?? null);
   const desc = item.description ?? '';
+  if (isForeignProduct(item, owner)) return 'none';
   if (TOOLS_HINT.test(desc) || PUBLIC_PAGE.test(desc)) return 'none';
-  if (host && ownHosts(owner).has(host)) {
+  if (COMPANY_SOURCE.test(source) && owner?.company) return 'company';
+  if (githubOwned(item.link, owner) || githubOrgOwned(item.link, owner)) return 'developer';
+  if (source === 'github') return 'none';
+  if (MAKER_SOURCE.test(source)) return 'developer';
+  const host = hostOf(item.link ?? null);
+  if (hostOwnedByBuilder(host, owner)) {
     if (PORTFOLIO_HINT.test(desc) || source === 'site') return 'portfolio';
     return 'named';
   }
   if (hostNamesOwner(host, owner)) return 'named';
-  if (PORTFOLIO_HINT.test(desc) && source === 'site') return 'portfolio';
+  const listed = listingHost(desc);
+  if (listed && hostOwnedByBuilder(listed, owner) && MADE_IT.test(desc)) return 'portfolio';
   return 'none';
 }
 
@@ -149,11 +175,17 @@ export function undatedPassesGate(
     if (!hasDesc) return false;
     const n = loose(item.name || '');
     if (ownerTokens(owner).some((token) => token.length >= 4 && (n.includes(token) || token.includes(n)))) return true;
-    if (githubOwned(item.link, owner)) return true;
-    if (PORTFOLIO_HINT.test(desc)) return true;
+    if (githubOwned(item.link, owner) || githubOrgOwned(item.link, owner)) return true;
+    if (MADE_IT.test(desc)) return true;
     return false;
   }
   return false;
+}
+
+/** A display name or X handle alone cannot prove ownership. Need a site, GitHub, or company. */
+export function ownerCanProve(owner?: OwnerContext | null): boolean {
+  if (!owner) return false;
+  return Boolean(owner.github || owner.site || owner.company || owner.companyGithub || (owner.sites && owner.sites.length));
 }
 
 export function ownerFromProfile(
@@ -163,8 +195,9 @@ export function ownerFromProfile(
     x?: string | null;
     site?: string | null;
     sites?: string[];
+    company?: string | null;
   } | null,
-  affiliation?: { name?: string | null; company?: string | null } | null,
+  affiliation?: { name?: string | null; company?: string | null; companyGithub?: string | null } | null,
 ): OwnerContext {
   return {
     name: affiliation?.name || profile?.name,
@@ -173,5 +206,6 @@ export function ownerFromProfile(
     site: profile?.site,
     sites: profile?.sites,
     company: affiliation?.company,
+    companyGithub: affiliation?.companyGithub || profile?.company,
   };
 }

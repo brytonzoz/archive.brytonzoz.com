@@ -13,6 +13,7 @@ export type ThermalItem = {
   via?: string | null;
   confidence?: number;
   significance?: number;
+  source?: string | null;
 };
 
 export type ThermalReceipt = {

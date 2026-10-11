@@ -5,10 +5,21 @@ import type { Align, PrintDoc, PrintLine, ThermalItem, ThermalReceipt } from './
 
 const SIG_LABELS = ['MINOR FIX', 'FEATURE', 'NOTABLE LAUNCH', 'MAJOR PRODUCT', 'LANDMARK'] as const;
 
+function realItems(items: ThermalItem[]): ThermalItem[] {
+  return items.filter((item) => item && item.name && item.name !== 'YOUR POTENTIAL' && item.source !== 'none');
+}
+
+function significanceBand(value?: number | null): number {
+  if (value == null || Number.isNaN(value)) return 2;
+  if (value <= 4) return Math.max(0, Math.min(4, Math.round(value)));
+  return Math.max(0, Math.min(4, Math.round(value / 20)));
+}
+
 function groupBySignificance(items: ThermalItem[]): { key: string; label: string; items: ThermalItem[] }[] {
   const buckets = new Map<number, ThermalItem[]>();
   for (const item of items) {
-    const band = Math.max(0, Math.min(4, Math.round(item.significance ?? 0)));
+    const band = significanceBand(item.significance);
+    if (band <= 0) continue;
     const list = buckets.get(band) ?? [];
     list.push(item);
     buckets.set(band, list);
@@ -96,10 +107,11 @@ export function receiptToDoc(receipt: ThermalReceipt): PrintDoc {
   lines.push({ kind: 'rule' });
 
   lines.push({ kind: 'text', text: `ITEM${' '.repeat(COLS_SMALL - 10)}STATUS`, align: 'left', small: true, faint: true });
+  const items = realItems(receipt.items);
   const groups =
-    receipt.items.length >= 8 && receipt.items.some((item) => item.significance != null)
-      ? groupBySignificance(receipt.items)
-      : [{ key: 'all', label: '', items: receipt.items }];
+    items.length >= 8 && items.some((item) => item.significance != null)
+      ? groupBySignificance(items)
+      : [{ key: 'all', label: '', items }];
   let printed = 0;
   groups.forEach((group) => {
     if (group.label) {

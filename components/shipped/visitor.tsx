@@ -14,6 +14,7 @@ import {
   TALL_PATH,
   itemDate,
   itemsShipped,
+  realReceiptItems,
   receiptNumber,
   shareText,
   shareTweet,
@@ -73,7 +74,7 @@ export function VisitorReceipt({ receipt, sponsors }: Loaded) {
       date={receiptDate(receipt.printedAt)}
       number={receiptNumber(receipt.id)}
       printedAt={receipt.printedAt}
-      items={receipt.items.map((item, i) => ({
+      items={realReceiptItems(receipt.items).map((item, i) => ({
         key: `${i}-${item.name}`,
         name: item.name,
         status: item.status,

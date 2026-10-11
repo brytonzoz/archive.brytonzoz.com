@@ -56,6 +56,29 @@ test('typed queries become person → role → company', () => {
   assert.equal(affiliation.shouldInferCompany(tibo), true);
   assert.equal(affiliation.shouldInferCompany({ ...affiliation.emptyAffiliation(), role: 'founder' }), false);
   assert.equal(affiliation.shouldInferCompany({ ...affiliation.emptyAffiliation(), role: 'ceo' }), true);
+  assert.equal(affiliation.shouldInferCompany({ ...affiliation.emptyAffiliation(), role: 'founder' }, { orgs: ['oven-sh'] }), true);
+  assert.equal(affiliation.shouldInferCompany({ ...affiliation.emptyAffiliation(), role: 'founder' }, { githubCompany: 'oven-sh' }), true);
+  const bun = affiliation.affiliationFromBio('Creator of Bun. https://bun.sh', affiliation.emptyAffiliation());
+  assert.equal(bun.role, 'founder');
+  assert.equal(bun.company, 'Bun');
+  assert.equal(
+    affiliation.pickCompanyGithub({
+      company: 'Bun',
+      githubCompany: '@oven-sh',
+      orgs: ['oven-sh', 'bytecodealliance'],
+      site: 'https://bun.sh',
+      role: 'founder',
+    }),
+    'oven-sh',
+  );
+  assert.equal(
+    affiliation.pickCompanyGithub({ company: 'Bun', githubCompany: null, orgs: ['oven-sh'], site: 'https://bun.sh', role: 'founder' }),
+    'oven-sh',
+  );
+  assert.equal(
+    affiliation.pickCompanyGithub({ company: 'Bun', githubCompany: null, orgs: ['oven-sh', 'sponsors'], site: null, role: 'founder' }),
+    null,
+  );
   assert.deepEqual(affiliation.leadProductTokens('ChatGPT & Codex', 'OpenAI'), ['Codex']);
   assert.equal(affiliation.primaryProduct('ChatGPT & Codex', 'OpenAI'), 'Codex');
   assert.equal(affiliation.viaLabel({ ...affiliation.emptyAffiliation(), company: 'OpenAI', product: 'Codex', role: 'lead' }, 'company-led-by-person'), 'via OpenAI · Codex');
@@ -412,7 +435,7 @@ test('long tapes group by significance and month', () => {
 test('harvest prints up to 200 verified lines without asking Claude to list them', () => {
   assert.equal(ai.MAX_ITEMS, 200);
   const many = Array.from({ length: 40 }, (_, i) =>
-    found({ name: `Ship ${i}`, link: `https://example.com/p${i}`, date: `2026-0${(i % 9) + 1}-01`, significance: i % 5 }),
+    found({ name: `Ship ${i}`, link: `https://example.com/p${i}`, date: `2026-0${(i % 9) + 1}-01`, significance: (i % 4) + 1 }),
   );
   const gathered = {
     found: many,

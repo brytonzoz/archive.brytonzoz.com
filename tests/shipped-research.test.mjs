@@ -829,13 +829,38 @@ test('personal feed product URLs count as portfolio ownership', async () => {
   const tony = { name: 'Tony Dinh', site: 'https://tonydinh.com', x: 'tdinh_me' };
   const item = {
     name: 'survive 10 waves',
-    description: 'Listed on news.tonydinh.com. Try it at http://www.survive10waves.com',
+    description: 'I made a game. Listed on news.tonydinh.com. Try it at http://www.survive10waves.com',
     date: '2026-08-29',
     source: 'site',
     link: 'https://www.survive10waves.com/',
   };
   assert.equal(ownership.ownershipEvidence(item, tony), 'portfolio');
   assert.equal(ownership.ownedByBuilder(item, tony), true);
+  assert.equal(
+    ownership.ownershipEvidence(
+      {
+        name: 'Canva',
+        description: 'Listed on blog.go-publicly.com',
+        date: '2026-03-01',
+        source: 'site',
+        link: 'https://www.canva.com/',
+      },
+      { name: 'Nico Jeannen', x: 'nico_jeannen', site: 'https://nicojeannen.com' },
+    ),
+    'none',
+  );
+});
+
+test('a third-party tools listicle is not a personal ship feed', () => {
+  const listicle = research.itemsFromPersonalFeed({
+    text: `<?xml version="1.0"?><rss><channel>
+      <item><title>100 tools founders use</title><link>https://blog.go-publicly.com/tools</link><pubDate>Sun, 01 Mar 2026 12:00:00 GMT</pubDate>
+      <description>https://www.canva.com/ https://stripe.com/ https://amazon.com/ https://wordpress.org/ https://www.capterra.com/ https://www.optimizely.com/</description></item>
+    </channel></rss>`,
+    url: 'https://blog.go-publicly.com/feed',
+    year: 2026,
+  });
+  assert.equal(listicle.some((item) => /canva|stripe|amazon|wordpress|capterra|optimizely/i.test(item.name)), false, JSON.stringify(listicle));
 });
 
 test('public MRR and stars keep their source URL', () => {

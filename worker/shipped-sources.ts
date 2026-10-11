@@ -141,6 +141,8 @@ export type Profile = {
   affiliation?: import('./shipped-affiliation').Affiliation;
   /** From GitHub `company` / worksFor, if we found one. */
   company?: string | null;
+  /** Public GitHub org memberships (`/users/{login}/orgs`). */
+  orgs?: string[];
 };
 
 export const emptyProfile = (): Profile => ({
@@ -1230,7 +1232,41 @@ function toPage(page: TinyfishPage): PageInfo | null {
 
 // ---- Who is this? --------------------------------------------------------------------------------
 
-export type GithubUser = { login: string; name: string; bio: string; blog: string | null; x: string | null; repos: number; company: string | null };
+export type GithubUser = {
+  login: string;
+  name: string;
+  bio: string;
+  blog: string | null;
+  x: string | null;
+  repos: number;
+  company: string | null;
+  orgs?: string[];
+};
+
+export async function githubUserOrgs(login: string, env: SourceEnv): Promise<string[]> {
+  if (!isGithubLogin(login) || !apiOpen(env)) return [];
+  const rows = await githubApi<{ login?: string }[]>(`/users/${encodeURIComponent(login)}/orgs?per_page=30`, env).catch(() => []);
+  return (rows || [])
+    .map((row) => (typeof row.login === 'string' ? row.login : ''))
+    .filter((org) => org && isGithubLogin(org));
+}
+
+/** The org that publishes a repo named after the company (oven-sh/bun from "creator of Bun"). */
+export async function orgOwningProduct(orgs: string[], product: string, env: SourceEnv): Promise<string | null> {
+  const { companySlug } = await import('./shipped-affiliation');
+  const slug = companySlug(product);
+  if (!slug || !apiOpen(env)) return null;
+  for (const org of orgs.slice(0, 8)) {
+    const login = org.replace(/^@/, '');
+    if (!isGithubLogin(login)) continue;
+    const repo = await githubApi<{ full_name?: string; name?: string }>(
+      `/repos/${encodeURIComponent(login)}/${encodeURIComponent(slug)}`,
+      env,
+    ).catch(() => null);
+    if (repo?.full_name || repo?.name) return login;
+  }
+  return null;
+}
 
 const xFrom = (urls: string[]) =>
   urls
@@ -1559,6 +1595,7 @@ export async function resolveIdentityFresh(subject: Subject, env: SourceEnv, tin
     profile.site ||= matched.user.blog;
     profile.x ||= matched.user.x;
     profile.company ||= matched.user.company;
+    if (matched.user.orgs?.length) profile.orgs = matched.user.orgs;
     if (matched.user.blog) {
       profile.site = matched.user.blog;
       profile.sites = mergeSites(profile.sites, [matched.user.blog]);
@@ -1571,9 +1608,17 @@ export async function resolveIdentityFresh(subject: Subject, env: SourceEnv, tin
       profile.site ||= user.blog;
       profile.x ||= user.x;
       profile.company ||= user.company;
+      if (user.orgs?.length) profile.orgs = user.orgs;
       if (user.blog) profile.sites = mergeSites(profile.sites, [user.blog]);
     } else notes.push('github-profile:miss');
   } else notes.push('github:unresolved');
+  if (profile.github && !profile.orgs?.length && apiOpen(env)) {
+    const orgs = await githubUserOrgs(profile.github, env).catch(() => []);
+    if (orgs.length) {
+      profile.orgs = orgs;
+      notes.push(`github-orgs:${orgs.join(',')}`);
+    }
+  }
 
   if (profile.bio) profile.sites = mergeSites(profile.sites, urlsFromText(profile.bio));
   const finished = finishProfile(profile);
@@ -1755,7 +1800,7 @@ export async function gather(
     gatherFresh(subject, resolved.profile, env, year, meter, tinyfish, resolved.notes, mode, opts?.onPartial, opts?.affiliation);
   if (opts?.rebuild && !opts.onPartial) return load();
   if (opts?.rebuild) return load();
-  const key = mode === 'full' ? `gather:full:v28:${year}:${resolved.cacheKey}` : `gather:v37:${year}:${resolved.cacheKey}`;
+  const key = mode === 'full' ? `gather:full:v29:${year}:${resolved.cacheKey}` : `gather:v38:${year}:${resolved.cacheKey}`;
   return cached(
     key,
     1440 * MIN,
@@ -1805,6 +1850,7 @@ async function gatherFresh(
     viaLabel,
     defaultAttribution,
     companyOrgGuess,
+    pickCompanyGithub,
     companyFromSites,
     needsPersonResolve,
     needsCompanyResolve,
@@ -1825,7 +1871,8 @@ async function gatherFresh(
   if (!affiliation.name) affiliation.name = who;
   const { companyFromSeedSites } = await import('./shipped-company-seeds');
   const applyCompanyHints = () => {
-    const infer = shouldInferCompany(affiliation);
+    const fromGithub = cleanGithubCompany(profile.company);
+    const infer = shouldInferCompany(affiliation, { githubCompany: fromGithub, orgs: profile.orgs });
     const fromSites = companyFromSites(sitesOf(profile), { name: affiliation.name || profile.name, handle: profile.x });
     if (infer && fromSites && !affiliation.company) {
       affiliation.company = fromSites.company;
@@ -1838,16 +1885,30 @@ async function gatherFresh(
         affiliation.companySite ||= fromSeed.site;
       }
     }
-    const fromGithub = cleanGithubCompany(profile.company);
     if (infer && fromGithub && !affiliation.company) affiliation.company = fromGithub;
+    if (!affiliation.companyGithub) {
+      affiliation.companyGithub = pickCompanyGithub({
+        company: affiliation.company,
+        githubCompany: fromGithub,
+        orgs: profile.orgs,
+        site: profile.site,
+        role: affiliation.role,
+      });
+    }
     if (!affiliation.companyX && affiliation.company) {
       const slug = companyOrgGuess(affiliation.company);
       if (slug && slug.length <= 15) affiliation.companyX = slug;
     }
-    if (!affiliation.companyGithub && affiliation.company) affiliation.companyGithub = companyOrgGuess(affiliation.company);
     if (affiliation.product) affiliation.product = primaryProduct(affiliation.product, affiliation.company) || affiliation.product;
   };
   applyCompanyHints();
+  if (!affiliation.companyGithub && profile.orgs?.length && affiliation.company && apiOpen(env)) {
+    const owned = await orgOwningProduct(profile.orgs, affiliation.company, env).catch(() => null);
+    if (owned) {
+      affiliation.companyGithub = owned;
+      notes.push(`github-org-product:${owned}`);
+    }
+  }
   profile.affiliation = affiliation;
 
   let xaiMicros = 0;

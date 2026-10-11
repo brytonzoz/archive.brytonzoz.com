@@ -1073,7 +1073,7 @@ export function finish(items: DraftItem[], note: string, seed: number, modulesRa
     owner: usableOwner(ctx.owner),
   }).map(asPrintedItem);
   if (!gated.length) {
-    return { items: [potentialItem()], note: POTENTIAL_NOTES[seed % POTENTIAL_NOTES.length], stats: [], potential: true, layout };
+    return { items: [], note: POTENTIAL_NOTES[seed % POTENTIAL_NOTES.length], stats: [], potential: true, layout };
   }
   const sorted = gated.slice(0, MAX_ITEMS).sort(byDate);
   const stats = Array.isArray(statsRaw)

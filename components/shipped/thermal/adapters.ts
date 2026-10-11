@@ -3,7 +3,7 @@
 // the pile and the DOM receipt never disagree.
 import { receiptDate } from '../../../lib/shipped';
 import { isFirstRun, receiptModules } from '../../../lib/shipped-modules';
-import { itemDate, itemsShipped, receiptNumber, subjectKicker, subjectLabel, type SponsorBlock, type YearReceipt } from '../../../lib/shipped-year';
+import { itemDate, itemsShipped, realReceiptItems, receiptNumber, subjectKicker, subjectLabel, type SponsorBlock, type YearReceipt } from '../../../lib/shipped-year';
 import type { ThermalReceipt } from './types';
 
 export type LoadedReceipt = { receipt: YearReceipt; sponsors: SponsorBlock | null };
@@ -34,7 +34,7 @@ export function fromLoaded({ receipt, sponsors }: LoadedReceipt): ThermalReceipt
     kicker,
     date: receiptDate(receipt.printedAt),
     number: receiptNumber(receipt.id),
-    items: receipt.items.map((item) => ({
+    items: realReceiptItems(receipt.items).map((item) => ({
       name: item.name,
       status: item.status,
       date: itemDate(item.date),
@@ -43,6 +43,7 @@ export function fromLoaded({ receipt, sponsors }: LoadedReceipt): ThermalReceipt
       via: item.via ?? null,
       confidence: item.confidence,
       significance: item.significance,
+      source: item.source,
     })),
     count: itemsShipped(receipt),
     note: receipt.note,

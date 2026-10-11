@@ -348,28 +348,39 @@ export function itemsFromPersonalFeed(opts: { text: string; url: string; year: n
   const preferProduct = (named: string, product?: { name: string; url: string } | null) => {
     if (!product) return named;
     if (!named) return product.name;
-    if (named.split(/\s+/).length > 3 || /^(a |an |the |game |app )/i.test(named) || /\b(with|using|from)\b/i.test(named)) {
+    if (
+      named.split(/\s+/).length > 3 ||
+      /^(a |an |the |game |app )/i.test(named) ||
+      /^(game|app|tool|site)$/i.test(named) ||
+      /\b(with|using|from)\b/i.test(named)
+    ) {
       return product.name;
     }
     return named;
   };
   const blocks = [...opts.text.matchAll(/<item\b[\s\S]*?<\/item>|<entry\b[\s\S]*?<\/entry>/gi)];
-  for (const item of itemsFromFeedXml(opts.text, opts.year)) {
+  for (const block of blocks) {
+    const item = itemsFromFeedXml(block[0], opts.year)[0];
+    if (!item) continue;
     const raw = `${item.name} ${item.description || ''}`;
-    const products = productUrlsFromCopy(raw, pageHost);
-    if (!looksLikePersonalShip(raw) && !looksLikePersonalShip(item.name) && !products.length) continue;
+    const products = productUrlsFromCopy(`${raw} ${block[0]}`, pageHost);
+    const personal = looksLikePersonalShip(raw) || looksLikePersonalShip(item.name);
+    // A roundup that names many other companies is never a ship list.
+    if (!personal && products.length >= 3) continue;
+    if (!personal && !products.length) continue;
     const named = journalShipName(item.name);
     const name = preferProduct(named, products[0]);
-    const hint = item.description ? `${listedOn}. ${item.description}` : listedOn;
+    const hint = item.description
+      ? `${personal ? 'I made this. ' : ''}${listedOn}. ${item.description}`
+      : personal
+        ? `I made this. ${listedOn}`
+        : listedOn;
     add(name || products[0]?.name || item.name, item.date, products[0]?.url || item.link, hint);
-    for (const extra of products.slice(named && name === named ? 0 : 1)) {
-      add(extra.name, item.date, extra.url, listedOn);
+    if (personal || products.length <= 2) {
+      for (const extra of products.slice(1)) {
+        add(extra.name, item.date, extra.url, personal ? `I made this. ${listedOn}` : listedOn);
+      }
     }
-  }
-  for (const block of blocks) {
-    const date = itemsFromFeedXml(block[0], opts.year)[0]?.date ?? null;
-    if (!date) continue;
-    for (const extra of productUrlsFromCopy(block[0], pageHost)) add(extra.name, date, extra.url, listedOn);
   }
   return found.slice(0, 80);
 }

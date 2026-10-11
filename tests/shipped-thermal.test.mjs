@@ -100,7 +100,7 @@ test('long tapes print significance group headers without a status tilde', () =>
   const text = doc.text;
   assert.ok(text.includes('LANDMARK'), text);
   assert.ok(text.includes('NOTABLE LAUNCH'), text);
-  assert.ok(text.includes('MINOR FIX'), text);
+  assert.equal(text.includes('MINOR FIX'), false, text);
   assert.ok(text.includes('via OpenAI · Codex'), text);
   assert.equal(text.includes('via OpenAI · Codex  A real line'), false, 'via and the description are not one run-on line');
   assert.equal(
@@ -114,6 +114,41 @@ test('a paid full tape prints the verified stamp and FULL serial', () => {
   const doc = receiptToDoc({ ...RECEIPT, full: true });
   assert.match(doc.text, /VERIFIED FULL RUN/);
   assert.match(doc.text, /#000042 FULL/);
+});
+
+test('an empty receipt prints 0 items, score 0, and no placeholder line', () => {
+  const doc = receiptToDoc({
+    ...RECEIPT,
+    items: [{ name: 'YOUR POTENTIAL', status: 'PRE-ORDER', source: 'none', significance: 0 }],
+    count: 0,
+    shipScore: 0,
+    note: 'Empty drawer. Go ship.',
+  });
+  assert.equal(doc.text.includes('YOUR POTENTIAL'), false, doc.text);
+  assert.equal(doc.text.includes('MINOR FIX'), false, doc.text);
+  const total = doc.lines.find((line) => line.kind === 'lead' && String(line.left).includes('ITEMS SHIPPED'));
+  assert.ok(total && total.right === '0', JSON.stringify(total));
+  assert.match(doc.text, /Empty drawer/);
+});
+
+test('mixed 0–4 and 0–100 significance scores print one header per band', () => {
+  const doc = receiptToDoc({
+    ...RECEIPT,
+    items: [
+      { name: 'ONE', status: 'LIVE', significance: 2, description: 'a' },
+      { name: 'TWO', status: 'LIVE', significance: 40, description: 'b' },
+      { name: 'THREE', status: 'LIVE', significance: 2, description: 'c' },
+      { name: 'FOUR', status: 'LIVE', significance: 45, description: 'd' },
+      { name: 'FIVE', status: 'LIVE', significance: 2, description: 'e' },
+      { name: 'SIX', status: 'LIVE', significance: 38, description: 'f' },
+      { name: 'SEVEN', status: 'LIVE', significance: 2, description: 'g' },
+      { name: 'EIGHT', status: 'LIVE', significance: 0, description: 'h' },
+    ],
+    count: 7,
+  });
+  const headers = doc.lines.filter((line) => line.kind === 'text' && line.text === 'NOTABLE LAUNCH');
+  assert.equal(headers.length, 1, doc.text);
+  assert.equal(doc.text.includes('MINOR FIX'), false, doc.text);
 });
 
 test('the plain-text copy carries every item and the note', () => {

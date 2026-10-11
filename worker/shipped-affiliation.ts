@@ -128,7 +128,7 @@ export function parseAffiliationQuery(text: string): Affiliation {
 const NOT_COMPANY = /^(the|a|an|this|that|our|all|humanity|people|life|course|things|stuff|code|service|privacy|policy|center|terms|javascript|browser|cookie|imprint|help|content|information|mission)$/i;
 
 function usableCompany(raw: string | null | undefined): string | null {
-  const name = cleanText(raw, 40);
+  const name = cleanText(raw, 40).replace(/[.,;:]+$/g, '');
   if (name.length < 3 || NOT_COMPANY.test(name)) return null;
   if (/\d/.test(name) && /[A-Z]/.test(name) && name.length > 8) return null;
   return name;
@@ -139,9 +139,10 @@ export function affiliationFromBio(bio: string, hint: Affiliation = emptyAffilia
   if (isJunkProfileText(bio)) return { ...hint };
   const text = cleanText(bio, 400);
   const out: Affiliation = { ...hint };
-  const ceo = text.match(/\b(ceo|founder|co-?founder)\b(?:\s*(?:of|at|@|,|[/|-]|–)\s*@?([A-Za-z][A-Za-z0-9._-]{1,39}))?/i);
+  const ceo = text.match(/\b(ceo|founder|co-?founder|creator|maker|author)\b(?:\s*(?:of|at|behind|@|,|[/|-]|–)\s*@?([A-Za-z][A-Za-z0-9._-]{1,39}))?/i);
   if (ceo) {
-    const role = ceo[1].toLowerCase().includes('founder') ? 'founder' : 'ceo';
+    const word = ceo[1].toLowerCase();
+    const role = word.includes('founder') || word === 'creator' || word === 'maker' || word === 'author' ? 'founder' : 'ceo';
     if (out.role === 'unknown' || role === 'ceo' || role === 'founder') out.role = role;
     if (ceo[2] && !out.company) out.company = usableCompany(ceo[2]);
   }
@@ -205,8 +206,50 @@ export function companyScope(roleOrAff: ScopeHint): 'all' | 'product' | 'none' {
 
 /** Infer a company from a personal site or GitHub org only for CEOs or typed-company queries.
  *  Indie founders (levelsio, Marc Lou) run many products; one site must not become THE company. */
-export function shouldInferCompany(affiliation: Pick<Affiliation, 'role' | 'typedCompany'>): boolean {
-  return affiliation.role === 'ceo' || Boolean(affiliation.typedCompany);
+export function shouldInferCompany(
+  affiliation: Pick<Affiliation, 'role' | 'typedCompany'>,
+  hint?: { githubCompany?: string | null; orgs?: string[] | null },
+): boolean {
+  if (affiliation.role === 'ceo' || Boolean(affiliation.typedCompany)) return true;
+  if (hint?.githubCompany) return true;
+  if (affiliation.role === 'founder' && (hint?.orgs?.length || hint?.githubCompany)) return true;
+  return false;
+}
+
+function orgKey(value: string | null | undefined): string {
+  return (value || '').toLowerCase().replace(/^@/, '').replace(/[^a-z0-9]/g, '');
+}
+
+/** Person → company GitHub org: profile company, org membership, or the site label. Never invent an org they are not in. */
+export function pickCompanyGithub(opts: {
+  company?: string | null;
+  githubCompany?: string | null;
+  orgs?: string[] | null;
+  site?: string | null;
+  role?: RoleKind | string | null;
+}): string | null {
+  const orgs = (opts.orgs || []).map((org) => org.replace(/^@/, '')).filter((org) => /^[A-Za-z0-9-]{1,39}$/.test(org));
+  const fromField = cleanGithubCompany(opts.githubCompany);
+  if (fromField && /^[A-Za-z0-9-]{1,39}$/.test(fromField)) {
+    const hit = orgs.find((org) => org.toLowerCase() === fromField.toLowerCase());
+    if (hit) return hit;
+    if (!orgs.length) return fromField;
+    return fromField;
+  }
+  const slug = companyOrgGuess(opts.company);
+  const want = [slug, opts.company].map(orgKey).filter((key) => key.length >= 2);
+  try {
+    if (opts.site) want.push(orgKey(new URL(opts.site).hostname.replace(/^www\./, '').split('.')[0]));
+  } catch {
+    /* ignore */
+  }
+  const named = orgs.find((org) => {
+    const key = orgKey(org);
+    return want.some((token) => token && (key === token || key.includes(token) || token.includes(key)));
+  });
+  if (named) return named;
+  if ((opts.role === 'ceo' || opts.role === 'founder') && orgs.length === 1) return orgs[0];
+  return null;
 }
 
 /** Cheap xAI / web identity when the typed query has no handle yet. */

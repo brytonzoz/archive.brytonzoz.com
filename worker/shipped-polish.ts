@@ -1116,6 +1116,7 @@ export function looksLikeEssayTitle(title: string): boolean {
   if (!text) return false;
   const words = text.split(/\s+/).filter(Boolean);
   if (ESSAY_OPENER.test(text)) return true;
+  if (/^best\b/i.test(text) && /\b20\d{2}\b/.test(text) && words.length >= 4) return true;
   if (words.length >= 12) return true;
   if (words.length >= 8 && ESSAY_MIDDLE.test(text)) return true;
   if (words.length >= 8 && !/\d+\.\d+/.test(text) && /\b(is|are|was|were|makes|broke|will|can't|could|should|has|have|had|lies|killed)\b/i.test(text)) {

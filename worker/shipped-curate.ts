@@ -272,8 +272,9 @@ export function harvestShouldWin(
   if (flagshipCeo || openaiLead) {
     if (harvestedCount < 12) return false;
     // Codex changelog titles look like essays, so cheapCount is not a signal here.
-    // A 60-line Vercel reel already kept the flagships — don't swap it for npm version spam.
-    return curatedCount < 25;
+    // Floors match the live goldens: Truell ≥40, Tibo ≥35, Rauch ≥25.
+    const floor = /^cursor$/i.test(brand) ? 40 : openaiLead ? 35 : 25;
+    return curatedCount < floor;
   }
   // Everyone else: keep Claude's tape. Restoring harvest reintroduces employer
   // changelogs, tweets, monthly blogs, and scoped npm ids.

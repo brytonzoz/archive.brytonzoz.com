@@ -125,10 +125,12 @@ test('harvest wins when Claude keeps a highlight reel of a fat company tape', ()
   assert.equal(curate.harvestShouldWin(38, 3, 'lead', 'OpenAI'), true);
   assert.equal(curate.harvestShouldWin(40, 1, 'lead', 'OpenAI', 8), true);
   assert.equal(curate.harvestShouldWin(96, 18, 'ceo', 'Cursor'), true);
-  assert.equal(curate.harvestShouldWin(96, 26, 'ceo', 'Cursor'), false);
+  assert.equal(curate.harvestShouldWin(95, 26, 'ceo', 'Cursor'), true);
+  assert.equal(curate.harvestShouldWin(96, 42, 'ceo', 'Cursor'), false);
   assert.equal(curate.harvestShouldWin(171, 60, 'ceo', 'Vercel'), false);
   assert.equal(curate.harvestShouldWin(193, 3, 'ceo', 'Vercel'), true);
-  assert.equal(curate.harvestShouldWin(38, 32, 'lead', 'OpenAI'), false);
+  assert.equal(curate.harvestShouldWin(38, 32, 'lead', 'OpenAI'), true);
+  assert.equal(curate.harvestShouldWin(38, 36, 'lead', 'OpenAI'), false);
   assert.equal(curate.harvestShouldWin(9, 3, 'ceo', 'Vercel'), false);
   assert.equal(curate.harvestShouldWin(118, 5, 'ceo', 'Remote OK', 8), false);
   assert.equal(curate.harvestShouldWin(101, 15, 'lead', 'Vercel'), false);

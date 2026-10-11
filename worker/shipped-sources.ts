@@ -23,6 +23,7 @@ import {
   extraSitePaths,
   guessHandleDotCom,
   githubLoginsFromText,
+  PROFILE_HOSTS,
   handleTokens,
   handleVariants,
   isJunkProfileText,
@@ -1481,16 +1482,27 @@ async function resolveProductMaker(
   return { x: x.slice(0, 4), github: github.slice(0, 4), names: names.slice(0, 3), sites: sites.slice(0, 4) };
 }
 
-async function followSitesForGithub(urls: string[], notes: string[]): Promise<string[]> {
+async function followSitesForGithub(
+  urls: string[],
+  notes: string[],
+): Promise<{ logins: string[]; sites: string[]; bio: string | null }> {
   const logins: string[] = [];
+  const sites: string[] = [];
+  let bio: string | null = null;
   for (const url of urls.slice(0, 4)) {
     const page = await readSite(url).catch(() => null);
     if (!page) continue;
-    const found = githubLoginsFromText(`${page.text}\n${page.links.map((l) => l.url).join('\n')}`);
+    const blob = `${page.title}\n${page.description}\n${page.text}\n${page.links.map((l) => l.url).join('\n')}`;
+    const found = githubLoginsFromText(blob);
     if (found.length) notes.push(`site-github:${hostOf(url)}=${found.join(',')}`);
     for (const login of found) if (!logins.some((v) => v.toLowerCase() === login.toLowerCase())) logins.push(login);
+    if (!bio && page.description && !isJunkProfileText(page.description)) bio = page.description;
+    for (const link of page.links) {
+      const href = publicUrl(link.url);
+      if (href && !PROFILE_HOSTS.test(hostOf(href) ?? '')) sites.push(href);
+    }
   }
-  return logins.slice(0, 6);
+  return { logins: logins.slice(0, 6), sites: sites.slice(0, 8), bio };
 }
 
 export async function resolveIdentityFresh(subject: Subject, env: SourceEnv, tinyfish: TinyfishAccess): Promise<ResolvedIdentity> {
@@ -1551,6 +1563,8 @@ export async function resolveIdentityFresh(subject: Subject, env: SourceEnv, tin
   }
 
   const followed = await followSitesForGithub(mergeSites(profile.sites, [profile.site]), notes);
+  if (followed.bio && !profile.bio) profile.bio = followed.bio;
+  profile.sites = mergeSites(profile.sites, followed.sites);
   const knownLogins = [
     ...companyLogins(parts.name || subject.id, parts.company),
     ...nameLogins(profile.name || parts.name || ''),
@@ -1558,7 +1572,7 @@ export async function resolveIdentityFresh(subject: Subject, env: SourceEnv, tin
     ...handleVariants(profile.x ?? ''),
     ...handleTokens(subject.id),
     ...handleTokens(profile.x ?? ''),
-    ...followed,
+    ...followed.logins,
     ...(xProfile?.github ?? []),
     profile.github,
     collided,
@@ -2065,6 +2079,7 @@ async function gatherFresh(
             affiliation,
             bio: profile.bio,
             orgs: profile.orgs,
+            sites: sitesOf(profile),
             get: (path) => githubApi(path, env),
             cache: (cacheKey, ttl, load) => cached(cacheKey, ttl, load),
             readText: async (url) => {

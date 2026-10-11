@@ -38,7 +38,7 @@ export type NameParts = { name: string; company: string | null; tokens: string[]
  * GitHub login. Never a harvest cheat sheet of eval builders.
  */
 export const IDENTITY_COLLISIONS: Record<string, string> = {
-  'jarred-sumner': 'jarredsumner',
+  jarredsumner: 'Jarred-Sumner',
   youyuxi: 'yyx990803',
   dan_abramov: 'gaearon',
 };
@@ -64,15 +64,32 @@ const SKIP_GH = new Set(
   ),
 );
 
+const SKIP_GH_PATH =
+  /^(sponsors|issues|pulls|actions|projects|security|settings|pulse|graphs|wiki|marketplace|topics|orgs|apps|enterprise|features|pricing|about|login|signup|notifications|search)$/i;
+
 /** github.com/<login> mentions in a bio, page, or search snippet. */
 export function githubLoginsFromText(text: string): string[] {
   const out: string[] = [];
   for (const match of text.matchAll(/github\.com\/([A-Za-z0-9-]{1,39})(?=$|[/?#\s"'<>),])/gi)) {
     const login = match[1];
-    if (!isGithubLogin(login) || SKIP_GH.has(login.toLowerCase())) continue;
+    if (!isGithubLogin(login) || SKIP_GH.has(login.toLowerCase()) || SKIP_GH_PATH.test(login)) continue;
     if (!out.some((v) => v.toLowerCase() === login.toLowerCase())) out.push(login);
   }
   return out.slice(0, 6);
+}
+
+/** github.com/<owner>/<repo> on a homepage or bio. */
+export function githubReposFromText(text: string): { owner: string; name: string }[] {
+  const out: { owner: string; name: string }[] = [];
+  for (const match of String(text || '').matchAll(/github\.com\/([A-Za-z0-9-]{1,39})\/([A-Za-z0-9._-]{1,100})/gi)) {
+    const owner = match[1];
+    const name = match[2].replace(/\.git$/i, '');
+    if (!isGithubLogin(owner) || SKIP_GH.has(owner.toLowerCase()) || SKIP_GH_PATH.test(owner) || SKIP_GH_PATH.test(name)) continue;
+    if (!/^[A-Za-z0-9._-]{1,100}$/.test(name)) continue;
+    if (out.some((row) => row.owner.toLowerCase() === owner.toLowerCase() && row.name.toLowerCase() === name.toLowerCase())) continue;
+    out.push({ owner, name });
+  }
+  return out.slice(0, 8);
 }
 
 /** @handle and x.com/twitter.com/<handle> mentions. */

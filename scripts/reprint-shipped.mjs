@@ -216,7 +216,7 @@ for (const q of PRINT_SUBJECTS) {
         q,
         who,
         note,
-        fallback: /is the (first line|only ship|named product) printed on this receipt/i.test(note),
+        fallback: /is the (first line|only ship|named product)( printed)? on this receipt/i.test(note),
         candidates: last.noteCandidates,
       }),
     );

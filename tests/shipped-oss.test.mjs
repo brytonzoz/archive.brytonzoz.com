@@ -28,6 +28,48 @@ test('major/minor releases with notes become product lines; patches roll up by m
   assert.equal(names.some((name) => /canary/i.test(name)), false);
 });
 
+test('prefixed tags still parse as semver', () => {
+  assert.deepEqual(oss.parseSemver('bun-v1.4.0'), { major: 1, minor: 4, patch: 0 });
+  assert.deepEqual(oss.parseSemver('svelte@5.20.0'), { major: 5, minor: 20, patch: 0 });
+  assert.deepEqual(oss.parseSemver('v1.3.2'), { major: 1, minor: 3, patch: 2 });
+});
+
+test('harvestOss takes a flagship repo linked from the maker site when the org is hidden', async () => {
+  const calls = [];
+  const get = async (path) => {
+    calls.push(path);
+    if (path.startsWith('/users/Jarred-Sumner/repos')) {
+      return [{ name: 'xmac', html_url: 'https://github.com/Jarred-Sumner/xmac', stargazers_count: 14, fork: false, pushed_at: '2026-05-25T00:00:00Z' }];
+    }
+    if (path.startsWith('/users/Jarred-Sumner/orgs')) return [{ login: 'codeblog' }];
+    if (path.includes('/oven-sh/bun/releases')) {
+      return [
+        { tag_name: 'bun-v1.4.0', name: 'Bun 1.4', published_at: '2026-08-20T12:00:00Z', body: 'Bun 1.4 notes', html_url: 'https://github.com/oven-sh/bun/releases/tag/bun-v1.4.0' },
+        { tag_name: 'bun-v1.4.1', published_at: '2026-09-04T12:00:00Z', body: '', html_url: 'https://github.com/oven-sh/bun/releases/tag/bun-v1.4.1' },
+        { tag_name: 'bun-v1.4.2', published_at: '2026-09-05T12:00:00Z', body: '', html_url: 'https://github.com/oven-sh/bun/releases/tag/bun-v1.4.2' },
+      ];
+    }
+    return [];
+  };
+  const { found, ran } = await oss.harvestOss({
+    login: 'Jarred-Sumner',
+    year: 2026,
+    get,
+    affiliation: { company: 'Bun', role: 'founder' },
+    bio: 'Creator of Bun. Working at Anthropic.',
+    orgs: ['codeblog'],
+    sites: ['https://jarredsumner.com/'],
+    readText: async (url) => {
+      if (/jarredsumner\.com/i.test(url)) return 'Creator of Bun. <a href="https://bun.com">Bun</a>';
+      if (/bun\.com/i.test(url)) return 'Bun runtime <a href="https://github.com/oven-sh/bun">oven-sh/bun</a>';
+      return null;
+    },
+  });
+  assert.ok(ran.some((tag) => /oss-site:oven-sh\/bun/.test(tag)), JSON.stringify(ran));
+  assert.ok(found.some((item) => /bun 1\.4/i.test(item.name)), JSON.stringify(found.map((item) => item.name)));
+  assert.equal(calls.some((path) => path.includes('/stats/contributors')), false);
+});
+
 test('product names prefer the project, not github.com', () => {
   assert.equal(oss.productNameFromRepo('rails', 'https://rubyonrails.org'), 'Rails');
   assert.equal(oss.productNameFromRepo('preact', 'https://preactjs.com'), 'Preact');

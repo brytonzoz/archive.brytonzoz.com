@@ -1,6 +1,7 @@
 /** Free GitHub OSS harvest: owned repos + founder/top-3 org repos → 2026 releases, tags, blogs, launches. */
 
 import { itemsFromFeedXml } from './shipped-changelog';
+import { githubReposFromText, productHostGuesses } from './shipped-identity';
 import { isPrereleaseShip } from './shipped-polish';
 import { looksLikeProductReadme } from './shipped-repos';
 
@@ -57,12 +58,13 @@ const SKIP_REPO =
   /\b(starter|course|action|example|template|foundations|academy|rules?|dotfiles|repro|demo|playground)\b/i;
 
 export function parseSemver(raw: string): { major: number; minor: number; patch: number } | null {
-  const text = String(raw || '')
-    .trim()
-    .replace(/^v/i, '');
-  const match = text.match(/^(\d{1,4})\.(\d{1,4})(?:\.(\d{1,4}))?(?:[-+].*)?$/);
-  if (!match) return null;
-  return { major: Number(match[1]), minor: Number(match[2]), patch: Number(match[3] || 0) };
+  const text = String(raw || '').trim();
+  const candidates = [text.replace(/^v/i, ''), text.replace(/^[A-Za-z][\w.-]*?[@/-]v?/i, '')];
+  for (const candidate of candidates) {
+    const match = candidate.match(/^(\d{1,4})\.(\d{1,4})(?:\.(\d{1,4}))?(?:[-+].*)?$/);
+    if (match) return { major: Number(match[1]), minor: Number(match[2]), patch: Number(match[3] || 0) };
+  }
+  return null;
 }
 
 export function isPrereleaseTag(tag: string): boolean {
@@ -499,6 +501,7 @@ export async function harvestOss(opts: {
   affiliation?: { company?: string | null; companyGithub?: string | null; role?: string | null; product?: string | null };
   bio?: string;
   orgs?: string[];
+  sites?: string[];
 }): Promise<{ found: OssFound[]; ran: string[] }> {
   const login = opts.login.replace(/^@/, '');
   const year = opts.year;
@@ -571,6 +574,40 @@ export async function harvestOss(opts: {
       if (Array.isArray(since) && since.length) {
         orgRepos.push(repo);
         ran.push(`oss-authored:${org}/${repo.name}`);
+      }
+    }
+  }
+
+  const products = [opts.affiliation?.product, opts.affiliation?.company].filter((value): value is string => Boolean(value));
+  const probeHomes = [
+    ...(opts.sites || []),
+    ...products.flatMap((product) => productHostGuesses(product)),
+  ].filter((url, i, all) => url && all.indexOf(url) === i);
+  if (opts.readText) {
+    for (const home of probeHomes.slice(0, 8)) {
+      const html = await memo(`oss:site:${home}`, 180 * 60, () => opts.readText!(home).catch(() => null));
+      if (!html) continue;
+      for (const hit of githubReposFromText(html)) {
+        const mentioned =
+          bioMentionsRepo(opts.bio, hit) ||
+          products.some((product) => product.toLowerCase().replace(/[^a-z0-9]+/g, '') === hit.name.toLowerCase().replace(/[^a-z0-9]+/g, ''));
+        const founder = isOrgFounder({
+          org: hit.owner,
+          bio: opts.bio,
+          company: opts.affiliation?.company,
+          companyGithub: opts.affiliation?.companyGithub,
+          role: opts.affiliation?.role,
+          product: opts.affiliation?.product,
+        });
+        if (!mentioned && !founder) continue;
+        orgRepos.push({
+          owner: hit.owner,
+          name: hit.name,
+          html_url: `https://github.com/${hit.owner}/${hit.name}`,
+          homepage: home,
+          stargazers_count: 0,
+        });
+        ran.push(`oss-site:${hit.owner}/${hit.name}`);
       }
     }
   }

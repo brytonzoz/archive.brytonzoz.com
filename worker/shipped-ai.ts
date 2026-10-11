@@ -1654,7 +1654,7 @@ export async function assembleReceipt(
         spent,
       });
       if (curated) {
-        if (harvestShouldWin(harvested.length, curated.items.length, affiliation?.role)) {
+        if (harvestShouldWin(harvested.length, curated.items.length, affiliation?.role, affiliation?.company, cheap.length)) {
           console.log(
             JSON.stringify({
               shipped: 'curate-thin',

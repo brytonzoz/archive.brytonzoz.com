@@ -193,6 +193,8 @@ test('shared receipt pages are the hero; DATE/RECEIPT pairs do not collide; chec
   assert.match(css, /shipped-desk-pin/);
   assert.match(css, /\.shipped-printer\.is-hero \.shipped-printer-body/);
   assert.match(css, /\.shipped-printer\.is-hero \.shipped-tilt\.is-more::after/);
+  assert.match(css, /\.shipped-printer\.is-hero \.shipped-tilt[\s\S]*overflow: visible/);
+  assert.doesNotMatch(css, /100svh - 72px/);
 
   const pay = fs.readFileSync(new URL('../worker/shipped.ts', import.meta.url), 'utf8');
   assert.match(pay, /\/r\/\$\{id\}\/\?paid=\{CHECKOUT_SESSION_ID\}/);
@@ -224,6 +226,7 @@ test('shared receipt pages are the hero; DATE/RECEIPT pairs do not collide; chec
   assert.doesNotMatch(turnstile, /if \(token\.current && !spent\.current\)/);
 
   const machine = fs.readFileSync(new URL('../components/shipped/Machine.tsx', import.meta.url), 'utf8');
+  assert.match(machine, /phase === 'torn' && !focus && !hero \? ' is-scroll'/);
   assert.match(machine, /type="button"/);
   assert.match(machine, /desk\.onPrint\(\)/);
   assert.match(machine, /onWarm/);

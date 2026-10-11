@@ -1281,6 +1281,51 @@ html.shipped-focus .shipped-desk-pins {
   }
 }
 
+@media (min-width: 1100px) {
+  .shipped-page {
+    padding-top: 28px;
+    background-color: #2a1f16;
+    background-image:
+      radial-gradient(ellipse 46% 32% at 50% 10%, rgba(255, 196, 120, 0.34), transparent 62%),
+      radial-gradient(ellipse 70% 40% at 50% 108%, rgba(0, 0, 0, 0.5), transparent 58%),
+      repeating-linear-gradient(90deg, rgba(62, 38, 22, 0.28) 0 1px, transparent 1px 13px),
+      repeating-linear-gradient(180deg, rgba(90, 56, 32, 0.08) 0 2px, transparent 2px 28px),
+      linear-gradient(180deg, #3d2b1c 0%, #2c1e14 46%, #21160f 100%),
+      url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='180' height='180'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='.65' numOctaves='3' stitchTiles='stitch'/%3E%3CfeColorMatrix values='0 0 0 0 .42 0 0 0 0 .28 0 0 0 0 .16 0 0 0 .14 0'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)'/%3E%3C/svg%3E");
+    background-blend-mode: normal, normal, multiply, overlay, normal, overlay;
+  }
+
+  .shipped-page:has(.shipped-stage.is-shared),
+  .shipped-page:has(.shipped-stage.is-focus) {
+    padding-bottom: calc(32px + var(--shipped-pill-stack) + env(safe-area-inset-bottom, 0px) + var(--player-offset, 0px));
+  }
+
+  .shipped-page:has(.shipped-stage.is-shared) .shipped-stack,
+  .shipped-page:has(.shipped-stage.is-focus) .shipped-stack {
+    width: min(48rem, calc(100% - 32px));
+  }
+
+  .shipped-stage.is-shared,
+  .shipped-stage.is-focus {
+    width: 100%;
+  }
+
+  .shipped-printer.is-hero,
+  .shipped-printer.is-focus {
+    width: 100%;
+  }
+
+  .shipped-printer.is-focus .shipped-out,
+  .shipped-printer.is-hero .shipped-out,
+  .shipped-printer.is-lifting .shipped-out {
+    width: 100%;
+  }
+
+  .shipped-hero-bar {
+    background: linear-gradient(180deg, rgba(42, 31, 22, 0.72) 60%, rgba(42, 31, 22, 0));
+  }
+}
+
 @media (min-width: 1440px) {
   .shipped-page {
     padding-top: 28px;
@@ -1344,8 +1389,9 @@ html.shipped-focus .shipped-desk-pins {
     width: 100%;
   }
 
-  .shipped-stage.is-shared {
-    width: min(40rem, 100%);
+  .shipped-stage.is-shared,
+  .shipped-stage.is-focus {
+    width: min(48rem, 100%);
   }
 
   .shipped-stage:not(.is-shared) .shipped-printer {
@@ -1871,17 +1917,20 @@ button.shipped-lcd-text {
 .shipped-printer.is-focus .shipped-out,
 .shipped-printer.is-hero .shipped-out,
 .shipped-printer.is-lifting .shipped-out {
-  width: min(26.5rem, 100%);
+  width: 100%;
   margin-top: 0;
   clip-path: none;
   -webkit-clip-path: none;
+  overflow: visible;
 }
 
+.shipped-printer.is-focus .shipped-tilt,
+.shipped-printer.is-hero .shipped-tilt,
 .shipped-printer.is-focus .shipped-tilt.is-scroll,
 .shipped-printer.is-hero .shipped-tilt.is-scroll {
-  max-height: calc(100svh - 72px - var(--shipped-pill-stack) - env(safe-area-inset-bottom, 0px));
-  overflow: auto;
-  overscroll-behavior: contain;
+  max-height: none;
+  overflow: visible;
+  overscroll-behavior: auto;
   padding-bottom: calc(var(--shipped-pill-stack) + env(safe-area-inset-bottom, 0px));
 }
 
@@ -1892,8 +1941,8 @@ button.shipped-lcd-text {
 
 .shipped-printer.is-focus .shipped-ticket,
 .shipped-printer.is-hero .shipped-ticket {
-  transform: perspective(1100px) rotateX(2.6deg) rotateZ(-0.4deg);
-  transform-origin: 50% 8%;
+  width: 100%;
+  transform: none;
 }
 
 .shipped-printer.is-focus .shipped-paper,

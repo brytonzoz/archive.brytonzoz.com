@@ -71,9 +71,9 @@ export type MachineProps = {
   onTorn?: (key: string) => void;
   /** Tear the hanging receipt now (another job is about to print). */
   tearSignal?: number;
-  /** Tallest the paper may hang (px) so the page never scrolls; a longer receipt scrolls inside once torn. */
+  /** Tallest the hanging (not focused) paper may be. Full-screen receipts scroll with the page. */
   paperMax?: number;
-  /** Torn visitor receipt fills the viewport; printer recedes. */
+  /** Torn visitor receipt fills the desk; the page scrolls. */
   focus?: boolean;
   /** Shared /r/<id>/ page: the receipt is already out; skip the printer chrome. */
   hero?: boolean;
@@ -783,11 +783,11 @@ export function Machine({ job, display, tone, onPrinted, onTorn, tearSignal = 0,
             >
               {phase === 'hanging' ? <div className="shipped-grip" aria-hidden="true" style={{ height: GRIP }} /> : null}
               <div
-                className={`shipped-tilt${phase === 'torn' || focus ? ' is-scroll' : ''}${more ? ' is-more' : ''}${phase === 'hanging' && !houseSlip && paperMax ? ' is-fade' : ''}`}
+                className={`shipped-tilt${phase === 'torn' && !focus && !hero ? ' is-scroll' : ''}${more && !focus && !hero ? ' is-more' : ''}${phase === 'hanging' && !houseSlip && paperMax ? ' is-fade' : ''}`}
                 ref={tilt}
-                style={paperMax && !focus ? { maxHeight: paperMax } : undefined}
-                tabIndex={(phase === 'torn' || focus) && more ? 0 : undefined}
-                aria-label={(phase === 'torn' || focus) && more ? `${shown.label}, scrollable` : undefined}
+                style={paperMax && !focus && !hero ? { maxHeight: paperMax } : undefined}
+                tabIndex={phase === 'torn' && !focus && !hero && more ? 0 : undefined}
+                aria-label={phase === 'torn' && !focus && !hero && more ? `${shown.label}, scrollable` : undefined}
               >
                 <Ticket
                   seed={shown.key}

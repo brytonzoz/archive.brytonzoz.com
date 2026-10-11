@@ -258,16 +258,15 @@ export function applyCuration(
   return { items: rollupGroups(kept), notes: parsed.notes.slice(0, 3) };
 }
 
-/** Claude highlight-reels a fat harvest — keep the gated tape and only take the notes. */
+/** Claude highlight-reels a fat company changelog — keep that gated tape and only take the notes. */
 export function harvestShouldWin(
   harvestedCount: number,
   curatedCount: number,
   role?: string | null,
 ): boolean {
   if (harvestedCount < 12) return false;
-  const company = /^(ceo|founder|lead|owner)$/i.test(role || '');
-  const floor = company ? 25 : 12;
-  const minKeep = Math.max(floor, Math.ceil(harvestedCount * 0.45));
+  if (!/^(ceo|lead)$/i.test(role || '')) return false;
+  const minKeep = Math.max(25, Math.ceil(harvestedCount * 0.45));
   return curatedCount < minKeep;
 }
 

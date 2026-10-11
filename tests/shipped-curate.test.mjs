@@ -125,7 +125,8 @@ test('harvest wins when Claude keeps a highlight reel of a fat company tape', ()
   assert.equal(curate.harvestShouldWin(171, 60, 'ceo'), true);
   assert.equal(curate.harvestShouldWin(38, 30, 'lead'), false);
   assert.equal(curate.harvestShouldWin(9, 3, 'ceo'), false);
-  assert.equal(curate.harvestShouldWin(14, 8, null), true);
+  assert.equal(curate.harvestShouldWin(14, 8, null), false);
+  assert.equal(curate.harvestShouldWin(97, 18, 'founder'), false);
 });
 
 test('rollup keeps an existing monthly RELEASES IN label', () => {

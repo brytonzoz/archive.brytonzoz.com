@@ -239,7 +239,7 @@ export function endsWithCutOffWord(text: string): boolean {
 
 export function looksCutOff(text: string): boolean {
   const trimmed = text.trim();
-  if (/[,;·|&]\s*$/.test(trimmed)) return true;
+  if (/[,;·|&:]\s*$/.test(trimmed)) return true;
   if (/\bnow\s+(has|accepts)(\s+\w+){0,2}$/i.test(trimmed) && trimmed.split(/\s+/).length >= 3) return true;
   if (/[A-Za-z0-9]-$/.test(trimmed)) return true;
   if (/\([^)]*$/.test(trimmed)) return true;
@@ -1128,6 +1128,16 @@ export function looksLikeScopedPackage(title: string): boolean {
   return /^@[\w.-]+\//.test(stripMarkup(title));
 }
 
+/** Monthly recap blogs and "building X, part N" essays are not ships. */
+export function looksLikeMonthlyRoundup(title: string): boolean {
+  const text = stripMarkup(title);
+  if (!text) return false;
+  if (/^what[’']s new in\b/i.test(text)) return true;
+  if (/^building\b.+,?\s+part\s+\d/i.test(text)) return true;
+  if (/^[A-Za-z]{3}\s+\d{1,2},\s+\d{4}\b/.test(text) && text.split(/\s+/).length <= 8) return true;
+  return false;
+}
+
 /** Tiny deterministic check after the LLM rewrites a title. */
 export function titleSanityOk(title: string): boolean {
   const text = stripMarkup(title);
@@ -1136,7 +1146,7 @@ export function titleSanityOk(title: string): boolean {
   if (/^#{1,6}\s/.test(title) || /<\/?[a-z]/.test(title)) return false;
   if (TITLE_TRAILING_GLUE.test(text)) return false;
   if (looksCutOff(text) || endsWithCutOffWord(text)) return false;
-  if (looksLikeEssayTitle(text) || looksLikeScopedPackage(text)) return false;
+  if (looksLikeEssayTitle(text) || looksLikeScopedPackage(text) || looksLikeMonthlyRoundup(text)) return false;
   return true;
 }
 
@@ -1838,7 +1848,7 @@ export function cheapHardFilter<T extends Polishable>(items: T[], year: number):
     if (!name || name === 'YOUR POTENTIAL') continue;
     if (!cheapYearOk(item, year)) continue;
     if (isPrereleaseShip(name) || isPrereleaseShip(item.name)) continue;
-    if (looksLikeEssayTitle(name)) continue;
+    if (looksLikeEssayTitle(name) || looksLikeScopedPackage(name) || looksLikeMonthlyRoundup(name)) continue;
     const link = String(item.link || '').trim();
     if (!link) continue;
     try {

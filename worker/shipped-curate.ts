@@ -88,10 +88,10 @@ export const CURATION_SYSTEM = [
   'Return one JSON object, no markdown:',
   '{"items":[{"id":"c0","title":"","group":null,"owned":true,"significance":2}],"notes":["","",""]}',
   'Input items are candidates the crawlers already found. You only keep, rename, group, or drop. Every kept id must be one of the input ids. Skip an id you are unsure of. Never invent an id.',
-  'A ship is a product, feature, release, or launch the customer or their resolved company/org made. For a CEO, founder, or lead, company-wide flagships and owned changelog / OSS releases count. The printed title must name THEIR thing, not a partner\'s product (drop a line whose subject is another company\'s flagship).',
-  'Drop: tweets and first-person posts, blog essays, travel notes, opinion columns, news commentary, reviews of other people\'s products, customer stories, listicles, monthly "what\'s new" roundups, docs, pricing, policy, settings nits, commit hashes, and scoped package ids left as @scope/name. Do not drop the customer\'s own changelog features or flagship releases just because they look small. Do not thin a busy year to a handful of highlights.',
-  'When many owned product/changelog candidates exist, keep the year. Roll patches of one product into one group like "VUE · 4 UPDATES IN OCT". A real product year should still look busy. Do not shrink it to two leftover settings. Leave group null for a distinct ship.',
-  'title: a complete noun phrase people would recognize (Composer 2, Cursor 3, Bugbot, Origin, Vercel Agent, Codex App are fine). Never a sentence, never first person, never cut mid-phrase, never trailing of/in/to/for/and/or/the/a/an/with/& . No markdown or HTML. If you cannot recover a complete name, drop that id. Prefer the public product name over @scope/package. Max 60 characters.',
+  'A ship is a product, feature, release, or launch the customer themselves made. Company-wide changelog and flagships count ONLY when role is CEO, founder, or lead of that company — then keep the year, including named platform flagships, and roll language-SDK / patch versions of one product into one monthly group. An employee, designer, advocate, or DX engineer keeps only work they personally shipped (their own product or repo). Drop the employer\'s changelog, CLI nits, marketplace blurbs, and partner launches unless that company is theirs to run.',
+  'Drop: tweets, first-person posts, experiments that are not a named launch, blog essays, travel notes, opinion, news commentary, reviews, customer stories, listicles, monthly "what\'s new" / "building X, part N" recaps, docs, pricing, policy, settings nits, commit hashes, date-only titles, titles cut mid-phrase or ending in a colon, and scoped package ids (@scope/name). Prefer the public product name. Do not drop a CEO/founder/lead\'s own changelog features. Do not thin a CEO/founder/lead year to a handful of highlights.',
+  'When many owned product/changelog candidates exist for a CEO/founder/lead or for the customer\'s own product, keep the year. Roll patches of one product into one group like "VUE · 4 UPDATES IN OCT" or "DUB TS · 6 RELEASES IN AUG". A real product year should still look busy. Do not shrink it to two leftover settings. Leave group null for a distinct ship. Never print the employer\'s version list on someone who does not run that company.',
+  'title: a complete noun phrase people would recognize (Composer 2, Cursor 3, Bugbot, Origin, Vercel Agent, Codex App, Svelte 6, Bun 1.4 are fine). Never a sentence, never first person, never cut mid-phrase, never trailing of/in/to/for/and/or/the/a/an/with/& . No markdown or HTML. If you cannot recover a complete name, drop that id. Prefer the public product name over @scope/package. Max 60 characters.',
   'significance: 0 minor, 1 feature, 2 notable launch, 3 major product. Use 0 for patches you still keep in a group. Cap the printed tape at 60 lines AFTER roll-ups. Order kept items by date (undated last).',
   'notes: exactly 3 different cashier notes for THIS customer and the kept items. One or two sentences, max 140 characters, never cut mid-word. Dry, specific, a little sideways. Mention one real kept ship with its original casing. At most one number, and only if it is already in the input. Never say the tape is blank if items exist. Never invent a count. Never another person\'s name, never a URL, never ALL CAPS ships, never restating the first item title as the whole note.',
   'Banned everywhere: delve, journey, innovative, seamless, emoji, exclamation marks, "the tape", "the register", "night shift", "public tape", "lead ship".',
@@ -275,10 +275,9 @@ export function harvestShouldWin(
     // A 60-line Vercel reel already kept the flagships — don't swap it for npm version spam.
     return curatedCount < 25;
   }
-  // Indie / OSS: restore only a tiny highlight reel of short release names, never a tweet dump.
-  if (harvestedCount < 8) return false;
-  if (typeof cheapCount === 'number' && cheapCount < harvestedCount * 0.7) return false;
-  return curatedCount < 12;
+  // Everyone else: keep Claude's tape. Restoring harvest reintroduces employer
+  // changelogs, tweets, monthly blogs, and scoped npm ids.
+  return false;
 }
 
 export function customerFromProfile(

@@ -11,11 +11,12 @@ import { shipName } from './shipped-changelog';
 import { shareKeywords } from './shipped-decisions';
 import { isOssHarvestItem, ownerFromProfile, type OwnerContext } from './shipped-ownership';
 import { flagshipLaunchName, isFlagshipYearKeep, isJoinOrAcquire, isPriorYearJoin, logFlagshipGate } from './shipped-flagship';
-import { cleanDescription, cleanShipTitle, cleanStatus, gateReceiptItems, isChangelogEntryHref, isOpenAiCompanyWide, looksLikeEssayTitle, noteCountMismatch, spokenShipName } from './shipped-polish';
+import { cheapHardFilter, cleanDescription, cleanShipTitle, cleanStatus, gateReceiptItems, isChangelogEntryHref, isOpenAiCompanyWide, noteCountMismatch, spokenShipName } from './shipped-polish';
 import { emptyAffiliation, type Affiliation } from './shipped-affiliation';
 import { looksLikePersonName } from './shipped-repos';
 import { RECEIPT_BUDGET_MICROS, formatReceiptStats, searchBudget, type SourcedStat } from './shipped-research';
 import {
+  CURATION_LINE_CAP,
   CURATION_MAX_TOKENS,
   CURATION_RESERVE_MICROS,
   applyCuration,
@@ -1694,7 +1695,7 @@ export async function assembleReceipt(
       console.log(JSON.stringify({ shipped: 'curate-fallback', who: gathered.profile.name || subject.display, reason: error instanceof Error ? error.message : 'error' }));
     }
   }
-  const fallbackItems = harvested.filter((item) => !looksLikeEssayTitle(item.name));
+  const fallbackItems = cheapHardFilter(harvested, year).slice(0, CURATION_LINE_CAP);
   if (fallbackItems.length) {
     const sealed = finish(fallbackItems, '', seed, undefined, formatStats(fallbackItems, gathered.stats ?? []), {
       role: affiliation?.role,

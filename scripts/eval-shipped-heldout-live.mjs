@@ -24,6 +24,9 @@ const JUNK = [
   /\bcustomer stor/i,
   /^@[a-z0-9._-]+\//i,
   /^(i|i'm|i've|we|we've|it's)\b/i,
+  /^what[’']s new in\b/i,
+  /^building\b.+,?\s+part\s+\d/i,
+  /:\s*$/,
 ];
 
 function essayTitle(name) {

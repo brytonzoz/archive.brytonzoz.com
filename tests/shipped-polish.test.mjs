@@ -1181,6 +1181,27 @@ test('cheap filters strip markup, drop prereleases and other years, and dedupe U
   const names = cheap.map((item) => item.name);
   assert.ok(names.includes('Composer 2'), JSON.stringify(names));
   assert.ok(names.includes('We launched AI Gateway'), JSON.stringify(names));
+  const journal = polish.cheapHardFilter(
+    [
+      found({
+        name: 'I made hotelist.com to fix ratings',
+        date: '2026-10-05',
+        link: 'https://levels.io/#hotelist-com',
+        source: 'site',
+        description: 'Announced 2026-10-05 on levels.io',
+      }),
+      found({
+        name: 'I added Photo AI features',
+        date: '2026-06-02',
+        link: 'https://levels.io/2026/photo-ai',
+        source: 'site',
+        description: 'I made this. Listed on levels.io',
+      }),
+    ],
+    2026,
+  );
+  assert.ok(journal.some((item) => /hotelist/i.test(item.name)), JSON.stringify(journal.map((item) => item.name)));
+  assert.ok(journal.some((item) => /photo ai/i.test(item.name)), JSON.stringify(journal.map((item) => item.name)));
   assert.equal(names.filter((name) => /composer/i.test(name)).length, 1);
   assert.equal(
     names.some((name) => /canary|old ship|coding almost solely|@dub\/|what.?s new in svelte|hotel in leiden|lisbon hotel|headshot generators/i.test(name)),

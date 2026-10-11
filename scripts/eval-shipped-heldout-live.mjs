@@ -49,6 +49,33 @@ function ossFloor(query) {
   return OSS_FLOOR[key] || 0;
 }
 
+// 0936709 held-out counts. Fail any builder who had real ships then and now prints 0.
+const BASELINE_0936709 = {
+  steventey: 0,
+  shadcn: 4,
+  swyx: 47,
+  levelsio: 1,
+  jarredsumner: 16,
+  yyx990803: 13,
+  dannypostmaa: 0,
+  nico_jeannen: 4,
+  'Rich-Harris': 0,
+  leerob: 2,
+  mckaywrigley: 1,
+  pontusab: 6,
+};
+
+function baselineKey(query) {
+  return String(query || '')
+    .replace(/^@/, '')
+    .trim();
+}
+
+function droppedToZero(query, count) {
+  const baseline = BASELINE_0936709[baselineKey(query)];
+  return Number(baseline || 0) > 0 && Number(count || 0) === 0;
+}
+
 function employerSpill(query, titles) {
   const who = String(query || '')
     .replace(/^@/, '')
@@ -120,6 +147,7 @@ async function printOne(query) {
     echoNote: echoNote(note, items),
     junk,
     emptyVerified: ossFloor(query) > 0 && items.length === 0,
+    droppedToZero: droppedToZero(query, items.length),
     employerSpill: employerSpill(query, titles),
     floor: ossFloor(query),
     costMicros: printed.costMicros ?? loaded.cost_micros ?? loaded.costMicros ?? null,
@@ -131,6 +159,7 @@ async function printOne(query) {
       !echoNote(note, items) &&
       (wall == null || wall === items.length) &&
       items.length >= ossFloor(query) &&
+      !droppedToZero(query, items.length) &&
       !employerSpill(query, titles).length,
   };
 }
@@ -165,6 +194,7 @@ const summary = {
     echoNote: row.echoNote,
     junk: row.junk,
     emptyVerified: row.emptyVerified,
+    droppedToZero: row.droppedToZero,
     employerSpill: row.employerSpill,
     floor: row.floor,
     costMicros: row.costMicros,

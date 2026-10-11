@@ -866,6 +866,7 @@ August 2026
   assert.equal(research.looksLikePersonalShip('I discovered that thousands of bots monitor X'), false);
   assert.ok(research.extraResearchPaths('https://levels.io').some((url) => /\/blog$/.test(url)));
   assert.ok(research.extraResearchPaths('https://levels.io').some((url) => /\/rss$/.test(url)));
+  assert.match(research.extraResearchPaths('https://levels.io')[0], /\/rss$/);
 });
 
 test('Indie Page __NEXT_DATA__ keeps 2026 startups and drops older ones', () => {

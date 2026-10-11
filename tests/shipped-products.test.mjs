@@ -101,4 +101,13 @@ test('printed titles stay noun phrases at 48 characters', () => {
   assert.ok(plugin);
   assert.ok(plugin.length <= 48, plugin);
   assert.equal(/\bnow supported\b/i.test(plugin), false);
+  for (const raw of [
+    'PROGRAM CLAUDE CODE AGENTS IN PRODUCTION AND OTHER TOOLS',
+    'DEPLOY CURSOR ORIGIN APPS TO PRODUCTION AND OTHER SURFACES',
+    'ALWAYS-ON TRACING FOR SERVERLESS FUNCTIONS AND OTHER SERVICES',
+    'MICROFRONTENDS PREVIEWS NOW LINK TO THE DEPLOYMENT AND OTHER SURFACES',
+  ]) {
+    const next = polish.cleanShipTitle(raw) || polish.shortenWordyTitle(raw);
+    assert.ok(next.split(/\s+/).filter(Boolean).length < 8, `${raw} -> ${next}`);
+  }
 });

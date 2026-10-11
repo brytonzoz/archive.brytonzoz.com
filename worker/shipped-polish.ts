@@ -16,6 +16,7 @@ import {
 import { isLegacyNpmFamily } from './shipped-dates';
 import { isOssHarvestItem, ownedByBuilder, ownerCanProve, undatedPassesGate, type OwnerContext } from './shipped-ownership';
 import { isEmployerSpill } from './shipped-products';
+import { journalShipName, looksLikePersonalShip } from './shipped-research';
 import type { ItemStatus } from '../lib/shipped-year';
 import { ITEM_STATUSES } from '../lib/shipped-year';
 
@@ -871,7 +872,7 @@ export function nounPhraseFromSentence(raw: string): string {
   if (lets) return tidy(lets[1]);
   const isNow = text.match(/^([A-Za-z][\w.-]{1,32}(?:\s+[A-Za-z][\w.-]{1,24}){0,3})\s+(?:is|are) now\b/i);
   if (isNow) return tidy(isNow[1]);
-  const nowDoes = text.match(/^([A-Za-z][\w.-]{1,32}(?:\s+[A-Za-z][\w.-]{1,24}){0,3})\s+now (?:display|shows?|includes?|accepts?)\b/i);
+  const nowDoes = text.match(/^([A-Za-z][\w.-]{1,32}(?:\s+[A-Za-z][\w.-]{1,24}){0,3})\s+now (?:display|shows?|includes?|accepts?|link|links)\b/i);
   if (nowDoes) return tidy(nowDoes[1]);
   const joining = text.match(/^([A-Za-z][\w.-]{1,32})\s+(?:is joining|joins)\s+([A-Za-z][\w.-]{1,32})/i);
   if (joining) return `${tidy(joining[1])} joining ${tidy(joining[2])}`;
@@ -952,7 +953,8 @@ export function cleanShipTitle(raw: unknown, max = TITLE_MAX): string {
     .replace(/\s+support for\b.*$/i, '')
     .replace(/\s+now supports?\b.*$/i, '')
     .replace(/\s+now supported\b.*$/i, '')
-    .replace(/\s+now (shows?|includes?|calculates?|provides?|returns?|uses?)\b.*$/i, '')
+    .replace(/\s+now (shows?|includes?|calculates?|provides?|returns?|uses?|links?)\b.*$/i, '')
+    .replace(/\s+and other\b.*$/i, '')
     .replace(/\s+(release|launch) notes\.?$/i, '')
     .replace(/\s+reconnects?$/i, '')
     .replace(/\s+,/g, ',')
@@ -981,7 +983,48 @@ export function cleanShipTitle(raw: unknown, max = TITLE_MAX): string {
   const clampTo = changelogSentence ? TITLE_MAX : keepVersion ? Math.max(max, TITLE_HARD_MAX) : TITLE_HARD_MAX;
   const clamped = wordClamp(text, clampTo);
   if (!clamped || isJunkTitle(clamped) || looksMidWord(clamped) || looksCutOff(clamped) || looksFragment(clamped)) return '';
-  return gateShipTitle(String(raw ?? ''), clamped);
+  return gateShipTitle(String(raw ?? ''), shortenWordyTitle(clamped));
+}
+
+/** Changelog leftovers with 8+ words become a short product name. */
+export function shortenWordyTitle(title: string): string {
+  let text = stripMarkup(title)
+    .replace(/\s+and other\b.*$/i, '')
+    .replace(/\s+now (links?)\b.*$/i, '')
+    .trim();
+  if (!text) return '';
+  if (/\d+\.\d+/.test(text) || /·\s*\d+\s+(updates?|releases?)/i.test(text)) return text;
+  if (isMinorPlatformChange(text) || isMinorPlatformChange(title)) return stripMarkup(title);
+  const words = text.split(/\s+/).filter(Boolean);
+  if (words.length < 8) return text;
+  const phrase = nounPhraseFromSentence(text);
+  const phraseWords = phrase ? phrase.split(/\s+/).filter(Boolean) : [];
+  if (phrase && phraseWords.length >= 2 && phraseWords.length < 8 && isProductNounPhrase(phrase) && !looksCutOff(phrase) && !isJunkTitle(phrase)) {
+    return phrase;
+  }
+  let clipped = words.slice(0, 5).join(' ');
+  while (clipped && TITLE_TRAILING_GLUE.test(clipped)) {
+    clipped = clipped.split(/\s+/).slice(0, -1).join(' ').trim();
+  }
+  if (
+    clipped.split(/\s+/).filter(Boolean).length >= 2 &&
+    isProductNounPhrase(clipped) &&
+    !looksCutOff(clipped) &&
+    !isJunkTitle(clipped) &&
+    !SENTENCE_VERB.test(clipped) &&
+    !/\bnow\b/i.test(clipped)
+  ) {
+    return clipped;
+  }
+  return text;
+}
+
+/** levels.io / indie journal ships: first-person launches, not blog essays. */
+export function isJournalShip(item: { name?: string; description?: string | null; source?: string }): boolean {
+  const desc = String(item.description || '');
+  if (/^I made this\./i.test(desc)) return true;
+  if (/\bAnnounced 20\d{2}/i.test(desc)) return true;
+  return looksLikePersonalShip(String(item.name || ''));
 }
 
 /** Product / feature / model noun phrase. Sentence fragments and dangling preps fail. */
@@ -1630,7 +1673,7 @@ export function polishCandidates<T extends Polishable>(items: T[], opts: PolishO
       drop(item, 'ceo-api-minutiae');
       continue;
     }
-    if (!flagship && isBlogEssayTitle(item.name)) {
+    if (!flagship && !isJournalShip(item) && isBlogEssayTitle(item.name)) {
       drop(item, 'essay-title');
       continue;
     }
@@ -1657,7 +1700,8 @@ export function polishCandidates<T extends Polishable>(items: T[], opts: PolishO
       company: opts.affiliation?.company,
       date: item.date,
     };
-    let name = cleanShipTitle(item.name);
+    let name = isJournalShip(item) && looksLikePersonalShip(item.name) ? cleanShipTitle(journalShipName(item.name) || item.name) : cleanShipTitle(item.name);
+    if (name) name = shortenWordyTitle(name);
     if (name) name = reconcileTitleWithHref(name, item.link);
     if (!name && (item.source === 'changelog' || isChangelogEntryHref(item.link))) {
       const fallback = wordClamp(stripDateSuffix(tidy(item.name).replace(/\bcopy link to\b[\s\S]*/i, '')), TITLE_MAX);
@@ -1901,15 +1945,21 @@ export function cheapHardFilter<T extends Polishable>(items: T[], year: number):
   const seen = new Set<string>();
   const out: T[] = [];
   for (const item of items) {
-    const name = stripMarkup(item.name);
+    let name = stripMarkup(item.name);
     if (!name || name === 'YOUR POTENTIAL') continue;
+    const journal = isJournalShip({ ...item, name });
+    if (journal && looksLikePersonalShip(name)) {
+      const rewritten = journalShipName(name);
+      if (rewritten) name = rewritten;
+    }
     if (!cheapYearOk(item, year)) continue;
     if (isPrereleaseShip(name) || isPrereleaseShip(item.name)) continue;
     if (
-      looksLikeEssayTitle(name) ||
-      isBlogEssayTitle(name) ||
-      looksLikeScopedPackage(name) ||
-      looksLikeMonthlyRoundup(name)
+      !journal &&
+      (looksLikeEssayTitle(name) ||
+        isBlogEssayTitle(name) ||
+        looksLikeScopedPackage(name) ||
+        looksLikeMonthlyRoundup(name))
     ) {
       continue;
     }

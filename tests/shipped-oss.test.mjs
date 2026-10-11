@@ -685,3 +685,87 @@ test('live prints keep the writer note; empty CI notes use the sentence fallback
   assert.ok(ci.note);
   assert.equal(ai.isBareProductNote(ci.note, ci.items), false);
 });
+
+test('founder org releases harvest before leftover pins so Vite is not starved', async () => {
+  const order = [];
+  const get = async (path) => {
+    order.push(path.split('?')[0]);
+    if (path.startsWith('/users/yyx990803/repos')) return [];
+    if (path.startsWith('/users/yyx990803/orgs')) return [{ login: 'vitejs' }];
+    if (path.startsWith('/users/yyx990803/events')) return [];
+    if (path.startsWith('/orgs/vitejs/repos')) {
+      return [
+        { name: 'vite', html_url: 'https://github.com/vitejs/vite', homepage: 'https://vite.dev', stargazers_count: 72000, fork: false, pushed_at: '2026-08-01T00:00:00Z' },
+        { name: 'vitest', html_url: 'https://github.com/vitest-dev/vitest', homepage: 'https://vitest.dev', stargazers_count: 14000, fork: false, pushed_at: '2026-07-01T00:00:00Z' },
+      ];
+    }
+    if (path === '/repos/yyx990803/notes') {
+      return { name: 'notes', html_url: 'https://github.com/yyx990803/notes', stargazers_count: 3, fork: false };
+    }
+    if (path.includes('/vitejs/vite/releases')) {
+      return [{ tag_name: 'v8.0.0', name: 'Vite 8', published_at: '2026-08-12T12:00:00Z', body: 'Vite 8', html_url: 'https://github.com/vitejs/vite/releases/tag/v8.0.0' }];
+    }
+    return [];
+  };
+  const { found, ran } = await oss.harvestOss({
+    login: 'yyx990803',
+    year: 2026,
+    get,
+    bio: 'Creator of Vue and Vite.',
+    affiliation: { company: 'VoidZero', role: 'founder', product: 'Vite' },
+    orgs: ['vitejs'],
+    pins: [{ owner: 'yyx990803', name: 'notes' }, { owner: 'vitejs', name: 'vite' }],
+    products: ['Vite', 'notes'],
+  });
+  const rel = order.findIndex((path) => path.includes('/vitejs/vite/releases'));
+  const pin = order.findIndex((path) => path === '/repos/yyx990803/notes');
+  assert.ok(rel >= 0, JSON.stringify(order));
+  assert.ok(pin < 0 || rel < pin, JSON.stringify(order));
+  assert.ok(found.some((item) => /vite 8/i.test(item.name)), JSON.stringify(found.map((item) => item.name)));
+  assert.ok(ran.some((tag) => /oss-founder:vitejs/.test(tag)), JSON.stringify(ran));
+});
+
+test('a leftover canary-only pin still prints after a star-heavy founder repo', async () => {
+  const get = async (path) => {
+    if (path.startsWith('/users/colinhacks/repos')) return [];
+    if (path.startsWith('/users/colinhacks/orgs')) return [{ login: 'colinhacks' }];
+    if (path.startsWith('/users/colinhacks/events')) return [];
+    if (path.startsWith('/orgs/colinhacks/repos')) {
+      return [{ name: 'zod', html_url: 'https://github.com/colinhacks/zod', homepage: 'https://zod.dev', stargazers_count: 38000, fork: false, pushed_at: '2026-09-01T00:00:00Z' }];
+    }
+    if (path === '/repos/nubjs/nub') {
+      return { name: 'nub', html_url: 'https://github.com/nubjs/nub', stargazers_count: 400, fork: false, pushed_at: '2026-10-06T12:00:00Z' };
+    }
+    if (path.includes('/colinhacks/zod/releases')) {
+      return [{ tag_name: 'v4.6.0', name: 'Zod 4.6', published_at: '2026-09-02T12:00:00Z', body: 'Zod 4.6', html_url: 'https://github.com/colinhacks/zod/releases/tag/v4.6.0' }];
+    }
+    if (path.includes('/nubjs/nub/releases')) {
+      return [
+        {
+          tag_name: 'v0.9.6-canary.20261006.547',
+          published_at: '2026-10-06T12:00:00Z',
+          prerelease: true,
+          html_url: 'https://github.com/nubjs/nub/releases/tag/v0.9.6-canary.20261006.547',
+        },
+      ];
+    }
+    return [];
+  };
+  const { found, ran } = await oss.harvestOss({
+    login: 'colinhacks',
+    year: 2026,
+    get,
+    bio: 'Author of Zod.',
+    affiliation: { company: 'Zod', role: 'founder', product: 'Zod' },
+    orgs: ['colinhacks'],
+    pins: [
+      { owner: 'colinhacks', name: 'zod' },
+      { owner: 'nubjs', name: 'nub' },
+    ],
+    products: ['Zod', 'Nub'],
+  });
+  const names = found.map((item) => item.name);
+  assert.ok(names.some((name) => /zod 4\.6/i.test(name)), JSON.stringify(names));
+  assert.ok(names.some((name) => /nub/i.test(name)), JSON.stringify(names));
+  assert.ok(ran.some((tag) => /oss-pin:nubjs\/nub/.test(tag)), JSON.stringify(ran));
+});

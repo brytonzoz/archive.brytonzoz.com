@@ -515,19 +515,19 @@ export function extraResearchPaths(siteUrl: string): string[] {
   if (!url) return [];
   const base = url.replace(/\/+$/, '');
   return [
-    `${base}/projects`,
-    `${base}/now`,
+    `${base}/rss`,
+    `${base}/feed`,
+    `${base}/rss.xml`,
+    `${base}/feed.xml`,
+    `${base}/blog`,
     `${base}/changelog`,
     `${base}/2026`,
+    `${base}/now`,
+    `${base}/projects`,
     `${base}/work`,
     `${base}/shipped`,
     `${base}/products`,
     `${base}/apps`,
-    `${base}/blog`,
-    `${base}/rss`,
-    `${base}/feed`,
-    `${base}/feed.xml`,
-    `${base}/rss.xml`,
   ];
 }
 

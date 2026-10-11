@@ -744,31 +744,6 @@ export async function harvestOss(opts: {
       if (pins.length) ran.push(`oss-pins-html:${pins.map((pin) => `${pin.owner}/${pin.name}`).slice(0, 8).join(',')}`);
     }
   }
-  for (const pin of pins.slice(0, 8)) {
-    if (isEmployerOrg(pin.owner) && !isOrgFounder({
-      org: pin.owner,
-      bio: opts.bio,
-      company: opts.affiliation?.company,
-      companyGithub: opts.affiliation?.companyGithub,
-      role: opts.affiliation?.role,
-      product: opts.affiliation?.product,
-    })) {
-      continue;
-    }
-    const meta = await memo(`oss:repo:${pin.owner}/${pin.name}`, 360 * 60, () =>
-      opts.get<Record<string, unknown>>(`/repos/${encodeURIComponent(pin.owner)}/${encodeURIComponent(pin.name)}`).catch(() => null),
-    );
-    const repo =
-      asRepo(pin.owner, meta || { name: pin.name, html_url: `https://github.com/${pin.owner}/${pin.name}`, stargazers_count: 1 }) ||
-      ({
-        owner: pin.owner,
-        name: pin.name,
-        html_url: `https://github.com/${pin.owner}/${pin.name}`,
-        stargazers_count: 1,
-      } satisfies OssRepo);
-    takeRepo(repo);
-    ran.push(`oss-pin:${pin.owner}/${pin.name}`);
-  }
 
   for (const hit of eventHits.slice(0, 8)) {
     if (isEmployerOrg(hit.owner) && !isOrgFounder({
@@ -830,21 +805,30 @@ export async function harvestOss(opts: {
     pendingStats.push({ org, repos: repos.slice(0, 3) });
   }
 
+  const pinFounderOpts = {
+    bio: opts.bio,
+    company: opts.affiliation?.company,
+    companyGithub: opts.affiliation?.companyGithub,
+    role: opts.affiliation?.role,
+    product: opts.affiliation?.product,
+  };
+  const leftoverPins = pins
+    .filter((pin) => !(isEmployerOrg(pin.owner) && !isOrgFounder({ org: pin.owner, ...pinFounderOpts })))
+    .filter((pin) => {
+      const key = `${pin.owner.toLowerCase()}/${pin.name.toLowerCase()}`;
+      return !orgRepos.some((row) => `${row.owner.toLowerCase()}/${row.name.toLowerCase()}` === key);
+    })
+    .slice(0, 4);
+
   const pinKeys = new Set(pins.map((pin) => `${pin.owner}/${pin.name}`.toLowerCase()));
   const productKeys = [...(opts.products || []), opts.affiliation?.product]
     .filter((value): value is string => Boolean(value))
-    .map((value) => value.toLowerCase().replace(/[^a-z0-9]/g, ''));
-  const isOwnProductRepo = (repo: OssRepo) => {
-    if (pinKeys.has(`${repo.owner}/${repo.name}`.toLowerCase())) return true;
+    .map((value) => value.toLowerCase().replace(/[^a-z0-9]/g, ''))
+    .filter((value) => value.length >= 2);
+  const isExactProductRepo = (repo: OssRepo) => {
     const name = repo.name.toLowerCase().replace(/[^a-z0-9]/g, '');
     const owner = repo.owner.toLowerCase().replace(/[^a-z0-9]/g, '');
-    return productKeys.some(
-      (product) =>
-        product &&
-        (product === name ||
-          product === owner ||
-          (product.length >= 3 && (name.includes(product) || owner.includes(product) || product.includes(name)))),
-    );
+    return productKeys.some((product) => product && (product === name || product === owner));
   };
 
   const seenHarvest = new Set<string>();
@@ -888,9 +872,12 @@ export async function harvestOss(opts: {
         releases = [...releases, ...more];
         if (more.length < 30) break;
       }
-      const ownProduct = isOwnProductRepo(repo);
+      const stables = yearStable();
       const yearPublished = releases.filter((row) => !row.draft && inYear(day(row.published_at), year));
-      const yearReleases = ownProduct ? yearPublished : yearStable();
+      const canaryOwn =
+        stables.length === 0 &&
+        (isExactProductRepo(repo) || pinKeys.has(`${repo.owner}/${repo.name}`.toLowerCase()));
+      const yearReleases = canaryOwn ? yearPublished : stables;
       let tags: OssTag[] = [];
       if (yearReleases.length < 5) {
         const rawTags = await memo(`oss:tags:${repo.owner}/${repo.name}`, 180 * 60, () =>
@@ -924,7 +911,7 @@ export async function harvestOss(opts: {
         );
         repo.readme = Boolean(readme);
       }
-      const lines = linesFromOssRepo(repo, yearReleases, tags, year, source, { includePrereleases: ownProduct });
+      const lines = linesFromOssRepo(repo, yearReleases, tags, year, source, { includePrereleases: canaryOwn });
       if (lines.length) {
         found.push(...lines);
         ran.push(`${tag}:${repo.owner}/${repo.name}:${lines.length}`);
@@ -932,13 +919,36 @@ export async function harvestOss(opts: {
     }
   };
 
-  orgRepos.sort((a, b) => {
-    const ownA = isOwnProductRepo(a) ? 0 : 1;
-    const ownB = isOwnProductRepo(b) ? 0 : 1;
-    if (ownA !== ownB) return ownA - ownB;
-    return (a.stargazers_count ?? 0) - (b.stargazers_count ?? 0);
-  });
   await harvestRepos(orgRepos.slice(0, 8), 'oss-rel');
+
+  if (leftoverPins.length && !overBudget()) {
+    const loaded = await Promise.all(
+      leftoverPins.map(async (pin) => {
+        const meta = await memo(`oss:repo:${pin.owner}/${pin.name}`, 360 * 60, () =>
+          opts.get<Record<string, unknown>>(`/repos/${encodeURIComponent(pin.owner)}/${encodeURIComponent(pin.name)}`).catch(() => null),
+        );
+        return { pin, meta };
+      }),
+    );
+    for (const { pin, meta } of loaded) {
+      const repo =
+        asRepo(pin.owner, meta || { name: pin.name, html_url: `https://github.com/${pin.owner}/${pin.name}`, stargazers_count: 1 }) ||
+        ({
+          owner: pin.owner,
+          name: pin.name,
+          html_url: `https://github.com/${pin.owner}/${pin.name}`,
+          stargazers_count: 1,
+        } satisfies OssRepo);
+      takeRepo(repo);
+      ran.push(`oss-pin:${pin.owner}/${pin.name}`);
+    }
+    await harvestRepos(
+      leftoverPins
+        .map((pin) => orgRepos.find((row) => row.owner.toLowerCase() === pin.owner.toLowerCase() && row.name.toLowerCase() === pin.name.toLowerCase()))
+        .filter((row): row is OssRepo => Boolean(row)),
+      'oss-rel',
+    );
+  }
 
   const alreadyHave = (item: OssFound): boolean =>
     found.some((row) => sameOssVersion(row.name, item.name) || row.link === item.link);

@@ -1822,7 +1822,7 @@ export async function gather(
     gatherFresh(subject, resolved.profile, env, year, meter, tinyfish, resolved.notes, mode, opts?.onPartial, opts?.affiliation);
   if (opts?.rebuild && !opts.onPartial) return load();
   if (opts?.rebuild) return load();
-  const key = mode === 'full' ? `gather:full:v33:${year}:${resolved.cacheKey}` : `gather:v42:${year}:${resolved.cacheKey}`;
+  const key = mode === 'full' ? `gather:full:v34:${year}:${resolved.cacheKey}` : `gather:v43:${year}:${resolved.cacheKey}`;
   return cached(
     key,
     1440 * MIN,
@@ -1933,10 +1933,6 @@ async function gatherFresh(
   });
   for (const product of ownProducts) {
     if (product.site) profile.sites = mergeSites(profile.sites, [product.site]);
-    else {
-      const guess = productHostGuesses(product.name)[0];
-      if (guess) profile.sites = mergeSites(profile.sites, [guess]);
-    }
   }
   if (ownProducts.length) {
     ran.push(`own-products:${ownProducts.map((row) => row.name).slice(0, 6).join(',')}`);
@@ -2083,12 +2079,12 @@ async function gatherFresh(
   }
   const homepage = profile.site;
   const extraHomes = [
-    ...sitesOf(profile).filter((url) => hostOf(url) !== hostOf(homepage)),
     ...(homepage ? extraResearchPaths(homepage) : []),
+    ...sitesOf(profile).filter((url) => hostOf(url) !== hostOf(homepage)),
     ...trustmrrUrls(profile),
   ]
     .filter((url, i, all) => all.findIndex((u) => u.replace(/\/+$/, '') === url.replace(/\/+$/, '')) === i)
-    .slice(0, 18);
+    .slice(0, 8);
   const ossHarvestP =
     profile.github && apiOpen(env)
       ? (async () => {

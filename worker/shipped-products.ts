@@ -9,7 +9,6 @@ import {
   cleanText,
   githubReposFromText,
   hostOf,
-  productHostGuesses,
   productNameFromHost,
   urlsFromText,
 } from './shipped-identity';
@@ -168,7 +167,7 @@ export function productsFromSurfaces(opts: {
   for (const row of productsFromUrls(opts.urls || [])) addProduct(out, row);
   for (const pin of opts.pins || []) {
     const name = prettyProduct(pin.name.replace(/[-_]+/g, ' ')) || pin.name;
-    addProduct(out, { name, github: pin, site: productHostGuesses(name)[0] ?? null });
+    addProduct(out, { name, github: pin, site: null });
   }
   const login = (opts.github || '').replace(/^@/, '');
   for (const org of opts.orgs || []) {
@@ -284,7 +283,7 @@ export async function harvestOwnProductSites(
   const seen = new Set<string>();
   const targets = products
     .map((product) => {
-      const site = product.site || productHostGuesses(product.name)[0] || null;
+      const site = product.site || null;
       return site ? { product, site } : null;
     })
     .filter((row): row is { product: OwnProduct; site: string } => Boolean(row))

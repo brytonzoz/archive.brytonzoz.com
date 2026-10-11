@@ -262,6 +262,18 @@ function rowsFromPage(html: string, url: string, year: number): ChangelogFound[]
   ];
 }
 
+/** Personal journal / RSS only — company-page scrapers turn indie blogs into essay tapes. */
+export function rowsFromPersonalHome(html: string, url: string, year: number): ChangelogFound[] {
+  if (/<item\b|<entry\b/i.test(html)) {
+    return itemsFromPersonalFeed({ text: html, url, year }).map(fromJournal);
+  }
+  const text = pageText(html);
+  return [
+    ...itemsFromDatedJournal({ text, url, year }).map(fromJournal),
+    ...itemsFromPersonalFeed({ text: html, url, year }).map(fromJournal),
+  ];
+}
+
 /** First-party changelog / RSS / release notes / personal launch posts for own products. */
 export async function harvestOwnProductSites(
   products: OwnProduct[],
@@ -312,7 +324,7 @@ export async function harvestOwnProductSites(
         const html = pages[i];
         const url = urls[i]!;
         if (!html) continue;
-        takeRows(found, seen, rowsFromPage(html, url, year), 'Personal launch');
+        takeRows(found, seen, rowsFromPersonalHome(html, url, year), 'Personal launch');
       }
     }),
   ]);

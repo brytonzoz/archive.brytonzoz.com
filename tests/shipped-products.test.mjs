@@ -22,6 +22,25 @@ test('bio and URL surfaces resolve own products without a person table', () => {
   assert.ok(fromUrls.some((row) => /dub/i.test(row.name)));
 });
 
+test('personal homes keep launch posts and drop company-page essays', () => {
+  const html = `
+    <html><body>
+      <h2>October 2026</h2>
+      <p>5 Oct I made hotelist.com to fix hotel booking</p>
+      <article>
+        <h1>Europeans are all captivated by the mind virus of productivity culture</h1>
+        <p>A long essay about travel and hotels.</p>
+      </article>
+      <article>
+        <h1>Winning my first big Stripe dispute in a decade after a chargeback</h1>
+      </article>
+    </body></html>`;
+  const rows = products.rowsFromPersonalHome(html, 'https://levels.io/', 2026);
+  const names = rows.map((row) => row.name);
+  assert.ok(names.some((name) => /hotelist/i.test(name)), JSON.stringify(names));
+  assert.equal(names.some((name) => /mind virus|stripe dispute/i.test(name)), false, JSON.stringify(names));
+});
+
 test('pinned repo HTML is parsed from the GitHub profile markup', () => {
   const html = `
     <div class="js-pinned-items-reorder-container">

@@ -5,6 +5,7 @@ import { test } from 'node:test';
 const curate = await import('../worker/shipped-curate.ts');
 const polish = await import('../worker/shipped-polish.ts');
 const year = await import('../lib/shipped-year.ts');
+const sources = await import('../worker/shipped-sources.ts');
 
 const found = (item) => ({
   description: '',
@@ -184,6 +185,29 @@ test('harvest wins when Claude keeps a highlight reel of a fat company tape', ()
     { name: 'DUB TS 0.72' },
     { name: 'DUB GO 0.25' },
   ]), false);
+  const bunPlusEssays = [
+    { name: 'Bun 1.4', kind: 'oss-release', link: 'https://github.com/oven-sh/bun/releases/tag/bun-v1.4.0' },
+    { name: 'Bun 1.3.6', kind: 'oss-release', link: 'https://github.com/oven-sh/bun/releases/tag/bun-v1.3.6' },
+    { name: 'Bun · 3 RELEASES IN JAN', kind: 'oss-release' },
+    { name: 'Bun 1.3.11', kind: 'oss-release', link: 'https://github.com/oven-sh/bun/releases/tag/bun-v1.3.11' },
+    { name: 'Bun · 2 RELEASES IN FEB', kind: 'oss-release' },
+    { name: 'Bun 1.3.14', kind: 'oss-release', link: 'https://github.com/oven-sh/bun/releases/tag/bun-v1.3.14' },
+    { name: 'Bun · 2 RELEASES IN APR', kind: 'oss-release' },
+    { name: 'Bun 1.4.3', kind: 'oss-release', link: 'https://github.com/oven-sh/bun/releases/tag/bun-v1.4.3' },
+    { name: 'Bun · 2 RELEASES IN SEP', kind: 'oss-release' },
+    { name: 'Bun 1.3.8', kind: 'oss-release', link: 'https://github.com/oven-sh/bun/releases/tag/bun-v1.3.8' },
+    { name: "Brazil's CPF catch-22 makes booking hotels impossible" },
+    { name: 'Tech insiders avoid touchscreens and smart homes because' },
+    { name: 'Europeans are all captivated by the mind virus' },
+    { name: 'Winning my first big Stripe dispute in a decade' },
+    { name: 'Leiden might be the best Dutch city to visit instead' },
+    { name: 'Hotel in the Netherlands sets AC minimum at 23' },
+    { name: 'Luxury products are really just meant for poor people' },
+    { name: 'Ignoring mind viruses leads to a slippery slope' },
+  ];
+  assert.equal(curate.harvestLooksLikeOssTape(bunPlusEssays), true);
+  assert.equal(curate.harvestLooksLikeCommentaryTape(bunPlusEssays), false);
+  assert.ok(sources.OSS_TIMEOUT_MS >= 28_000);
   assert.equal(curate.harvestLooksLikeCommentaryTape([
     { name: "Brazil's CPF catch-22 makes booking hotels impossible" },
     { name: 'Tech insiders avoid touchscreens and smart homes because' },

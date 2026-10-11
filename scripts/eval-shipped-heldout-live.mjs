@@ -34,17 +34,19 @@ function essayTitle(name) {
   return words.length >= 12;
 }
 
-const VERIFIED_BUILDERS = new Set(
-  'steventey,shadcn,swyx,levelsio,jarredsumner,yyx990803,dannypostmaa,nico_jeannen,rich-harris,rich_harris,leerob,mckaywrigley,pontusab'
-    .split(',')
-    .map((value) => value.toLowerCase()),
-);
+const OSS_FLOOR = {
+  jarredsumner: 15,
+  yyx990803: 15,
+  youyuxi: 15,
+  'rich-harris': 10,
+  rich_harris: 10,
+};
 
-function isVerifiedBuilder(query) {
+function ossFloor(query) {
   const key = String(query || '')
     .replace(/^@/, '')
     .toLowerCase();
-  return VERIFIED_BUILDERS.has(key);
+  return OSS_FLOOR[key] || 0;
 }
 
 function employerSpill(query, titles) {
@@ -117,8 +119,9 @@ async function printOne(query) {
     note,
     echoNote: echoNote(note, items),
     junk,
-    emptyVerified: isVerifiedBuilder(query) && items.length === 0,
+    emptyVerified: ossFloor(query) > 0 && items.length === 0,
     employerSpill: employerSpill(query, titles),
+    floor: ossFloor(query),
     costMicros: printed.costMicros ?? loaded.cost_micros ?? loaded.costMicros ?? null,
     inputTokens: printed.inputTokens ?? loaded.input_tokens ?? loaded.inputTokens ?? null,
     outputTokens: printed.outputTokens ?? loaded.output_tokens ?? loaded.outputTokens ?? null,
@@ -127,7 +130,7 @@ async function printOne(query) {
       !junk.length &&
       !echoNote(note, items) &&
       (wall == null || wall === items.length) &&
-      !(isVerifiedBuilder(query) && items.length === 0) &&
+      items.length >= ossFloor(query) &&
       !employerSpill(query, titles).length,
   };
 }
@@ -163,6 +166,7 @@ const summary = {
     junk: row.junk,
     emptyVerified: row.emptyVerified,
     employerSpill: row.employerSpill,
+    floor: row.floor,
     costMicros: row.costMicros,
     inputTokens: row.inputTokens,
     outputTokens: row.outputTokens,

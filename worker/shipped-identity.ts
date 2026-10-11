@@ -489,6 +489,14 @@ export function guessHandleHomes(handle: string | null | undefined): string[] {
   return [...new Set(out)];
 }
 
+/** Only `levelsio` → `levels.io`. Generic handle.com guesses stay out of harvest. */
+export function splitHandleHomes(handle: string | null | undefined): string[] {
+  const id = (handle || '').replace(/^@/, '').toLowerCase();
+  const split = id.match(/^([a-z][a-z0-9]{3,18})(io|ai|app|dev|so)$/);
+  if (!split) return [];
+  return [`https://${split[1]}.${split[2]}/`];
+}
+
 export function extraSitePaths(siteUrl: string): string[] {
   const url = httpsUrl(siteUrl);
   if (!url) return [];

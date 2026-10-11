@@ -247,6 +247,15 @@ test('share cards are a 1200×630 desk photo and a 1080×1350 download', async (
   assert.equal(card.includes('printerLip') || /url\(#chassis\)/.test(card), false, 'card is a desk photo, not the printer template');
 });
 
+test('admin gather waits for the OSS harvest budget', () => {
+  const worker = fs.readFileSync(new URL('../worker/shipped.ts', import.meta.url), 'utf8');
+  const sources = fs.readFileSync(new URL('../worker/shipped-sources.ts', import.meta.url), 'utf8');
+  const gather = Number((worker.match(/ADMIN_GATHER_MS = ([\d_]+)/)?.[1] || '0').replace(/_/g, ''));
+  const oss = Number((sources.match(/OSS_TIMEOUT_MS = ([\d_]+)/)?.[1] || '0').replace(/_/g, ''));
+  assert.ok(oss >= 28_000, `OSS_TIMEOUT_MS ${oss}`);
+  assert.ok(gather > oss, `ADMIN_GATHER_MS ${gather} should exceed OSS_TIMEOUT_MS ${oss}`);
+});
+
 test('share pages fill a placeholder instead of appending head scripts', () => {
   const page = fs.readFileSync(new URL('../app/shipped/r/page.tsx', import.meta.url), 'utf8');
   const worker = fs.readFileSync(new URL('../worker/shipped.ts', import.meta.url), 'utf8');

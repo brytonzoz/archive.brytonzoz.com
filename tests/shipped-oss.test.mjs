@@ -62,6 +62,39 @@ test('a pinned product with only 2026 canaries still prints a product line', () 
   assert.equal(names.some((name) => /canary/i.test(name)), false);
 });
 
+test('empty pins still harvest a profile HTML pin', async () => {
+  const get = async (path) => {
+    if (path.startsWith('/users/colinhacks/repos')) return [];
+    if (path.startsWith('/users/colinhacks/orgs')) return [];
+    if (path.startsWith('/users/colinhacks/events')) return [];
+    if (path === '/repos/nubjs/nub') {
+      return { name: 'nub', html_url: 'https://github.com/nubjs/nub', stargazers_count: 400, fork: false, pushed_at: '2026-10-06T00:00:00Z' };
+    }
+    if (path.includes('/nubjs/nub/releases')) {
+      return [
+        {
+          tag_name: 'v0.9.6-canary.20261006.547',
+          published_at: '2026-10-06T12:00:00Z',
+          prerelease: true,
+          html_url: 'https://github.com/nubjs/nub/releases/tag/v0.9.6-canary.20261006.547',
+        },
+      ];
+    }
+    return [];
+  };
+  const { found, ran } = await oss.harvestOss({
+    login: 'colinhacks',
+    year: 2026,
+    get,
+    readText: async (url) => {
+      if (!/github\.com\/colinhacks\/?$/i.test(url)) return null;
+      return `<span data-hydro-click='{"event_type":"user_profile.click","payload":{"target":"PINNED_REPO"}}' href="/nubjs/nub" class="Link">nub</span>`;
+    },
+  });
+  assert.ok(ran.some((tag) => /oss-pins-html:nubjs\/nub/i.test(tag)), JSON.stringify(ran));
+  assert.ok(found.some((item) => /nub/i.test(item.name)), JSON.stringify(found.map((item) => item.name)));
+});
+
 test('prefixed tags still parse as semver', () => {
   assert.deepEqual(oss.parseSemver('bun-v1.4.0'), { major: 1, minor: 4, patch: 0 });
   assert.deepEqual(oss.parseSemver('svelte@5.20.0'), { major: 5, minor: 20, patch: 0 });
@@ -101,7 +134,7 @@ test('event repos pin the flagship before site probes', async () => {
     },
   });
   const rel = order.findIndex((row) => row.includes('/releases'));
-  const site = order.findIndex((row) => row.startsWith('site:'));
+  const site = order.findIndex((row) => row.startsWith('site:') && !/github\.com\//i.test(row));
   assert.ok(rel >= 0, JSON.stringify(order));
   assert.ok(site < 0 || rel < site, JSON.stringify(order));
   assert.ok(ran.some((tag) => /oss-event-repo:oven-sh\/bun/.test(tag)), JSON.stringify(ran));

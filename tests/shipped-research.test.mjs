@@ -823,6 +823,8 @@ test('a /projects page dated 2026 becomes found items', () => {
   assert.equal(identity.guessHandleDotCom('www'), null);
   assert.ok(identity.guessHandleHomes('levelsio').includes('https://levelsio.com/'));
   assert.ok(identity.guessHandleHomes('levelsio').includes('https://levels.io/'));
+  assert.deepEqual(identity.splitHandleHomes('levelsio'), ['https://levels.io/']);
+  assert.deepEqual(identity.splitHandleHomes('yyx990803'), []);
 });
 
 test('indie blog month archives become dated ships and skip commentary', () => {

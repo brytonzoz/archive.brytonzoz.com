@@ -4,6 +4,7 @@ import { itemsFromFeedXml } from './shipped-changelog';
 import { affiliationFromBio } from './shipped-affiliation';
 import { githubReposFromText, productHostGuesses } from './shipped-identity';
 import { isPrereleaseShip } from './shipped-polish';
+import { pinnedReposFromHtml } from './shipped-products';
 import { looksLikeProductReadme } from './shipped-repos';
 
 export type OssRelease = {
@@ -734,6 +735,15 @@ export async function harvestOss(opts: {
   };
 
   const pins = [...(opts.pins || [])];
+  if (!pins.length && opts.readText) {
+    const html = await memo(`oss:pinhtml:${login.toLowerCase()}`, 360 * 60, () =>
+      opts.readText!(`https://github.com/${login}`).catch(() => null),
+    );
+    if (html) {
+      pins.push(...pinnedReposFromHtml(html));
+      if (pins.length) ran.push(`oss-pins-html:${pins.map((pin) => `${pin.owner}/${pin.name}`).slice(0, 8).join(',')}`);
+    }
+  }
   for (const pin of pins.slice(0, 8)) {
     if (isEmployerOrg(pin.owner) && !isOrgFounder({
       org: pin.owner,
@@ -820,7 +830,7 @@ export async function harvestOss(opts: {
     pendingStats.push({ org, repos: repos.slice(0, 3) });
   }
 
-  const pinKeys = new Set((opts.pins || []).map((pin) => `${pin.owner}/${pin.name}`.toLowerCase()));
+  const pinKeys = new Set(pins.map((pin) => `${pin.owner}/${pin.name}`.toLowerCase()));
   const productKeys = [...(opts.products || []), opts.affiliation?.product]
     .filter((value): value is string => Boolean(value))
     .map((value) => value.toLowerCase().replace(/[^a-z0-9]/g, ''));

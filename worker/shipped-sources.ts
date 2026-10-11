@@ -21,7 +21,7 @@ import {
   collisionOverride,
   companyLogins,
   extraSitePaths,
-  guessHandleHomes,
+  splitHandleHomes,
   githubLoginsFromText,
   handleTokens,
   handleVariants,
@@ -208,7 +208,7 @@ export interface SourceProvider {
 
 const UA = 'brytonzoz.com-shipped (+https://shipped.brytonzoz.com/)';
 export const SOURCE_TIMEOUT_MS = 6000;
-const OSS_TIMEOUT_MS = 12_000;
+export const OSS_TIMEOUT_MS = 28_000;
 const TIMEOUT = SOURCE_TIMEOUT_MS;
 
 export async function raceTimeout<T>(work: Promise<T>, ms: number, fallback: T): Promise<T> {
@@ -1335,7 +1335,7 @@ async function apiUser(login: string, env: SourceEnv): Promise<GithubUser | null
 /** Who this GitHub login is: the profile page, else TinyFish reading it, else the API. Null = no such account. */
 export async function githubUser(login: string, env: SourceEnv, tinyfish: TinyfishAccess = null): Promise<GithubUser | null> {
   if (!isGithubLogin(login) || NOT_USERS.has(login.toLowerCase())) return null;
-  return cached(`gh:user:v2:${login.toLowerCase()}`, 360 * MIN, async () => {
+  return cached(`gh:user:v3:${login.toLowerCase()}`, 360 * MIN, async () => {
     try {
       const html = await githubPage(`/${login}`);
       if (!html) return null;
@@ -2076,7 +2076,7 @@ async function gatherFresh(
       })()
     : Promise.resolve(null);
 
-  const guessedHomes = [...guessHandleHomes(profile.github), ...guessHandleHomes(profile.x)];
+  const guessedHomes = [...splitHandleHomes(profile.github), ...splitHandleHomes(profile.x)];
   if (guessedHomes.length) {
     if (!profile.site) profile.site = guessedHomes[0] || null;
     profile.sites = mergeSites(profile.sites, guessedHomes);

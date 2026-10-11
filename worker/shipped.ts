@@ -2215,8 +2215,10 @@ async function loadStoredNotes(db: D1Database, exceptId?: number): Promise<strin
   return notes;
 }
 
-const ADMIN_GATHER_MS = 11_000;
-const ADMIN_CURATE_MS = 8_000;
+// OSS harvest's own budget is 28s. The first-wave partial (including org
+// releases) must finish before this deadline or admin prints get an empty stub.
+export const ADMIN_GATHER_MS = 40_000;
+const ADMIN_CURATE_MS = 12_000;
 
 function stubGathered(subject: Subject): Gathered {
   const profile = emptyProfile();

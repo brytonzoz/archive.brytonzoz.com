@@ -35,7 +35,7 @@
 // Tables are created (and new columns added) on first use; see SCHEMA below.
 import { CURATION_RESERVE_MICROS, DEFAULT_MODEL, PrintError, assembleReceipt, demoReceipt, finish, harvestItems, maxSearches, promptFor, worstCaseMicros, type AiEnv, type DraftItem } from './shipped-ai';
 import { harvestLooksLikeCommentaryTape } from './shipped-curate';
-import { cheapHardFilter, isBlogEssayTitle, looksLikeEssayTitle, titleSanityOk } from './shipped-polish';
+import { RECEIPT_LINE_CAP, cheapHardFilter, isBlogEssayTitle, looksLikeEssayTitle } from './shipped-polish';
 import { ICON_HASH, bytesDataUri, iconDataUri, iconKey, reencodeLogo, storeIcon } from './shipped-icons';
 import { houseMark } from './shipped-marks';
 import { yearCardPng, yearRolloPdf, yearRolloPng, yearTallPng, type LogoResolver } from './shipped-og';
@@ -2218,7 +2218,7 @@ async function loadStoredNotes(db: D1Database, exceptId?: number): Promise<strin
 // OSS harvest's own budget is 28s. The first-wave partial (including org
 // releases) must finish before this deadline or admin prints get an empty stub.
 export const ADMIN_GATHER_MS = 40_000;
-const ADMIN_CURATE_MS = 12_000;
+export const ADMIN_CURATE_MS = 20_000;
 
 function stubGathered(subject: Subject): Gathered {
   const profile = emptyProfile();
@@ -2295,8 +2295,10 @@ async function assembleForAdmin(
   } catch (error) {
     if (error instanceof PrintError && error.code === 'out-of-credit') throw error;
   }
-  const found = cheapHardFilter(gathered.found, year).filter((item) => titleSanityOk(item.name));
-  const fallback = harvestLooksLikeCommentaryTape(found) ? [] : harvestItems({ ...gathered, found }, year).slice(0, 20);
+  const cheap = cheapHardFilter(gathered.found, year);
+  const fallback = harvestLooksLikeCommentaryTape(cheap)
+    ? []
+    : harvestItems(gathered, year).slice(0, RECEIPT_LINE_CAP);
   return {
     draft: {
       ...finish(fallback, '', seed, undefined, undefined, {

@@ -138,6 +138,8 @@ test('harvest wins when Claude keeps a highlight reel of a fat company tape', ()
   assert.equal(curate.harvestShouldWin(193, 11, 'ceo', 'Vercel'), false);
   assert.equal(curate.harvestShouldWin(193, 31, 'ceo', 'Vercel'), false);
   assert.equal(curate.harvestShouldWin(60, 8, 'ceo', 'Vercel'), true);
+  assert.equal(curate.harvestShouldWin(15, 15, 'ceo', 'Vercel'), true);
+  assert.equal(curate.harvestShouldWin(20, 15, 'ceo', 'Vercel'), true);
   assert.equal(curate.harvestShouldWin(60, 31, 'ceo', 'Vercel'), false);
   assert.equal(curate.harvestShouldWin(38, 32, 'lead', 'OpenAI'), true);
   assert.equal(curate.harvestShouldWin(38, 36, 'lead', 'OpenAI'), false);
@@ -224,6 +226,39 @@ test('harvest wins when Claude keeps a highlight reel of a fat company tape', ()
     { name: 'Vite 8' },
     { name: 'Vue 3.5.27' },
   ]), false);
+  const svelteRecaps = [
+    { name: "What's new in Svelte: January 2026", kind: 'oss-blog', link: 'https://svelte.dev/blog/whats-new-in-svelte-january-2026' },
+    { name: "What's new in Svelte: February 2026", kind: 'oss-blog', link: 'https://svelte.dev/blog/whats-new-in-svelte-february-2026' },
+    { name: 'Svelte 5.29', kind: 'oss-release', link: 'https://github.com/sveltejs/svelte/releases/tag/svelte%405.29.0' },
+    { name: 'Svelte 5.30', kind: 'oss-release', link: 'https://github.com/sveltejs/svelte/releases/tag/svelte%405.30.0' },
+    { name: 'SvelteKit 2.49', kind: 'oss-release', link: 'https://github.com/sveltejs/kit/releases/tag/2.49.0' },
+    { name: 'Svelte 5.31', kind: 'oss-release', link: 'https://github.com/sveltejs/svelte/releases/tag/svelte%405.31.0' },
+    { name: 'Svelte 5.32', kind: 'oss-release', link: 'https://github.com/sveltejs/svelte/releases/tag/svelte%405.32.0' },
+    { name: 'SvelteKit 2.50', kind: 'oss-release', link: 'https://github.com/sveltejs/kit/releases/tag/2.50.0' },
+    { name: 'Svelte 5.33', kind: 'oss-release', link: 'https://github.com/sveltejs/svelte/releases/tag/svelte%405.33.0' },
+    { name: 'Svelte 5.34', kind: 'oss-release', link: 'https://github.com/sveltejs/svelte/releases/tag/svelte%405.34.0' },
+  ];
+  const ossOnly = curate.ossWinTape(svelteRecaps);
+  assert.equal(ossOnly.every((item) => !/what.?s new in/i.test(item.name)), true, JSON.stringify(ossOnly));
+  assert.ok(ossOnly.length >= 8, JSON.stringify(ossOnly));
+  const expanded = curate.expandCeoHarvestWin(
+    [
+      { name: 'NEXT.JS 16.4', link: 'https://vercel.com/changelog/next-16-4', source: 'changelog' },
+      { name: 'V0 PLATFORM API', link: 'https://vercel.com/changelog/v0-platform-api', source: 'changelog' },
+    ],
+    [
+      { name: 'NEXT.JS 16.4', link: 'https://vercel.com/changelog/next-16-4', source: 'changelog' },
+      { name: 'Vercel Sandbox routing is generally available', link: 'https://vercel.com/changelog/sandbox-routing', source: 'changelog' },
+      { name: 'Persistent memory for eve agents', link: 'https://vercel.com/changelog/persistent-memory', source: 'changelog' },
+      { name: "What's new in Svelte: January 2026", link: 'https://svelte.dev/blog/whats-new-in-svelte-january-2026' },
+    ],
+    'ceo',
+    'Vercel',
+    30,
+  );
+  assert.ok(expanded.some((item) => /sandbox routing/i.test(item.name)), JSON.stringify(expanded));
+  assert.ok(expanded.some((item) => /persistent memory/i.test(item.name)), JSON.stringify(expanded));
+  assert.equal(expanded.some((item) => /what.?s new in svelte/i.test(item.name)), false, JSON.stringify(expanded));
   const restored = curate.unionHarvestWin(
     [
       { name: 'NEXT.JS 16.4', link: 'https://vercel.com/changelog/next-16-4' },

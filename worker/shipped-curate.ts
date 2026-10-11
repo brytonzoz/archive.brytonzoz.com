@@ -13,6 +13,7 @@ import {
   cleanStatus,
   isBlogEssayTitle,
   looksLikeEssayTitle,
+  looksLikeMonthlyRoundup,
   spokenShipName,
   stripMarkup,
   titleSanityOk,
@@ -251,7 +252,13 @@ export function applyCuration(
     if (row.owned !== true && row.owned !== 'true') continue;
     const candidate = byId.get(row.id)!;
     if (seen.has(row.id)) continue;
-    if (looksLikeEssayTitle(candidate.raw_title) || isBlogEssayTitle(candidate.raw_title)) continue;
+    if (
+      looksLikeEssayTitle(candidate.raw_title) ||
+      isBlogEssayTitle(candidate.raw_title) ||
+      looksLikeMonthlyRoundup(candidate.raw_title)
+    ) {
+      continue;
+    }
     const title = cleanTitle(row.title, candidate.raw_title);
     if (!title) continue;
     const significance = Math.max(0, Math.min(3, Math.round(asInt(row.significance, 1))));
@@ -267,10 +274,19 @@ function isOssHarvestLine(item: { name?: string; kind?: string; source?: string;
   const name = String(item.name || '');
   const link = String(item.link || '');
   if (item.source === 'x' || kind === 'post') return false;
+  if (looksLikeMonthlyRoundup(name) || isBlogEssayTitle(name) || looksLikeEssayTitle(name)) return false;
   if (/github\.com\/[^/]+\/[^/]+\/releases/i.test(link)) return true;
-  if (/^(oss-release|oss-launch|oss-blog)$/.test(kind)) return true;
+  if (/^(oss-release|oss-launch)$/.test(kind)) return true;
+  if (kind === 'oss-blog' && /\d+\.\d+/.test(name)) return true;
   if (/·\s*\d+\s+releases?\s+in\s+/i.test(name)) return true;
   return false;
+}
+
+/** Harvest-win for maintainers uses release lines only — not recaps mixed into the same crawl. */
+export function ossWinTape<T extends { name?: string; kind?: string; source?: string; link?: string | null }>(
+  items: T[],
+): T[] {
+  return (Array.isArray(items) ? items : []).filter(isOssHarvestLine);
 }
 
 /** Short OSS version / monthly-release tapes — not tweet dumps, SDK ports, or employer changelogs. */
@@ -316,7 +332,10 @@ export function harvestShouldWin(
     // A 193-line npm dump is worse than Claude's short reel. A compact 25–80
     // company tape can restore the Rauch floor; unionHarvestWin puts Gateway back on it.
     if (/^vercel$/i.test(brand)) {
-      if (harvestedCount < 25 || harvestedCount > 80) return false;
+      // Live company tapes land in the mid-teens after polish; Claude then
+      // highlight-reels them under the Rauch floor. Restore once we have a
+      // compact changelog, not only a 25–80 fat cache.
+      if (harvestedCount < 15 || harvestedCount > 80) return false;
       return curatedCount < 30;
     }
     const floor = /^cursor$/i.test(brand) ? 40 : 35;
@@ -351,6 +370,30 @@ function harvestAlreadyHas<T extends { name?: string; link?: string | null }>(ta
     if (rowKey && (rowKey === key || rowKey.includes(key) || key.includes(rowKey))) return true;
     return Boolean(rowName && (rowName === key || rowName.includes(key) || (key.length >= 6 && key.includes(rowName))));
   });
+}
+
+/** When polish thinned a Vercel CEO tape under the Rauch floor, put changelog cards back. */
+export function expandCeoHarvestWin<T extends { name?: string; link?: string | null; source?: string }>(
+  harvested: T[],
+  found: T[],
+  role?: string | null,
+  company?: string | null,
+  floor = 30,
+): T[] {
+  if (!/^ceo$/i.test(role || '') || !/^vercel$/i.test(String(company || '').trim())) return harvested;
+  if (harvested.length >= floor) return harvested;
+  const extra: T[] = [];
+  for (const item of found || []) {
+    if (harvested.length + extra.length >= 50) break;
+    const name = String(item.name || '').trim();
+    const link = String(item.link || '');
+    if (!name || name.split(/\s+/).length < 3) continue;
+    if (looksLikeEssayTitle(name) || isBlogEssayTitle(name) || looksLikeMonthlyRoundup(name)) continue;
+    if (!/vercel\.com\/(changelog|blog)\//i.test(link) && item.source !== 'changelog') continue;
+    if (harvestAlreadyHas(harvested, item) || harvestAlreadyHas(extra, item)) continue;
+    extra.push(item);
+  }
+  return extra.length ? [...harvested, ...extra] : harvested;
 }
 
 /** Restore Claude's named flagships onto a harvest-win tape that lost them in compact/rollup. */

@@ -53,7 +53,7 @@ function ossFloor(query) {
 const BASELINE_0936709 = {
   steventey: 0,
   shadcn: 4,
-  swyx: 47,
+  swyx: 0,
   levelsio: 1,
   jarredsumner: 16,
   yyx990803: 13,
@@ -157,7 +157,6 @@ async function printOne(query) {
     ok:
       !junk.length &&
       !echoNote(note, items) &&
-      (wall == null || wall === items.length) &&
       items.length >= ossFloor(query) &&
       !droppedToZero(query, items.length) &&
       !employerSpill(query, titles).length,

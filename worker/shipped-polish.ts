@@ -363,6 +363,7 @@ export function isBlogEssayTitle(title: string): boolean {
   if (/\bfor (python |javascript |js |typescript )?engineers\b/i.test(text)) return true;
   if (/\bproduction index\b/i.test(text)) return true;
   if (/\brecap\b/i.test(text)) return true;
+  if (/^what[’']s new in\b/i.test(text)) return true;
   if (/\b(security boundaries|credential sprawl|security release|we disabled)\b/i.test(text)) return true;
   if (/\b(customer journeys?|global affairs|intelligence age|safety cases|youth safety|frontline defenders|false front|road ahead|view inside|epidemiology)\b/i.test(text)) return true;
   if (/\bships\s+\d+\s+times?\s+a\s+day\b/i.test(text) || /\bfastest-adopted\b/i.test(text)) return true;
@@ -1019,11 +1020,10 @@ export function shortenWordyTitle(title: string): string {
   return text;
 }
 
-/** levels.io / indie journal ships: first-person launches, not blog essays. */
+/** levels.io / indie journal ships: first-person launches, not blog essays.
+ *  "Announced 2026" / "I made this." on the description is not enough — tweet
+ *  dumps get those prefixes from the journal scraper. */
 export function isJournalShip(item: { name?: string; description?: string | null; source?: string }): boolean {
-  const desc = String(item.description || '');
-  if (/^I made this\./i.test(desc)) return true;
-  if (/\bAnnounced 20\d{2}/i.test(desc)) return true;
   return looksLikePersonalShip(String(item.name || ''));
 }
 
@@ -1673,7 +1673,11 @@ export function polishCandidates<T extends Polishable>(items: T[], opts: PolishO
       drop(item, 'ceo-api-minutiae');
       continue;
     }
-    if (!flagship && !isJournalShip(item) && isBlogEssayTitle(item.name)) {
+    if (
+      !flagship &&
+      !isJournalShip(item) &&
+      (isBlogEssayTitle(item.name) || looksLikeEssayTitle(item.name) || looksLikeMonthlyRoundup(item.name))
+    ) {
       drop(item, 'essay-title');
       continue;
     }
@@ -1711,7 +1715,6 @@ export function polishCandidates<T extends Polishable>(items: T[], opts: PolishO
         !looksCutOff(fallback) &&
         !looksMidWord(fallback) &&
         !looksFragment(fallback) &&
-        !TITLE_START_BAD.test(fallback) &&
         !isVagueOrCutTitle(item.name) &&
         !isVagueOrCutTitle(fallback) &&
         !/including:?$/i.test(String(item.name || '')) &&
@@ -1734,6 +1737,18 @@ export function polishCandidates<T extends Polishable>(items: T[], opts: PolishO
     if (isChangelogIdOrHostCrumb(name, item.link) || isChangelogIdOrHostCrumb(item.name, item.link)) {
       drop(item, 'changelog-id');
       continue;
+    }
+    if (looksLikePrintedFirstPerson(name)) {
+      const launched = name.match(
+        /^(?:we|i|i['’]ve|i['’]m)\s+(?:launched|shipped|released|built|made|added)\s+(.+)$/i,
+      );
+      const extracted = launched?.[1]?.trim() || '';
+      if (extracted && isProductNounPhrase(extracted) && !looksLikePrintedFirstPerson(extracted)) {
+        name = extracted;
+      } else {
+        drop(item, 'first-person');
+        continue;
+      }
     }
     if (isJunkTitle(name, junkOpts)) {
       if (flagship) {

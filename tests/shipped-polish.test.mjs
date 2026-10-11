@@ -802,6 +802,8 @@ test('OpenAI index essays drop; named flagships stay', () => {
   assert.equal(polish.isBlogEssayTitle('GPT-6'), false);
   assert.equal(polish.isBlogEssayTitle('Delphi ships 100 times a day with its Python backend'), true);
   assert.equal(polish.isBlogEssayTitle('Jev is the fastest-adopted model in AI Gateway history'), true);
+  assert.equal(polish.isBlogEssayTitle("What's new in Svelte: January 2026"), true);
+  assert.equal(polish.isBlogEssayTitle("WHAT’S NEW IN SVELTE: MARCH 2026"), true);
   assert.equal(polish.isBlogEssayTitle('ChatGPT Images'), false);
   assert.equal(polish.isBlogEssayTitle('Sora'), false);
 });
@@ -1197,11 +1199,49 @@ test('cheap filters strip markup, drop prereleases and other years, and dedupe U
         source: 'site',
         description: 'I made this. Listed on levels.io',
       }),
+      found({
+        name: "I've been coding almost solely on my VPS with Claude this year",
+        date: '2026-06-03',
+        link: 'https://levels.io/2026/vps',
+        source: 'site',
+        description: 'Announced 2026-06-03 on levels.io',
+      }),
     ],
     2026,
   );
   assert.ok(journal.some((item) => /hotelist/i.test(item.name)), JSON.stringify(journal.map((item) => item.name)));
   assert.ok(journal.some((item) => /photo ai/i.test(item.name)), JSON.stringify(journal.map((item) => item.name)));
+  assert.equal(
+    journal.some((item) => /coding almost solely|vps with claude/i.test(item.name)),
+    false,
+    JSON.stringify(journal.map((item) => item.name)),
+  );
+  const printed = polish.gateReceiptItems(
+    [
+      found({
+        name: "What's new in Svelte: January 2026",
+        date: '2026-01-15',
+        link: 'https://svelte.dev/blog/whats-new-in-svelte-january-2026',
+      }),
+      found({
+        name: 'Svelte 5.29',
+        date: '2026-03-01',
+        link: 'https://github.com/sveltejs/svelte/releases/tag/svelte%405.29.0',
+        kind: 'oss-release',
+      }),
+      found({
+        name: "I've been coding almost solely on my VPS with Claude this year",
+        date: '2026-06-03',
+        link: 'https://levels.io/2026/vps',
+        source: 'site',
+        description: 'Announced 2026-06-03 on levels.io',
+      }),
+    ],
+    { year: 2026, who: 'Rich Harris' },
+  );
+  const printedNames = printed.map((item) => item.name);
+  assert.ok(printedNames.some((name) => /svelte 5\.29/i.test(name)), JSON.stringify(printedNames));
+  assert.equal(printedNames.some((name) => /what.?s new in svelte|coding almost solely/i.test(name)), false, JSON.stringify(printedNames));
   assert.equal(names.filter((name) => /composer/i.test(name)).length, 1);
   assert.equal(
     names.some((name) => /canary|old ship|coding almost solely|@dub\/|what.?s new in svelte|hotel in leiden|lisbon hotel|headshot generators/i.test(name)),

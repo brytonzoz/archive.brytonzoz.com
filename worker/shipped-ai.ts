@@ -23,9 +23,11 @@ import {
   cachedSystem,
   curationUserPrompt,
   customerFromProfile,
+  expandCeoHarvestWin,
   harvestLooksLikeCommentaryTape,
   harvestLooksLikeOssTape,
   harvestShouldWin,
+  ossWinTape,
   packCandidates,
   unionHarvestWin,
   parseCurationJson,
@@ -1656,10 +1658,14 @@ export async function assembleReceipt(
         spent,
       });
       if (curated) {
+        const ossHeavy = harvestLooksLikeOssTape(harvested);
+        const winSource = ossHeavy
+          ? ossWinTape(harvested)
+          : expandCeoHarvestWin(harvested, gathered.found as typeof harvested, affiliation?.role, affiliation?.company);
         if (
           !harvestLooksLikeCommentaryTape(harvested) &&
-          harvestShouldWin(harvested.length, curated.items.length, affiliation?.role, affiliation?.company, cheap.length, {
-            ossHeavy: harvestLooksLikeOssTape(harvested),
+          harvestShouldWin(winSource.length, curated.items.length, affiliation?.role, affiliation?.company, cheap.length, {
+            ossHeavy,
           })
         ) {
           console.log(
@@ -1667,6 +1673,7 @@ export async function assembleReceipt(
               shipped: 'curate-thin',
               who: gathered.profile.name || subject.display,
               harvested: harvested.length,
+              win: winSource.length,
               curated: curated.items.length,
               role: affiliation?.role || null,
             }),
@@ -1683,7 +1690,7 @@ export async function assembleReceipt(
             owner: ownerFromProfile(gathered.profile, affiliation),
             apiDown: false,
           };
-          const tape = unionHarvestWin(harvested, curated.items);
+          const tape = unionHarvestWin(winSource, curated.items);
           const sealed = finish(tape, curated.note, seed, undefined, formatStats(tape, gathered.stats ?? []), noteCtx);
           return {
             ...sealed,

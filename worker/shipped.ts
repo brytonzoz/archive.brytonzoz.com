@@ -33,7 +33,7 @@
 // Every guardrail (rate limits, locks, the budget, kill switches, the human check, headers) lives in
 // worker/shipped-guard.ts; the threat list is docs/shipped-security.md.
 // Tables are created (and new columns added) on first use; see SCHEMA below.
-import { CURATION_RESERVE_MICROS, DEFAULT_MODEL, PrintError, assembleReceipt, demoReceipt, finish, maxSearches, promptFor, worstCaseMicros, type AiEnv, type DraftItem } from './shipped-ai';
+import { CURATION_RESERVE_MICROS, DEFAULT_MODEL, PrintError, assembleReceipt, demoReceipt, finish, harvestItems, maxSearches, promptFor, worstCaseMicros, type AiEnv, type DraftItem } from './shipped-ai';
 import { ICON_HASH, bytesDataUri, iconDataUri, iconKey, reencodeLogo, storeIcon } from './shipped-icons';
 import { houseMark } from './shipped-marks';
 import { yearCardPng, yearRolloPdf, yearRolloPng, yearTallPng, type LogoResolver } from './shipped-og';
@@ -55,8 +55,10 @@ import {
   candidatesFromIdentity,
   clean,
   faviconUrl,
+  emptyProfile,
   gather,
   hostOf,
+  raceTimeout,
   readSite,
   resolveIdentity,
   tinyfishAccess,
@@ -2200,6 +2202,92 @@ async function loadStoredNotes(db: D1Database, exceptId?: number): Promise<strin
   return notes;
 }
 
+const ADMIN_GATHER_MS = 11_000;
+const ADMIN_CURATE_MS = 8_000;
+
+function stubGathered(subject: Subject): Gathered {
+  const profile = emptyProfile();
+  profile.name = subject.display || subject.id;
+  if (subject.kind === 'x') profile.x = subject.id;
+  if (subject.kind === 'github') profile.github = subject.id;
+  return { found: [], web: [], pages: [], site: null, profile, ran: ['deadline'], failed: [] };
+}
+
+function tapeLooksBroken(items: { name?: string | null }[] | undefined): boolean {
+  const names = (items || []).map((item) => String(item?.name || ''));
+  if (names.some((name) => /^@[\w.-]+\//.test(name) || /[<>{}`#]/.test(name) || /:\s*$/.test(name) || /^what[’']s new in\b/i.test(name))) {
+    return true;
+  }
+  return names.filter((name) => /^VERCEL \d/i.test(name)).length >= 8;
+}
+
+async function gatherForAdmin(
+  subject: Subject,
+  env: ShippedEnv,
+  db: D1Database,
+  year: number,
+  extra: { rebuild?: boolean; affiliation?: Partial<import('./shipped-affiliation').Affiliation> } = {},
+): Promise<Gathered> {
+  let latest: Gathered | null = null;
+  const work = gather(
+    subject,
+    gatherEnv(env, db, { xaiMeter: denyXaiMeter(), xaiMode: 'off', SHIPPED_XAI_OFF: '1' }),
+    year,
+    tinyfishMeter(db),
+    {
+      rebuild: extra.rebuild,
+      affiliation: extra.affiliation,
+      onPartial: (partial) => {
+        latest = partial;
+      },
+    },
+  );
+  const gathered = await raceTimeout(work, ADMIN_GATHER_MS, null as Gathered | null);
+  return gathered ?? latest ?? stubGathered(subject);
+}
+
+async function assembleForAdmin(
+  subject: Subject,
+  gathered: Gathered,
+  year: number,
+  seed: number,
+  env: ShippedEnv,
+  budget: number,
+  usedNotes: string[],
+): Promise<{ draft: Awaited<ReturnType<typeof assembleReceipt>>; timedOut: boolean }> {
+  try {
+    const result = await raceTimeout(
+      assembleReceipt(subject, gathered, year, seed, env, budget, usedNotes).catch((error) => {
+        if (error instanceof PrintError && error.code === 'out-of-credit') throw error;
+        return null;
+      }),
+      ADMIN_CURATE_MS,
+      null,
+    );
+    if (result) return { draft: result, timedOut: false };
+  } catch (error) {
+    if (error instanceof PrintError && error.code === 'out-of-credit') throw error;
+  }
+  const fallback = harvestItems(gathered, year).slice(0, 20);
+  return {
+    draft: {
+      ...finish(fallback, '', seed, undefined, undefined, {
+        who: gathered.profile.name,
+        handle: gathered.profile.x,
+        year,
+        affiliation: gathered.profile.affiliation,
+        apiDown: true,
+      }),
+      model: env.SHIPPED_MODEL || DEFAULT_MODEL,
+      inputTokens: 0,
+      outputTokens: 0,
+      searches: 0,
+      costMicros: 0,
+    },
+    timedOut: true,
+  };
+}
+
 /** Re-run gather + assemble for an existing row. Same id; listed/hidden stay as they are. */
 async function reprintReceipt(
   env: ShippedEnv,
@@ -2227,13 +2315,7 @@ async function reprintReceipt(
   if (!slot) return json({ error: 'busy' }, 503);
   let reserved = 0;
   try {
-    let gathered = await gather(
-      subject,
-      gatherEnv(env, db, { xaiMeter: denyXaiMeter(), xaiMode: 'off', SHIPPED_XAI_OFF: '1' }),
-      year,
-      tinyfishMeter(db),
-      { rebuild: true, affiliation: affiliationHint },
-    );
+    let gathered = await gatherForAdmin(subject, env, db, year, { rebuild: true, affiliation: affiliationHint });
     gathered = await enrichReprintCompanyCache(env, db, year, affiliationHint, gathered);
     const resolved = gathered.profile.name && !hasBlockedWord(gathered.profile.name) ? gathered.profile.name : subject.display;
     subject.display = prettyPersonName(resolved) || clean(resolved, 60);
@@ -2252,9 +2334,9 @@ async function reprintReceipt(
       if (!(await reserveBudget(db, cap, worst, budgetKey()))) return json({ error: 'out-of-paper' }, 503);
       reserved = worst;
       try {
-        const result = await assembleReceipt(subject, gathered, year, seedOf(row.login_key), env, worst, await loadStoredNotes(db, id));
-        draft = result;
-        usage = { input: result.inputTokens, output: result.outputTokens, searches: result.searches, cost: result.costMicros };
+        const assembled = await assembleForAdmin(subject, gathered, year, seedOf(row.login_key), env, worst, await loadStoredNotes(db, id));
+        draft = assembled.draft;
+        usage = { input: draft.inputTokens, output: draft.outputTokens, searches: draft.searches, cost: draft.costMicros };
         reserved = 0;
         await settleBudget(db, worst, usage.cost, budgetKey());
       } catch (error) {
@@ -2266,7 +2348,7 @@ async function reprintReceipt(
           await setOutOfCredit(db);
           return json({ error: 'out-of-paper' }, 503);
         }
-        throw error;
+        draft = finish([], '', seedOf(row.login_key), undefined, undefined, { year, apiDown: true, who: subject.display });
       }
     }
     const remappedGithub =
@@ -2283,7 +2365,7 @@ async function reprintReceipt(
     const x = (gathered.profile.x && isXHandle(gathered.profile.x) ? gathered.profile.x : subject.kind === 'x' ? subject.id : null) || null;
     const realNew = (draft.items || []).filter((item) => item?.name && item.name !== 'YOUR POTENTIAL' && item.source !== 'none');
     const realOld = (current.items || []).filter((item) => item?.name && item.name !== 'YOUR POTENTIAL' && item.source !== 'none');
-    if (!realNew.length && realOld.length && !remappedGithub) {
+    if (!realNew.length && realOld.length && !remappedGithub && !tapeLooksBroken(current.items)) {
       console.log(JSON.stringify({ shipped: 'reprint-keep', id: row.id, kept: realOld.length, why: 'empty-harvest' }));
       const keptItems = current.items as DraftItem[];
       const keptNote = current.note || '';
@@ -2369,13 +2451,7 @@ async function printFreshSubject(env: ShippedEnv, db: D1Database, raw: string): 
   if (!slot) return json({ error: 'busy' }, 503);
   let reserved = 0;
   try {
-    const gathered = await gather(
-      subject,
-      gatherEnv(env, db, { xaiMeter: denyXaiMeter(), xaiMode: 'off', SHIPPED_XAI_OFF: '1' }),
-      year,
-      tinyfishMeter(db),
-      { rebuild: true },
-    );
+    const gathered = await gatherForAdmin(subject, env, db, year, { rebuild: true });
     const resolved = gathered.profile.name && !hasBlockedWord(gathered.profile.name) ? gathered.profile.name : subject.display;
     subject.display = prettyPersonName(resolved) || clean(resolved, 60);
     let model: string | null = null;
@@ -2394,9 +2470,9 @@ async function printFreshSubject(env: ShippedEnv, db: D1Database, raw: string): 
       if (!(await reserveBudget(db, cap, worst, budgetKey()))) return json({ error: 'out-of-paper' }, 503);
       reserved = worst;
       try {
-        const result = await assembleReceipt(subject, gathered, year, seed, env, worst, await loadStoredNotes(db));
-        draft = result;
-        usage = { input: result.inputTokens, output: result.outputTokens, searches: result.searches, cost: result.costMicros };
+        const assembled = await assembleForAdmin(subject, gathered, year, seed, env, worst, await loadStoredNotes(db));
+        draft = assembled.draft;
+        usage = { input: draft.inputTokens, output: draft.outputTokens, searches: draft.searches, cost: draft.costMicros };
         reserved = 0;
         await settleBudget(db, worst, usage.cost, budgetKey());
       } catch (error) {
@@ -2408,7 +2484,7 @@ async function printFreshSubject(env: ShippedEnv, db: D1Database, raw: string): 
           await setOutOfCredit(db);
           return json({ error: 'out-of-paper' }, 503);
         }
-        throw error;
+        draft = finish([], '', seed, undefined, undefined, { year, apiDown: true, who: subject.display });
       }
     }
     const x = (gathered.profile.x && isXHandle(gathered.profile.x) ? gathered.profile.x : subject.kind === 'x' ? subject.id : null) || null;

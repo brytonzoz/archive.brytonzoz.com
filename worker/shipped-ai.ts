@@ -1384,7 +1384,7 @@ export function worstCaseMicros(model: string, promptChars: number, searches: nu
 const TURNS = 3;
 const MAX_TOKENS = 4096;
 /** Each Anthropic call gives up after this long; the print as a whole stays under the Worker's limits. */
-const CALL_TIMEOUT_MS = 40_000;
+const CALL_TIMEOUT_MS = 10_000;
 /** The gathered data handed to the model is capped, so a huge page can't run up the bill. */
 const PROMPT_CHARS = 60_000;
 

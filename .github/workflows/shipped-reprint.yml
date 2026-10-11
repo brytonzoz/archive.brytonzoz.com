@@ -53,7 +53,7 @@ jobs:
     name: Reprint receipts (no xAI)
     if: github.event_name == 'workflow_dispatch' || contains(github.event.head_commit.message, '[shipped-reprint')
     runs-on: ubuntu-latest
-    timeout-minutes: 45
+    timeout-minutes: 60
     steps:
       - uses: actions/checkout@v5
 
@@ -110,9 +110,13 @@ jobs:
             if [ -n "$PRINT" ]; then
               export SHIPPED_PRINT_SUBJECTS="$PRINT"
             fi
+            if printf '%s\n' "$MSG" | grep -q '\[shipped-reprint-wall\]'; then
+              export SHIPPED_REPRINT_WALL=1
+            fi
           fi
           echo "Reprint ids: $SHIPPED_REPRINT_FORCE_IDS"
           echo "Print subjects: $SHIPPED_PRINT_SUBJECTS"
+          echo "Wall reprint: ${SHIPPED_REPRINT_WALL:-}"
           node --no-warnings scripts/reprint-shipped.mjs
 
       - name: Held-out live prints

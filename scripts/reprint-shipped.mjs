@@ -37,6 +37,16 @@ const RECEIPT_PATH = (id) => `/r/${id}/`;
 const origin = (process.argv[2] || process.env.SHIPPED_ORIGIN || 'https://shipped-staging.brytonzoz.com').replace(/\/+$/, '');
 const password = process.env.ADMIN_PASSWORD || '';
 const FORCE = process.env.SHIPPED_REPRINT_FORCE === '1';
+const WALL = process.env.SHIPPED_REPRINT_WALL === '1';
+const KEEP_IDS = new Set([6, 7, 13, 16, 17, 18, 19, 20, 21, 22]);
+const BROKEN_TITLE = [
+  /###/,
+  /<\/?[a-z]/i,
+  /^@[a-z0-9._-]+\//i,
+  /^what[’']s new in\b/i,
+  /:\s*$/,
+  /commission analytics you can$/i,
+];
 const FORCE_IDS = new Set(
   (process.env.SHIPPED_REPRINT_FORCE_IDS || '')
     .split(',')
@@ -75,17 +85,42 @@ const DEFAULT_TARGETS = [
   { id: 22, who: 'Stephanj' },
 ];
 
+if (!password) {
+  console.error('ADMIN_PASSWORD is required to reprint.');
+  process.exit(1);
+}
+
+async function fetchPile() {
+  const receipts = [];
+  let before = '';
+  for (let page = 0; page < 8; page++) {
+    const url = `${origin}/api/shipped/pile?limit=200&t=${Date.now()}${before ? `&before=${before}` : ''}`;
+    const res = await fetch(url, { cache: 'no-store' });
+    if (!res.ok) break;
+    const body = await res.json();
+    const rows = Array.isArray(body.receipts) ? body.receipts : [];
+    receipts.push(...rows);
+    if (!body.next || !rows.length) break;
+    before = String(body.next);
+  }
+  return receipts;
+}
+
+if (WALL) {
+  const pile = await fetchPile();
+  for (const row of pile) {
+    const id = Number(row?.id);
+    if (Number.isFinite(id) && id > 0) FORCE_IDS.add(id);
+  }
+  console.log(`Wall reprint: ${[...FORCE_IDS].sort((a, b) => a - b).join(',') || '(empty pile)'}`);
+}
+
 const TARGETS =
   FORCE_IDS.size > 0
     ? [...FORCE_IDS]
         .sort((a, b) => a - b)
         .map((id) => DEFAULT_TARGETS.find((t) => t.id === id) ?? { id, who: `#${id}` })
     : DEFAULT_TARGETS;
-
-if (!password) {
-  console.error('ADMIN_PASSWORD is required to reprint.');
-  process.exit(1);
-}
 
 const headers = { authorization: `Bearer ${password}`, 'content-type': 'application/json' };
 
@@ -157,7 +192,9 @@ for (const target of TARGETS) {
   }
   if (!last.ok) {
     console.error(`#${target.id} ${who} reprint failed: ${last.status} ${last.error || ''}`);
-    process.exit(1);
+    if (!WALL) process.exit(1);
+    rows.push({ id: target.id, who, items: prior, url: `${origin}${RECEIPT_PATH(target.id)}`, skipped: false, error: last.error, ms: last.ms });
+    continue;
   }
   await new Promise((ok) => setTimeout(ok, 3000));
   let after = await readReceipt(target.id);
@@ -278,7 +315,59 @@ for (const q of PRINT_SUBJECTS) {
   });
 }
 
-const report = { origin, xai: 'off', sha: process.env.GITHUB_SHA || null, receipts: rows };
+function titleLooksBroken(name) {
+  return BROKEN_TITLE.some((re) => re.test(String(name || '')));
+}
+
+function tapeLooksBroken(titles) {
+  const names = Array.isArray(titles) ? titles : [];
+  if (names.some(titleLooksBroken)) return true;
+  return names.filter((name) => /^VERCEL \d/i.test(name)).length >= 8;
+}
+
+function looseWho(value) {
+  return String(value || '')
+    .toLowerCase()
+    .replace(/^@/, '')
+    .replace(/[^a-z0-9]/g, '');
+}
+
+async function hideReceipt(id) {
+  const res = await fetch(`${origin}/api/admin/shipped`, {
+    method: 'POST',
+    headers,
+    body: JSON.stringify({ action: 'hide-receipt', id }),
+  });
+  const body = await res.json().catch(() => ({}));
+  return res.ok && body.ok === true;
+}
+
+const hidden = [];
+if (WALL) {
+  const pile = await fetchPile();
+  const byWho = new Map();
+  for (const row of pile) {
+    const key = looseWho(row.who);
+    if (!key) continue;
+    const list = byWho.get(key) || [];
+    list.push(row);
+    byWho.set(key, list);
+  }
+  for (const row of pile) {
+    const id = Number(row.id);
+    if (!id || KEEP_IDS.has(id)) continue;
+    const titles = (row.items || []).map((item) => item.name);
+    const twins = byWho.get(looseWho(row.who)) || [];
+    const newerTwin = twins.some((other) => Number(other.id) > id);
+    if (tapeLooksBroken(titles) || newerTwin) {
+      const ok = await hideReceipt(id);
+      hidden.push({ id, who: row.who, count: row.count, why: tapeLooksBroken(titles) ? 'broken' : 'duplicate', ok });
+      console.log(`hide #${id} ${row.who} (${tapeLooksBroken(titles) ? 'broken' : 'older duplicate'}) ${ok ? 'ok' : 'failed'}`);
+    }
+  }
+}
+
+const report = { origin, xai: 'off', sha: process.env.GITHUB_SHA || null, receipts: rows, hidden };
 console.log(JSON.stringify(report, null, 2));
 const reportPath = process.env.SHIPPED_REPORT;
 if (reportPath) {

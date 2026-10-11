@@ -914,7 +914,7 @@ test('personal RSS keeps dated ships and drops commentary', () => {
     year: 2026,
   });
   assert.ok(tony.some((item) => /survive|10 waves/i.test(item.name) && item.link?.includes('survive10waves')), JSON.stringify(tony));
-  assert.ok(tony.some((item) => /pulse/i.test(item.name)), JSON.stringify(tony));
+  assert.equal(tony.some((item) => /pulse|product hunt/i.test(item.name)), false, JSON.stringify(tony));
   assert.ok(tony.every((item) => item.link && /^https?:\/\//.test(item.link)));
   assert.ok(tony.every((item) => /listed on/i.test(item.description || '')), JSON.stringify(tony));
 });

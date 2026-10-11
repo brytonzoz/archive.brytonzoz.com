@@ -365,9 +365,8 @@ export function itemsFromPersonalFeed(opts: { text: string; url: string; year: n
     const raw = `${item.name} ${item.description || ''}`;
     const products = productUrlsFromCopy(`${raw} ${block[0]}`, pageHost);
     const personal = looksLikePersonalShip(raw) || looksLikePersonalShip(item.name);
-    // A roundup that names many other companies is never a ship list.
-    if (!personal && products.length >= 3) continue;
-    if (!personal && !products.length) continue;
+    // Personal RSS essays that only mention other companies are not ships.
+    if (!personal) continue;
     const named = journalShipName(item.name);
     const name = preferProduct(named, products[0]);
     const hint = item.description

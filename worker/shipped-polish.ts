@@ -1184,7 +1184,7 @@ export function looksLikeEssayTitle(title: string): boolean {
   if (/\bbest\b/i.test(text) && /\b(20\d{2}|generators?|tools?|apps?)\b/i.test(text) && words.length >= 4) return true;
   if (words.length >= 12) return true;
   if (words.length >= 8 && ESSAY_MIDDLE.test(text)) return true;
-  if (words.length >= 8 && !/\d+\.\d+/.test(text) && /\b(is|are|was|were|makes|broke|will|can't|could|should|has|have|had|lies|killed)\b/i.test(text)) {
+  if (words.length >= 6 && !/\d+\.\d+/.test(text) && /\b(is|are|was|were|makes|broke|will|can't|could|should|has|have|had|lies|killed)\b/i.test(text)) {
     return true;
   }
   return false;
@@ -1213,7 +1213,7 @@ export function looksLikeScopedPackage(title: string): boolean {
 export function looksLikeMonthlyRoundup(title: string): boolean {
   const text = stripMarkup(title);
   if (!text) return false;
-  if (/^what[’']s new in\b/i.test(text)) return true;
+  if (/^what[’'`´]?s new in\b/i.test(text.normalize('NFKD').replace(/[\u0300-\u036f]/g, ''))) return true;
   if (/^building\b.+,?\s+part\s+\d/i.test(text)) return true;
   if (/\b(year in review|annual recap|wrapped|recap)\b/i.test(text) && !/\d+\.\d+/.test(text)) return true;
   if (/^[A-Za-z]{3}\s+\d{1,2},\s+\d{4}\b/.test(text) && text.split(/\s+/).length <= 8) return true;
@@ -1978,6 +1978,8 @@ export function cheapHardFilter<T extends Polishable>(items: T[], year: number):
     ) {
       continue;
     }
+    const listedOnly = /^Listed on /i.test(String(item.description || ''));
+    if (listedOnly && name.split(/\s+/).filter(Boolean).length >= 5 && !/\d+\.\d+/.test(name)) continue;
     if (looksLikeSocialPost(item)) continue;
     const link = String(item.link || '').trim();
     if (!link) continue;

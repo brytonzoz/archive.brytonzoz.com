@@ -248,7 +248,7 @@ test('harvest wins when Claude keeps a highlight reel of a fat company tape', ()
     ],
     [
       { name: 'NEXT.JS 16.4', link: 'https://vercel.com/changelog/next-16-4', source: 'changelog' },
-      { name: 'Vercel Sandbox routing is generally available', link: 'https://vercel.com/changelog/sandbox-routing', source: 'changelog' },
+      { name: 'Vercel Sandbox routing', link: 'https://vercel.com/changelog/sandbox-routing', source: 'changelog' },
       { name: 'Persistent memory for eve agents', link: 'https://vercel.com/changelog/persistent-memory', source: 'changelog' },
       { name: "What's new in Svelte: January 2026", link: 'https://svelte.dev/blog/whats-new-in-svelte-january-2026' },
     ],

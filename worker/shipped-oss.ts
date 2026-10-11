@@ -522,6 +522,19 @@ export async function harvestOss(opts: {
     );
     orgs = (rows || []).map((row) => String(row.login || '')).filter((org) => /^[A-Za-z0-9-]{1,39}$/.test(org));
   }
+  if (orgs.length < 8) {
+    const events = await memo(`oss:events:${login.toLowerCase()}`, 180 * 60, () =>
+      opts.get<{ repo?: { name?: string }; type?: string }[]>(`/users/${encodeURIComponent(login)}/events?per_page=30`).catch(() => []),
+    );
+    for (const event of Array.isArray(events) ? events : []) {
+      const full = String(event.repo?.name || '');
+      const org = full.split('/')[0] || '';
+      if (!org || org.toLowerCase() === login.toLowerCase() || !/^[A-Za-z0-9-]{1,39}$/.test(org)) continue;
+      if (!orgs.some((row) => row.toLowerCase() === org.toLowerCase())) orgs.push(org);
+      if (orgs.length >= 8) break;
+    }
+    if (events?.length) ran.push(`oss-events:${orgs.slice(0, 8).join(',')}`);
+  }
   ran.push(`oss-orgs:${orgs.slice(0, 8).join(',') || 'none'}`);
 
   const orgRepos: OssRepo[] = [];

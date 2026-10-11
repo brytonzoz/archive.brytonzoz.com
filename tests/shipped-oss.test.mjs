@@ -34,6 +34,30 @@ test('prefixed tags still parse as semver', () => {
   assert.deepEqual(oss.parseSemver('v1.3.2'), { major: 1, minor: 3, patch: 2 });
 });
 
+test('harvestOss adds hidden orgs from public events', async () => {
+  const get = async (path) => {
+    if (path.startsWith('/users/Jarred-Sumner/repos')) return [];
+    if (path.startsWith('/users/Jarred-Sumner/orgs')) return [{ login: 'codeblog' }];
+    if (path.startsWith('/users/Jarred-Sumner/events')) return [{ type: 'PushEvent', repo: { name: 'oven-sh/bun' } }];
+    if (path.startsWith('/orgs/oven-sh/repos')) {
+      return [{ name: 'bun', html_url: 'https://github.com/oven-sh/bun', homepage: 'https://bun.com', stargazers_count: 96000, fork: false, pushed_at: '2026-10-10T00:00:00Z' }];
+    }
+    if (path.includes('/oven-sh/bun/releases')) {
+      return [{ tag_name: 'bun-v1.4.0', name: 'Bun 1.4', published_at: '2026-08-20T12:00:00Z', body: 'Bun 1.4 notes', html_url: 'https://github.com/oven-sh/bun/releases/tag/bun-v1.4.0' }];
+    }
+    if (path.includes('/commits?author=Jarred-Sumner')) return [{ sha: 'abc' }];
+    return [];
+  };
+  const { found, ran } = await oss.harvestOss({
+    login: 'Jarred-Sumner',
+    year: 2026,
+    get,
+    orgs: ['codeblog'],
+  });
+  assert.ok(ran.some((tag) => /oss-events:.*oven-sh/.test(tag)), JSON.stringify(ran));
+  assert.ok(found.some((item) => /bun/i.test(item.name)), JSON.stringify(found.map((item) => item.name)));
+});
+
 test('harvestOss follows a personal site to the product homepage when GitHub bio is empty', async () => {
   const get = async (path) => {
     if (path.startsWith('/users/Jarred-Sumner/repos')) return [];

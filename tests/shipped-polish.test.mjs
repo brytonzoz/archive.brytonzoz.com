@@ -252,6 +252,10 @@ test('source lines are via Brand · host with no sitemap metadata', () => {
   assert.equal(polish.cleanDescription('To install Bun v1.3.14 Windows: bash powershell'), '');
   assert.equal(polish.cleanDescription('96e1bb1: Promote @vercel/passport to stable'), '');
   assert.equal(polish.cleanDescription('Breaking changes - LLVM is the only code generation'), '');
+  assert.equal(
+    polish.cleanDescription('allow declarations in the template Patch Changes'),
+    'allow declarations',
+  );
   assert.equal(polish.cleanDescription("See What's new in V5 for an overview of changes between"), '');
   assert.equal(
     polish.cleanDescription('XDR Boost is an open source alternative to Vivid without'),

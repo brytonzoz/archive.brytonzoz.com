@@ -1395,7 +1395,9 @@ export function cleanDescription(value: unknown): string {
     .trim();
   text = text.replace(DESC_VERSION_HEADER, '').trim();
   text = text.replace(/^(?:patch|minor|major)\s+changes\b[:\s-]*/i, '').trim();
+  text = text.replace(/\s+(?:patch|minor|major)\s+changes\b.*$/i, '').trim();
   text = text.replace(/^(?:what's changed|what changed|what's new|features|fixes|changelog|release notes)\b[:\s-]*/i, '').trim();
+  text = text.replace(/\s+what'?s changed\b.*$/i, '').trim();
   text = text.replace(/^(?:chore|feat|fix|docs|refactor):\s*/i, '').trim();
   text = text.replace(/^\s*[-*+]\s+/g, '').replace(/\(#[0-9a-f]+\)/gi, '').replace(/#\d+\b/g, '').trim();
   if (!text || DESC_UPDATED_DEPS.test(text) || DESC_CHANGELOG_LABEL.test(text) || /^[0-9a-f]{7,40}$/i.test(text)) return '';
@@ -1419,7 +1421,7 @@ export function storedSublineLooksJunk(desc: string | undefined | null): boolean
   const markup = String(desc ?? '');
   if (DESC_HASH_PREFIX.test(raw) || /^[0-9a-f]{7,40}(?:\b|[:\s-])/i.test(raw)) return true;
   if (DESC_INSTALL.test(raw) || DESC_INSTALL_CMD.test(raw) || DESC_BREAKING.test(raw) || DESC_SEE_POINTER.test(raw)) return true;
-  if (DESC_CHANGELOG_LABEL.test(raw) || /\bpatch changes\b/i.test(raw) || /\bwhat'?s changed\b/i.test(raw)) return true;
+  if (DESC_CHANGELOG_LABEL.test(raw) || /\b(?:patch|minor|major)\s+changes\b/i.test(raw) || /\bwhat'?s changed\b/i.test(raw)) return true;
   if (/https?:\/\//i.test(markup) || /[#*_`\[\]]/.test(markup) || /<\/?[a-z]/i.test(markup)) return true;
   if (looksIncompleteSubline(raw)) return true;
   const printed = cleanDescription(desc);

@@ -66,7 +66,7 @@ jobs:
           cache: npm
       - run: npm ci
       - name: Wait for staging Worker
-        run: sleep 200
+        run: sleep 360
       - name: Sanitize all receipts on staging
         env:
           ADMIN_PASSWORD: ${{ secrets.ADMIN_PASSWORD }}

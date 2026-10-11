@@ -227,6 +227,7 @@ const OSS_FLAGSHIP_REPOS = [
   'svelte',
   'kit',
   'rollup',
+  'nub',
 ];
 
 function ossRepoPriority(name: string): number {
@@ -984,12 +985,10 @@ export async function harvestOss(opts: {
     }
   };
 
-  const rankedRepos = rankOssHarvestRepos(orgRepos);
-  await harvestRepos(rankedRepos.slice(0, 16), 'oss-rel');
-
-  if (leftoverPins.length && !overBudget()) {
+  const loadPins = async (pinsToLoad: typeof leftoverPins) => {
+    if (!pinsToLoad.length) return;
     const loaded = await Promise.all(
-      leftoverPins.map(async (pin) => {
+      pinsToLoad.map(async (pin) => {
         const meta = await memo(`oss:repo:${pin.owner}/${pin.name}`, 360 * 60, () =>
           opts.get<Record<string, unknown>>(`/repos/${encodeURIComponent(pin.owner)}/${encodeURIComponent(pin.name)}`).catch(() => null),
         );
@@ -1009,12 +1008,22 @@ export async function harvestOss(opts: {
       ran.push(`oss-pin:${pin.owner}/${pin.name}`);
     }
     await harvestRepos(
-      leftoverPins
+      pinsToLoad
         .map((pin) => orgRepos.find((row) => row.owner.toLowerCase() === pin.owner.toLowerCase() && row.name.toLowerCase() === pin.name.toLowerCase()))
         .filter((row): row is OssRepo => Boolean(row)),
       'oss-rel',
     );
-  }
+  };
+
+  const pinName = (pin: { name: string }) => pin.name.toLowerCase().replace(/[^a-z0-9-]/g, '');
+  const flagshipPins = leftoverPins.filter((pin) => OSS_FLAGSHIP_REPOS.includes(pinName(pin)));
+  const laterPins = leftoverPins.filter((pin) => !OSS_FLAGSHIP_REPOS.includes(pinName(pin)));
+  // Flagship leftover pins (Nub) before a fat founder tape spends the 6s budget.
+  // Personal leftover pins (notes) stay after so Vite / Vitest are not starved.
+  await loadPins(flagshipPins);
+  const rankedRepos = rankOssHarvestRepos(orgRepos);
+  await harvestRepos(rankedRepos.slice(0, 16), 'oss-rel');
+  if (!overBudget()) await loadPins(laterPins);
 
   const alreadyHave = (item: OssFound): boolean =>
     found.some((row) => sameOssVersion(row.name, item.name) || row.link === item.link);

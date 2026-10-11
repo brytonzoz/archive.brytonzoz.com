@@ -210,6 +210,8 @@ export interface SourceProvider {
 const UA = 'brytonzoz.com-shipped (+https://shipped.brytonzoz.com/)';
 export const SOURCE_TIMEOUT_MS = 6000;
 export const OSS_TIMEOUT_MS = 6000;
+/** Own homepage / journal — slightly longer than third-party sources so hotelist.com lands. */
+export const HOME_TIMEOUT_MS = 8000;
 const TIMEOUT = SOURCE_TIMEOUT_MS;
 
 export async function raceTimeout<T>(work: Promise<T>, ms: number, fallback: T): Promise<T> {
@@ -1152,14 +1154,14 @@ function linedText(html: string, max: number): string {
     .slice(0, max);
 }
 
-export async function readSite(siteUrl: string): Promise<SiteInfo | null> {
+export async function readSite(siteUrl: string, timeoutMs = TIMEOUT): Promise<SiteInfo | null> {
   const url = publicUrl(siteUrl);
   if (!url) return null;
   const feed = /\/(rss|feed|atom)(\.xml)?$/i.test(url);
   const page = await safeFetch(url, {
     accept: feed ? 'application/rss+xml, application/atom+xml, application/xml, text/xml, text/html' : 'text/html',
     maxBytes: 800_000,
-    timeoutMs: TIMEOUT,
+    timeoutMs,
     types: feed
       ? ['application/rss+xml', 'application/atom+xml', 'application/xml', 'text/xml', 'text/html', 'application/xhtml']
       : ['text/html', 'application/xhtml'],
@@ -2123,7 +2125,7 @@ async function gatherFresh(
   );
   const [results, site, extraSites, searched, storeHarvest, githubOverview] = await Promise.all([
     Promise.allSettled(SOURCES.filter((source) => source.enabled(ctx)).map(async (source) => ({ id: source.id, found: await raceTimeout(source.run(ctx), SOURCE_TIMEOUT_MS, []) }))),
-    homepage ? raceTimeout(readSite(homepage).catch(() => null), SOURCE_TIMEOUT_MS, null) : Promise.resolve(null),
+    homepage ? raceTimeout(readSite(homepage, HOME_TIMEOUT_MS).catch(() => null), HOME_TIMEOUT_MS, null) : Promise.resolve(null),
     Promise.all(extraHomes.map((url) => raceTimeout(readSite(url).catch(() => null), SOURCE_TIMEOUT_MS, null))),
     Promise.all(
       queries.map((query) =>

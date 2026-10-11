@@ -23,6 +23,7 @@ import {
   titleSanityOk,
   wordClamp,
 } from './shipped-polish';
+import { journalShipName, looksLikePersonalShip } from './shipped-research';
 import type { ItemSource } from '../lib/shipped-year';
 
 function hostOf(url: string | null | undefined): string {
@@ -392,6 +393,7 @@ function companyHarvestFloor(kind: CompanyWinKind, floor?: number): number {
   if (Number.isFinite(floor) && (floor as number) > 0) return floor as number;
   if (kind === 'openai') return 35;
   if (kind === 'cursor-ceo') return 40;
+  if (kind === 'vercel-ceo') return 40;
   return 30;
 }
 
@@ -411,7 +413,16 @@ function companyHarvestCardOk(item: { link?: string | null; source?: string }, k
 
 function cleanedHarvestName(raw: string, link?: string | null): string {
   const short = rewriteShipTitle(raw, link) || cleanShipTitle(raw) || shortenWordyTitle(raw) || '';
-  return String(short || '').trim();
+  const named = String(short || '').trim();
+  if (named) return named;
+  const words = stripMarkup(raw)
+    .replace(/\s+/g, ' ')
+    .trim()
+    .split(/\s+/)
+    .filter(Boolean)
+    .slice(0, 5);
+  const clip = words.join(' ');
+  return titleSanityOk(clip) ? clip : '';
 }
 
 /** Put first-party changelog cards back when polish thinned a company CEO/lead tape. */
@@ -478,10 +489,15 @@ export function unionJournalShips<T extends { name?: string; link?: string | nul
   for (const item of harvested || []) {
     if (!isJournalShip(item)) continue;
     const raw = String(item.name || '').trim();
-    if (!raw || looksLikeEssayTitle(raw) || isBlogEssayTitle(raw) || looksLikeMonthlyRoundup(raw)) continue;
-    const name = rewriteShipTitle(raw, item.link) || raw;
-    if (!titleSanityOk(name)) continue;
-    if (name.split(/\s+/).filter(Boolean).length >= 8 && !/\d+\.\d+/.test(name)) continue;
+    if (!raw) continue;
+    const personal = looksLikePersonalShip(raw) || String(item.kind || '') === 'journal-ship';
+    if (!personal && (looksLikeEssayTitle(raw) || isBlogEssayTitle(raw) || looksLikeMonthlyRoundup(raw))) continue;
+    const name = journalShipName(raw) || rewriteShipTitle(raw, item.link) || raw;
+    if (looksLikeEssayTitle(name) || isBlogEssayTitle(name) || looksLikeMonthlyRoundup(name)) continue;
+    const words = name.split(/\s+/).filter(Boolean);
+    const journalOk = isJournalShip({ ...item, name }) && words.length <= 4 && !looksLikeEssayTitle(name);
+    if (!titleSanityOk(name) && !journalOk) continue;
+    if (words.length >= 8 && !/\d+\.\d+/.test(name)) continue;
     if (harvestAlreadyHas(tape, { ...item, name }) || harvestAlreadyHas(extra, { ...item, name })) continue;
     extra.push({ ...item, name });
   }

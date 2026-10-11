@@ -377,6 +377,12 @@ test('harvest wins when Claude keeps a highlight reel of a fat company tape', ()
   assert.ok(journalBack.some((item) => /nomads/i.test(item.name)), JSON.stringify(journalBack));
   assert.ok(journalBack.some((item) => /photo ai/i.test(item.name)), JSON.stringify(journalBack));
   assert.equal(journalBack.some((item) => /luxury hotels/i.test(item.name)), false, JSON.stringify(journalBack));
+  const journalRewritten = curate.unionJournalShips(
+    [{ name: 'INFINITESLOP.AI', link: 'https://github.com/levelsio/infiniteslop', kind: 'oss-release' }],
+    [{ name: 'I made hotelist.com to fix Airbnb ratings', link: 'https://levels.io/#hotelist-com', source: 'site', kind: 'journal-ship' }],
+  );
+  assert.ok(journalRewritten.some((item) => /hotelist/i.test(item.name)), JSON.stringify(journalRewritten));
+  assert.ok(journalRewritten.every((item) => item.name.trim().split(/\s+/).length < 8), JSON.stringify(journalRewritten));
   const essayRss = [
     { name: 'Luxury hotels are mathematically bad value', kind: 'oss-blog', link: 'https://levels.io/luxury-hotels' },
     { name: "I've been coding almost solely on my VPS", kind: 'oss-blog', link: 'https://levels.io/vps' },

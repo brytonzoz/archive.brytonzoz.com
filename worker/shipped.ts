@@ -2327,11 +2327,13 @@ async function reprintReceipt(
     if (!state.demo) await recordSpend(db, true, usage.input, usage.output, usage.searches);
     await dropShareImages(env, row.id).catch(() => undefined);
     await dropListedCache(env, row.id);
+    const printed = (draft.items || []).filter((item) => item?.name && item.name !== 'YOUR POTENTIAL' && item.source !== 'none');
     return json({
       ok: true,
       id: row.id,
       note: draft.note,
-      count: (draft.items || []).filter((item) => item?.name && item.name !== 'YOUR POTENTIAL' && item.source !== 'none').length,
+      count: printed.length,
+      titles: printed.map((item) => item.name),
       costMicros: usage.cost,
       inputTokens: usage.input,
       outputTokens: usage.output,
@@ -2446,11 +2448,13 @@ async function printFreshSubject(env: ShippedEnv, db: D1Database, raw: string): 
     if (!state.demo) await recordSpend(db, true, usage.input, usage.output, usage.searches);
     await dropShareImages(env, inserted.id).catch(() => undefined);
     await dropListedCache(env, inserted.id);
+    const printed = (draft.items || []).filter((item) => item?.name && item.name !== 'YOUR POTENTIAL' && item.source !== 'none');
     return json({
       ok: true,
       id: inserted.id,
       note: draft.note,
-      count: (draft.items || []).filter((item) => item?.name && item.name !== 'YOUR POTENTIAL' && item.source !== 'none').length,
+      count: printed.length,
+      titles: printed.map((item) => item.name),
       costMicros: usage.cost,
       inputTokens: usage.input,
       outputTokens: usage.output,

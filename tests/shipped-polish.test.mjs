@@ -1145,13 +1145,18 @@ test('cheap filters strip markup, drop prereleases and other years, and dedupe U
       found({ name: 'Old ship', date: '2025-12-01', link: 'https://example.com/old' }),
       found({ name: 'Composer 2 again', date: '2026-03-20', link: 'https://cursor.com/blog/composer-2?utm=1' }),
       found({ name: '### Minor Changes', date: '2026-05-01', link: 'https://github.com/vuejs/core/releases/10', description: '### Minor Changes - 17ee736' }),
+      found({
+        name: "I've been coding almost solely on my VPS with Claude this year",
+        date: '2026-06-01',
+        link: 'https://x.com/levelsio/status/1',
+      }),
     ],
     2026,
   );
   const names = cheap.map((item) => item.name);
   assert.ok(names.includes('Composer 2'), JSON.stringify(names));
   assert.equal(names.filter((name) => /composer/i.test(name)).length, 1);
-  assert.equal(names.some((name) => /canary|old ship/i.test(name)), false, JSON.stringify(names));
+  assert.equal(names.some((name) => /canary|old ship|coding almost solely/i.test(name)), false, JSON.stringify(names));
   assert.ok(names.includes('Minor Changes'), JSON.stringify(names));
   assert.equal(cheap.find((item) => item.name === 'Minor Changes')?.description, 'Minor Changes - 17ee736');
 });

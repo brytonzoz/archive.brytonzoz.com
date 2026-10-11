@@ -68,12 +68,24 @@ test('applyCuration keeps owned ids, rewrites titles, and rolls up groups', () =
   assert.equal(tape.notes.length, 3);
 });
 
-test('applyCuration fails closed on unknown ids or cut titles from a fat harvest', () => {
+test('applyCuration skips unknown ids and fails closed on cut titles from a fat harvest', () => {
   const packed = curate.packCandidates(
     Array.from({ length: 8 }, (_, i) => found({ name: `Ship ${i}`, date: `2026-03-0${(i % 8) + 1}`, link: `https://example.com/s${i}` })),
     2026,
   );
   assert.equal(curate.applyCuration({ items: [{ id: 'nope', title: 'X', owned: true, significance: 2 }], notes: [] }, packed), null);
+  const mixed = curate.applyCuration(
+    {
+      items: [
+        { id: 'nope', title: 'Ghost', owned: true, significance: 2 },
+        { id: packed[0].id, title: 'Ship 0', owned: true, significance: 2 },
+      ],
+      notes: ['Ship 0 stayed.', 'The ghost id was ignored.', 'Still a real tape.'],
+    },
+    packed,
+  );
+  assert.ok(mixed);
+  assert.equal(mixed.items.some((item) => /ship 0/i.test(item.name)), true);
   const cut = curate.applyCuration(
     {
       items: packed.map((row) => ({ id: row.id, title: 'Commission analytics you can', owned: true, significance: 2 })),
@@ -102,4 +114,7 @@ test('title sanity is the only post-LLM title check', () => {
   assert.equal(polish.titleSanityOk('Commission analytics you can'), false);
   assert.equal(polish.titleSanityOk('Teams &'), false);
   assert.equal(polish.titleSanityOk('### Minor Changes'), false);
+  assert.equal(polish.titleSanityOk("I've been coding almost solely on my VPS with Claude"), false);
+  assert.equal(polish.titleSanityOk('@dub/embed-react'), false);
+  assert.equal(polish.looksLikeEssayTitle('Rimowa suitcase broke after Copenhagen to Lisbon flight and then some more'), true);
 });

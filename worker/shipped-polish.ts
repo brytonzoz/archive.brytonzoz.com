@@ -1100,6 +1100,24 @@ export function stripMarkup(value: unknown): string {
 
 const TITLE_TRAILING_GLUE =
   /(?:^|[\s/])(&|of|in|to|for|and|or|the|a|an|with|on|as|by|from|into|vs|via|can|you|we|they|now|just|still)\s*$/i;
+const ESSAY_OPENER =
+  /^(i|i'm|i've|i'd|we|we've|it's|this is how|everyone can|congratulations|yesterday|looking through)\b/i;
+const ESSAY_MIDDLE = /\b(because|while america|after trying|so now|is the best|in the entire|i think)\b/i;
+
+/** Tweet / blog-essay titles are not product names. */
+export function looksLikeEssayTitle(title: string): boolean {
+  const text = stripMarkup(title);
+  if (!text) return false;
+  const words = text.split(/\s+/).filter(Boolean);
+  if (ESSAY_OPENER.test(text)) return true;
+  if (words.length >= 12) return true;
+  if (words.length >= 8 && ESSAY_MIDDLE.test(text)) return true;
+  return false;
+}
+
+export function looksLikeScopedPackage(title: string): boolean {
+  return /^@[\w.-]+\//.test(stripMarkup(title));
+}
 
 /** Tiny deterministic check after the LLM rewrites a title. */
 export function titleSanityOk(title: string): boolean {
@@ -1109,6 +1127,7 @@ export function titleSanityOk(title: string): boolean {
   if (/^#{1,6}\s/.test(title) || /<\/?[a-z]/.test(title)) return false;
   if (TITLE_TRAILING_GLUE.test(text)) return false;
   if (looksCutOff(text) || endsWithCutOffWord(text)) return false;
+  if (looksLikeEssayTitle(text) || looksLikeScopedPackage(text)) return false;
   return true;
 }
 
@@ -1810,6 +1829,7 @@ export function cheapHardFilter<T extends Polishable>(items: T[], year: number):
     if (!name || name === 'YOUR POTENTIAL') continue;
     if (!cheapYearOk(item, year)) continue;
     if (isPrereleaseShip(name) || isPrereleaseShip(item.name)) continue;
+    if (looksLikeEssayTitle(name)) continue;
     const link = String(item.link || '').trim();
     if (!link) continue;
     try {

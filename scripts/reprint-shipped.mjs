@@ -108,6 +108,7 @@ function usageOf(body) {
     inputTokens: Number.isFinite(Number(body?.inputTokens)) ? Number(body.inputTokens) : null,
     outputTokens: Number.isFinite(Number(body?.outputTokens)) ? Number(body.outputTokens) : null,
     count: Number.isFinite(Number(body?.count)) ? Number(body.count) : null,
+    titles: Array.isArray(body?.titles) ? body.titles.filter((name) => typeof name === 'string') : [],
   };
 }
 
@@ -164,8 +165,8 @@ for (const target of TARGETS) {
     await new Promise((ok) => setTimeout(ok, 8000));
     after = (await readReceipt(target.id)) || before;
   }
-  const items = realCount(after) || (after?.potential ? 0 : prior);
-  const titles = titlesOf(after);
+  const items = last.count ?? realCount(after) ?? (after?.potential ? 0 : prior);
+  const titles = last.titles?.length ? last.titles : titlesOf(after);
   const url = `${origin}${RECEIPT_PATH(target.id)}`;
   console.log(`#${target.id} ${who} → ${items} items ${last.costMicros ?? '?'}µs ${last.ms}ms ${url}`);
   console.log(JSON.stringify({ shipped: 'reprint', id: target.id, who, items, titles, note: last.note, costMicros: last.costMicros, inputTokens: last.inputTokens, outputTokens: last.outputTokens, ms: last.ms }));
@@ -241,8 +242,8 @@ for (const q of PRINT_SUBJECTS) {
     after = last.id ? await readReceipt(last.id) : null;
   }
   const who = after?.subject?.display || after?.login || `@${q}`;
-  const items = realCount(after);
-  const titles = titlesOf(after);
+  const items = last.count ?? realCount(after);
+  const titles = last.titles?.length ? last.titles : titlesOf(after);
   const note = last.note || after?.note || null;
   const url = last.id ? `${origin}${RECEIPT_PATH(last.id)}` : origin;
   console.log(`#${last.id} ${who} → ${items} items ${last.costMicros ?? '?'}µs ${last.ms}ms ${url}`);

@@ -22,7 +22,14 @@ const JUNK = [
   /\bdeepwiki\b/i,
   /\bhow to\b/i,
   /\bcustomer stor/i,
+  /^@[a-z0-9._-]+\//i,
+  /^(i|i'm|i've|we|we've|it's)\b/i,
 ];
+
+function essayTitle(name) {
+  const words = String(name || '').trim().split(/\s+/).filter(Boolean);
+  return words.length >= 12;
+}
 
 function realItems(receipt) {
   return (receipt?.items || []).filter((item) => item && item.name && item.name !== 'YOUR POTENTIAL' && item.source !== 'none');
@@ -73,7 +80,7 @@ async function printOne(query) {
   const items = realItems(receipt);
   const wall = await pileCount(printed.id);
   const titles = items.map((item) => item.name);
-  const junk = titles.filter((name) => JUNK.some((re) => re.test(name)));
+  const junk = titles.filter((name) => JUNK.some((re) => re.test(name)) || essayTitle(name));
   const note = String(receipt.note || printed.note || '');
   return {
     query,

@@ -84,7 +84,7 @@ jobs:
 
       - name: Wait for staging Worker
         if: ${{ github.event_name == 'push' }}
-        run: sleep 120
+        run: sleep 200
 
       - name: Reprint
         env:

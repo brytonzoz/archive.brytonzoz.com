@@ -1202,6 +1202,24 @@ test('cheap filters strip markup, drop prereleases and other years, and dedupe U
   );
   assert.ok(journal.some((item) => /hotelist/i.test(item.name)), JSON.stringify(journal.map((item) => item.name)));
   assert.ok(journal.some((item) => /photo ai/i.test(item.name)), JSON.stringify(journal.map((item) => item.name)));
+  const essays = polish.cheapHardFilter(
+    [
+      found({
+        name: 'Luxury hotels are mathematically bad value',
+        date: '2026-08-01',
+        link: 'https://levels.io/luxury-hotels',
+        source: 'site',
+        description: 'Listed on levels.io',
+      }),
+      found({
+        name: "What's new in Svelte: January 2026",
+        date: '2026-01-15',
+        link: 'https://svelte.dev/blog/whats-new-in-svelte-january-2026',
+      }),
+    ],
+    2026,
+  );
+  assert.equal(essays.some((item) => /luxury hotels|what.?s new in svelte/i.test(item.name)), false, JSON.stringify(essays.map((item) => item.name)));
   assert.equal(names.filter((name) => /composer/i.test(name)).length, 1);
   assert.equal(
     names.some((name) => /canary|old ship|coding almost solely|@dub\/|what.?s new in svelte|hotel in leiden|lisbon hotel|headshot generators/i.test(name)),

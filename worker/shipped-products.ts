@@ -9,6 +9,7 @@ import {
   cleanText,
   githubReposFromText,
   hostOf,
+  productHostGuesses,
   productNameFromHost,
   urlsFromText,
 } from './shipped-identity';
@@ -283,7 +284,7 @@ export async function harvestOwnProductSites(
   const seen = new Set<string>();
   const targets = products
     .map((product) => {
-      const site = product.site || null;
+      const site = product.site || (product.github ? null : productHostGuesses(product.name)[0]) || null;
       return site ? { product, site } : null;
     })
     .filter((row): row is { product: OwnProduct; site: string } => Boolean(row))

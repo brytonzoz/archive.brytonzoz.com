@@ -258,7 +258,7 @@ export function applyCuration(
   return { items: rollupGroups(kept), notes: parsed.notes.slice(0, 3) };
 }
 
-/** Claude highlight-reels a fat company changelog — keep that gated tape and only take the notes. */
+/** Claude highlight-reels a fat harvest — keep the gated tape and only take the notes. */
 export function harvestShouldWin(
   harvestedCount: number,
   curatedCount: number,
@@ -266,12 +266,17 @@ export function harvestShouldWin(
   company?: string | null,
   cheapCount?: number,
 ): boolean {
-  if (harvestedCount < 12) return false;
-  const ceo = /^ceo$/i.test(role || '') && /^(vercel|openai|cursor)$/i.test(String(company || '').trim());
-  const openaiLead = /^lead$/i.test(role || '') && /^openai$/i.test(String(company || '').trim());
-  if (!ceo && !openaiLead) return false;
+  const brand = String(company || '').trim();
+  const flagshipCeo = /^ceo$/i.test(role || '') && /^(vercel|openai|cursor)$/i.test(brand);
+  const openaiLead = /^lead$/i.test(role || '') && /^openai$/i.test(brand);
+  const companyTape = flagshipCeo || openaiLead;
+  const ossMaintainer = /^(founder|owner)$/i.test(role || '') && !/^(vercel|openai|cursor)$/i.test(brand);
+  const indie = !role || !/^(ceo|founder|lead|owner)$/i.test(role);
+  if (!companyTape && !ossMaintainer && !indie) return false;
+  if (harvestedCount < (companyTape ? 12 : 8)) return false;
   if (typeof cheapCount === 'number' && cheapCount < harvestedCount * 0.5) return false;
-  const minKeep = Math.max(25, Math.ceil(harvestedCount * 0.45));
+  const floor = companyTape ? 25 : 15;
+  const minKeep = Math.max(floor, Math.ceil(harvestedCount * 0.45));
   return curatedCount < minKeep;
 }
 

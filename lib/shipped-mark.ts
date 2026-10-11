@@ -66,7 +66,7 @@ export function logoPlacement(items: LogoItem[]): { headerSrc: string | null; it
   }
   let headerSrc: string | null = null;
   let best = 1;
-  for (const [src, n] of counts) {
+  for (const [src, n] of Array.from(counts.entries())) {
     if (n > best) {
       best = n;
       headerSrc = src;

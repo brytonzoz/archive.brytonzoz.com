@@ -88,8 +88,8 @@ export const CURATION_SYSTEM = [
   'Return one JSON object, no markdown:',
   '{"items":[{"id":"c0","title":"","group":null,"owned":true,"significance":2}],"notes":["","",""]}',
   'Input items are candidates the crawlers already found. You only keep, rename, group, or drop. Every kept id must be one of the input ids. Skip an id you are unsure of. Never invent an id.',
-  'A ship is a product, feature, release, or launch the customer or their resolved company/org made. For a CEO or founder, company-wide flagships count. The printed title must name THEIR thing, not a partner\'s product (drop a line whose subject is another company\'s flagship).',
-  'Drop: tweets and first-person posts, blog essays, travel notes, opinion columns, news commentary, reviews of other people\'s products, customer stories, listicles, docs, pricing, policy, settings nits, commit hashes, and scoped package ids left as @scope/name. Do not drop the customer\'s own changelog features or flagship releases just because they look small.',
+  'A ship is a product, feature, release, or launch the customer or their resolved company/org made. For a CEO, founder, or lead, company-wide flagships and owned changelog / OSS releases count. The printed title must name THEIR thing, not a partner\'s product (drop a line whose subject is another company\'s flagship).',
+  'Drop: tweets and first-person posts, blog essays, travel notes, opinion columns, news commentary, reviews of other people\'s products, customer stories, listicles, docs, pricing, policy, settings nits, commit hashes, and scoped package ids left as @scope/name. Do not drop the customer\'s own changelog features or flagship releases just because they look small. Do not thin a busy year to a handful of highlights.',
   'When many owned product/changelog candidates exist, keep the year. Roll patches of one product into one group like "VUE · 4 UPDATES IN OCT". A real product year should still look busy. Do not shrink it to two leftover settings. Leave group null for a distinct ship.',
   'title: a complete noun phrase people would recognize (Composer 2, Cursor 3, Bugbot, Origin, Vercel Agent, Codex App are fine). Never a sentence, never first person, never cut mid-phrase, never trailing of/in/to/for/and/or/the/a/an/with/& . No markdown or HTML. If you cannot recover a complete name, drop that id. Prefer the public product name over @scope/package. Max 60 characters.',
   'significance: 0 minor, 1 feature, 2 notable launch, 3 major product. Use 0 for patches you still keep in a group. Cap the printed tape at 60 lines AFTER roll-ups. Order kept items by date (undated last).',
@@ -216,10 +216,10 @@ function rollupGroups(rows: { item: CuratedItem; group: string | null }[]): Cura
     const latest = items.slice().sort((a, b) => (a.date ?? '').localeCompare(b.date ?? '')).at(-1)!;
     const month = latest.date?.match(/^\d{4}-(\d{2})/);
     const mon = month ? MONTHS[Number(month[1]) - 1] : '';
-    const grouped = /·\s*\d+\s+updates?\s+in\s+/i.test(label)
+    const grouped = /·\s*\d+\s+(updates?|releases?)\s+in\s+/i.test(label)
       ? label
       : mon
-        ? `${label.replace(/\s*·\s*\d+\s+updates?\s+in\s+\w+\s*$/i, '').trim()} · ${items.length} UPDATES IN ${mon}`
+        ? `${label.replace(/\s*·\s*\d+\s+(updates?|releases?)\s+in\s+\w+\s*$/i, '').trim()} · ${items.length} UPDATES IN ${mon}`
         : `${label} · ${items.length} UPDATES`;
     rolled.push({
       ...latest,
@@ -256,6 +256,19 @@ export function applyCuration(
   }
   if (!kept.length && packed.length >= 8) return null;
   return { items: rollupGroups(kept), notes: parsed.notes.slice(0, 3) };
+}
+
+/** Claude highlight-reels a fat harvest — keep the gated tape and only take the notes. */
+export function harvestShouldWin(
+  harvestedCount: number,
+  curatedCount: number,
+  role?: string | null,
+): boolean {
+  if (harvestedCount < 12) return false;
+  const company = /^(ceo|founder|lead|owner)$/i.test(role || '');
+  const floor = company ? 25 : 12;
+  const minKeep = Math.max(floor, Math.ceil(harvestedCount * 0.45));
+  return curatedCount < minKeep;
 }
 
 export function customerFromProfile(

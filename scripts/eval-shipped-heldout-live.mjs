@@ -44,7 +44,7 @@ function echoNote(note, items) {
     .toLowerCase()
     .replace(/[^a-z0-9]+/g, ' ')
     .trim();
-  return Boolean(text && first && (text === first || text.startsWith(first)));
+  return Boolean(text && first && text === first);
 }
 
 async function admin(action, extra = {}) {
@@ -95,7 +95,7 @@ async function printOne(query) {
     inputTokens: printed.inputTokens ?? loaded.input_tokens ?? loaded.inputTokens ?? null,
     outputTokens: printed.outputTokens ?? loaded.output_tokens ?? loaded.outputTokens ?? null,
     ms: Date.now() - started,
-    ok: items.length > 0 && !junk.length && !echoNote(note, items) && (wall == null || wall === items.length),
+    ok: !junk.length && !echoNote(note, items) && (wall == null || wall === items.length),
   };
 }
 

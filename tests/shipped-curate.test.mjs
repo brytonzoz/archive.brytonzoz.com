@@ -118,3 +118,41 @@ test('title sanity is the only post-LLM title check', () => {
   assert.equal(polish.titleSanityOk('@dub/embed-react'), false);
   assert.equal(polish.looksLikeEssayTitle('Rimowa suitcase broke after Copenhagen to Lisbon flight and then some more'), true);
 });
+
+test('harvest wins when Claude keeps a highlight reel of a fat company tape', () => {
+  assert.equal(curate.harvestShouldWin(38, 3, 'lead'), true);
+  assert.equal(curate.harvestShouldWin(96, 26, 'ceo'), true);
+  assert.equal(curate.harvestShouldWin(171, 60, 'ceo'), true);
+  assert.equal(curate.harvestShouldWin(38, 30, 'lead'), false);
+  assert.equal(curate.harvestShouldWin(9, 3, 'ceo'), false);
+  assert.equal(curate.harvestShouldWin(14, 8, null), true);
+});
+
+test('rollup keeps an existing monthly RELEASES IN label', () => {
+  const packed = curate.packCandidates(
+    [
+      found({ name: 'Bun 1.3.6', date: '2026-01-08', link: 'https://github.com/oven-sh/bun/releases/tag/bun-v1.3.6' }),
+      found({ name: 'Bun 1.3.7', date: '2026-01-15', link: 'https://github.com/oven-sh/bun/releases/tag/bun-v1.3.7' }),
+      found({ name: 'Bun 1.3.8', date: '2026-01-22', link: 'https://github.com/oven-sh/bun/releases/tag/bun-v1.3.8' }),
+    ],
+    2026,
+  );
+  const tape = curate.applyCuration(
+    {
+      items: packed.map((row) => ({
+        id: row.id,
+        title: 'Bun',
+        group: 'BUN · 3 RELEASES IN JAN',
+        owned: true,
+        significance: 1,
+      })),
+      notes: ['Bun kept shipping in January.'],
+    },
+    packed,
+  );
+  assert.ok(tape);
+  assert.deepEqual(
+    tape.items.map((item) => item.name),
+    ['BUN · 3 RELEASES IN JAN'],
+  );
+});

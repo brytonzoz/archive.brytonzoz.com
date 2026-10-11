@@ -16,13 +16,13 @@ import { emptyAffiliation, type Affiliation } from './shipped-affiliation';
 import { looksLikePersonName } from './shipped-repos';
 import { RECEIPT_BUDGET_MICROS, formatReceiptStats, searchBudget, type SourcedStat } from './shipped-research';
 import {
-  CURATION_LINE_CAP,
   CURATION_MAX_TOKENS,
   CURATION_RESERVE_MICROS,
   applyCuration,
   cachedSystem,
   curationUserPrompt,
   customerFromProfile,
+  harvestShouldWin,
   packCandidates,
   parseCurationJson,
 } from './shipped-curate';
@@ -487,7 +487,7 @@ export type NoteContext = {
   affiliation?: Affiliation | null;
   owner?: OwnerContext | null;
   apiDown?: boolean;
-  /** LLM curation already chose the lines; skip the heuristic gate. */
+  /** LLM curation already chose the lines; leftover/junk gate still runs. */
   curated?: boolean;
 };
 
@@ -1083,17 +1083,13 @@ function asPrintedItem(item: DraftItem): DraftItem {
 export function finish(items: DraftItem[], note: string, seed: number, modulesRaw?: unknown, statsRaw?: unknown, ctx: NoteContext = {}): Draft {
   const layout = sanitizeLayout(modulesRaw, seed);
   const year = ctx.year || new Date().getUTCFullYear();
-  const gated = (
-    ctx.curated
-      ? items.filter((item) => item.name && item.name !== 'YOUR POTENTIAL' && item.source !== 'none')
-      : gateReceiptItems(items, {
-          year,
-          who: ctx.who,
-          handle: ctx.handle,
-          affiliation: affiliationFromCtx(ctx),
-          owner: usableOwner(ctx.owner),
-        })
-  ).map(asPrintedItem);
+  const gated = gateReceiptItems(items, {
+    year,
+    who: ctx.who,
+    handle: ctx.handle,
+    affiliation: affiliationFromCtx(ctx),
+    owner: usableOwner(ctx.owner),
+  }).map(asPrintedItem);
   if (!gated.length) {
     return { items: [], note: POTENTIAL_NOTES[seed % POTENTIAL_NOTES.length], stats: [], potential: true, layout };
   }
@@ -1657,16 +1653,48 @@ export async function assembleReceipt(
         usedNotes,
         spent,
       });
-      if (curated) return curated;
+      if (curated) {
+        if (harvestShouldWin(harvested.length, curated.items.length, affiliation?.role)) {
+          console.log(
+            JSON.stringify({
+              shipped: 'curate-thin',
+              who: gathered.profile.name || subject.display,
+              harvested: harvested.length,
+              curated: curated.items.length,
+              role: affiliation?.role || null,
+            }),
+          );
+          const noteCtx: NoteContext = {
+            role: affiliation?.role,
+            company: affiliation?.company,
+            who: gathered.profile.name,
+            handle: gathered.profile.x,
+            bio: gathered.profile.bio,
+            usedNotes,
+            year,
+            affiliation,
+            owner: ownerFromProfile(gathered.profile, affiliation),
+            apiDown: false,
+          };
+          const sealed = finish(harvested, curated.note, seed, undefined, formatStats(harvested, gathered.stats ?? []), noteCtx);
+          return {
+            ...sealed,
+            model: curated.model,
+            inputTokens: curated.inputTokens,
+            outputTokens: curated.outputTokens,
+            searches: curated.searches,
+            costMicros: curated.costMicros,
+            noteCandidates: curated.noteCandidates,
+          };
+        }
+        return curated;
+      }
     } catch (error) {
       if (error instanceof PrintError && error.code === 'out-of-credit') throw error;
       console.log(JSON.stringify({ shipped: 'curate-fallback', who: gathered.profile.name || subject.display, reason: error instanceof Error ? error.message : 'error' }));
     }
   }
-  const fallbackItems = (cheap.length ? cheap.map((row) => row.found) : harvested.filter((item) => !looksLikeEssayTitle(item.name))).slice(
-    0,
-    CURATION_LINE_CAP,
-  );
+  const fallbackItems = harvested.filter((item) => !looksLikeEssayTitle(item.name));
   if (fallbackItems.length) {
     const sealed = finish(fallbackItems, '', seed, undefined, formatStats(fallbackItems, gathered.stats ?? []), {
       role: affiliation?.role,

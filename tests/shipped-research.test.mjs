@@ -551,6 +551,53 @@ test('cashier note and stats are specific to the items, never stock copy', () =>
   assert.equal(ai.isBareProductNote(longAws.note, longAws.items), false, longAws.note);
   assert.doesNotMatch(longAws.note, /public tape|lead ship/i);
   assert.match(longAws.note, /AWS|Vercel Plugin|receipt/i);
+  const curatedForeign = ai.finish(
+    [
+      {
+        name: 'CURSOR CLOUD AGENTS',
+        spoken: 'Cursor Cloud Agents',
+        description: 'deploy Cursor agents',
+        date: '2026-10-01',
+        status: 'LAUNCHED',
+        link: 'https://vercel.com/changelog/cursor-cloud-agents',
+        icon: null,
+        source: 'changelog',
+      },
+      {
+        name: 'VERCEL AGENT',
+        spoken: 'Vercel Agent',
+        description: 'first-party agent',
+        date: '2026-10-09',
+        status: 'LAUNCHED',
+        link: 'https://vercel.com/changelog/vercel-agent',
+        icon: null,
+        source: 'changelog',
+      },
+    ],
+    'Vercel Agent is the one that belongs on this tape.',
+    4,
+    undefined,
+    [],
+    {
+      who: 'Guillermo Rauch',
+      handle: 'rauchg',
+      company: 'Vercel',
+      role: 'ceo',
+      year: 2026,
+      curated: true,
+      affiliation: { company: 'Vercel', role: 'ceo', name: 'Guillermo Rauch' },
+      apiDown: false,
+    },
+  );
+  assert.equal(
+    curatedForeign.items.some((item) => /cursor cloud agents/i.test(item.name)),
+    false,
+    JSON.stringify(curatedForeign.items.map((item) => item.name)),
+  );
+  assert.ok(
+    curatedForeign.items.some((item) => /vercel agent/i.test(item.name)),
+    JSON.stringify(curatedForeign.items.map((item) => item.name)),
+  );
   const emptyOnly = ai.finish([], 'keep going', 3, undefined, [], { who: 'Nobody', apiDown: false, year: 2026 });
   assert.equal(emptyOnly.potential, true);
   assert.equal(ai.isEmptyTapeNote(emptyOnly.note), true, emptyOnly.note);

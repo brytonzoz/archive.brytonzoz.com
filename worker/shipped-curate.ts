@@ -88,12 +88,12 @@ export const CURATION_SYSTEM = [
   'Return one JSON object, no markdown:',
   '{"items":[{"id":"c0","title":"","group":null,"owned":true,"significance":2}],"notes":["","",""]}',
   'Input items are candidates the crawlers already found. You only keep, rename, group, or drop. Every kept id must be one of the input ids. Skip an id you are unsure of. Never invent an id.',
-  'A ship is a product, feature, release, or launch the customer themselves made. Company-wide changelog and flagships count ONLY when role is CEO, founder, or lead of that company — then keep the year, including named platform flagships, and roll language-SDK / patch versions of one product into one monthly group. An employee, designer, advocate, or DX engineer keeps only work they personally shipped (their own product or repo). Drop the employer\'s changelog, CLI nits, marketplace blurbs, and partner launches unless that company is theirs to run.',
-  'Drop: tweets, first-person posts, experiments that are not a named launch, blog essays, travel notes, opinion, news commentary, reviews, customer stories, listicles, monthly "what\'s new" / "building X, part N" recaps, docs, pricing, policy, settings nits, commit hashes, date-only titles, titles cut mid-phrase or ending in a colon, and scoped package ids (@scope/name). Prefer the public product name. Do not drop a CEO/founder/lead\'s own changelog features. Do not thin a CEO/founder/lead year to a handful of highlights.',
-  'When many owned product/changelog candidates exist for a CEO/founder/lead or for the customer\'s own product, keep the year. Roll patches of one product into one group like "VUE · 4 UPDATES IN OCT" or "DUB TS · 6 RELEASES IN AUG". A real product year should still look busy. Do not shrink it to two leftover settings. Leave group null for a distinct ship. Never print the employer\'s version list on someone who does not run that company.',
+  'A ship is a product, feature, release, or launch the customer themselves made. Their own repo or product always counts, even when they also work at a larger company. Company-wide changelog and flagships count ONLY when role is CEO, founder, or lead of that company. An employee, designer, advocate, or DX engineer drops the employer\'s changelog, CLI nits, marketplace blurbs, and partner launches — but keeps the side project.',
+  'Drop: tweets, first-person posts, demos that only say a thing was tested in a browser or "with Claude", blog essays, travel notes, opinion, news commentary, reviews, customer stories, listicles, monthly "what\'s new" / "building X, part N" recaps, docs, pricing, policy, settings nits, commit hashes, date-only titles, titles cut mid-phrase or ending in a colon, and scoped package ids (@scope/name). Prefer the public product name.',
+  'KEEP THE YEAR. If 6 or more candidates share one product name the customer owns, you must keep that year as monthly groups (like "BUN · 3 RELEASES IN JAN" or "DUB TS · 6 RELEASES IN AUG"). Returning one leftover version, or an empty tape, when those candidates exist is a failed receipt. A CEO/founder/lead of a platform company must print 25–60 lines after roll-ups and must keep every named flagship that appears in the candidates (rewrite the changelog sentence to the public product name: AI Gateway, Vercel Agent, v0, Codex App, Composer, Cursor 3, Bugbot, Origin). Roll raw package version numbers of one product into one monthly group — never print a raw version list. Leave group null for a distinct ship.',
   'title: a complete noun phrase people would recognize (Composer 2, Cursor 3, Bugbot, Origin, Vercel Agent, Codex App, Svelte 6, Bun 1.4 are fine). Never a sentence, never first person, never cut mid-phrase, never trailing of/in/to/for/and/or/the/a/an/with/& . No markdown or HTML. If you cannot recover a complete name, drop that id. Prefer the public product name over @scope/package. Max 60 characters.',
   'significance: 0 minor, 1 feature, 2 notable launch, 3 major product. Use 0 for patches you still keep in a group. Cap the printed tape at 60 lines AFTER roll-ups. Order kept items by date (undated last).',
-  'notes: exactly 3 different cashier notes for THIS customer and the kept items. One or two sentences, max 140 characters, never cut mid-word. Dry, specific, a little sideways. Mention one real kept ship with its original casing. At most one number, and only if it is already in the input. Never say the tape is blank if items exist. Never invent a count. Never another person\'s name, never a URL, never ALL CAPS ships, never restating the first item title as the whole note.',
+  'notes: exactly 3 different cashier notes for THIS customer and the kept items. One or two sentences, max 140 characters, never cut mid-word. Dry, specific, a little sideways. Mention one real kept ship with its original casing. At most one number, and only if it is already in the input. Never mention a ship that is not in the kept items. Never say the tape is blank if items exist. Never invent a count. Never another person\'s name, never a URL, never ALL CAPS ships, never restating the first item title as the whole note.',
   'Banned everywhere: delve, journey, innovative, seamless, emoji, exclamation marks, "the tape", "the register", "night shift", "public tape", "lead ship".',
 ].join('\n');
 
@@ -271,9 +271,10 @@ export function harvestShouldWin(
   const openaiLead = /^lead$/i.test(role || '') && /^openai$/i.test(brand);
   if (flagshipCeo || openaiLead) {
     if (harvestedCount < 12) return false;
-    // Codex changelog titles look like essays, so cheapCount is not a signal here.
-    // Floors match the live goldens: Truell ≥40, Tibo ≥35, Rauch ≥25.
-    const floor = /^cursor$/i.test(brand) ? 40 : openaiLead ? 35 : 25;
+    // Vercel harvest is npm version spam and misses named flagships — keep Claude's reel.
+    if (/^vercel$/i.test(brand)) return false;
+    // Codex / Cursor harvests still hold the year when Claude highlight-reels them.
+    const floor = /^cursor$/i.test(brand) ? 40 : 35;
     return curatedCount < floor;
   }
   // Everyone else: keep Claude's tape. Restoring harvest reintroduces employer

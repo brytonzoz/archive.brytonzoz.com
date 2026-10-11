@@ -68,7 +68,7 @@ async function receiptOf(id) {
 }
 
 async function pileCount(id) {
-  const response = await fetch(`${origin}/api/shipped/pile?limit=200`, { cache: 'no-store' });
+  const response = await fetch(`${origin}/api/shipped/pile?limit=200&t=${Date.now()}`, { cache: 'no-store' });
   if (!response.ok) return null;
   const body = await response.json();
   const row = (body.receipts || []).find((entry) => entry.id === id);

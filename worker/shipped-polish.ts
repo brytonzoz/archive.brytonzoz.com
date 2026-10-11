@@ -1562,25 +1562,11 @@ export function orderReceiptItems<T extends Polishable>(items: T[]): T[] {
  * Named majors (Vite 7 / Vite 8) and flagships stay separate.
  */
 export function rollupSamePackageVersions<T extends Polishable>(items: T[]): T[] {
-  const groups = new Map<string, { item: T; product: string; version: string | null; count: number }[]>();
+  const groups = new Map<string, { item: T; product: string; version: string; count: number }[]>();
   const kept: T[] = [];
   for (const item of items) {
-    if (VERSION_RANGE.test(item.name) || flagshipLaunchName(item)) {
+    if (PACKAGE_ROLLUP.test(item.name) || VERSION_RANGE.test(item.name) || flagshipLaunchName(item)) {
       kept.push(item);
-      continue;
-    }
-    const rolled = tidy(item.name).match(PACKAGE_ROLLUP);
-    if (rolled) {
-      const product = tidy(item.name).replace(PACKAGE_ROLLUP, '').trim() || item.name;
-      if (NAMED_OSS_MAJOR.test(product) || flagshipLaunchName({ ...item, name: product })) {
-        kept.push(item);
-        continue;
-      }
-      const count = Number(item.name.match(/·\s*(\d+)\s+(?:updates?|releases?)/i)?.[1]) || 1;
-      const key = loose(product);
-      const list = groups.get(key) ?? [];
-      list.push({ item, product, version: null, count });
-      groups.set(key, list);
       continue;
     }
     const parts = versionParts(item.name);
@@ -1600,18 +1586,13 @@ export function rollupSamePackageVersions<T extends Polishable>(items: T[]): T[]
       continue;
     }
     const latest = list.slice().sort((a, b) => (b.item.date ?? '').localeCompare(a.item.date ?? ''))[0]!.item;
-    const versions = list
-      .map((row) => row.version?.replace(/^v/i, '') || '')
-      .filter(Boolean)
-      .sort(cmpSemver);
+    const versions = list.map((row) => row.version.replace(/^v/i, '')).sort(cmpSemver);
     const product = list[0]!.product;
     const majors = new Set(versions.map((version) => version.split('.')[0]));
     const first = versions[0] || '';
     const last = versions[versions.length - 1] || first;
     const name =
-      majors.size === 1 && first && last && first !== last && list.every((row) => row.version)
-        ? `${product} ${first}–${last}`
-        : `${product} · ${count} releases`;
+      majors.size === 1 && first && last && first !== last ? `${product} ${first}–${last}` : `${product} · ${count} releases`;
     kept.push({ ...latest, name, description: '' });
   }
   return kept;

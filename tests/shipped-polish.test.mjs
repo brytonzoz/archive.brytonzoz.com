@@ -1505,6 +1505,8 @@ test('patch and minor lines of one package roll into a single tape line', () => 
     ],
     { year: 2026, who: 'colinhacks', handle: 'colinhacks' },
   );
-  assert.equal(printed.length, 1, JSON.stringify(printed.map((item) => item.name)));
-  assert.match(printed[0].name, /trpc · 8 releases/i);
+  const printedNames = printed.map((item) => item.name);
+  assert.equal(printedNames.filter((name) => /trpc 11\.|trpc 10\./i.test(name)).length, 0, JSON.stringify(printedNames));
+  assert.ok(printedNames.some((name) => /trpc · 5 releases/i.test(name)), JSON.stringify(printedNames));
+  assert.ok(printedNames.some((name) => /trpc · 3 releases in mar/i.test(name)), JSON.stringify(printedNames));
 });

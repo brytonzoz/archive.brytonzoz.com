@@ -19,6 +19,10 @@ import type { ItemStatus } from '../lib/shipped-year';
 import { ITEM_STATUSES } from '../lib/shipped-year';
 
 export const TITLE_MAX = 60;
+/** Cheap harvest cap before the one LLM curation call. */
+export const CHEAP_CANDIDATE_CAP = 150;
+/** Printed tape cap after curation roll-ups. */
+export const RECEIPT_LINE_CAP = 60;
 
 const DOCS_NAV =
   /^(overview|prompting|pool|security|browser|search|terminal|settings|plugins?|hooks?|cli|api|faq|guides?|reference|getting started|quickstart|quick start|installation|install|usage|examples?|changelog|release notes|acting as users|builds|context|rules|modes?|models?|indexing|privacy|enterprise|teams|billing|account|authentication|auth|docs|home|index|support|repositories|ideas|pull requests|last updated|what'?s new|agents|legal|update)$/i;
@@ -143,7 +147,7 @@ function loose(text: string): string {
   return text.toLowerCase().normalize('NFKD').replace(/[^a-z0-9]/g, '');
 }
 
-function wordClamp(text: string, max: number): string {
+export function wordClamp(text: string, max: number): string {
   if (text.length <= max) return text;
   const cut = text.slice(0, max);
   const space = cut.lastIndexOf(' ');
@@ -1079,18 +1083,43 @@ export function cleanStatus(value: unknown): ItemStatus {
 
 const DESC_MAX = 90;
 
+/** Strip markdown and HTML so harvest text never prints as `###` / `<h3>`. */
+export function stripMarkup(value: unknown): string {
+  return tidy(value)
+    .replace(/```[\s\S]*?```/g, ' ')
+    .replace(/`+/g, '')
+    .replace(/!\[([^\]]*)\]\([^)]+\)/g, '$1')
+    .replace(/\[([^\]]+)\]\([^)]+\)/g, '$1')
+    .replace(/^#{1,6}\s+/gm, '')
+    .replace(/<\/?[a-z][^>]*>/gi, ' ')
+    .replace(/\b(p|h[1-6]|div|span|img|a|ul|ol|li|br)\s+(align|class|src|href|style)=["'][^"']*["']/gi, ' ')
+    .replace(/[*_~]{1,3}/g, '')
+    .replace(/\s+/g, ' ')
+    .trim();
+}
+
+const TITLE_TRAILING_GLUE =
+  /(?:^|[\s/])(&|of|in|to|for|and|or|the|a|an|with|on|as|by|from|into|vs|via|can|you|we|they|now|just|still)\s*$/i;
+
+/** Tiny deterministic check after the LLM rewrites a title. */
+export function titleSanityOk(title: string): boolean {
+  const text = stripMarkup(title);
+  if (!text || text.length < 2) return false;
+  if (/[<>{}`#]/.test(text)) return false;
+  if (/^#{1,6}\s/.test(title) || /<\/?[a-z]/.test(title)) return false;
+  if (TITLE_TRAILING_GLUE.test(text)) return false;
+  if (looksCutOff(text) || endsWithCutOffWord(text)) return false;
+  return true;
+}
+
 export function cleanDescription(value: unknown): string {
-  let text = tidy(value);
+  let text = stripMarkup(value);
   if (!text || META_DESC.test(text) || HOST_ONLY.test(text)) return '';
   if (/\bopens in a new window\b|\bcopy link to\b/i.test(text) && text.split(/\s+/).length <= 14) return '';
   text = text
     .replace(/\s*\(opens in a new window\)\.?/gi, '')
     .replace(/\bopens in a new window\b/gi, '')
     .replace(/\bcopy link to\b[\s\S]*/gi, '')
-    .replace(/<\/?[a-z][^>]*>/gi, ' ')
-    .replace(/\b(p|h[1-6]|div|span|img|a|ul|ol|li|br)\s+(align|class|src|href|style)=["'][^"']*["']/gi, ' ')
-    .replace(/\b(p|h[1-6])\s+align=["']?center["']?/gi, ' ')
-    .replace(/align=["']?center["']?/gi, ' ')
     .replace(/\s+/g, ' ')
     .trim();
   if (
@@ -1758,4 +1787,50 @@ export function rollupCeoLeadCrumbs<T extends Polishable>(items: T[], affiliatio
  */
 export function gateReceiptItems<T extends Polishable>(items: T[], opts: PolishOpts): T[] {
   return polishCandidates(items, opts);
+}
+
+function cheapYearOk(item: Polishable, year: number): boolean {
+  const raw = item.date ? String(item.date) : '';
+  if (!raw) return item.thisYear !== false;
+  const match = raw.match(/^(\d{4})/);
+  if (!match) return item.thisYear !== false;
+  if (Number(match[1]) === year) return !isFutureDate(item.date);
+  return Boolean(flagshipLaunchName(item) && isFlagshipYearKeep(item, year));
+}
+
+/**
+ * Hard pre-filters only: year, URL, canary/prerelease, markup strip, URL dedupe.
+ * Title/junk/ownership heuristics stay out — the LLM curation call owns those.
+ */
+export function cheapHardFilter<T extends Polishable>(items: T[], year: number): T[] {
+  const seen = new Set<string>();
+  const out: T[] = [];
+  for (const item of items) {
+    const name = stripMarkup(item.name);
+    if (!name || name === 'YOUR POTENTIAL') continue;
+    if (!cheapYearOk(item, year)) continue;
+    if (isPrereleaseShip(name) || isPrereleaseShip(item.name)) continue;
+    const link = String(item.link || '').trim();
+    if (!link) continue;
+    try {
+      const url = new URL(link);
+      if (url.protocol !== 'http:' && url.protocol !== 'https:') continue;
+    } catch {
+      continue;
+    }
+    const key = hrefKey(link);
+    if (key && seen.has(key)) continue;
+    if (key) seen.add(key);
+    const description = cleanDescription(item.description);
+    out.push({ ...item, name, description });
+  }
+  return out
+    .slice()
+    .sort((a, b) => {
+      const date = (b.date ?? '').localeCompare(a.date ?? '');
+      if (date) return date;
+      return (b.score ?? 0) - (a.score ?? 0);
+    })
+    .slice(0, CHEAP_CANDIDATE_CAP)
+    .sort((a, b) => (a.date ?? '9999').localeCompare(b.date ?? '9999'));
 }

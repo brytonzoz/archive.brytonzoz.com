@@ -25,3 +25,11 @@ None of these queries appear in `docs/shipped-eval-builders.md`, the original he
 Pass bar (every receipt): zero third-party products, zero cut titles, zero junk-fixture hits, a non-fallback note, and ≥3 real items when `knownLaunches` is true.
 
 Major OSS maintainers must get ≥10 lines from the GitHub OSS harvest (owned repos + founder/top-3 org repos → 2026 releases/tags, blog RSS, new ≥100-star repos). Evan You and Jarred Sumner must get ≥15. CI uses cached GitHub-shaped releases in `tests/fixtures/shipped-heldout/oss.json`; live prints hit the GitHub API with `SHIPPED_GITHUB_TOKEN`. Held-out notes in CI use the sentence fallback (no Claude); live prints call the cashier writer.
+
+## Live held-out (Claude curation, xAI off)
+
+After staging deploys, `scripts/eval-shipped-heldout-live.mjs` prints these names on staging with the real Claude curation call. Do not hand-seed items or tune per name.
+
+`steventey`, `shadcn`, `swyx`, `levelsio`, `jarredsumner`, `yyx990803`, `dannypostmaa`, `nico_jeannen`, `Rich-Harris`, `leerob`, `mckaywrigley`, `pontusab`.
+
+Each row reports count, every title, the cashier note, wall count, cost/latency, and a self-audit for leftover junk (cut titles, markdown/HTML, other companies, patch spam, notes that echo the first title).

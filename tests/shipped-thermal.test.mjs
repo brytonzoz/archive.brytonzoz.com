@@ -100,7 +100,7 @@ test('long tapes print significance group headers without a status tilde', () =>
   const text = doc.text;
   assert.ok(text.includes('LANDMARK'), text);
   assert.ok(text.includes('NOTABLE LAUNCH'), text);
-  assert.equal(text.includes('MINOR FIX'), false, text);
+  assert.ok(text.includes('MINOR FIX'), text);
   assert.ok(text.includes('via OpenAI · Codex'), text);
   assert.equal(text.includes('via OpenAI · Codex  A real line'), false, 'via and the description are not one run-on line');
   assert.equal(
@@ -144,11 +144,12 @@ test('mixed 0–4 and 0–100 significance scores print one header per band', ()
       { name: 'SEVEN', status: 'LIVE', significance: 2, description: 'g' },
       { name: 'EIGHT', status: 'LIVE', significance: 0, description: 'h' },
     ],
-    count: 7,
+    count: 8,
   });
   const headers = doc.lines.filter((line) => line.kind === 'text' && line.text === 'NOTABLE LAUNCH');
   assert.equal(headers.length, 1, doc.text);
-  assert.equal(doc.text.includes('MINOR FIX'), false, doc.text);
+  assert.ok(doc.text.includes('MINOR FIX'), doc.text);
+  assert.ok(doc.text.includes('EIGHT'), doc.text);
 });
 
 test('the plain-text copy carries every item and the note', () => {

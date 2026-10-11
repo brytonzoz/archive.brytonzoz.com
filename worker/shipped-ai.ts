@@ -15,6 +15,16 @@ import { cleanDescription, cleanShipTitle, cleanStatus, gateReceiptItems, isChan
 import { emptyAffiliation, type Affiliation } from './shipped-affiliation';
 import { looksLikePersonName } from './shipped-repos';
 import { RECEIPT_BUDGET_MICROS, formatReceiptStats, searchBudget, type SourcedStat } from './shipped-research';
+import {
+  CURATION_MAX_TOKENS,
+  CURATION_RESERVE_MICROS,
+  applyCuration,
+  cachedSystem,
+  curationUserPrompt,
+  customerFromProfile,
+  packCandidates,
+  parseCurationJson,
+} from './shipped-curate';
 
 export interface AiEnv {
   ANTHROPIC_API_KEY?: string;
@@ -476,6 +486,8 @@ export type NoteContext = {
   affiliation?: Affiliation | null;
   owner?: OwnerContext | null;
   apiDown?: boolean;
+  /** LLM curation already chose the lines; skip the heuristic gate. */
+  curated?: boolean;
 };
 
 function notableShip(items: DraftItem[]): DraftItem | null {
@@ -1070,13 +1082,17 @@ function asPrintedItem(item: DraftItem): DraftItem {
 export function finish(items: DraftItem[], note: string, seed: number, modulesRaw?: unknown, statsRaw?: unknown, ctx: NoteContext = {}): Draft {
   const layout = sanitizeLayout(modulesRaw, seed);
   const year = ctx.year || new Date().getUTCFullYear();
-  const gated = gateReceiptItems(items, {
-    year,
-    who: ctx.who,
-    handle: ctx.handle,
-    affiliation: affiliationFromCtx(ctx),
-    owner: usableOwner(ctx.owner),
-  }).map(asPrintedItem);
+  const gated = (
+    ctx.curated
+      ? items.filter((item) => item.name && item.name !== 'YOUR POTENTIAL' && item.source !== 'none')
+      : gateReceiptItems(items, {
+          year,
+          who: ctx.who,
+          handle: ctx.handle,
+          affiliation: affiliationFromCtx(ctx),
+          owner: usableOwner(ctx.owner),
+        })
+  ).map(asPrintedItem);
   if (!gated.length) {
     return { items: [], note: POTENTIAL_NOTES[seed % POTENTIAL_NOTES.length], stats: [], potential: true, layout };
   }
@@ -1421,6 +1437,139 @@ function parseNoteCandidates(parsed: unknown): string[] {
   return [];
 }
 
+export { CURATION_RESERVE_MICROS } from './shipped-curate';
+
+type ClaudeCall = (body: unknown) => Promise<Response>;
+
+async function askClaudeJson(
+  call: ClaudeCall,
+  body: Record<string, unknown>,
+  usage: { input: number; output: number; searches: number },
+): Promise<unknown | null> {
+  let response = await call(body);
+  if (!response.ok) {
+    const text = await response.clone().text();
+    if (response.status === 400 && /thinking/i.test(text)) {
+      response = await call({ ...body, thinking: undefined });
+    }
+  }
+  if (!response.ok) {
+    if (isCreditError(response.status, await response.text())) {
+      throw Object.assign(new PrintError('out-of-credit', 503), { costMicros: 0, inputTokens: usage.input, outputTokens: usage.output });
+    }
+    return null;
+  }
+  const message = (await response.json()) as Message;
+  const u = message.usage ?? {};
+  usage.input += (u.input_tokens ?? 0) + (u.cache_creation_input_tokens ?? 0) + (u.cache_read_input_tokens ?? 0);
+  usage.output += u.output_tokens ?? 0;
+  return parseJson(message.content ?? []);
+}
+
+async function curateTape(opts: {
+  call: ClaudeCall;
+  usage: { input: number; output: number; searches: number };
+  model: string;
+  subject: Subject;
+  gathered: Gathered;
+  year: number;
+  seed: number;
+  usedNotes: string[];
+  spent: () => number;
+}): Promise<AiResult | null> {
+  const packed = packCandidates(opts.gathered.found, opts.year);
+  if (!packed.length) return null;
+  const affiliation = opts.gathered.profile.affiliation;
+  const customer = customerFromProfile(opts.gathered.profile, opts.gathered.profile.x || opts.gathered.profile.github);
+  const user = curationUserPrompt(customer, packed, opts.year);
+  const request = {
+    model: opts.model,
+    max_tokens: CURATION_MAX_TOKENS,
+    system: cachedSystem(),
+    messages: [{ role: 'user', content: user }],
+    thinking: { type: 'disabled' },
+  };
+  const tryParse = async (parsed: unknown) => {
+    const raw = parseCurationJson(parsed);
+    return raw ? applyCuration(raw, packed) : null;
+  };
+  let tape = await tryParse(await askClaudeJson(opts.call, request, opts.usage));
+  if (!tape && opts.spent() < CURATION_RESERVE_MICROS - 2_000) {
+    const retry = {
+      ...request,
+      messages: [
+        { role: 'user', content: user },
+        {
+          role: 'user',
+          content:
+            'Your last reply was not valid JSON for this schema. Reply again with only {"items":[{"id":"c0","title":"","group":null,"owned":true,"significance":2}],"notes":["","",""]} using ids from <candidates>.',
+        },
+      ],
+    };
+    tape = await tryParse(await askClaudeJson(opts.call, retry, opts.usage));
+  }
+  if (!tape) return null;
+
+  const noteCtx: NoteContext = {
+    role: affiliation?.role,
+    company: affiliation?.company,
+    who: opts.gathered.profile.name,
+    handle: opts.gathered.profile.x,
+    bio: opts.gathered.profile.bio,
+    usedNotes: opts.usedNotes,
+    year: opts.year,
+    affiliation,
+    owner: ownerFromProfile(opts.gathered.profile, affiliation),
+    curated: true,
+  };
+  const stats = formatStats(tape.items, opts.gathered.stats ?? []);
+  let ranked = rankCashierNotes(tape.notes, tape.items as DraftItem[], stats, noteCtx);
+  let noteCandidates = noteCandidateLog(ranked);
+  logNoteReject(noteCtx, ranked, false);
+  let note = ranked.find((row) => !row.hard)?.note ?? '';
+  if (!note && tape.notes.length && opts.spent() < CURATION_RESERVE_MICROS - 2_000) {
+    const reasons = ranked
+      .filter((row) => row.hard)
+      .map((row) => `- "${row.note}" (${row.hard})`)
+      .join('\n');
+    const retryNotes = {
+      ...request,
+      max_tokens: 400,
+      messages: [
+        { role: 'user', content: user },
+        {
+          role: 'user',
+          content: `Keep the same items. Those notes were rejected:\n${reasons || '(none passed the factual check)'}\nWrite 3 new cashier notes that avoid those problems. JSON only: {"items":[],"notes":["","",""]} — you may omit items.`,
+        },
+      ],
+    };
+    const second = parseCurationJson(await askClaudeJson(opts.call, retryNotes, opts.usage));
+    const extra = second?.notes?.length ? second.notes : parseNoteCandidates(second);
+    if (extra.length) {
+      const ranked2 = rankCashierNotes(extra, tape.items as DraftItem[], stats, noteCtx);
+      noteCandidates = [...noteCandidates, ...noteCandidateLog(ranked2)];
+      logNoteReject(noteCtx, ranked2, true);
+      note = ranked2.find((row) => !row.hard)?.note ?? pickLeastBadNote([...tape.notes, ...extra], tape.items as DraftItem[], stats, noteCtx);
+      if (!note) logNoteReject(noteCtx, ranked2, 'exhausted');
+    }
+  }
+  const draft = finish(tape.items as DraftItem[], note, opts.seed, undefined, stats, { ...noteCtx, apiDown: false });
+  const cost = opts.spent();
+  console.log(
+    JSON.stringify({
+      shipped: 'ai',
+      model: opts.model,
+      mode: 'curate',
+      candidates: packed.length,
+      items: draft.items.length,
+      inputTokens: opts.usage.input,
+      outputTokens: opts.usage.output,
+      costMicros: cost,
+    }),
+  );
+  return { ...draft, model: opts.model, inputTokens: opts.usage.input, outputTokens: opts.usage.output, searches: 0, costMicros: cost, noteCandidates };
+}
+
 export async function assembleReceipt(
   subject: Subject,
   gathered: Gathered,
@@ -1493,6 +1642,26 @@ export async function assembleReceipt(
   };
 
   const affiliation = gathered.profile.affiliation;
+  const cheap = packCandidates(gathered.found, year);
+  if (cheap.length) {
+    try {
+      const curated = await curateTape({
+        call,
+        usage,
+        model,
+        subject,
+        gathered,
+        year,
+        seed,
+        usedNotes,
+        spent,
+      });
+      if (curated) return curated;
+    } catch (error) {
+      if (error instanceof PrintError && error.code === 'out-of-credit') throw error;
+      console.log(JSON.stringify({ shipped: 'curate-fallback', who: gathered.profile.name || subject.display, reason: error instanceof Error ? error.message : 'error' }));
+    }
+  }
   if (harvested.length) {
     const sealed = finish(harvested, '', seed, undefined, formatStats(harvested, gathered.stats ?? []), {
       role: affiliation?.role,

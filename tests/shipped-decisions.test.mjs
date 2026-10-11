@@ -441,6 +441,7 @@ test('long tapes group by significance and month', () => {
   assert.equal(bySig[0].label, 'LANDMARK');
   assert.equal(bySig[0].items[0].name, 'A');
   assert.ok(bySig.some((g) => g.label === 'NOTABLE LAUNCH' && g.items.length === 2));
+  assert.ok(bySig.some((g) => g.label === 'MINOR FIX' && g.items.some((item) => item.name === 'D')));
   const byMonth = year.groupItemsByMonth(items);
   assert.equal(byMonth[0].label, 'JANUARY 2026');
   assert.equal(byMonth.at(-1).label, 'UNDATED');

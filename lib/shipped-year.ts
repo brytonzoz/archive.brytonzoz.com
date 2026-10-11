@@ -167,12 +167,12 @@ export function significanceBand(value?: number | null): number | null {
   return Math.max(0, Math.min(4, Math.round(value / 20)));
 }
 
-/** Group a long tape by Decisions significance (landmark first). Minor-fix rows stay off the receipt. */
+/** Group a long tape by significance (landmark first). Every stored line prints — count matches the wall. */
 export function groupItemsBySignificance<T extends { significance?: number }>(items: T[]): { key: string; label: string; items: T[] }[] {
   const buckets = new Map<number, T[]>();
   for (const item of items) {
     const band = significanceBand(item.significance);
-    if (band == null || band <= 0) continue;
+    if (band == null) continue;
     const list = buckets.get(band) ?? [];
     list.push(item);
     buckets.set(band, list);

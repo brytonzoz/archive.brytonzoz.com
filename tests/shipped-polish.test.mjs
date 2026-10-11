@@ -1128,3 +1128,30 @@ test('undated HeadshotPro drops; leftover cut-offs and customer-story metrics dr
   assert.equal(names.some((name) => /headshotpro|speed insights|nokia|teams\s*&/i.test(name)), false, JSON.stringify(names));
   assert.ok(names.some((name) => /agentbar/i.test(name)), JSON.stringify(names));
 });
+
+test('cheap filters strip markup, drop prereleases and other years, and dedupe URLs', () => {
+  assert.equal(polish.stripMarkup('### Minor Changes - 17ee736'), 'Minor Changes - 17ee736');
+  assert.equal(polish.stripMarkup('h3Dub.co…/h3').replace(/\.{3}/g, '…'), 'h3Dub.co…/h3');
+  assert.equal(polish.stripMarkup('<h3>Dub.co</h3>'), 'Dub.co');
+  assert.equal(polish.cleanDescription('### Minor Changes - 17ee736'), 'Minor Changes - 17ee736');
+  assert.equal(polish.titleSanityOk('Commission analytics you can'), false);
+  assert.equal(polish.titleSanityOk('Teams &'), false);
+  assert.equal(polish.titleSanityOk('Composer 2'), true);
+  assert.equal(polish.titleSanityOk('### Changelog'), false);
+  const cheap = polish.cheapHardFilter(
+    [
+      found({ name: 'Composer 2', date: '2026-03-19', link: 'https://cursor.com/blog/composer-2' }),
+      found({ name: 'eslint-plugin-vue@10.7.0-canary.1', date: '2026-04-01', link: 'https://www.npmjs.com/package/eslint-plugin-vue' }),
+      found({ name: 'Old ship', date: '2025-12-01', link: 'https://example.com/old' }),
+      found({ name: 'Composer 2 again', date: '2026-03-20', link: 'https://cursor.com/blog/composer-2?utm=1' }),
+      found({ name: '### Minor Changes', date: '2026-05-01', link: 'https://github.com/vuejs/core/releases/10', description: '### Minor Changes - 17ee736' }),
+    ],
+    2026,
+  );
+  const names = cheap.map((item) => item.name);
+  assert.ok(names.includes('Composer 2'), JSON.stringify(names));
+  assert.equal(names.filter((name) => /composer/i.test(name)).length, 1);
+  assert.equal(names.some((name) => /canary|old ship/i.test(name)), false, JSON.stringify(names));
+  assert.ok(names.includes('Minor Changes'), JSON.stringify(names));
+  assert.equal(cheap.find((item) => item.name === 'Minor Changes')?.description, 'Minor Changes - 17ee736');
+});

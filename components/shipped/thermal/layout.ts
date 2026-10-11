@@ -19,7 +19,7 @@ function groupBySignificance(items: ThermalItem[]): { key: string; label: string
   const buckets = new Map<number, ThermalItem[]>();
   for (const item of items) {
     const band = significanceBand(item.significance);
-    if (band <= 0) continue;
+    if (band < 0) continue;
     const list = buckets.get(band) ?? [];
     list.push(item);
     buckets.set(band, list);

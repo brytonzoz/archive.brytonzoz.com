@@ -33,7 +33,7 @@
 // Every guardrail (rate limits, locks, the budget, kill switches, the human check, headers) lives in
 // worker/shipped-guard.ts; the threat list is docs/shipped-security.md.
 // Tables are created (and new columns added) on first use; see SCHEMA below.
-import { DEFAULT_MODEL, PrintError, assembleReceipt, costMicros, demoReceipt, finish, maxSearches, promptFor, worstCaseMicros, type AiEnv, type DraftItem } from './shipped-ai';
+import { CURATION_RESERVE_MICROS, DEFAULT_MODEL, PrintError, assembleReceipt, demoReceipt, finish, maxSearches, promptFor, worstCaseMicros, type AiEnv, type DraftItem } from './shipped-ai';
 import { ICON_HASH, bytesDataUri, iconDataUri, iconKey, reencodeLogo, storeIcon } from './shipped-icons';
 import { houseMark } from './shipped-marks';
 import { yearCardPng, yearRolloPdf, yearRolloPng, yearTallPng, type LogoResolver } from './shipped-og';
@@ -235,7 +235,8 @@ function shippedOrigin(env: ShippedEnv, url: URL): string {
   return !env.SHIPPED_HOST || url.host === env.SHIPPED_HOST ? url.origin : `https://${env.SHIPPED_HOST}`;
 }
 
-const CACHE_DAYS = 7;
+/** Fresh prints re-run unless the same subject printed within the last hour. */
+export const CACHE_MS = HOUR;
 /** A subject whose print just failed isn't tried again for this long (no paying twice for the same failure). */
 const FAILED_FOR = 10 * MINUTE;
 /** Longest a print may hold its locks (gathering + up to three 40 s model calls). */
@@ -577,11 +578,11 @@ async function print(request: Request, env: ShippedEnv, ctx: ExecutionContext): 
   const year = yearOf(env);
   const mode = modeOf(year);
   if (await blocked(db, key)) return json({ error: 'taken-down' }, 410);
-  // Already printed this week: the same receipt again, free, even while the machine is out of paper.
-  // Empty / potential tapes are not locked — identity misses used to cache "YOUR POTENTIAL" for 7 days.
+  // Already printed in the last hour: the same receipt again, free, even while the machine is out of paper.
+  // Empty / potential tapes are not locked — identity misses used to cache "YOUR POTENTIAL" for a week.
   const cached = await db
     .prepare('SELECT id, data FROM shipped_receipts WHERE login_key = ? AND mode = ? AND demo = ? AND hidden = 0 AND created_at > ? ORDER BY id DESC LIMIT 1')
-    .bind(key, mode, env.ANTHROPIC_API_KEY ? 0 : 1, Date.now() - CACHE_DAYS * DAY)
+    .bind(key, mode, env.ANTHROPIC_API_KEY ? 0 : 1, Date.now() - CACHE_MS)
     .first<{ id: number; data: string }>();
   if (cached) {
     const prior = (() => {
@@ -724,7 +725,7 @@ async function generate(
             let grown = demoReceipt(gathered, year, seed);
             if (!state.demo) {
               model = env.SHIPPED_MODEL || DEFAULT_MODEL;
-              const worst = costMicros(model, 4_000, 256, 0);
+              const worst = CURATION_RESERVE_MICROS;
               const cap = await cycleBudgetCap(db, env);
               if (cap !== null && (await reserveBudget(db, cap, worst, budgetKey()))) {
                 try {
@@ -764,9 +765,9 @@ async function generate(
     } else {
       // The worst this print could cost is held against today's budget first, so a burst can't overspend it.
       model = env.SHIPPED_MODEL || DEFAULT_MODEL;
-      const harvestedEnough = gathered.found.length >= 3 || gathered.ran.some((tag) => tag.includes('xai'));
+      const harvestedEnough = gathered.found.length >= 1 || gathered.ran.some((tag) => tag.includes('xai'));
       const worst = harvestedEnough
-        ? costMicros(model, 4_000, 256, 0)
+        ? CURATION_RESERVE_MICROS
         : worstCaseMicros(model, promptFor(subject, gathered, year).length, maxSearches(env));
       const cap = await cycleBudgetCap(db, env);
       if (cap === null) return json({ error: 'out-of-paper' }, 503);
@@ -1044,7 +1045,7 @@ async function pile(url: URL, env: ShippedEnv): Promise<Response> {
     frozen: window.phase === 'closed',
     next: rows.results.length === limit ? rows.results[rows.results.length - 1].id : null,
   };
-  return json(body, 200, window.phase === 'closed' ? 'public, max-age=3600' : 'public, max-age=15');
+  return json(body, 200, window.phase === 'closed' ? 'public, max-age=3600' : 'public, max-age=10');
 }
 
 /** POST /api/shipped/pile { id, token }: toss your receipt on the pile (until the printer shuts off). */
@@ -1585,7 +1586,7 @@ async function rerunFullReceipt(db: D1Database, env: ShippedEnv, id: number): Pr
     }
     const seed = seedOf(subjectKey(current.subject));
     const draft = env.ANTHROPIC_API_KEY
-      ? await assembleReceipt(current.subject, gathered, year, seed, env, costMicros(env.SHIPPED_MODEL || DEFAULT_MODEL, 4_000, 256, 0), await loadStoredNotes(db, id))
+      ? await assembleReceipt(current.subject, gathered, year, seed, env, CURATION_RESERVE_MICROS, await loadStoredNotes(db, id))
       : demoReceipt(gathered, year, seed);
     const receipt: Omit<YearReceipt, 'id'> = {
       version: 2,
@@ -2243,7 +2244,9 @@ async function reprintReceipt(
       draft = demoReceipt(gathered, year, seedOf(row.login_key));
     } else {
       model = env.SHIPPED_MODEL || DEFAULT_MODEL;
-      const worst = worstCaseMicros(model, promptFor(subject, gathered, year).length, maxSearches(env));
+      const worst = gathered.found.length
+        ? CURATION_RESERVE_MICROS
+        : worstCaseMicros(model, promptFor(subject, gathered, year).length, maxSearches(env));
       const cap = await cycleBudgetCap(db, env);
       if (cap === null) return json({ error: 'out-of-paper' }, 503);
       if (!(await reserveBudget(db, cap, worst, budgetKey()))) return json({ error: 'out-of-paper' }, 503);
@@ -2328,6 +2331,10 @@ async function reprintReceipt(
       ok: true,
       id: row.id,
       note: draft.note,
+      count: (draft.items || []).filter((item) => item?.name && item.name !== 'YOUR POTENTIAL' && item.source !== 'none').length,
+      costMicros: usage.cost,
+      inputTokens: usage.input,
+      outputTokens: usage.output,
       noteCandidates: 'noteCandidates' in draft ? draft.noteCandidates ?? [] : [],
     });
   } catch (error) {
@@ -2377,9 +2384,8 @@ async function printFreshSubject(env: ShippedEnv, db: D1Database, raw: string): 
       draft = demoReceipt(gathered, year, seed);
     } else {
       model = env.SHIPPED_MODEL || DEFAULT_MODEL;
-      const harvestedEnough = gathered.found.length >= 3;
-      const worst = harvestedEnough
-        ? costMicros(model, 4_000, 256, 0)
+      const worst = gathered.found.length
+        ? CURATION_RESERVE_MICROS
         : worstCaseMicros(model, promptFor(subject, gathered, year).length, maxSearches(env));
       const cap = await cycleBudgetCap(db, env);
       if (cap === null) return json({ error: 'out-of-paper' }, 503);
@@ -2444,6 +2450,10 @@ async function printFreshSubject(env: ShippedEnv, db: D1Database, raw: string): 
       ok: true,
       id: inserted.id,
       note: draft.note,
+      count: (draft.items || []).filter((item) => item?.name && item.name !== 'YOUR POTENTIAL' && item.source !== 'none').length,
+      costMicros: usage.cost,
+      inputTokens: usage.input,
+      outputTokens: usage.output,
       noteCandidates: 'noteCandidates' in draft ? draft.noteCandidates ?? [] : [],
     });
   } catch (error) {

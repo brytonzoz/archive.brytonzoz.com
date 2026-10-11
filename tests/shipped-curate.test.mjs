@@ -119,6 +119,10 @@ test('title sanity is the only post-LLM title check', () => {
   assert.equal(polish.titleSanityOk("What's new in Svelte: January 2026"), false);
   assert.equal(polish.titleSanityOk('Dub vs Tolt:'), false);
   assert.equal(polish.looksLikeEssayTitle('Rimowa suitcase broke after Copenhagen to Lisbon flight and then some more'), true);
+  assert.equal(polish.looksLikeEssayTitle('We launched AI Gateway'), false);
+  assert.equal(polish.titleSanityOk('We launched AI Gateway'), false);
+  assert.equal(polish.titleSanityOk('WE BUILT EMOJI SEARCH'), false);
+  assert.equal(polish.titleSanityOk('AI Gateway'), true);
 });
 
 test('harvest wins when Claude keeps a highlight reel of a fat company tape', () => {
@@ -129,6 +133,8 @@ test('harvest wins when Claude keeps a highlight reel of a fat company tape', ()
   assert.equal(curate.harvestShouldWin(96, 42, 'ceo', 'Cursor'), false);
   assert.equal(curate.harvestShouldWin(171, 60, 'ceo', 'Vercel'), false);
   assert.equal(curate.harvestShouldWin(193, 3, 'ceo', 'Vercel'), false);
+  assert.equal(curate.harvestShouldWin(60, 8, 'ceo', 'Vercel'), true);
+  assert.equal(curate.harvestShouldWin(60, 28, 'ceo', 'Vercel'), false);
   assert.equal(curate.harvestShouldWin(38, 32, 'lead', 'OpenAI'), true);
   assert.equal(curate.harvestShouldWin(38, 36, 'lead', 'OpenAI'), false);
   assert.equal(curate.harvestShouldWin(9, 3, 'ceo', 'Vercel'), false);

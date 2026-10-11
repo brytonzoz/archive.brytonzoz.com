@@ -34,6 +34,7 @@
 // worker/shipped-guard.ts; the threat list is docs/shipped-security.md.
 // Tables are created (and new columns added) on first use; see SCHEMA below.
 import { CURATION_RESERVE_MICROS, DEFAULT_MODEL, PrintError, assembleReceipt, demoReceipt, finish, harvestItems, maxSearches, promptFor, worstCaseMicros, type AiEnv, type DraftItem } from './shipped-ai';
+import { cheapHardFilter, titleSanityOk } from './shipped-polish';
 import { ICON_HASH, bytesDataUri, iconDataUri, iconKey, reencodeLogo, storeIcon } from './shipped-icons';
 import { houseMark } from './shipped-marks';
 import { yearCardPng, yearRolloPdf, yearRolloPng, yearTallPng, type LogoResolver } from './shipped-og';
@@ -2215,7 +2216,17 @@ function stubGathered(subject: Subject): Gathered {
 
 function tapeLooksBroken(items: { name?: string | null }[] | undefined): boolean {
   const names = (items || []).map((item) => String(item?.name || ''));
-  if (names.some((name) => /^@[\w.-]+\//.test(name) || /[<>{}`#]/.test(name) || /:\s*$/.test(name) || /^what[’']s new in\b/i.test(name))) {
+  if (
+    names.some(
+      (name) =>
+        /^@[\w.-]+\//.test(name) ||
+        /[<>{}`#]/.test(name) ||
+        /:\s*$/.test(name) ||
+        /^what[’']s new in\b/i.test(name) ||
+        /^(i|i'm|i've|we|we've|it's)\b/i.test(name) ||
+        name.trim().split(/\s+/).filter(Boolean).length >= 12,
+    )
+  ) {
     return true;
   }
   return names.filter((name) => /^VERCEL \d/i.test(name)).length >= 8;
@@ -2268,7 +2279,8 @@ async function assembleForAdmin(
   } catch (error) {
     if (error instanceof PrintError && error.code === 'out-of-credit') throw error;
   }
-  const fallback = harvestItems(gathered, year).slice(0, 20);
+  const found = cheapHardFilter(gathered.found, year).filter((item) => titleSanityOk(item.name));
+  const fallback = harvestItems({ ...gathered, found }, year).slice(0, 20);
   return {
     draft: {
       ...finish(fallback, '', seed, undefined, undefined, {

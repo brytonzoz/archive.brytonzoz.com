@@ -46,6 +46,7 @@ const BROKEN_TITLE = [
   /^what[’']s new in\b/i,
   /:\s*$/,
   /commission analytics you can$/i,
+  /^(i|i'm|i've|we|we've|it's)\b/i,
 ];
 const FORCE_IDS = new Set(
   (process.env.SHIPPED_REPRINT_FORCE_IDS || '')
@@ -322,6 +323,7 @@ function titleLooksBroken(name) {
 function tapeLooksBroken(titles) {
   const names = Array.isArray(titles) ? titles : [];
   if (names.some(titleLooksBroken)) return true;
+  if (names.some((name) => String(name || '').trim().split(/\s+/).filter(Boolean).length >= 12)) return true;
   return names.filter((name) => /^VERCEL \d/i.test(name)).length >= 8;
 }
 

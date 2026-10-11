@@ -1112,10 +1112,11 @@ export function stripMarkup(value: unknown): string {
 const TITLE_TRAILING_GLUE =
   /(?:^|[\s/])(&|of|in|to|for|and|or|the|a|an|with|on|as|by|from|into|vs|via|can|you|we|they|now|just|still)\s*$/i;
 const ESSAY_OPENER =
-  /^(i|i'm|i've|i'd|we|we've|it's|this is how|everyone can|congratulations|yesterday|looking through)\b/i;
+  /^(i|i'm|i've|i'd|we've|it's|this is how|everyone can|congratulations|yesterday|looking through)\b/i;
+const PRINTED_FIRST_PERSON = /^(i|i'm|i've|i'd|we|we've|it's)\b/i;
 const ESSAY_MIDDLE = /\b(because|while america|after trying|so now|is the best|in the entire|i think)\b/i;
 
-/** Tweet / blog-essay titles are not product names. */
+/** Tweet / blog-essay titles are not product names. Short "We launched X" changelog lines stay for Claude to rename. */
 export function looksLikeEssayTitle(title: string): boolean {
   const text = stripMarkup(title);
   if (!text) return false;
@@ -1128,6 +1129,21 @@ export function looksLikeEssayTitle(title: string): boolean {
     return true;
   }
   return false;
+}
+
+/** Printed tape titles cannot stay in first person — Claude must rewrite "We launched X" to the product name. */
+export function looksLikePrintedFirstPerson(title: string): boolean {
+  return PRINTED_FIRST_PERSON.test(stripMarkup(title));
+}
+
+export function looksLikeSocialPost(item: { source?: string; kind?: string; link?: string | null }): boolean {
+  if (String(item.source || '') === 'x' || String(item.kind || '') === 'post') return true;
+  try {
+    const host = new URL(String(item.link || '')).hostname.replace(/^www\./, '').toLowerCase();
+    return host === 'x.com' || host === 'twitter.com' || host.endsWith('.twitter.com') || host === 'mobile.x.com';
+  } catch {
+    return false;
+  }
 }
 
 export function looksLikeScopedPackage(title: string): boolean {
@@ -1152,7 +1168,9 @@ export function titleSanityOk(title: string): boolean {
   if (/^#{1,6}\s/.test(title) || /<\/?[a-z]/.test(title)) return false;
   if (TITLE_TRAILING_GLUE.test(text)) return false;
   if (looksCutOff(text) || endsWithCutOffWord(text)) return false;
-  if (looksLikeEssayTitle(text) || looksLikeScopedPackage(text) || looksLikeMonthlyRoundup(text)) return false;
+  if (looksLikePrintedFirstPerson(text) || looksLikeEssayTitle(text) || looksLikeScopedPackage(text) || looksLikeMonthlyRoundup(text)) {
+    return false;
+  }
   return true;
 }
 
@@ -1859,6 +1877,7 @@ export function cheapHardFilter<T extends Polishable>(items: T[], year: number):
     if (!cheapYearOk(item, year)) continue;
     if (isPrereleaseShip(name) || isPrereleaseShip(item.name)) continue;
     if (looksLikeEssayTitle(name) || looksLikeScopedPackage(name) || looksLikeMonthlyRoundup(name)) continue;
+    if (looksLikeSocialPost(item)) continue;
     const link = String(item.link || '').trim();
     if (!link) continue;
     try {

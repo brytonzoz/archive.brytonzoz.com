@@ -259,12 +259,13 @@ export function applyCuration(
 }
 
 /** Short OSS version / monthly-release tapes — not tweet dumps or employer changelogs. */
-export function harvestLooksLikeOssTape(items: { name?: string; kind?: string }[]): boolean {
+export function harvestLooksLikeOssTape(items: { name?: string; kind?: string; source?: string }[]): boolean {
   const rows = Array.isArray(items) ? items : [];
   if (rows.length < 8) return false;
   const oss = rows.filter((item) => {
     const kind = String(item.kind || '');
     const name = String(item.name || '');
+    if (item.source === 'x' || kind === 'post') return false;
     if (/^(oss-release|oss-launch|oss-blog)$/.test(kind)) return true;
     if (/·\s*\d+\s+releases?\s+in\s+/i.test(name)) return true;
     return /^[A-Za-z][\w.+-]*(?:\s+[A-Za-z][\w.+-]*){0,3}\s+v?\d+\.\d+/i.test(name);
@@ -286,8 +287,12 @@ export function harvestShouldWin(
   const openaiLead = /^lead$/i.test(role || '') && /^openai$/i.test(brand);
   if (flagshipCeo || openaiLead) {
     if (harvestedCount < 12) return false;
-    // Vercel harvest is npm version spam and misses named flagships — keep Claude's reel.
-    if (/^vercel$/i.test(brand)) return false;
+    // A 193-line npm dump is worse than Claude's short reel. A compact 25–80
+    // company tape (now including AI Gateway) can restore a thinned CEO year.
+    if (/^vercel$/i.test(brand)) {
+      if (harvestedCount < 25 || harvestedCount > 80) return false;
+      return curatedCount < 25;
+    }
     // Codex / Cursor harvests still hold the year when Claude highlight-reels them.
     const floor = /^cursor$/i.test(brand) ? 40 : 35;
     return curatedCount < floor;

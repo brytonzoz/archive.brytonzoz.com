@@ -1166,13 +1166,17 @@ test('cheap filters strip markup, drop prereleases and other years, and dedupe U
       }),
       found({ name: '@dub/embed-react', date: '2026-07-01', link: 'https://www.npmjs.com/package/@dub/embed-react' }),
       found({ name: "What's new in Svelte: January 2026", date: '2026-01-15', link: 'https://svelte.dev/blog/whats-new-in-svelte-january-2026' }),
+      found({ name: 'Hotel in Leiden', date: '2026-08-01', link: 'https://x.com/levelsio/status/2', source: 'x', kind: 'post' }),
+      found({ name: 'We launched AI Gateway', date: '2026-04-01', link: 'https://vercel.com/changelog/ai-gateway' }),
+      found({ name: 'Lisbon hotel thread', date: '2026-08-02', link: 'https://x.com/levelsio/status/3', source: 'web' }),
     ],
     2026,
   );
   const names = cheap.map((item) => item.name);
   assert.ok(names.includes('Composer 2'), JSON.stringify(names));
+  assert.ok(names.includes('We launched AI Gateway'), JSON.stringify(names));
   assert.equal(names.filter((name) => /composer/i.test(name)).length, 1);
-  assert.equal(names.some((name) => /canary|old ship|coding almost solely|@dub\/|what.?s new in svelte/i.test(name)), false, JSON.stringify(names));
+  assert.equal(names.some((name) => /canary|old ship|coding almost solely|@dub\/|what.?s new in svelte|hotel in leiden|lisbon hotel/i.test(name)), false, JSON.stringify(names));
   assert.ok(names.includes('Minor Changes'), JSON.stringify(names));
   assert.equal(cheap.find((item) => item.name === 'Minor Changes')?.description, 'Minor Changes - 17ee736');
 });

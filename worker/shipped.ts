@@ -1098,8 +1098,6 @@ async function loadPile(url: URL, env: ShippedEnv, db: D1Database): Promise<Pile
   const mode = modeOf(yearOf(env));
   const receipts: PileReceipt[] = [];
   let cursor = before;
-  let lastId: number | null = null;
-  let exhausted = false;
   const total = await db.prepare('SELECT COUNT(*) AS n FROM shipped_receipts WHERE listed = 1 AND hidden = 0 AND mode = ?').bind(mode).first<{ n: number }>();
   for (let pass = 0; pass < 4 && receipts.length < limit; pass++) {
     const batch = Math.min(80, Math.max(limit * 2, 24));
@@ -1107,27 +1105,21 @@ async function loadPile(url: URL, env: ShippedEnv, db: D1Database): Promise<Pile
       .prepare('SELECT id, data, created_at FROM shipped_receipts WHERE listed = 1 AND hidden = 0 AND mode = ? AND id < ? ORDER BY id DESC LIMIT ?')
       .bind(mode, cursor, batch)
       .all<PileRow>();
-    if (!rows.results.length) {
-      exhausted = true;
-      break;
-    }
+    if (!rows.results.length) break;
     for (const row of rows.results) {
-      lastId = row.id;
       const entry = pileEntry(row);
       if (entry) receipts.push(entry);
       if (receipts.length >= limit) break;
     }
     cursor = rows.results[rows.results.length - 1].id;
-    if (rows.results.length < batch) {
-      exhausted = true;
-      break;
-    }
+    if (rows.results.length < batch) break;
   }
+  const shown = receipts.slice(0, limit);
   return {
-    receipts: receipts.slice(0, limit),
-    total: total?.n ?? receipts.length,
+    receipts: shown,
+    total: total?.n ?? shown.length,
     frozen: window.phase === 'closed',
-    next: exhausted || receipts.length < limit ? null : lastId,
+    next: shown.length === limit ? shown[shown.length - 1].id : null,
   };
 }
 

@@ -203,7 +203,7 @@ export interface SourceProvider {
 
 const UA = 'brytonzoz.com-shipped (+https://shipped.brytonzoz.com/)';
 export const SOURCE_TIMEOUT_MS = 6000;
-const OSS_TIMEOUT_MS = 16_000;
+const OSS_TIMEOUT_MS = 22_000;
 const TIMEOUT = SOURCE_TIMEOUT_MS;
 
 export async function raceTimeout<T>(work: Promise<T>, ms: number, fallback: T): Promise<T> {
@@ -1347,9 +1347,9 @@ export async function githubUser(login: string, env: SourceEnv, tinyfish: Tinyfi
 
 /** GitHub accounts going by this name: the API's user search while it has room, else GitHub search via TinyFish. */
 export async function searchGithubUsers(name: string, env: SourceEnv, tinyfish: TinyfishAccess = null): Promise<{ login: string }[]> {
-  return cached(`gh:people:${loose(name)}`, 1440 * MIN, async () => {
+  return cached(`gh:people:v2:${loose(name)}`, 1440 * MIN, async () => {
     if (apiOpen(env)) {
-      const query = /\s/.test(name.trim()) ? `fullname:${name.trim()}` : `${name} in:name`;
+      const query = /\s/.test(name.trim()) ? `fullname:${name.trim()}` : name.trim();
       const data = await githubApi<{ items?: { login?: unknown }[] }>(`/search/users?q=${encodeURIComponent(query)}&per_page=4`, env).catch(() => null);
       if (data) return (data.items ?? []).filter((u) => typeof u.login === 'string' && isGithubLogin(u.login)).map((u) => ({ login: u.login as string }));
     }
@@ -1801,7 +1801,7 @@ export async function gather(
     gatherFresh(subject, resolved.profile, env, year, meter, tinyfish, resolved.notes, mode, opts?.onPartial, opts?.affiliation);
   if (opts?.rebuild && !opts.onPartial) return load();
   if (opts?.rebuild) return load();
-  const key = mode === 'full' ? `gather:full:v30:${year}:${resolved.cacheKey}` : `gather:v39:${year}:${resolved.cacheKey}`;
+  const key = mode === 'full' ? `gather:full:v31:${year}:${resolved.cacheKey}` : `gather:v40:${year}:${resolved.cacheKey}`;
   return cached(
     key,
     1440 * MIN,

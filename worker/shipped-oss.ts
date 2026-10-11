@@ -538,24 +538,39 @@ export async function harvestOss(opts: {
       .filter((row): row is OssRepo => Boolean(row))
       .filter((row) => inYear(row.pushed_at, year) || inYear(row.created_at, year) || (row.stargazers_count ?? 0) >= 200)
       .sort((a, b) => (b.stargazers_count ?? 0) - (a.stargazers_count ?? 0));
-    if (founder) {
-      orgRepos.push(...repos.slice(0, 20));
-      ran.push(`oss-founder:${org}`);
+    const mentioned = repos.filter(
+      (repo) =>
+        bioMentionsRepo(opts.bio, repo) ||
+        bioMentionsRepo(opts.affiliation?.product || opts.affiliation?.company || '', repo),
+    );
+    if (founder || mentioned.length) {
+      orgRepos.push(...(founder ? repos.slice(0, 20) : mentioned));
+      ran.push(founder ? `oss-founder:${org}` : `oss-bio:${org}/${mentioned.map((row) => row.name).slice(0, 4).join(',')}`);
       continue;
     }
-    const checked = repos.slice(0, 8);
+    const checked = repos.slice(0, 3);
     for (const repo of checked) {
-      if (bioMentionsRepo(opts.bio, repo) || bioMentionsRepo(opts.affiliation?.product || opts.affiliation?.company || '', repo)) {
-        orgRepos.push(repo);
-        ran.push(`oss-bio:${org}/${repo.name}`);
-        continue;
-      }
-      const stats = await memo(`oss:stats:${org}/${repo.name}:${year}`, 360 * 60, () =>
-        opts.get<ContributorStat[]>(`/repos/${encodeURIComponent(org)}/${encodeURIComponent(repo.name)}/stats/contributors`).catch(() => []),
-      );
+      const stats = await Promise.race([
+        memo(`oss:stats:${org}/${repo.name}:${year}`, 360 * 60, () =>
+          opts.get<ContributorStat[]>(`/repos/${encodeURIComponent(org)}/${encodeURIComponent(repo.name)}/stats/contributors`).catch(() => []),
+        ),
+        new Promise<ContributorStat[]>((resolve) => setTimeout(resolve, 2500, [])),
+      ]);
       if (isTopContributorInYear(Array.isArray(stats) ? stats : [], login, year, 3)) {
         orgRepos.push(repo);
         ran.push(`oss-top3:${org}/${repo.name}`);
+        continue;
+      }
+      const since = await memo(`oss:authored:${org}/${repo.name}:${login}:${year}`, 360 * 60, () =>
+        opts
+          .get<{ sha?: string }[]>(
+            `/repos/${encodeURIComponent(org)}/${encodeURIComponent(repo.name)}/commits?author=${encodeURIComponent(login)}&since=${year}-01-01T00:00:00Z&per_page=1`,
+          )
+          .catch(() => []),
+      );
+      if (Array.isArray(since) && since.length) {
+        orgRepos.push(repo);
+        ran.push(`oss-authored:${org}/${repo.name}`);
       }
     }
   }

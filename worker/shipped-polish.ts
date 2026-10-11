@@ -38,7 +38,7 @@ const PLATFORM_POLICY =
   /\b(deployment retention|default to \d+[-\s]?day|retain(?:s|ed|ing)? (fewer )?deployments|skip sending|request bodies|routing middleware|billing begins|spend management|per-user budgets|hobby projects now retain|edge requests are now called|no longer caches|timestamp attributes are now supported)\b/i;
 const CHOPPED_GATEWAY = /^microsoft decision[- ]?1$/i;
 const TRAILING_PREP =
-  /\b(of|in|to|for|and|or|the|a|an|with|on|as|by|from|into|longer|kind|new|our|your|through|their|its|vs|lower|higher|more|less|day|days|every|managed|security|controlled|trusted|general|advanced|remote|task|chat|now|key|third|are|image|usage|delay|preview|zero|has|accepts|service)$/i;
+  /(?:^|[\s/])(of|in|to|for|and|or|the|a|an|with|on|as|by|from|into|longer|kind|new|our|your|through|their|its|vs|lower|higher|more|less|day|days|every|managed|security|controlled|trusted|general|advanced|remote|task|chat|now|key|third|are|image|usage|delay|preview|zero|has|accepts|service)$/i;
 export const CUT_OFF_ENDINGS =
   /^(now|and|with|for|of|the|on|key|third|are|image|usage|delay|preview|zero|has|accepts|service)$/i;
 const TITLE_START_BAD =
@@ -224,7 +224,7 @@ export function endsWithCutOffWord(text: string): boolean {
     words.length >= 3 &&
     last.length >= 8 &&
     !/\d/.test(last) &&
-    !/(tion|sion|ment|ness|ship|ware|work|ings|able|ible|ical|ular|ers?|ors?|ies|ous|ive|est|ing|ted|als?|ects|ity|ance|ence|ator|ency|graphy)$/i.test(
+    !/(tion|sion|ment|ness|ship|ware|work|ings|able|ible|ical|ular|ers?|ors?|ies|ous|ive|est|ing|ted|als?|ects|ity|ance|ence|ator|ency|graphy|shots)$/i.test(
       last,
     )
   ) {
@@ -461,7 +461,7 @@ export function isJunkTitle(
   const text = tidy(title);
   if (!text) return true;
   if (text.length < 3 && !/^v\d$/i.test(text)) return true;
-  if (BYLINE.test(text) || NAME_LIST.test(text) || ROUNDUP.test(text) || READ_THE.test(text) || INSTRUCTIONAL.test(text)) return true;
+  if (BYLINE.test(text) || ((text.match(/,/g) || []).length < 2 && NAME_LIST.test(text)) || ROUNDUP.test(text) || READ_THE.test(text) || INSTRUCTIONAL.test(text)) return true;
   if (RESEARCH_GERUND.test(text) || CUSTOMER_STORY.test(text) || CHOPPED_GATEWAY.test(text) || isAcquisitionNews(text)) return true;
   if (CTA_NAV.test(text) || CTA_TRAIL.test(text)) return true;
   if (/^(download on the|get it on|get the app|affiliates|analytics|available on|filed under|quitting)\b/i.test(text)) return true;

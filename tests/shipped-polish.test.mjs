@@ -935,6 +935,9 @@ test('prereleases, starters, and Gateway model listings are not ships', () => {
   assert.equal(polish.looksCutOff('SPEED INSIGHTS NOW HAS'), true);
   assert.equal(polish.looksCutOff('VERCEL CONNECT NOW ACCEPTS SERVICE'), true);
   assert.equal(polish.looksCutOff('TEAMS &'), true);
+  assert.equal(polish.looksCutOff('BROWSER EXTENSIONS, SITE TOOLS, AND CLOUD SIGN-IN'), false);
+  assert.equal(polish.isJunkTitle('BROWSER EXTENSIONS, SITE TOOLS, AND CLOUD SIGN-IN'), false);
+  assert.match(polish.cleanShipTitle('BROWSER EXTENSIONS, SITE TOOLS, AND CLOUD SIGN-IN'), /sign-in/i);
   assert.equal(polish.looksMidWord('SO VISIBLE-TAB ROUTING AND ANNOTATIONS PERSIST'), true);
   assert.equal(polish.isJunkTitle('SO VISIBLE-TAB ROUTING AND ANNOTATIONS PERSIST'), true);
   assert.equal(polish.cleanShipTitle('SO VISIBLE-TAB ROUTING AND ANNOTATIONS PERSIST'), '');

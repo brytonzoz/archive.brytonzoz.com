@@ -196,6 +196,34 @@ test('harvestOss reads owned + founder org releases and blog RSS', async () => {
   assert.equal(calls.some((path) => path.includes('/stats/contributors')), false);
 });
 
+test('bio-mentioned org repos skip contributor stats', async () => {
+  const calls = [];
+  const get = async (path) => {
+    calls.push(path);
+    if (path.startsWith('/users/yyx990803/repos')) return [];
+    if (path.startsWith('/orgs/vitejs/repos')) {
+      return [
+        { name: 'vite', homepage: 'https://vite.dev', stargazers_count: 72000, fork: false, pushed_at: '2026-01-16T00:00:00Z' },
+        { name: 'docs', homepage: 'https://vite.dev', stargazers_count: 800, fork: false, pushed_at: '2026-02-01T00:00:00Z' },
+      ];
+    }
+    if (path.includes('/vitejs/vite/releases')) {
+      return [{ tag_name: 'v7.0.0', name: 'Vite 7', published_at: '2026-01-16T12:00:00Z', body: 'Vite 7', html_url: 'https://github.com/vitejs/vite/releases/tag/v7.0.0' }];
+    }
+    return [];
+  };
+  const { found, ran } = await oss.harvestOss({
+    login: 'yyx990803',
+    year: 2026,
+    get,
+    bio: 'Creator of Vite.',
+    orgs: ['vitejs'],
+  });
+  assert.ok(ran.some((tag) => /oss-(bio|founder):vitejs/.test(tag)), JSON.stringify(ran));
+  assert.ok(found.some((item) => /vite 7/i.test(item.name)));
+  assert.equal(calls.some((path) => path.includes('/stats/contributors')), false);
+});
+
 test('live prints keep the writer note; empty CI notes use the sentence fallback', () => {
   const items = [
     {

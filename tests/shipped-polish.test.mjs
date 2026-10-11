@@ -1467,6 +1467,121 @@ test('CEO tapes drop tiny npm utilities, strip npm blurbs, and lead with flagshi
   assert.match(draft.items[0].name, /AI GATEWAY|VERCEL AGENT|^V0$/i);
 });
 
+test('home PRINT demoReceipt drops CEO npm utilities even when affiliation.role is still unknown', () => {
+  const foundItems = [
+    found({
+      name: 'serve',
+      description: 'Static file serving and directory listing',
+      date: '2026-03-03',
+      source: 'npm',
+      link: 'https://www.npmjs.com/package/serve',
+      significance: 4,
+    }),
+    found({
+      name: 'botid',
+      description: 'A package with a client-side React component and a server-side API library.',
+      date: '2026-03-03',
+      source: 'npm',
+      link: 'https://www.npmjs.com/package/botid',
+      significance: 4,
+    }),
+    found({
+      name: 'canvas',
+      description: 'Canvas graphics API backed by Cairo',
+      date: '2026-03-31',
+      source: 'npm',
+      link: 'https://www.npmjs.com/package/canvas',
+      significance: 4,
+    }),
+    found({
+      name: 'superagent',
+      description: 'elegant & feature rich browser / node HTTP with a fluent API',
+      date: '2026-09-23',
+      source: 'npm',
+      link: 'https://www.npmjs.com/package/superagent',
+      significance: 4,
+    }),
+    found({
+      name: 'Vercel Plugin',
+      date: '2026-03-26',
+      source: 'changelog',
+      link: 'https://vercel.com/changelog/vercel-plugin-openai-codex-and-codex-cli-support',
+      significance: 2,
+    }),
+    found({
+      name: 'v0 Platform API',
+      date: '2026-09-18',
+      source: 'changelog',
+      link: 'https://vercel.com/changelog/v0-now-reads-npm-credentials-from-shared-environment-variables',
+      significance: 2,
+    }),
+    found({
+      name: 'Vercel Agent',
+      date: '2026-09-30',
+      source: 'changelog',
+      link: 'https://vercel.com/changelog/vercel-agent-now-installs-private-packages-from-npm-and-custom-registries',
+      significance: 2,
+    }),
+    found({
+      name: 'AI Gateway',
+      date: '2026-08-12',
+      source: 'changelog',
+      link: 'https://vercel.com/changelog/ai-gateway',
+      significance: 2,
+    }),
+  ];
+  assert.equal(polish.isCeoNpmUtility({ name: 'serve', source: 'npm', link: 'https://www.npmjs.com/package/serve' }, null), false);
+  assert.equal(polish.isHeadlinerItem(foundItems[0]), false);
+  const inferred = polish.effectivePrintAffiliation(foundItems, { name: 'Guillermo Rauch', role: 'unknown' });
+  assert.equal(inferred?.role, 'ceo');
+  assert.equal(inferred?.company, 'Vercel');
+  const gathered = {
+    found: foundItems,
+    rawFound: foundItems,
+    web: [],
+    pages: [],
+    site: null,
+    profile: {
+      name: 'Guillermo Rauch',
+      bio: '',
+      site: 'https://rauchg.com',
+      x: 'rauchg',
+      github: 'rauchg',
+      affiliation: { name: 'Guillermo Rauch', company: null, role: 'unknown', product: null, companyX: null, companyGithub: null, companySite: null, typedCompany: false },
+    },
+    ran: ['partial:npm', 'partial:company'],
+    failed: [],
+    stats: [],
+  };
+  const harvested = ai.harvestItems(gathered, 2026);
+  const names = harvested.map((item) => item.name);
+  assert.equal(names.some((name) => /^(serve|botid|canvas|superagent)$/i.test(name)), false, JSON.stringify(names));
+  const demo = ai.demoReceipt(gathered, 2026, 1);
+  const printed = demo.items.map((item) => item.name);
+  assert.equal(printed.some((name) => /^(SERVE|BOTID|CANVAS|SUPERAGENT)$/i.test(name)), false, JSON.stringify(printed));
+  assert.match(printed[0], /AI GATEWAY|VERCEL AGENT|V0/i);
+  const finished = ai.finish(
+    foundItems.map((item) => ({
+      name: item.name.toUpperCase(),
+      spoken: item.name,
+      description: item.description || '',
+      date: item.date,
+      status: 'LAUNCHED',
+      link: item.link,
+      icon: null,
+      source: item.source,
+      significance: item.significance,
+    })),
+    'Serve',
+    1,
+    undefined,
+    [],
+    { who: 'Guillermo Rauch', handle: 'rauchg', year: 2026 },
+  );
+  assert.equal(finished.items.some((item) => /^(SERVE|BOTID|CANVAS|SUPERAGENT)$/i.test(item.name)), false, JSON.stringify(finished.items.map((item) => item.name)));
+  assert.match(finished.items[0].name, /AI GATEWAY|VERCEL AGENT|V0/i);
+});
+
 test('patch and minor lines of one package roll into a single tape line', () => {
   const rolled = polish.rollupSamePackageVersions([
     found({ name: 'TRPC 10.45.4', date: '2026-01-12', source: 'npm', link: 'https://www.npmjs.com/package/@trpc/server' }),

@@ -1,6 +1,6 @@
 // Hard pre-filters + title cleanup for the SHIPPED tape. Runs BEFORE Decisions
 // so bylines, docs nav, roundups, and cut-off headings never get scored as ships.
-import type { Affiliation } from './shipped-affiliation';
+import { emptyAffiliation, type Affiliation } from './shipped-affiliation';
 import { isJunkProductName, looksLikeCodeIdentifier, looksLikePersonName } from './shipped-repos';
 import {
   cursorModelTitle,
@@ -1508,6 +1508,64 @@ export function isNpmPackageItem(item: { source?: string | null; link?: string |
 }
 
 const CEO_NPM_KEEP = /^(next(?:\.?js)?|vercel|swr|ai|ai-sdk|ncc|@ai-sdk\/|@vercel\/)/i;
+const FLAGSHIP_COMPANY = /^(vercel|openai|cursor|anysphere)$/i;
+
+function hostCompany(link?: string | null): string | null {
+  const host = hostOf(link ?? null);
+  if (!host) return null;
+  if (/(^|\.)vercel\.com$/i.test(host)) return 'Vercel';
+  if (/(^|\.)(openai|chatgpt)\.com$/i.test(host)) return 'OpenAI';
+  if (/(^|\.)cursor\.com$/i.test(host)) return 'Cursor';
+  return null;
+}
+
+/** First-party changelog/company cards that mark a Vercel/OpenAI/Cursor CEO tape. */
+export function companyFromPrintTape(
+  items: { source?: string | null; link?: string | null }[] | null | undefined,
+): string | null {
+  const counts: Record<string, number> = { Vercel: 0, OpenAI: 0, Cursor: 0 };
+  for (const item of items || []) {
+    const company = hostCompany(item.link);
+    if (!company) continue;
+    const link = item.link || '';
+    const sourced = item.source === 'changelog' || item.source === 'company' || /\/(changelog|blog)\//i.test(link);
+    if (!sourced) continue;
+    counts[company] = (counts[company] || 0) + 1;
+  }
+  const ranked = Object.entries(counts).sort((a, b) => b[1] - a[1]);
+  const best = ranked[0];
+  return best && best[1] >= 3 ? best[0] : null;
+}
+
+function flagshipCompanyName(raw?: string | null): string | null {
+  const slug = String(raw || '')
+    .replace(/^@/, '')
+    .toLowerCase()
+    .replace(/[^a-z0-9]/g, '');
+  if (!FLAGSHIP_COMPANY.test(slug)) return null;
+  if (slug === 'openai') return 'OpenAI';
+  if (slug === 'anysphere' || slug === 'cursor') return 'Cursor';
+  if (slug === 'vercel') return 'Vercel';
+  return null;
+}
+
+/**
+ * Fresh home prints often have Vercel changelog rows before identity sets
+ * role=ceo. Infer the CEO affiliation from the tape so polish/finish match reprint.
+ */
+export function effectivePrintAffiliation(
+  items: { source?: string | null; link?: string | null }[] | null | undefined,
+  affiliation?: Affiliation | null,
+): Affiliation | null {
+  const base = affiliation ? { ...emptyAffiliation(), ...affiliation } : emptyAffiliation();
+  const company = flagshipCompanyName(base.company) || companyFromPrintTape(items);
+  if (base.role === 'ceo' || base.role === 'founder') {
+    return company && !base.company ? { ...base, company } : affiliation ?? base;
+  }
+  if (base.role === 'lead' || base.role === 'employee') return affiliation ?? base;
+  if (!company) return affiliation ?? null;
+  return { ...base, company, role: 'ceo' };
+}
 
 /** One-word npm utilities (serve, canvas, botid) do not lead a CEO tape. */
 export function isCeoNpmUtility(
@@ -1537,6 +1595,7 @@ export function printedDescription(item: { description?: string; source?: string
 /** Significance-3 / named flagships print first (top ~5), then the rest by date. */
 export function isHeadlinerItem(item: Polishable): boolean {
   if (flagshipLaunchName(item)) return true;
+  if (isNpmPackageItem(item)) return false;
   return (item.significance ?? 0) >= 3;
 }
 
@@ -1845,7 +1904,8 @@ export function capUndated<T extends Polishable>(items: T[], onDrop?: (drop: Pol
 
 export function polishCandidates<T extends Polishable>(items: T[], opts: PolishOpts): T[] {
   const year = opts.year;
-  const who = opts.who || opts.affiliation?.name || '';
+  const affiliation = effectivePrintAffiliation(items, opts.affiliation);
+  const who = opts.who || affiliation?.name || '';
   const out: T[] = [];
   const drops: PolishDrop[] = [];
   const drop = (item: Polishable, reason: string) => {
@@ -1855,18 +1915,18 @@ export function polishCandidates<T extends Polishable>(items: T[], opts: PolishO
   };
   for (const item of items) {
     const flagship = flagshipLaunchName(item);
-    if (isEmployerSpill(item, opts.affiliation)) {
+    if (isEmployerSpill(item, affiliation)) {
       drop(item, 'employer-spill');
       continue;
     }
     if (
-      (opts.affiliation?.role === 'ceo' || opts.affiliation?.role === 'founder') &&
+      (affiliation?.role === 'ceo' || affiliation?.role === 'founder') &&
       isCeoApiMinutiae(item.name, item.link)
     ) {
       drop(item, 'ceo-api-minutiae');
       continue;
     }
-    if (isCeoNpmUtility(item, opts.affiliation)) {
+    if (isCeoNpmUtility(item, affiliation)) {
       drop(item, 'ceo-npm-utility');
       continue;
     }
@@ -1898,7 +1958,7 @@ export function polishCandidates<T extends Polishable>(items: T[], opts: PolishO
       who,
       handle: opts.handle,
       github: opts.owner?.github,
-      company: opts.affiliation?.company,
+      company: affiliation?.company,
       date: item.date,
     };
     let name = isJournalShip(item) && looksLikePersonalShip(item.name) ? cleanShipTitle(journalShipName(item.name) || item.name) : cleanShipTitle(item.name);
@@ -1957,15 +2017,15 @@ export function polishCandidates<T extends Polishable>(items: T[], opts: PolishO
         continue;
       }
     }
-    if (isOffCompanyChangelog({ ...item, name }, opts.affiliation?.company || junkOpts.company)) {
+    if (isOffCompanyChangelog({ ...item, name }, affiliation?.company || junkOpts.company)) {
       drop(item, 'off-company-changelog');
       continue;
     }
-    if (isForeignProductOnCompanyTape(name, opts.affiliation?.company || junkOpts.company)) {
+    if (isForeignProductOnCompanyTape(name, affiliation?.company || junkOpts.company)) {
       drop(item, 'foreign-vendor');
       continue;
     }
-    if (isStaleBioProduct({ name, date: item.date }, opts.affiliation, year)) {
+    if (isStaleBioProduct({ name, date: item.date }, affiliation, year)) {
       drop(item, 'stale-bio-product');
       continue;
     }
@@ -2038,7 +2098,7 @@ export function polishCandidates<T extends Polishable>(items: T[], opts: PolishO
       drop(item, 'undated-unowned');
       continue;
     }
-    const role = opts.affiliation?.role;
+    const role = affiliation?.role;
     const ceo = role === 'ceo' || role === 'founder';
     const npmRow = isNpmPackageItem({ ...item, name });
     let significance = item.significance;
@@ -2052,7 +2112,7 @@ export function polishCandidates<T extends Polishable>(items: T[], opts: PolishO
       name,
       description: printedDescription({ ...item, name }),
       date,
-      via: sourceVia({ ...item, name }, opts.affiliation),
+      via: sourceVia({ ...item, name }, affiliation),
       status: cleanStatus(item.status),
       significance,
       thisYear: Boolean(item.thisYear) || Boolean(date && (String(date).startsWith(String(year)) || isFlagshipYearKeep(item, year))),
@@ -2085,7 +2145,7 @@ export function polishCandidates<T extends Polishable>(items: T[], opts: PolishO
   if (drops.length) {
     console.log(JSON.stringify({ shipped: 'polish-drops', who, handle: opts.handle || null, kept: capped.length, drops: drops.slice(0, 80) }));
   }
-  const rolled = rollupCeoLeadCrumbs(capped, opts.affiliation);
+  const rolled = rollupCeoLeadCrumbs(capped, affiliation);
   if (rolled.length < capped.length) drop({ name: `${capped.length - rolled.length} ceo-lead crumbs` }, 'ceo-rollup');
   const sane = rolled.flatMap((item) => {
     if (/·\s*\d+\s+(updates?|releases?)/i.test(item.name) || VERSION_RANGE.test(item.name)) return [item];

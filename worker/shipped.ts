@@ -732,13 +732,14 @@ async function generate(
       ctx.waitUntil(
         (async () => {
           try {
-            let lastCount = draft.items.length;
+            let lastTape = draft.items.map((item) => item.name).join('|');
             const flushGrowing = async () => {
               const snap = latest;
               if (!snap || full) return;
               const next = demoReceipt(snap, year, seed);
-              if (next.items.length <= lastCount) return;
-              lastCount = next.items.length;
+              const tape = next.items.map((item) => item.name).join('|');
+              if (tape === lastTape) return;
+              lastTape = tape;
               await persist(snap, next, { growing: true, model: null, usage: { input: 0, output: 0, searches: 0, cost: 0 }, id: inserted.id });
             };
             const ticker = (async () => {

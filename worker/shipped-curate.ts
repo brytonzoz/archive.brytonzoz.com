@@ -1,7 +1,7 @@
 // One structured Claude call that curates the cheap-filtered harvest into a receipt.
 // Harvesters and cheap hard filters stay; title/junk/ownership heuristics are the fallback
 // only when this JSON cannot be parsed or validated.
-import type { Affiliation } from './shipped-affiliation';
+import { emptyAffiliation, type Affiliation } from './shipped-affiliation';
 import type { Found } from './shipped-sources';
 import { flagshipLaunchName } from './shipped-flagship';
 import {
@@ -12,7 +12,9 @@ import {
   cleanDescription,
   cleanShipTitle,
   cleanStatus,
+  effectivePrintAffiliation,
   isBlogEssayTitle,
+  isCeoNpmUtility,
   isJournalShip,
   looksLikeEssayTitle,
   looksLikeMonthlyRoundup,
@@ -651,8 +653,15 @@ export function unionOwnDatedShips<T extends { name?: string; link?: string | nu
   year: number,
   owner: OwnDatedOwner,
 ): T[] {
+  const affiliation = effectivePrintAffiliation(tape, {
+    ...emptyAffiliation(),
+    company: owner.company || null,
+    companyGithub: owner.companyGithub || null,
+    role: owner.role === 'ceo' || owner.role === 'founder' || owner.role === 'lead' || owner.role === 'employee' ? owner.role : 'unknown',
+  });
   const extra: T[] = [];
   for (const item of harvested || []) {
+    if (isCeoNpmUtility(item, affiliation)) continue;
     if (!isOwnDatedShip(item, year, owner)) continue;
     const raw = String(item.name || '').trim();
     const name = cleanedHarvestName(raw, item.link) || raw;

@@ -11,7 +11,7 @@ import { shipName } from './shipped-changelog';
 import { shareKeywords } from './shipped-decisions';
 import { isOssHarvestItem, ownerFromProfile, type OwnerContext } from './shipped-ownership';
 import { flagshipLaunchName, isFlagshipYearKeep, isJoinOrAcquire, isPriorYearJoin, logFlagshipGate } from './shipped-flagship';
-import { cheapHardFilter, cleanDescription, cleanShipTitle, cleanStatus, gateReceiptItems, isChangelogEntryHref, isJournalShip, isNpmPackageItem, isOpenAiCompanyWide, noteCountMismatch, orderReceiptItems, printedDescription, rewriteShipTitle, spokenShipName, titleSanityOk } from './shipped-polish';
+import { cheapHardFilter, cleanDescription, cleanShipTitle, cleanStatus, effectivePrintAffiliation, gateReceiptItems, isChangelogEntryHref, isCeoNpmUtility, isJournalShip, isNpmPackageItem, isOpenAiCompanyWide, noteCountMismatch, orderReceiptItems, printedDescription, rewriteShipTitle, spokenShipName, titleSanityOk } from './shipped-polish';
 import { emptyAffiliation, type Affiliation } from './shipped-affiliation';
 import { looksLikePersonName } from './shipped-repos';
 import { RECEIPT_BUDGET_MICROS, formatReceiptStats, journalShipName, looksLikePersonalShip, searchBudget, type SourcedStat } from './shipped-research';
@@ -995,13 +995,18 @@ function boostCeoFlagship(draft: DraftItem | null, affiliation?: Affiliation | n
   return draft;
 }
 
+function printAffiliation(gathered: Gathered) {
+  return effectivePrintAffiliation(gathered.found, gathered.profile.affiliation);
+}
+
 function printGateOpts(gathered: Gathered, year: number) {
+  const affiliation = printAffiliation(gathered);
   return {
     year,
-    who: gathered.profile.name || gathered.profile.affiliation?.name,
+    who: gathered.profile.name || affiliation?.name,
     handle: gathered.profile.x || gathered.profile.github,
-    affiliation: gathered.profile.affiliation,
-    owner: ownerFromProfile(gathered.profile, gathered.profile.affiliation),
+    affiliation,
+    owner: ownerFromProfile(gathered.profile, affiliation),
   };
 }
 
@@ -1044,7 +1049,7 @@ export function harvestItems(gathered: Gathered, year: number): DraftItem[] {
   const seen = new Set<string>();
   const items: DraftItem[] = [];
   const polished = gateReceiptItems(gathered.found, printGateOpts(gathered, year));
-  const affiliation = gathered.profile.affiliation;
+  const affiliation = printAffiliation(gathered);
   for (const item of polished) {
     const draft = boostCeoFlagship(toDraftItem(item, year), affiliation);
     if (!draft) continue;
@@ -1098,11 +1103,12 @@ function asPrintedItem(item: DraftItem): DraftItem {
 export function finish(items: DraftItem[], note: string, seed: number, modulesRaw?: unknown, statsRaw?: unknown, ctx: NoteContext = {}): Draft {
   const layout = sanitizeLayout(modulesRaw, seed);
   const year = ctx.year || new Date().getUTCFullYear();
+  const affiliation = effectivePrintAffiliation(items, affiliationFromCtx(ctx));
   const gated = gateReceiptItems(items, {
     year,
     who: ctx.who,
     handle: ctx.handle,
-    affiliation: affiliationFromCtx(ctx),
+    affiliation,
     owner: usableOwner(ctx.owner),
   }).map(asPrintedItem);
   if (!gated.length) {
@@ -1142,7 +1148,7 @@ function printNote(note: string, _stats: string[]): string {
 /** Without the AI: the harvested, verified lines as they are, and a canned note. */
 export function demoReceipt(gathered: Gathered, year: number, seed: number): Draft {
   const items = harvestItems(gathered, year);
-  const affiliation = gathered.profile.affiliation;
+  const affiliation = printAffiliation(gathered);
   const noteCtx: NoteContext = {
     role: affiliation?.role,
     company: affiliation?.company,
@@ -1659,7 +1665,7 @@ export async function assembleReceipt(
     return send(body);
   };
 
-  const affiliation = gathered.profile.affiliation;
+  const affiliation = printAffiliation(gathered);
   const cheap = packCandidates(gathered.found, year);
   if (cheap.length) {
     try {
@@ -1683,7 +1689,9 @@ export async function assembleReceipt(
           affiliation?.company,
         );
         const owner = ownerFromProfile(gathered.profile, affiliation);
-        const pool = [...(gathered.rawFound || []), ...harvested, ...(gathered.found as typeof harvested)];
+        const pool = [...(gathered.rawFound || []), ...harvested, ...(gathered.found as typeof harvested)].filter(
+          (item) => !isCeoNpmUtility(item, affiliation),
+        );
         const noteCtx: NoteContext = {
           role: affiliation?.role,
           company: affiliation?.company,
@@ -1714,7 +1722,7 @@ export async function assembleReceipt(
             affiliation?.role,
             affiliation?.company,
             year,
-          );
+          ).filter((item) => !isCeoNpmUtility(item, affiliation));
         if (
           !harvestLooksLikeCommentaryTape(harvested) &&
           harvestShouldWin(winSource.length, curated.items.length, affiliation?.role, affiliation?.company, cheap.length, {

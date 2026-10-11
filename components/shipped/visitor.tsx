@@ -130,7 +130,7 @@ function MailedPrint({ receipt }: { receipt: Printed }) {
   const payments = state?.payments;
 
   // Stripe is a same-tab navigation. Coming back (bfcache, tab restore, or a hung request)
-  // must never leave MAIL ME stuck as OPENING CHECKOUT….
+  // must never leave MAIL ME stuck as ONE MOMENT….
   useEffect(() => {
     const reset = () => {
       setBusy(false);
@@ -197,10 +197,10 @@ function MailedPrint({ receipt }: { receipt: Printed }) {
         disabled={busy}
         aria-busy={busy}
       >
-        {busy ? 'OPENING CHECKOUT…' : `MAIL ME THE REAL PRINT · ${money(payments.printCents)}`}
+        {busy ? 'ONE MOMENT…' : `MAIL ME THE REAL PRINT · ${money(payments.printCents)}`}
       </button>
       <p className="mt-1 text-[11px] text-[#f3ead8]/55">
-        80mm thermal paper, mailed in the US. Shipping included, tax at checkout.{' '}
+        80mm thermal, mailed in the US.{' '}
         <a href="/terms/#prints" className="underline">
           Terms
         </a>
@@ -276,10 +276,10 @@ function UpgradePay({ receipt, kind }: { receipt: Printed; kind: 'full' | 'bundl
         disabled={busy}
         aria-busy={busy}
       >
-        {busy ? 'OPENING CHECKOUT…' : kind === 'bundle' ? `FULL + MAILED PRINT · ${money(cents)}` : `FULL RECEIPT · ${money(cents)}`}
+        {busy ? 'ONE MOMENT…' : kind === 'bundle' ? `FULL + MAILED PRINT · ${money(cents)}` : `FULL RECEIPT · ${money(cents)}`}
       </button>
       {kind === 'full' ? (
-        <p className="mt-1 text-[11px] text-[#f3ead8]/55">Deep pass: more X posts, company harvest, extra web. Tax at checkout.</p>
+        <p className="mt-1 text-[11px] text-[#f3ead8]/55">The deep pass: more posts, companies, and the rest of the web.</p>
       ) : null}
       <HumanCheck ref={human} check={state?.generator.human} onToken={setToken} theme="dark" appearance={asked ? 'always' : 'execute'} />
       {error ? (
@@ -569,7 +569,7 @@ export function SharePill({
             </>
           ) : (
             <button type="button" className="shipped-pill-hit" onPointerDown={press} onClick={() => setOpen(true)}>
-              <span aria-hidden="true">↗</span> {receipt.full ? 'Share · FULL' : 'Share · full $3'}
+              <span aria-hidden="true">↗</span> Share this slip
             </button>
           )}
         </div>

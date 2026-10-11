@@ -42,6 +42,52 @@ export function paperClip(top: EdgePoint[] | null, bottom: EdgePoint[] | null): 
   return `polygon(${upper.concat(lower).join(', ')})`;
 }
 
+/** The torn edge's depth at x (0–100). */
+export function edgeAt(edge: EdgePoint[], x: number): number {
+  if (x <= edge[0].x) return edge[0].y;
+  const last = edge[edge.length - 1];
+  if (x >= last.x) return last.y;
+  let lo = 0;
+  let hi = edge.length - 1;
+  while (hi - lo > 1) {
+    const mid = (lo + hi) >> 1;
+    if (edge[mid].x <= x) lo = mid;
+    else hi = mid;
+  }
+  const a = edge[lo];
+  const b = edge[hi];
+  const f = (x - a.x) / (b.x - a.x || 1);
+  return a.y + (b.y - a.y) * f;
+}
+
+/**
+ * Serrated tear that follows the finger: progress 0 is still attached (clean top), 1 is fully torn.
+ * The side the hand pulled gives way first; the far side stays a straight cut until the rip arrives.
+ */
+export function tearRevealClip(edge: EdgePoint[], progress: number, fromLeft = true, bottom: EdgePoint[] | null = null): string {
+  const p = Math.max(0, Math.min(1, progress));
+  if (p <= 0.001) return paperClip(null, bottom);
+  if (p >= 0.999) return paperClip(edge, bottom);
+  const front = +(fromLeft ? p * 100 : 100 - p * 100).toFixed(2);
+  const bite = +edgeAt(edge, front).toFixed(2);
+  const top: EdgePoint[] = [];
+  if (fromLeft) {
+    for (const pt of edge) {
+      if (pt.x <= front) top.push(pt);
+    }
+    if (!top.length || top[top.length - 1].x < front) top.push({ x: front, y: bite });
+    top.push({ x: 100, y: 0 });
+  } else {
+    top.push({ x: 0, y: 0 });
+    top.push({ x: front, y: 0 });
+    top.push({ x: front, y: bite });
+    for (const pt of edge) {
+      if (pt.x >= front) top.push(pt);
+    }
+  }
+  return paperClip(top, bottom);
+}
+
 /** The stub left in the printer: its lower edge is the exact other half of the receipt's top edge. */
 export function stubClip(edge: EdgePoint[], height: number, depth = 5): string {
   const lower = [...edge].reverse().map((p) => `${p.x}% ${(height - depth + p.y).toFixed(2)}px`);

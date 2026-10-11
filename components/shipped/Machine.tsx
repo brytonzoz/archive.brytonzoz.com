@@ -10,7 +10,7 @@
 import React, { useCallback, useEffect, useRef, useState } from 'react';
 import { press, pressPrint, pressTear, pressTick } from './feel';
 import { Ticket } from './paper';
-import { rubber, spring, springStep, stubClip, tornEdge, type SpringConfig } from './physics';
+import { rubber, spring, springStep, stubClip, tearRevealClip, tornEdge, type SpringConfig } from './physics';
 import { click, motorOff, motorOn, rip, tick, useSound } from './sound';
 
 type JobBase = {
@@ -128,11 +128,15 @@ export function Machine({ job, display, tone, onPrinted, onTorn, tearSignal = 0,
   const [hint, setHint] = useState(false);
   const [sound, toggleSound] = useSound();
   const [live, setLive] = useState(false);
+  const [lifting, setLifting] = useState(false);
   useEffect(() => setLive(true), []);
   const body = useRef<HTMLDivElement>(null);
+  const head = useRef<HTMLSpanElement>(null);
   const feed = useRef<HTMLDivElement>(null);
   const pull = useRef<HTMLDivElement>(null);
   const tilt = useRef<HTMLDivElement>(null);
+  const ripFromLeft = useRef(true);
+  const lastRip = useRef(0);
   const pos = useRef<Vec>({ x: 0, y: 0, r: 0 });
   const stop = useRef<(() => void) | null>(null);
   const callbacks = useRef({ onPrinted, onTorn });
@@ -153,12 +157,26 @@ export function Machine({ job, display, tone, onPrinted, onTorn, tearSignal = 0,
     pos.current = { x: 0, y: 0, r: 0 };
     if (shown.kind === 'print') setStubSeed(shown.key);
     setHint(false);
+    setLifting(false);
     setShown(job);
     setPhase(phaseFor(job));
   }, [job, shown]);
 
   /** Rotation pivots at the tear bar, so a long receipt swings less or its foot would fly off the counter. */
   const swing = useCallback(() => Math.min(1, 520 / Math.max(1, pull.current?.offsetHeight ?? 520)), []);
+
+  const ticketFace = () => pull.current?.querySelector('.shipped-ticket') as HTMLElement | null;
+
+  const applyRip = useCallback(
+    (progress: number, fromLeft: boolean) => {
+      const ticket = ticketFace();
+      if (!ticket) return;
+      const clip = tearRevealClip(tornEdge(`${shown.key}:top`), progress, fromLeft);
+      ticket.style.clipPath = clip;
+      ticket.style.setProperty('-webkit-clip-path', clip);
+    },
+    [shown.key],
+  );
 
   const settle = useCallback((to: Vec, velocity: Vec, config: SpringConfig, done: () => void) => {
     const el = pull.current;
@@ -177,29 +195,35 @@ export function Machine({ job, display, tone, onPrinted, onTorn, tearSignal = 0,
       rip();
       pressTear();
       setHint(false);
+      const fromLeft = velocity.x === 0 ? ripFromLeft.current : velocity.x < 0;
+      ripFromLeft.current = fromLeft;
+      applyRip(1, fromLeft);
       setPhase('tearing');
       const lift = isVisitorPrint(shown);
-      const direction = velocity.x === 0 ? (Math.random() < 0.5 ? -1 : 1) : Math.sign(velocity.x);
+      if (lift) setLifting(true);
+      const direction = fromLeft ? -1 : 1;
       const rest = lift
         ? { x: 0, y: 0, r: 0 }
         : { x: direction * (2 + Math.random() * 6), y: REST_Y, r: direction * (0.5 + Math.random() * 0.9) * swing() };
       const throwV = lift
-        ? { x: velocity.x * 0.4, y: Math.min(velocity.y, -380), r: direction * 8 }
+        ? { x: velocity.x * 0.35, y: Math.min(velocity.y, -420), r: direction * 10 }
         : velocity;
       const key = shown.key;
       if (reducedMotion()) {
         pos.current = rest;
         if (pull.current) pull.current.style.transform = transformOf(rest);
         setPhase('torn');
+        setLifting(false);
         callbacks.current.onTorn?.(key);
         return;
       }
       settle(rest, throwV, lift ? FLY : SETTLE, () => {
         setPhase('torn');
+        setLifting(false);
         callbacks.current.onTorn?.(key);
       });
     },
-    [settle, swing, shown],
+    [applyRip, settle, swing, shown],
   );
 
   // Print: shove the paper out from under the head, then let it hang.
@@ -255,6 +279,16 @@ export function Machine({ job, display, tone, onPrinted, onTorn, tearSignal = 0,
       { duration: 90, iterations: Infinity },
     );
     motorOn();
+    const strokeHead = (right: boolean, ms: number) => {
+      const bar = head.current;
+      if (!bar || reducedMotion()) return;
+      bar.animate(
+        right
+          ? [{ transform: 'translate3d(0, 0, 0)' }, { transform: 'translate3d(257%, 0, 0)' }]
+          : [{ transform: 'translate3d(257%, 0, 0)' }, { transform: 'translate3d(0, 0, 0)' }],
+        { duration: Math.max(48, ms - 8), easing: 'linear', fill: 'forwards' },
+      );
+    };
     const feedLine = () => {
       if (cancelled) return;
       printed = Math.min(height, printed + line);
@@ -263,8 +297,15 @@ export function Machine({ job, display, tone, onPrinted, onTorn, tearSignal = 0,
       clip(height - printed);
       el.style.transform = `translate3d(${jitter.toFixed(2)}px, 0, 0)`;
       el.style.setProperty('--burn', `${printed}px`);
+      strokeHead(n % 2 === 1, stepMs);
       tick();
       if (n % 2 === 0) pressTick();
+      const inked = printed;
+      timers.push(
+        window.setTimeout(() => {
+          if (!cancelled) el.style.setProperty('--ink', `${inked}px`);
+        }, Math.round(stepMs * 0.55)),
+      );
       if (printed < height) {
         const hold = n % 7 === 0 ? stepMs * 2.1 : stepMs;
         timers.push(window.setTimeout(feedLine, hold));
@@ -274,6 +315,7 @@ export function Machine({ job, display, tone, onPrinted, onTorn, tearSignal = 0,
       motorOff();
       clip(0);
       el.style.transform = '';
+      el.style.setProperty('--ink', `${height}px`);
       setPhase('hanging');
       tell(true, false);
     };
@@ -321,16 +363,29 @@ export function Machine({ job, display, tone, onPrinted, onTorn, tearSignal = 0,
       left = Math.max(0, left - 18);
       n += 1;
       clip(left);
-      el.style.setProperty('--burn', `${height - left}px`);
+      const printed = height - left;
+      el.style.setProperty('--burn', `${printed}px`);
       el.style.transform = `translate3d(${n % 2 ? 0.4 : -0.35}px, 0, 0)`;
+      head.current?.animate(
+        n % 2
+          ? [{ transform: 'translate3d(0, 0, 0)' }, { transform: 'translate3d(257%, 0, 0)' }]
+          : [{ transform: 'translate3d(257%, 0, 0)' }, { transform: 'translate3d(0, 0, 0)' }],
+        { duration: 62, easing: 'linear', fill: 'forwards' },
+      );
       tick();
       if (n % 2 === 0) pressTick();
+      timers.push(
+        window.setTimeout(() => {
+          el.style.setProperty('--ink', `${printed}px`);
+        }, 38),
+      );
       if (left > 0) {
         timers.push(window.setTimeout(step, 70));
         return;
       }
       clip(0);
       el.style.transform = '';
+      el.style.setProperty('--ink', `${height}px`);
       motorOff();
     };
     timers.push(window.setTimeout(step, 40));
@@ -369,6 +424,7 @@ export function Machine({ job, display, tone, onPrinted, onTorn, tearSignal = 0,
     const now = performance.now();
     drag.current = { id: event.pointerId, x: event.clientX, y: event.clientY, t: now, lx: event.clientX, ly: event.clientY, lt: now, vx: 0, vy: 0, grip, moved: false };
     swallowClick.current = false;
+    lastRip.current = 0;
   }
 
   function onPointerMove(event: React.PointerEvent<HTMLDivElement>) {
@@ -400,7 +456,16 @@ export function Machine({ job, display, tone, onPrinted, onTorn, tearSignal = 0,
     const v = { x: side * 0.16, y: dy > 0 ? rubber(dy, 150) : rubber(dy, 16), r: side * 0.034 * swing() };
     pos.current = v;
     if (pull.current) pull.current.style.transform = transformOf(v);
-    const pulled = dy > 64 || Math.abs(dx) > 84 || (d.vy > 0.7 && dy > 14) || (Math.abs(d.vx) > 0.9 && Math.abs(dx) > 18);
+    const rip = Math.max(0, Math.min(1, Math.max(dy / 72, Math.abs(dx) / 90)));
+    const fromLeft = dx <= 0;
+    ripFromLeft.current = fromLeft;
+    applyRip(rip, fromLeft);
+    if (rip - lastRip.current >= 0.14) {
+      lastRip.current = rip;
+      pressTick();
+      tick();
+    }
+    const pulled = dy > 64 || Math.abs(dx) > 84 || rip >= 0.92 || (d.vy > 0.7 && dy > 14) || (Math.abs(d.vx) > 0.9 && Math.abs(dx) > 18);
     if (pulled) {
       drag.current = null;
       tear({ x: d.vx * 1000 * 0.35, y: Math.max(200, d.vy * 1000 * 0.5), r: d.vx * 60 });
@@ -416,6 +481,7 @@ export function Machine({ job, display, tone, onPrinted, onTorn, tearSignal = 0,
       if (!(event.target as HTMLElement).closest('a,button')) tear({ x: 0, y: 600, r: 0 });
       return;
     }
+    applyRip(0, ripFromLeft.current);
     settle({ x: 0, y: 0, r: 0 }, { x: d.vx * 1000 * 0.3, y: d.vy * 1000 * 0.3, r: 0 }, SNAP_BACK, () => undefined);
   }
 
@@ -634,7 +700,7 @@ export function Machine({ job, display, tone, onPrinted, onTorn, tearSignal = 0,
   );
 
   return (
-    <div className={`shipped-printer is-${phase} tone-${tone}${focus ? ' is-focus' : ''}${hero ? ' is-hero' : ''}`} data-sound={sound ? 'on' : 'off'}>
+    <div className={`shipped-printer is-${phase} tone-${tone}${focus ? ' is-focus' : ''}${hero ? ' is-hero' : ''}${lifting ? ' is-lifting' : ''}`} data-sound={sound ? 'on' : 'off'}>
       <div className="shipped-printer-body" ref={body}>
         {desk ? (
           <form
@@ -652,7 +718,7 @@ export function Machine({ job, display, tone, onPrinted, onTorn, tearSignal = 0,
           chrome
         )}
         <div className="shipped-mouth" aria-hidden="true">
-          <span className="shipped-head" />
+          <span className="shipped-head" ref={head} />
           <span className="shipped-aperture" />
           <span className="shipped-bar" />
         </div>
@@ -704,7 +770,13 @@ export function Machine({ job, display, tone, onPrinted, onTorn, tearSignal = 0,
                 tabIndex={(phase === 'torn' || focus) && more ? 0 : undefined}
                 aria-label={(phase === 'torn' || focus) && more ? `${shown.label}, scrollable` : undefined}
               >
-                <Ticket seed={shown.key} label={shown.label} slip={shown.slip} className={shown.end ? 'is-end' : ''}>
+                <Ticket
+                  seed={shown.key}
+                  label={shown.label}
+                  slip={shown.slip}
+                  torn={{ top: phase === 'torn' || phase === 'tearing', bottom: true }}
+                  className={shown.end ? 'is-end' : ''}
+                >
                   {shown.content}
                 </Ticket>
               </div>

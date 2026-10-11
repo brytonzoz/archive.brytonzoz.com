@@ -183,10 +183,11 @@ export function WallFocus({ receipt, crumpled, reduced, onClose, onCrumple, onUn
     const tick = (now: number) => {
       if (crumple.current !== engine) return;
       const t = Math.min(1, (now - start) / dur);
-      const eased = t * t * (3 - 2 * t);
+      const eased = 1 - Math.pow(1 - t, 3);
+      const squash = Math.sin(t * Math.PI) * 0.16;
       engine.update(from + (to - from) * eased);
       ctx.clearRect(0, 0, node.width, node.height);
-      engine.draw(ctx, { x: 0, y: 0, angle: 0, scale: 1 }, dpr);
+      engine.draw(ctx, { x: 0, y: 0, angle: (to > 0.5 ? 0.7 : -0.55) * eased, scale: 1 - squash }, dpr);
       if (t < 1) {
         anim.current = window.requestAnimationFrame(tick);
         return;

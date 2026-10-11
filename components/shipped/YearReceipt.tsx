@@ -155,26 +155,27 @@ function ItemRow({ item, compact }: { item: ViewItem; compact?: boolean }) {
           <ItemName item={item} />
         </h3>
         <span className="shipped-lead-fill" aria-hidden="true" />
-        <p className="shrink-0 text-[12px] font-semibold tabular-nums">
+        <p className="shipped-item-status">
           <span className="sr-only">Status: </span>
           {item.status}
         </p>
       </div>
       {!compact && (item.date || item.description || item.via) ? (
-        <p className="mt-0.5 text-[11.5px] leading-[1.45] opacity-80">
-          {item.via ? <span className="block opacity-60">{item.via}</span> : null}
-          {item.description || item.date ? (
-            <span className={item.via ? 'mt-0.5 block' : undefined}>
-              {item.description}
-              {item.date ? (
-                <span className="whitespace-nowrap opacity-75">
-                  {item.description ? '  ' : ''}
-                  {item.date}
-                </span>
-              ) : null}
-            </span>
+        <div className="shipped-lead shipped-item-meta">
+          <p className="shipped-item-desc text-[11.5px] leading-[1.45]">
+            {item.via ? <span className="block opacity-60">{item.via}</span> : null}
+            {item.description ? <span className={item.via ? 'mt-0.5 block' : undefined}>{item.description}</span> : null}
+          </p>
+          {item.date ? (
+            <>
+              <span className="shipped-lead-fill" aria-hidden="true" />
+              <p className="shipped-item-date">
+                <span className="sr-only">Date: </span>
+                {item.date}
+              </p>
+            </>
           ) : null}
-        </p>
+        </div>
       ) : null}
     </li>
   );
@@ -188,7 +189,7 @@ function ItemList({ props }: { props: YearReceiptProps }) {
       <p className="shipped-lead text-[10.5px] opacity-60" aria-hidden="true">
         <span>ITEM</span>
         <span className="shipped-lead-fill is-blank" />
-        <span>STATUS</span>
+        <span className="shipped-item-status">STATUS</span>
       </p>
       <div className="mt-1">
         {groups.map((group) => (

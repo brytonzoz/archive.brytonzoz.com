@@ -25,7 +25,7 @@ export function WallSlip({ receipt }: { receipt: PileReceipt }) {
 
 /** Offscreen texture for the local crumple — same words the slip shows. */
 export function paintWallSlip(ctx: CanvasRenderingContext2D, receipt: PileReceipt, width: number, height: number) {
-  ctx.fillStyle = '#f2eee6';
+  ctx.fillStyle = '#f2ead4';
   ctx.fillRect(0, 0, width, height);
   ctx.fillStyle = '#1d1b19';
   ctx.textBaseline = 'top';

@@ -173,6 +173,21 @@ test('the year is configurable and falls back to this year', () => {
   }
 });
 
+test('a tear follows the finger: clean top, then teeth from one side, then the full edge', async () => {
+  const { paperClip, tearRevealClip, tornEdge } = await import('../components/shipped/physics.ts');
+  const edge = tornEdge('tear-follow:top');
+  const attached = tearRevealClip(edge, 0, true);
+  const half = tearRevealClip(edge, 0.4, true);
+  const done = tearRevealClip(edge, 1, true);
+  const fromRight = tearRevealClip(edge, 0.4, false);
+  assert.equal(attached, paperClip(null, null));
+  assert.equal(done, paperClip(edge, null));
+  assert.match(half, /polygon\(/);
+  assert.match(fromRight, /0% 0px/);
+  assert.notEqual(half, fromRight);
+  assert.notEqual(half, attached);
+});
+
 test('the receipt feed reveals the header first, never the footer', async () => {
   const { feedFrames } = await import('../components/shipped/physics.ts');
   const { frames } = feedFrames(180, 'seed', 0.8);

@@ -765,6 +765,32 @@
   overflow: hidden;
 }
 
+.shipped-item-status,
+.shipped-item-date {
+  flex: 0 0 5.6rem;
+  min-width: 5.6rem;
+  text-align: right;
+  font-variant-numeric: tabular-nums lining-nums;
+  font-feature-settings: 'tnum' 1, 'lnum' 1;
+  font-weight: 600;
+}
+
+.shipped-item-date {
+  font-weight: 500;
+  font-size: 11.5px;
+  letter-spacing: 0.04em;
+}
+
+.shipped-item-meta {
+  margin-top: 0.15rem;
+}
+
+.shipped-item-desc {
+  flex: 1 1 auto;
+  min-width: 0;
+  opacity: 0.8;
+}
+
 @media (max-width: 430px) {
   .shipped-item-name {
     font-size: 12.5px;
@@ -891,7 +917,7 @@
 .shipped-item-logo {
   image-rendering: pixelated;
   height: auto;
-  filter: grayscale(1) contrast(2.6) brightness(0.68);
+  filter: grayscale(1) contrast(3.4) brightness(0.55);
   mix-blend-mode: multiply;
 }
 
@@ -1115,9 +1141,9 @@ html.shipped-focus .shipped-board {
 
 @media (min-width: 1440px) {
   .shipped-page {
-    padding-top: 40px;
+    padding-top: 48px;
     background-image:
-      radial-gradient(ellipse 58% 36% at 50% 8%, rgba(255, 214, 160, 0.22), transparent 62%),
+      radial-gradient(ellipse 42% 28% at 50% 6%, rgba(255, 214, 160, 0.28), transparent 64%),
       radial-gradient(ellipse 90% 55% at 50% 100%, rgba(0, 0, 0, 0.72), transparent 58%),
       linear-gradient(180deg, #1c1814 0%, #120f0c 42%, #0c0a08 100%),
       url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='180' height='180'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='.72' numOctaves='3' stitchTiles='stitch'/%3E%3CfeColorMatrix values='0 0 0 0 .62 0 0 0 0 .52 0 0 0 0 .4 0 0 0 .11 0'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)'/%3E%3C/svg%3E");
@@ -1136,12 +1162,23 @@ html.shipped-focus .shipped-board {
     width: min(32rem, 100%);
   }
 
+  .shipped-counter {
+    padding: 28px 20px 36px;
+    border-radius: 8px;
+    background:
+      radial-gradient(ellipse 70% 40% at 50% 0%, rgba(255, 214, 160, 0.08), transparent 62%),
+      linear-gradient(180deg, rgba(42, 32, 24, 0.35), rgba(18, 14, 10, 0.2));
+    box-shadow:
+      inset 0 1px 0 rgba(255, 255, 255, 0.04),
+      0 1px 0 rgba(0, 0, 0, 0.4);
+  }
+
   .shipped-printer-body {
     box-shadow:
       inset 0 1px 0 rgba(255, 255, 255, 0.16),
       inset 0 -1px 0 rgba(0, 0, 0, 0.75),
       0 2px 2px rgba(0, 0, 0, 0.45),
-      0 36px 64px -16px rgba(0, 0, 0, 0.82);
+      0 40px 72px -16px rgba(0, 0, 0, 0.86);
   }
 }
 
@@ -1454,18 +1491,23 @@ button.shipped-lcd-text {
 .shipped-head {
   position: absolute;
   left: 1.5rem;
-  right: 1.5rem;
   top: 3px;
-  height: 2px;
+  width: 26%;
+  height: 3px;
   border-radius: 1px;
-  background: linear-gradient(90deg, transparent, rgba(243, 234, 216, 0.45), transparent);
+  background: linear-gradient(90deg, transparent, rgba(243, 234, 216, 0.7), rgba(255, 196, 120, 0.35), transparent);
+  box-shadow: 0 0 6px rgba(255, 196, 120, 0.28);
   opacity: 0;
+  will-change: transform;
 }
 
 .is-printing .shipped-head,
 .is-feeding .shipped-head {
   opacity: 1;
-  animation: shipped-head 0.11s linear infinite alternate;
+}
+
+.is-feeding .shipped-head {
+  animation: shipped-head 0.28s linear infinite alternate;
 }
 
 .shipped-aperture {
@@ -1576,9 +1618,12 @@ button.shipped-lcd-text {
 }
 
 .shipped-printer.is-focus .shipped-out,
-.shipped-printer.is-hero .shipped-out {
+.shipped-printer.is-hero .shipped-out,
+.shipped-printer.is-lifting .shipped-out {
   width: min(26.5rem, 100%);
   margin-top: 0;
+  clip-path: none;
+  -webkit-clip-path: none;
 }
 
 .shipped-printer.is-focus .shipped-tilt.is-scroll,
@@ -1596,16 +1641,42 @@ button.shipped-lcd-text {
 
 .shipped-printer.is-focus .shipped-ticket,
 .shipped-printer.is-hero .shipped-ticket {
-  transform: perspective(1200px) rotateX(1.8deg);
-  transform-origin: 50% 6%;
+  transform: perspective(1100px) rotateX(2.6deg) rotateZ(-0.4deg);
+  transform-origin: 50% 8%;
 }
 
 .shipped-printer.is-focus .shipped-paper,
 .shipped-printer.is-hero .shipped-paper {
   box-shadow:
     inset 0 1px 0 rgba(255, 255, 255, 0.62),
-    inset 0 -22px 28px rgba(80, 50, 20, 0.07),
-    0 18px 36px rgba(0, 0, 0, 0.28);
+    inset 0 -28px 34px rgba(80, 50, 20, 0.1),
+    inset 0 0 40px rgba(80, 50, 20, 0.04),
+    0 22px 42px rgba(0, 0, 0, 0.3);
+}
+
+.shipped-printer.is-focus .shipped-paper::after,
+.shipped-printer.is-hero .shipped-paper::after {
+  opacity: 0.22;
+}
+
+.shipped-printer.is-focus .shipped-paper::before,
+.shipped-printer.is-hero .shipped-paper::before {
+  background:
+    linear-gradient(180deg, rgba(255, 255, 255, 0.34), transparent 16px),
+    linear-gradient(0deg, rgba(80, 50, 20, 0.14), transparent 36px),
+    radial-gradient(120% 40% at 50% 100%, rgba(90, 58, 24, 0.08), transparent 70%),
+    linear-gradient(90deg, rgba(62, 44, 22, 0.14), transparent 10%, transparent 90%, rgba(62, 44, 22, 0.16));
+}
+
+.shipped-printer.is-lifting .shipped-printer-body,
+.shipped-printer.is-lifting .shipped-mouth,
+.shipped-printer.is-lifting .shipped-stub,
+.shipped-printer.is-lifting .shipped-hint,
+.shipped-printer.is-lifting .shipped-keys {
+  opacity: 0;
+  transform: translate3d(0, 12px, 0) scale(0.94);
+  pointer-events: none;
+  transition: opacity 420ms var(--ease-out), transform 420ms var(--ease-out);
 }
 
 .shipped-stub {
@@ -1636,6 +1707,7 @@ button.shipped-lcd-text {
 .is-printing .shipped-feed,
 .is-feeding .shipped-feed {
   --burn: 0px;
+  --ink: 0px;
   clip-path: inset(0 0 100% 0);
   -webkit-clip-path: inset(0 0 100% 0);
 }
@@ -1644,16 +1716,16 @@ button.shipped-lcd-text {
   -webkit-mask-image: linear-gradient(
     180deg,
     #000 0,
-    #000 calc(var(--burn, 0px) - 22px),
-    rgba(0, 0, 0, 0.38) var(--burn, 0px),
-    transparent calc(var(--burn, 0px) + 10px)
+    #000 calc(var(--ink, 0px) - 6px),
+    rgba(0, 0, 0, 0.34) var(--burn, 0px),
+    transparent calc(var(--burn, 0px) + 12px)
   );
   mask-image: linear-gradient(
     180deg,
     #000 0,
-    #000 calc(var(--burn, 0px) - 22px),
-    rgba(0, 0, 0, 0.38) var(--burn, 0px),
-    transparent calc(var(--burn, 0px) + 10px)
+    #000 calc(var(--ink, 0px) - 6px),
+    rgba(0, 0, 0, 0.34) var(--burn, 0px),
+    transparent calc(var(--burn, 0px) + 12px)
   );
 }
 
@@ -2303,10 +2375,10 @@ button.shipped-lcd-text {
 
 @keyframes shipped-head {
   from {
-    transform: translateX(-8%);
+    transform: translate3d(0, 0, 0);
   }
   to {
-    transform: translateX(8%);
+    transform: translate3d(257%, 0, 0);
   }
 }
 
@@ -2388,6 +2460,16 @@ button.shipped-lcd-text {
   .is-printing .shipped-ink {
     -webkit-mask-image: none;
     mask-image: none;
+  }
+
+  .shipped-printer.is-lifting .shipped-printer-body,
+  .shipped-printer.is-lifting .shipped-mouth,
+  .shipped-printer.is-lifting .shipped-stub,
+  .shipped-printer.is-lifting .shipped-hint,
+  .shipped-printer.is-lifting .shipped-keys {
+    opacity: 0;
+    transform: none;
+    transition: none;
   }
 
   .is-printing .shipped-feed::after,
@@ -2526,19 +2608,22 @@ button.shipped-lcd-text {
   position: absolute;
   top: 0;
   left: 0;
-  border-radius: 2px;
-  background: linear-gradient(180deg, #efe4cf, #e2d3b5);
-  box-shadow: 0 8px 14px rgba(0, 0, 0, 0.22);
+  background:
+    repeating-linear-gradient(180deg, transparent 0 13px, rgba(40, 28, 16, 0.08) 13px 14px),
+    #f2ead4;
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.45), 0 8px 14px rgba(0, 0, 0, 0.22);
   overflow: hidden;
   transform-origin: 50% 8px;
+  clip-path: polygon(0% 1.8%, 8% 0, 28% 1.4%, 52% 0, 78% 1.2%, 100% 0.3%, 100% 100%, 0 100%);
 }
 
 .shipped-wall-skel-pin::after {
   content: '';
   position: absolute;
-  inset: 0;
-  background: linear-gradient(90deg, transparent, rgba(255, 248, 236, 0.45), transparent);
-  transform: translateX(-100%);
+  inset: 18% 12% 22%;
+  background:
+    repeating-linear-gradient(180deg, transparent 0 10px, rgba(26, 22, 18, 0.12) 10px 11px, transparent 11px 22px);
+  opacity: 0.55;
   animation: shipped-shimmer 1.4s ease-in-out infinite;
 }
 
@@ -2572,17 +2657,22 @@ button.shipped-lcd-text {
 }
 
 .shipped-wall-slip {
+  position: relative;
   height: 100%;
   padding: 12px 10px 10px;
   overflow: hidden;
-  background:
-    linear-gradient(90deg, rgba(70, 48, 28, 0.1), transparent 12%, transparent 88%, rgba(70, 48, 28, 0.12)),
-    linear-gradient(180deg, rgba(255, 255, 255, 0.28), transparent 20%),
-    #efe4cf;
+  background-color: #f2ead4;
+  background-image:
+    linear-gradient(90deg, rgba(70, 48, 28, 0.14), transparent 10%, transparent 90%, rgba(70, 48, 28, 0.16)),
+    repeating-linear-gradient(180deg, transparent 0 11px, rgba(40, 28, 16, 0.04) 11px 12px),
+    url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='80' height='80'%3E%3Cfilter id='g'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='1.05' numOctaves='2' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23g)' opacity='.28'/%3E%3C/svg%3E");
   color: #1a1612;
-  box-shadow: 0 10px 18px rgba(0, 0, 0, 0.28), 0 1px 0 rgba(255, 255, 255, 0.4) inset;
+  box-shadow:
+    inset 0 1px 0 rgba(255, 255, 255, 0.5),
+    inset 0 -14px 18px rgba(80, 50, 20, 0.08),
+    0 10px 18px rgba(0, 0, 0, 0.28);
   font-family: var(--font-receipt), ui-monospace, monospace;
-  clip-path: polygon(1% 1.6%, 4% 0, 12% 1.2%, 28% 0.2%, 46% 1.4%, 63% 0, 81% 1.1%, 96% 0.3%, 99% 2%, 100% 14%, 98.8% 38%, 100% 62%, 98.6% 86%, 99% 98%, 88% 100%, 64% 98.6%, 42% 100%, 18% 98.8%, 2% 100%, 0 86%, 1.2% 58%, 0 28%);
+  clip-path: polygon(0% 1.8%, 3% 0, 9% 1.4%, 18% 0.2%, 31% 1.6%, 46% 0, 59% 1.3%, 73% 0.3%, 86% 1.5%, 96% 0.2%, 100% 2%, 99% 14%, 100% 38%, 98.6% 62%, 100% 86%, 99% 98.4%, 88% 100%, 64% 98.4%, 42% 100%, 18% 98.6%, 2% 100%, 0 86%, 1.4% 58%, 0 28%);
 }
 
 .shipped-wall-slip-kicker,
@@ -2617,11 +2707,14 @@ button.shipped-lcd-text {
   font-size: 9px;
   letter-spacing: 0.04em;
   text-transform: uppercase;
+  font-variant-numeric: tabular-nums;
 }
 
 .shipped-wall-slip-items li span:last-child {
   opacity: 0.55;
   flex: none;
+  font-variant-numeric: tabular-nums;
+  font-feature-settings: 'tnum' 1;
 }
 
 .shipped-wall-tack {
@@ -2730,8 +2823,12 @@ html.shipped-wall-focus-open .shipped-wall-board {
 
 @keyframes shipped-wall-lift {
   from {
-    opacity: 0.55;
-    transform: translate3d(0, 28px, 0) scale(0.95);
+    opacity: 0.4;
+    transform: translate3d(0, 52px, 0) rotateX(14deg) scale(0.92);
+  }
+  62% {
+    opacity: 1;
+    transform: translate3d(0, -6px, 0) rotateX(-2deg) scale(1.02);
   }
   to {
     opacity: 1;

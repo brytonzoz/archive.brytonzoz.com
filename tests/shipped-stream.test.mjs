@@ -156,6 +156,10 @@ test('after a print the stage auto-tears; sponsors stay collapsed; Turnstile has
   assert.match(machine, /pressTear/);
   assert.match(machine, /pressTick/);
   assert.match(machine, /--burn/);
+  assert.match(machine, /--ink/);
+  assert.match(machine, /tearRevealClip/);
+  assert.match(machine, /is-lifting/);
+  assert.match(machine, /strokeHead|257%/);
 
   const stagePrinted = fs.readFileSync(new URL('../components/shipped/ShippedStage.tsx', import.meta.url), 'utf8');
   assert.match(stagePrinted, /720/);

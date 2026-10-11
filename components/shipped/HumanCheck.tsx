@@ -5,10 +5,16 @@
 // second on a phone). Either way the parent gets a single-use token through onToken. execute() waits
 // until that token exists, so Print can run the check instead of showing a checkbox on the first screen.
 import React, { forwardRef, useEffect, useImperativeHandle, useRef } from 'react';
+import { SHIPPED_TURNSTILE_SITE_KEY } from '../../lib/shipped-turnstile';
 import { Turnstile, type TurnstileHandle } from './Turnstile';
 
 export type HumanCheckConfig = { kind: 'turnstile'; siteKey: string } | { kind: 'pow'; bits: number };
 export type HumanCheckHandle = { reset: () => void; execute: () => Promise<string | null>; warm: () => void };
+export const FALLBACK_HUMAN: HumanCheckConfig = { kind: 'turnstile', siteKey: SHIPPED_TURNSTILE_SITE_KEY };
+
+export function resolveHumanCheck(check: HumanCheckConfig | null | undefined): HumanCheckConfig {
+  return check ?? FALLBACK_HUMAN;
+}
 
 type Props = {
   check: HumanCheckConfig | null | undefined;
@@ -67,9 +73,9 @@ export const HumanCheck = forwardRef<HumanCheckHandle, Props>(function HumanChec
   const checkRef = useRef(check);
   checkRef.current = check;
   const [round, setRound] = React.useState(0);
-  const [needed, setNeeded] = React.useState(appearance === 'always');
+  const [needed, setNeeded] = React.useState(true);
   React.useEffect(() => {
-    if (appearance === 'always') setNeeded(true);
+    setNeeded(true);
   }, [appearance]);
 
   function emit(value: string | null) {
@@ -82,8 +88,12 @@ export const HumanCheck = forwardRef<HumanCheckHandle, Props>(function HumanChec
     reset: () => {
       token.current = null;
       onToken(null);
-      if (checkRef.current?.kind === 'turnstile') turnstile.current?.reset();
-      else setRound((n) => n + 1);
+      setNeeded(true);
+      if (checkRef.current?.kind === 'pow') setRound((n) => n + 1);
+      else {
+        setRound((n) => n + 1);
+        turnstile.current?.reset();
+      }
     },
     warm: () => {
       setNeeded(true);
@@ -94,30 +104,24 @@ export const HumanCheck = forwardRef<HumanCheckHandle, Props>(function HumanChec
       onToken(null);
       setNeeded(true);
       const start = Date.now();
-      while (!checkRef.current && Date.now() - start < 8_000) {
-        await new Promise((resolve) => window.setTimeout(resolve, 50));
-      }
-      const current = checkRef.current;
-      if (current?.kind === 'turnstile') {
+      const current = resolveHumanCheck(checkRef.current);
+      if (current.kind === 'turnstile') {
         while (!turnstile.current && Date.now() - start < 8_000) {
           await new Promise((resolve) => window.setTimeout(resolve, 50));
         }
         return turnstile.current?.execute() ?? null;
       }
-      if (current?.kind === 'pow') {
-        return Promise.race([
-          new Promise<string | null>((resolve) => waiters.current.push(resolve)),
-          new Promise<string | null>((resolve) => window.setTimeout(() => resolve(null), 15_000)),
-        ]);
-      }
-      return null;
+      return Promise.race([
+        new Promise<string | null>((resolve) => waiters.current.push(resolve)),
+        new Promise<string | null>((resolve) => window.setTimeout(() => resolve(null), 15_000)),
+      ]);
     },
   }));
 
-  if (!check) return null;
-  if (check.kind === 'turnstile') {
+  const resolved = resolveHumanCheck(check);
+  if (resolved.kind === 'turnstile') {
     if (!needed) return null;
-    return <Turnstile ref={turnstile} siteKey={check.siteKey} onToken={emit} theme={theme} appearance={appearance} />;
+    return <Turnstile ref={turnstile} siteKey={resolved.siteKey} onToken={emit} theme={theme} appearance={appearance} />;
   }
   return <Puzzle onToken={emit} round={round} />;
 });

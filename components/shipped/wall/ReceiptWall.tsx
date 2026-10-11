@@ -2,27 +2,78 @@
 
 // Endless masonry of listed receipts, pinned on a cork board. Tap one to lift it, drag to spin.
 // Crumple is localStorage only — the pile API is read, never written, from here.
-import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import React, { Component, useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import type { PileReceipt, PileResponse } from '../../../lib/shipped-pile';
 import { layoutWall, readCrumpled, setCrumpled, wallColumns, wallGutter, type WallCard } from '../../../lib/shipped-wall';
 import { press } from '../feel';
+import { useShippedState } from '../state';
 import { WallFocus } from './WallFocus';
 import { WallSlip } from './WallSlip';
 
 const PAGE = 24;
 const BUFFER = 720;
 const RETRIES = 3;
+const FETCH_MS = 4_000;
+
+function asReceipt(row: Partial<PileReceipt> & { id: number; who?: string }): PileReceipt | null {
+  if (!Number.isSafeInteger(row.id) || row.id < 1) return null;
+  const items = Array.isArray(row.items)
+    ? row.items
+        .filter((item): item is { name: string; status: string } => Boolean(item && typeof item.name === 'string'))
+        .map((item) => ({ name: item.name, status: typeof item.status === 'string' ? item.status : '' }))
+    : [];
+  return {
+    id: row.id,
+    who: typeof row.who === 'string' && row.who ? row.who : `#${row.id}`,
+    count: Number.isFinite(row.count) ? Number(row.count) : items.length,
+    potential: Boolean(row.potential),
+    full: Boolean(row.full),
+    items,
+    printedAt: typeof row.printedAt === 'string' ? row.printedAt : '',
+  };
+}
 
 async function fetchPile(before?: number | null): Promise<PileResponse> {
   const url = new URL('/api/shipped/pile', window.location.origin);
   url.searchParams.set('limit', String(PAGE));
   if (before) url.searchParams.set('before', String(before));
-  const response = await fetch(url, { cache: 'no-store' });
+  const response = await fetch(url, { cache: 'no-store', signal: AbortSignal.timeout(FETCH_MS) });
   if (!response.ok) throw new Error('pile');
-  return response.json() as Promise<PileResponse>;
+  const page = (await response.json()) as PileResponse;
+  const receipts = (page.receipts ?? []).flatMap((row) => asReceipt(row) ?? []);
+  return { ...page, receipts, next: page.next ?? null, total: page.total ?? receipts.length };
+}
+
+class WallCatch extends Component<{ children: React.ReactNode }, { failed: boolean }> {
+  state = { failed: false };
+  static getDerivedStateFromError() {
+    return { failed: true };
+  }
+  render() {
+    if (this.state.failed) {
+      return (
+        <section className="shipped-wall" data-wall="" aria-label="The wall">
+          <header className="shipped-wall-head">
+            <h2>The wall</h2>
+            <p>Reload to pin again</p>
+          </header>
+        </section>
+      );
+    }
+    return this.props.children;
+  }
 }
 
 export function ReceiptWall({ page = false }: { page?: boolean }) {
+  return (
+    <WallCatch>
+      <ReceiptWallBoard page={page} />
+    </WallCatch>
+  );
+}
+
+function ReceiptWallBoard({ page = false }: { page?: boolean }) {
+  const state = useShippedState();
   const board = useRef<HTMLDivElement>(null);
   const [receipts, setReceipts] = useState<PileReceipt[]>([]);
   const [next, setNext] = useState<number | null>(null);
@@ -50,7 +101,12 @@ export function ReceiptWall({ page = false }: { page?: boolean }) {
     loading.current = true;
     try {
       const page = await fetchPile(before);
-      if (!before && page.receipts.length === 0) throw new Error('empty');
+      if (!before && page.receipts.length === 0 && page.next != null && tries.current < RETRIES) {
+        tries.current += 1;
+        loading.current = false;
+        void load(page.next);
+        return;
+      }
       setReceipts((current) => {
         const seen = new Set(current.map((row) => row.id));
         return before ? [...current, ...page.receipts.filter((row) => !seen.has(row.id))] : page.receipts;
@@ -76,6 +132,15 @@ export function ReceiptWall({ page = false }: { page?: boolean }) {
   useEffect(() => {
     void load();
   }, [load]);
+
+  useEffect(() => {
+    if (receipts.length || !ready || !state?.recent?.length) return;
+    const fallback = state.recent.flatMap((row) => asReceipt({ id: row.id, who: row.who, count: row.count, potential: row.potential, full: row.full, items: [] }) ?? []);
+    if (fallback.length) {
+      setReceipts(fallback);
+      setTotal((n) => n || state.piled || fallback.length);
+    }
+  }, [ready, receipts.length, state]);
 
   useEffect(() => {
     const node = board.current;
@@ -105,7 +170,8 @@ export function ReceiptWall({ page = false }: { page?: boolean }) {
   const visible = useMemo(() => {
     const lo = view.top - BUFFER;
     const hi = view.top + view.height + BUFFER;
-    return cards.filter((card) => card.y + card.h >= lo && card.y <= hi);
+    const inView = cards.filter((card) => card.y + card.h >= lo && card.y <= hi);
+    return inView.length ? inView : cards.slice(0, 16);
   }, [cards, view]);
 
   useEffect(() => {
@@ -121,7 +187,7 @@ export function ReceiptWall({ page = false }: { page?: boolean }) {
     <section className={`shipped-wall${page ? ' is-page' : ''}`} data-wall="" aria-label="The wall">
       <header className="shipped-wall-head">
         <h2>The wall</h2>
-        <p>{empty ? 'Pinning' : `${total} pinned`}</p>
+        <p>{empty ? (ready ? 'Nothing pinned yet' : 'Pinning') : `${total} pinned`}</p>
       </header>
       <div ref={board} className="shipped-wall-board" style={{ height: empty ? Math.max(height, 520) : Math.max(height, 280) }}>
         {empty ? <WallSkeleton width={width} /> : null}

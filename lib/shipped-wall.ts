@@ -113,7 +113,7 @@ export function layoutWall<T extends { id: number; items: { name: string }[] }>(
   const cards: WallCard[] = receipts.map((receipt) => {
     const col = tops.indexOf(Math.min(...tops));
     const style = wallPinStyle(receipt.id);
-    const h = estimateWallCardHeight(receipt.items.length, crumpled.has(receipt.id), w);
+    const h = estimateWallCardHeight(receipt.items?.length ?? 0, crumpled.has(receipt.id), w);
     const x = gap + col * (w + gap);
     const y = tops[col];
     tops[col] = y + h + gap;

@@ -8,7 +8,7 @@ import { track } from '../../lib/analytics';
 import { countdown } from '../../lib/shipped-event';
 import { readQuery, receiptNumber, type Candidate } from '../../lib/shipped-year';
 import { press } from './feel';
-import { HumanCheck, type HumanCheckHandle } from './HumanCheck';
+import { FALLBACK_HUMAN, HumanCheck, type HumanCheckHandle } from './HumanCheck';
 import { Machine, type Job, type Tone } from './Machine';
 import { Line, Rule, Tall } from './paper';
 import { Ticker } from './Ticker';
@@ -534,7 +534,10 @@ export function ShippedStage({ opening, title }: { opening: Opening; title: Reac
                     if (step.name === 'pick' || step.name === 'jammed' || step.name === 'retry') setStep({ name: 'idle' });
                     if (error) setError(null);
                   },
-                  onPrint: () => void submit(),
+                  onPrint: () => {
+                    if (step.name === 'retry') human.current?.reset();
+                    void submit();
+                  },
                   onWarm: () => human.current?.warm(),
                   printing: busy,
                   retry: step.name === 'retry',
@@ -553,7 +556,9 @@ export function ShippedStage({ opening, title }: { opening: Opening; title: Reac
           }
         />
 
-        {shared ? null : <HumanCheck ref={human} check={generator?.enabled ? generator.human : null} onToken={() => undefined} theme="dark" appearance="execute" />}
+        {shared ? null : (
+          <HumanCheck ref={human} check={generator?.human ?? FALLBACK_HUMAN} onToken={() => undefined} theme="dark" appearance="execute" />
+        )}
 
         {error && step.name === 'retry' ? (
           <button

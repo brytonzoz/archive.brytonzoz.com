@@ -5,7 +5,7 @@ import type { PileReceipt } from '../../../lib/shipped-pile';
 
 /** Mini thermal face for a pinned receipt. Ink only — the pin/tape live on the card around it. */
 export function WallSlip({ receipt }: { receipt: PileReceipt }) {
-  const items = receipt.items.slice(0, 5);
+  const items = (receipt.items ?? []).slice(0, 5);
   return (
     <article className="shipped-wall-slip">
       <p className="shipped-wall-slip-kicker">SHIPPED 2026</p>

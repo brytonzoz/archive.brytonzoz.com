@@ -34,7 +34,7 @@ let pending: Promise<ShippedState | null> | null = null;
 const listeners = new Set<(state: ShippedState | null) => void>();
 
 function load(): Promise<ShippedState | null> {
-  pending ??= fetch('/api/shipped/state', { cache: 'no-store' })
+  pending ??= fetch('/api/shipped/state', { cache: 'no-store', signal: AbortSignal.timeout(4_000) })
     .then((response) => (response.ok ? (response.json() as Promise<ShippedState>) : null))
     .catch(() => null);
   return pending;

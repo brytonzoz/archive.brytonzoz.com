@@ -274,6 +274,10 @@ test('pile and receipt cache keys share the listed hash so wall busts match', ()
   assert.match(worker, /cache\.delete\(listedCacheRequest\(origin, path, seconds\)\)/);
   assert.match(worker, /found\.growing \? 'no-store'/);
   assert.match(worker, /if \(receipt\.version !== 2 \|\| receipt\.growing\) return null/);
+  assert.match(worker, /STATE_BUDGET_MS = 800/);
+  assert.match(worker, /raceTimeout\(buildState\(env\), STATE_BUDGET_MS/);
+  assert.match(worker, /raceTimeout\(loadPile\(url, env, db\), 700/);
+  assert.match(worker, /maxAge > 0 && maxAge < seconds/);
 });
 
 test('share pages fill a placeholder instead of appending head scripts', () => {
@@ -319,9 +323,10 @@ test('the wall crumples only in this browser and pages from the listed pile', as
   assert.equal(Math.round(phone - (right.x + right.w)), gap);
   const wall = fs.readFileSync(new URL('../components/shipped/wall/ReceiptWall.tsx', import.meta.url), 'utf8');
   assert.match(wall, /\/api\/shipped\/pile/);
-  assert.match(wall, /localStorage/);
+  assert.match(wall, /readCrumpled/);
   assert.match(wall, /WallSkeleton/);
-  assert.doesNotMatch(wall, /Nothing pinned yet/);
+  assert.match(wall, /Nothing pinned yet/);
+  assert.match(wall, /AbortSignal\.timeout/);
   assert.doesNotMatch(wall, /shipped-sources|shipped-ai/);
   const worker = fs.readFileSync(new URL('../worker/shipped.ts', import.meta.url), 'utf8');
   assert.match(worker, /listed !== false/);

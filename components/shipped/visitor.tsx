@@ -25,7 +25,7 @@ import {
 } from '../../lib/shipped-year';
 import { press, tap } from './feel';
 import { openCheckout } from './print-stream';
-import { HumanCheck, type HumanCheckHandle } from './HumanCheck';
+import { FALLBACK_HUMAN, HumanCheck, type HumanCheckHandle } from './HumanCheck';
 import { refreshShippedState, useShippedState } from './state';
 import { YearReceipt } from './YearReceipt';
 
@@ -205,7 +205,7 @@ function MailedPrint({ receipt }: { receipt: Printed }) {
           Terms
         </a>
       </p>
-      <HumanCheck ref={human} check={state?.generator.human} onToken={setToken} theme="dark" appearance={asked ? 'always' : 'execute'} />
+      <HumanCheck ref={human} check={state?.generator.human ?? FALLBACK_HUMAN} onToken={setToken} theme="dark" appearance={asked ? 'always' : 'execute'} />
       {error ? (
         <p className="mt-1 text-[12px] font-semibold text-[#f3ead8]" role="alert">
           {error}
@@ -281,7 +281,7 @@ function UpgradePay({ receipt, kind }: { receipt: Printed; kind: 'full' | 'bundl
       {kind === 'full' ? (
         <p className="mt-1 text-[11px] text-[#f3ead8]/55">The deep pass: more posts, companies, and the rest of the web.</p>
       ) : null}
-      <HumanCheck ref={human} check={state?.generator.human} onToken={setToken} theme="dark" appearance={asked ? 'always' : 'execute'} />
+      <HumanCheck ref={human} check={state?.generator.human ?? FALLBACK_HUMAN} onToken={setToken} theme="dark" appearance={asked ? 'always' : 'execute'} />
       {error ? (
         <p className="mt-1 text-[12px] font-semibold text-[#f3ead8]" role="alert">
           {error}

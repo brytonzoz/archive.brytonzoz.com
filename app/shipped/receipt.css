@@ -1100,7 +1100,7 @@
 
 html.shipped-focus .shipped-stack > p,
 html.shipped-focus .shipped-nav,
-html.shipped-focus .shipped-wall,
+html.shipped-focus .shipped-wall:not(.is-page),
 html.shipped-focus .shipped-board,
 html.shipped-focus .shipped-desk-pins {
   display: none;
@@ -2118,33 +2118,28 @@ button.shipped-lcd-text {
 
 .shipped-turnstile {
   position: fixed;
-  left: 8px;
-  bottom: 8px;
+  left: 0;
+  bottom: 0;
   z-index: 1;
   width: 300px;
   height: 65px;
-  opacity: 0;
-  overflow: hidden;
+  margin: 0;
+  opacity: 0.01;
+  overflow: visible;
   pointer-events: none;
 }
 
-.shipped-turnstile.is-on {
-  z-index: 80;
-  opacity: 1;
-  overflow: visible;
-  pointer-events: auto;
-}
-
+.shipped-turnstile.is-on,
 .shipped-turnstile.is-challenge {
-  position: relative;
-  left: auto;
-  bottom: auto;
   z-index: 6;
   width: min(19rem, 100%);
   height: auto;
   min-height: 65px;
-  margin: 4px auto 0;
+  margin: 8px auto 0;
   padding: 8px 10px 10px;
+  opacity: 1;
+  overflow: visible;
+  pointer-events: auto;
   border: 1px solid rgba(243, 234, 216, 0.16);
   border-radius: 12px;
   background: rgba(26, 22, 18, 0.92);
@@ -2152,7 +2147,7 @@ button.shipped-lcd-text {
 }
 
 .shipped-turnstile-box {
-  width: 300px;
+  width: min(300px, 100%);
   max-width: 100%;
   min-height: 65px;
   margin: 0 auto;

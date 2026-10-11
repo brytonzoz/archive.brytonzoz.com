@@ -20,18 +20,34 @@ let script: Promise<TurnstileApi> | null = null;
 function loadTurnstile(): Promise<TurnstileApi> {
   script ??= new Promise((resolve, reject) => {
     if (window.turnstile) return resolve(window.turnstile);
-    const tag = document.createElement('script');
-    tag.src = 'https://challenges.cloudflare.com/turnstile/v0/api.js?render=explicit';
-    tag.async = true;
-    tag.onload = () => (window.turnstile ? resolve(window.turnstile) : reject(new Error('turnstile')));
+    const existing = document.querySelector<HTMLScriptElement>('script[src*="challenges.cloudflare.com/turnstile"]');
+    const tag = existing ?? document.createElement('script');
+    if (!existing) {
+      tag.src = 'https://challenges.cloudflare.com/turnstile/v0/api.js?render=explicit';
+      tag.async = true;
+      tag.defer = true;
+      document.head.appendChild(tag);
+    }
+    const start = Date.now();
+    const wait = () => {
+      if (window.turnstile) return resolve(window.turnstile);
+      if (Date.now() - start > 8_000) {
+        script = null;
+        return reject(new Error('turnstile'));
+      }
+      window.setTimeout(wait, 40);
+    };
+    tag.onload = wait;
     tag.onerror = () => {
       script = null;
       reject(new Error('turnstile'));
     };
-    document.head.appendChild(tag);
+    wait();
   });
   return script;
 }
+
+if (typeof document !== 'undefined') void loadTurnstile();
 
 export type TurnstileHandle = { reset: () => void; execute: () => Promise<string | null>; warm: () => void };
 
@@ -43,7 +59,7 @@ type TurnstileProps = {
   appearance?: 'always' | 'interaction-only' | 'execute';
 };
 
-const EXECUTE_MS = 15_000;
+const EXECUTE_MS = 4_000;
 
 export const Turnstile = forwardRef<TurnstileHandle, TurnstileProps>(function Turnstile(
   { siteKey, onToken, theme = 'light', appearance = 'execute' },
@@ -79,73 +95,72 @@ export const Turnstile = forwardRef<TurnstileHandle, TurnstileProps>(function Tu
     resolveWaiters(value);
   }
 
-  function askToVerify() {
-    minting.current = false;
+  function showManaged() {
+    setFailed(false);
     setChallenge(true);
-    setFailed(true);
-    emit(null);
+    setRound((n) => n + 1);
   }
 
-  function resetWidget() {
+  function resetWidget(remount = false) {
     token.current = null;
     spent.current = false;
     callback.current(null);
-    if (widget.current && api.current) {
-      try {
-        api.current.reset(widget.current);
-      } catch {
-        setRound((n) => n + 1);
-      }
+    if (remount || !widget.current || !api.current) {
+      setChallenge(appearance === 'always');
+      setFailed(false);
+      setRound((n) => n + 1);
+      return;
+    }
+    try {
+      api.current.reset(widget.current);
+    } catch {
+      setRound((n) => n + 1);
     }
   }
 
   useImperativeHandle(ref, () => ({
     reset: () => {
-      resetWidget();
+      minting.current = false;
+      resetWidget(true);
     },
     warm: () => {
-      setChallenge(false);
       setFailed(false);
+      void loadTurnstile();
     },
     execute: () => {
       // Always mint a new token. A leftover or spent one is what made PRINT 400.
       minting.current = true;
       token.current = null;
       spent.current = false;
-      if (widget.current && api.current) {
-        try {
-          api.current.reset(widget.current);
-        } catch {
-          // Remounting here would drop the waiter. Execute the current widget instead.
-        }
-      }
+      setFailed(false);
       return new Promise((resolve) => {
         waiters.current.push(resolve);
         const start = Date.now();
         let kicked = false;
+        let managed = visible;
         const run = () => {
           if (token.current) {
             minting.current = false;
             resolveWaiters(token.current);
             return;
           }
-          if (widget.current && api.current && !kicked) {
+          if (!managed && Date.now() - start > EXECUTE_MS) {
+            managed = true;
+            showManaged();
+          }
+          if (widget.current && api.current && !kicked && !managed) {
             kicked = true;
             try {
               api.current.execute(widget.current);
             } catch {
-              askToVerify();
-              return;
+              managed = true;
+              showManaged();
             }
-          }
-          if (Date.now() - start > EXECUTE_MS) {
-            askToVerify();
-            return;
           }
           if (!token.current) window.setTimeout(run, 50);
         };
         // reset() must settle before execute() or Cloudflare answers 400.
-        window.setTimeout(run, 120);
+        window.setTimeout(run, 80);
       });
     },
   }));
@@ -157,11 +172,12 @@ export const Turnstile = forwardRef<TurnstileHandle, TurnstileProps>(function Tu
     loadTurnstile()
       .then((loaded) => {
         if (cancelled || widget.current) return;
+        el.innerHTML = '';
         api.current = loaded;
         widget.current = loaded.render(el, {
           sitekey: siteKey,
           theme,
-          appearance: visible ? 'always' : 'interaction-only',
+          appearance: visible ? 'always' : 'execute',
           execution: visible ? 'render' : 'execute',
           size: visible ? 'flexible' : 'compact',
           callback: (value: string) => queueMicrotask(() => emit(value)),
@@ -172,25 +188,22 @@ export const Turnstile = forwardRef<TurnstileHandle, TurnstileProps>(function Tu
             }),
           'error-callback': () =>
             queueMicrotask(() => {
-              if (!visible) {
-                setChallenge(true);
-                setFailed(true);
-                setRound((n) => n + 1);
-              }
-              emit(null);
+              setFailed(true);
+              if (!visible) showManaged();
+              else emit(null);
             }),
           'timeout-callback': () =>
             queueMicrotask(() => {
-              setChallenge(true);
               setFailed(true);
-              emit(null);
+              if (!visible) showManaged();
+              else emit(null);
             }),
         });
       })
       .catch(() => {
         setChallenge(true);
         setFailed(true);
-        emit(null);
+        if (!minting.current) emit(null);
       });
     return () => {
       cancelled = true;
@@ -209,8 +222,7 @@ export const Turnstile = forwardRef<TurnstileHandle, TurnstileProps>(function Tu
             className="shipped-turnstile-hit"
             onClick={() => {
               setFailed(false);
-              resetWidget();
-              setRound((n) => n + 1);
+              resetWidget(true);
             }}
           >
             {failed ? 'Tap to verify' : 'Checking you’re human'}

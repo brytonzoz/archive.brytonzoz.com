@@ -108,6 +108,7 @@ import {
   issueChallenge,
   overGlobalPrintLimit,
   overLimit,
+  raceTimeout,
   readJsonCapped,
   refuseRequest,
   release,
@@ -337,7 +338,8 @@ async function database(env: ShippedEnv): Promise<D1Database | null> {
     schemaReady = null;
     throw error;
   });
-  await schemaReady;
+  // Reads must not wait out a stuck migrate; tables already exist on staging/prod.
+  await raceTimeout(schemaReady.then(() => true), 350, false);
   return db;
 }
 
@@ -384,14 +386,6 @@ async function generatorState(env: ShippedEnv, db: D1Database | null, off?: Set<
   const human = humanCheck(env);
   const year = yearOf(env);
   const sources = sourceNames(env);
-  if (db) {
-    const hit = await db
-      .prepare('SELECT 1 AS x FROM shipped_company_cache WHERE slug = ? AND year = ?')
-      .bind('openai', year)
-      .first()
-      .catch(() => null);
-    if (hit) sources.push('company-cache');
-  }
   const base = { turnstileSiteKey: human.kind === 'turnstile' ? human.siteKey : null, human, year, sources };
   const stop = (reason: string): GeneratorState => ({ ...base, enabled: false, demo: false, reason });
   if (!db) return stop('no-database');
@@ -400,12 +394,18 @@ async function generatorState(env: ShippedEnv, db: D1Database | null, off?: Set<
   const demo = !env.ANTHROPIC_API_KEY;
   if (demo && isProduction(env)) return stop('no-ai');
   if (!demo) {
-    if (await outOfCredit(db)) return stop('out-of-paper');
-    const cap = await cycleBudgetCap(db, env);
-    // No database is the only remaining null; a sales-query miss now yields the $180 base.
-    if (cap === null) return stop('out-of-paper');
-    const used = await budgetUsed(db, budgetKey());
-    if (used.spent + used.reserved >= cap) return stop('out-of-paper');
+    const paper = await raceTimeout(
+      (async () => {
+        if (await outOfCredit(db)) return 'out-of-paper';
+        const cap = await cycleBudgetCap(db, env);
+        if (cap === null) return 'out-of-paper';
+        const used = await budgetUsed(db, budgetKey());
+        return used.spent + used.reserved >= cap ? 'out-of-paper' : null;
+      })(),
+      400,
+      null,
+    );
+    if (paper === 'out-of-paper') return stop('out-of-paper');
   }
   return { ...base, enabled: true, demo, reason: null };
 }
@@ -1021,6 +1021,8 @@ async function cached(request: Request, ctx: ExecutionContext, seconds: number, 
   if (hit) return hit;
   const response = await make();
   if (response.status !== 200) return response;
+  const maxAge = Number(/max-age=(\d+)/.exec(response.headers.get('cache-control') ?? '')?.[1] ?? 0);
+  if (maxAge > 0 && maxAge < seconds) return response;
   const headers = new Headers(response.headers);
   headers.set('cache-control', `public, max-age=${seconds}`);
   const copy = new Response(response.clone().body, { status: 200, headers });
@@ -1052,42 +1054,81 @@ const pileToken = (env: ShippedEnv, id: number) => hmacHex(env.ADMIN_PASSWORD ||
 type PileRow = { id: number; data: string; created_at: number };
 
 function pileEntry(row: PileRow): PileReceipt | null {
-  const receipt = JSON.parse(row.data) as YearReceipt;
-  if (receipt.version !== 2 || receipt.growing) return null;
-  const items = realReceiptItems(receipt.items);
-  return {
-    id: row.id,
-    who: subjectLabel(receipt.subject),
-    count: items.length,
-    potential: receipt.potential || items.length === 0,
-    full: Boolean(receipt.full),
-    items: items.slice(0, 6).map((item) => ({ name: item.name, status: item.status })),
-    printedAt: receipt.printedAt,
-  };
+  try {
+    const receipt = JSON.parse(row.data) as YearReceipt;
+    if (receipt.version !== 2 || receipt.growing) return null;
+    const items = realReceiptItems(receipt.items ?? []);
+    return {
+      id: row.id,
+      who: subjectLabel(receipt.subject),
+      count: items.length,
+      potential: receipt.potential || items.length === 0,
+      full: Boolean(receipt.full),
+      items: items.slice(0, 6).map((item) => ({ name: item.name, status: item.status })),
+      printedAt: receipt.printedAt,
+    };
+  } catch {
+    return null;
+  }
 }
+
+type PileMemo = { at: number; body: PileResponse };
+let pileMemo: PileMemo | null = null;
 
 /** GET /api/shipped/pile?before=<id>&limit=<n>: the newest receipts their printers tossed on the pile. */
 async function pile(url: URL, env: ShippedEnv): Promise<Response> {
-  const db = await database(env);
   const window = event(env);
-  if (!db) return json({ receipts: [], total: 0, frozen: window.phase === 'closed', next: null } satisfies PileResponse);
+  const empty: PileResponse = { receipts: [], total: pileMemo?.body.total ?? 0, frozen: window.phase === 'closed', next: null };
+  const beforeParam = url.searchParams.get('before');
+  const db = await database(env);
+  if (!db) return json(empty);
+  const body = await raceTimeout(loadPile(url, env, db), 700, null);
+  if (!body) {
+    if (!beforeParam && pileMemo && Date.now() - pileMemo.at < 120_000) return json(pileMemo.body, 200, 'public, max-age=5');
+    return json(empty, 200, 'public, max-age=2');
+  }
+  if (!beforeParam) pileMemo = { at: Date.now(), body };
+  return json(body, 200, window.phase === 'closed' ? 'public, max-age=3600' : 'public, max-age=10');
+}
+
+async function loadPile(url: URL, env: ShippedEnv, db: D1Database): Promise<PileResponse> {
+  const window = event(env);
   const before = Number(url.searchParams.get('before')) || Number.MAX_SAFE_INTEGER;
   const limit = Math.min(200, Math.max(1, Number(url.searchParams.get('limit')) || 120));
-  const [rows, total] = await Promise.all([
-    db
+  const mode = modeOf(yearOf(env));
+  const receipts: PileReceipt[] = [];
+  let cursor = before;
+  let lastId: number | null = null;
+  let exhausted = false;
+  const total = await db.prepare('SELECT COUNT(*) AS n FROM shipped_receipts WHERE listed = 1 AND hidden = 0 AND mode = ?').bind(mode).first<{ n: number }>();
+  for (let pass = 0; pass < 4 && receipts.length < limit; pass++) {
+    const batch = Math.min(80, Math.max(limit * 2, 24));
+    const rows = await db
       .prepare('SELECT id, data, created_at FROM shipped_receipts WHERE listed = 1 AND hidden = 0 AND mode = ? AND id < ? ORDER BY id DESC LIMIT ?')
-      .bind(modeOf(yearOf(env)), before, limit)
-      .all<PileRow>(),
-    db.prepare('SELECT COUNT(*) AS n FROM shipped_receipts WHERE listed = 1 AND hidden = 0 AND mode = ?').bind(modeOf(yearOf(env))).first<{ n: number }>(),
-  ]);
-  const receipts = rows.results.flatMap((row) => pileEntry(row) ?? []);
-  const body: PileResponse = {
-    receipts,
+      .bind(mode, cursor, batch)
+      .all<PileRow>();
+    if (!rows.results.length) {
+      exhausted = true;
+      break;
+    }
+    for (const row of rows.results) {
+      lastId = row.id;
+      const entry = pileEntry(row);
+      if (entry) receipts.push(entry);
+      if (receipts.length >= limit) break;
+    }
+    cursor = rows.results[rows.results.length - 1].id;
+    if (rows.results.length < batch) {
+      exhausted = true;
+      break;
+    }
+  }
+  return {
+    receipts: receipts.slice(0, limit),
     total: total?.n ?? receipts.length,
     frozen: window.phase === 'closed',
-    next: rows.results.length === limit ? rows.results[rows.results.length - 1].id : null,
+    next: exhausted || receipts.length < limit ? null : lastId,
   };
-  return json(body, 200, window.phase === 'closed' ? 'public, max-age=3600' : 'public, max-age=10');
 }
 
 /** POST /api/shipped/pile { id, token }: toss your receipt on the pile (until the printer shuts off). */
@@ -1829,13 +1870,55 @@ async function publicLogo(env: ShippedEnv, id: number): Promise<Response> {
   return png(object.body, 'public, max-age=300');
 }
 
-async function state(env: ShippedEnv): Promise<Response> {
+const STATE_FRESH_MS = 8_000;
+const STATE_STALE_MS = 120_000;
+const STATE_BUDGET_MS = 800;
+let stateMemo: { at: number; body: Record<string, unknown> } | null = null;
+
+function skeletonState(env: ShippedEnv, extra: Record<string, unknown> = {}): Record<string, unknown> {
+  const human = humanCheck(env);
+  const window = event(env);
+  const year = yearOf(env);
+  return {
+    event: { name: EVENT_NAME, opensAt: window.opensAt, closesAt: window.closesAt, phase: window.phase, now: window.now },
+    payments: {
+      open: false,
+      prints: window.phase === 'open',
+      provider: sponsorProvider(env)?.id ?? null,
+      live: Boolean(sponsorProvider(env)?.live),
+      wallet: Boolean(sponsorProvider(env)?.id === 'stripe' && env.STRIPE_PUBLISHABLE_KEY),
+      printCents: PRINT_PRICE_CENTS,
+      fullCents: FULL_PRICE_CENTS,
+      bundleCents: BUNDLE_PRICE_CENTS,
+      lockMinutes: BID_RULES.lockMinutes,
+    },
+    printed: 0,
+    shared: 0,
+    shipped: 0,
+    views: 0,
+    piled: 0,
+    recent: [],
+    generator: {
+      enabled: window.phase === 'open',
+      demo: !env.ANTHROPIC_API_KEY,
+      reason: window.phase === 'closed' ? 'closed' : null,
+      turnstileSiteKey: human.kind === 'turnstile' ? human.siteKey : null,
+      human,
+      year,
+      sources: sourceNames(env),
+    },
+    sponsors: { slots: [], frozen: window.phase === 'closed' },
+    ...extra,
+  };
+}
+
+async function buildState(env: ShippedEnv): Promise<Record<string, unknown>> {
   const db = await database(env);
-  const off = await switchedOff(env, db);
+  const off = await raceTimeout(switchedOff(env, db), 250, new Set<Switch>());
   const generator = await generatorState(env, db, off);
   const provider = sponsorProvider(env);
   const window = await liveWindow(env, db);
-  const closes = await slotClosesAt(db, window.closesAt);
+  const closes = await raceTimeout(slotClosesAt(db, window.closesAt), 250, Array.from({ length: SLOT_COUNT }, () => window.closesAt));
   const anySlotOpen = closes.some((at) => takeoversOpen(window.now, at));
   const open = Boolean(provider) && (window.phase === 'open' || anySlotOpen);
   const payments = {
@@ -1851,37 +1934,55 @@ async function state(env: ShippedEnv): Promise<Response> {
   };
   const zeros = { printed: 0, shared: 0, shipped: 0, views: 0, piled: 0 };
   const base = { event: { name: EVENT_NAME, opensAt: window.opensAt, closesAt: window.closesAt, phase: window.phase, now: window.now }, payments };
-  if (!db) return json({ ...base, ...zeros, recent: [], generator, sponsors: await sponsorBlock(null, env, off) });
+  if (!db) return { ...base, ...zeros, recent: [], generator, sponsors: await sponsorBlock(null, env, off) };
 
-  const [tallies, recent, piled, sponsors] = await Promise.all([
-    counters(db),
-    db
-      .prepare(`SELECT id, data FROM shipped_receipts WHERE listed = 1 AND hidden = 0 AND mode = ? ORDER BY id DESC LIMIT 12`)
-      .bind(modeOf(generator.year))
-      .all<{ id: number; data: string }>(),
-    db.prepare('SELECT COUNT(*) AS n FROM shipped_receipts WHERE listed = 1 AND hidden = 0 AND mode = ?').bind(modeOf(generator.year)).first<{ n: number }>(),
-    sponsorBlock(db, env, off),
-  ]);
-  return json(
-    {
-      ...base,
-      generator,
-      printed: tallies.printed,
-      shared: tallies.shared,
-      shipped: tallies.shipped,
-      views: tallies.views,
-      piled: piled?.n ?? 0,
-      recent: recent.results.flatMap((row) => {
+  const pack = await raceTimeout(
+    Promise.all([
+      counters(db),
+      db
+        .prepare(`SELECT id, data FROM shipped_receipts WHERE listed = 1 AND hidden = 0 AND mode = ? ORDER BY id DESC LIMIT 12`)
+        .bind(modeOf(generator.year))
+        .all<{ id: number; data: string }>(),
+      db.prepare('SELECT COUNT(*) AS n FROM shipped_receipts WHERE listed = 1 AND hidden = 0 AND mode = ?').bind(modeOf(generator.year)).first<{ n: number }>(),
+      sponsorBlock(db, env, off),
+    ]),
+    500,
+    null,
+  );
+  if (!pack) return { ...base, ...zeros, recent: [], generator, sponsors: await sponsorBlock(null, env, off) };
+  const [tallies, recent, piled, sponsors] = pack;
+  return {
+    ...base,
+    generator,
+    printed: tallies.printed,
+    shared: tallies.shared,
+    shipped: tallies.shipped,
+    views: tallies.views,
+    piled: piled?.n ?? 0,
+    recent: recent.results.flatMap((row) => {
+      try {
         const receipt = JSON.parse(row.data) as YearReceipt;
         return receipt.version === 2
           ? [{ id: row.id, who: subjectLabel(receipt.subject), count: itemsShipped(receipt), potential: receipt.potential, full: Boolean(receipt.full) }]
           : [];
-      }),
-      sponsors,
-    },
-    200,
-    'public, max-age=10',
-  );
+      } catch {
+        return [];
+      }
+    }),
+    sponsors,
+  };
+}
+
+async function state(env: ShippedEnv): Promise<Response> {
+  const now = Date.now();
+  if (stateMemo && now - stateMemo.at < STATE_FRESH_MS) return json(stateMemo.body, 200, 'public, max-age=10');
+  const built = await raceTimeout(buildState(env), STATE_BUDGET_MS, null);
+  if (built) {
+    stateMemo = { at: Date.now(), body: built };
+    return json(built, 200, 'public, max-age=10');
+  }
+  if (stateMemo && now - stateMemo.at < STATE_STALE_MS) return json(stateMemo.body, 200, 'public, max-age=2');
+  return json(skeletonState(env), 200, 'public, max-age=2');
 }
 
 const TICKER_HOW = {
@@ -2077,7 +2178,10 @@ export async function handleShipped(request: Request, env: ShippedEnv, ctx: Exec
   if (path === '/api/shipped/challenge' && method === 'GET') return challenge(request, env);
   if (path === '/api/shipped/lookup' && method === 'POST') return lookup(request, env);
   if (path === '/api/shipped/print' && method === 'POST') return print(request, env, ctx);
-  if (path === '/api/shipped/pile' && method === 'GET') return cached(request, ctx, 15, () => pile(url, env));
+  if (path === '/api/shipped/pile' && method === 'GET') {
+    if (url.searchParams.get('before')) return pile(url, env);
+    return cached(request, ctx, 15, () => pile(url, env));
+  }
   if (path === '/api/shipped/pile' && method === 'POST') return tossOnPile(request, env);
   if (path === '/api/shipped/shared' && method === 'POST') return shared(request, env);
   if (path === '/api/shipped/seen' && method === 'POST') return seen(request, env);

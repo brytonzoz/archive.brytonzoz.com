@@ -9,7 +9,7 @@ import { closingLabel } from '../../lib/shipped-event';
 import { money } from '../../lib/shipped-receipt';
 import { BID_RULES, HERO_SLOT, limitsFor, slotLabel, takeoversOpen, validateBid } from '../../lib/shipped-sponsors';
 import type { SponsorSlot } from '../../lib/shipped-year';
-import { HumanCheck, type HumanCheckHandle } from './HumanCheck';
+import { FALLBACK_HUMAN, HumanCheck, type HumanCheckHandle } from './HumanCheck';
 import { Line, Rule, Ticket } from './paper';
 import { closeSponsor, openSponsor, useSponsorPick } from './sponsor-pick';
 import { refreshShippedState, useShippedState } from './state';
@@ -299,7 +299,7 @@ export function SponsorDesk() {
             </label>
             {fieldError('terms')}
 
-            <HumanCheck ref={human} check={state?.generator.human} onToken={setToken} />
+            <HumanCheck ref={human} check={state?.generator.human ?? FALLBACK_HUMAN} onToken={setToken} />
 
             <div className="grid grid-cols-2 gap-1.5">
               <button

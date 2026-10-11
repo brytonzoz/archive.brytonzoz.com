@@ -591,16 +591,29 @@ export const INERT_CSP = "default-src 'none'; img-src 'self' data:; style-src 'u
 /** Images viewed as documents: `sandbox` makes Chrome log sandboxed-script errors. */
 export const IMAGE_CSP = "default-src 'none'; frame-ancestors 'none'";
 
+export function raceTimeout<T>(promise: Promise<T>, ms: number, fallback: T): Promise<T> {
+  let timer: ReturnType<typeof setTimeout> | undefined;
+  return Promise.race([
+    promise.finally(() => {
+      if (timer) clearTimeout(timer);
+    }),
+    new Promise<T>((resolve) => {
+      timer = setTimeout(() => resolve(fallback), ms);
+    }),
+  ]);
+}
+
 export function cspFor(scriptHashes: string[]): string {
   return [
     "default-src 'self'",
     // 'wasm-unsafe-eval' lets the pile's physics (Rapier) compile WebAssembly; JS eval stays blocked.
-    `script-src 'self' 'wasm-unsafe-eval' ${scriptHashes.map((hash) => `'sha256-${hash}'`).join(' ')} https://challenges.cloudflare.com https://js.stripe.com https://static.cloudflareinsights.com`.replace(/\s+/g, ' '),
+    `script-src 'self' 'wasm-unsafe-eval' ${scriptHashes.map((hash) => `'sha256-${hash}'`).join(' ')} https://challenges.cloudflare.com https://*.cloudflare.com https://js.stripe.com https://static.cloudflareinsights.com`.replace(/\s+/g, ' '),
     "style-src 'self' 'unsafe-inline'",
-    "img-src 'self' data: blob: https://*.stripe.com",
+    "img-src 'self' data: blob: https://challenges.cloudflare.com https://*.cloudflare.com https://*.stripe.com",
     "font-src 'self' data:",
-    "connect-src 'self' https://challenges.cloudflare.com https://api.stripe.com https://*.stripe.com https://m.stripe.network https://cloudflareinsights.com",
-    'frame-src https://challenges.cloudflare.com https://js.stripe.com https://hooks.stripe.com https://pay.google.com',
+    "connect-src 'self' https://challenges.cloudflare.com https://*.cloudflare.com https://api.stripe.com https://*.stripe.com https://m.stripe.network https://cloudflareinsights.com",
+    'frame-src https://challenges.cloudflare.com https://*.cloudflare.com https://js.stripe.com https://hooks.stripe.com https://pay.google.com',
+    'child-src https://challenges.cloudflare.com https://*.cloudflare.com https://js.stripe.com',
     "worker-src 'self' blob:",
     "media-src 'self'",
     "manifest-src 'self'",

@@ -6,7 +6,7 @@ import React, { useEffect, useRef, useState } from 'react';
 import { receiptNumber } from '../../lib/shipped-year';
 import { Rule, Ticket } from './paper';
 import { useShippedState } from './state';
-import { HumanCheck, type HumanCheckHandle } from './HumanCheck';
+import { FALLBACK_HUMAN, HumanCheck, type HumanCheckHandle } from './HumanCheck';
 
 export function RemoveForm() {
   const state = useShippedState();
@@ -72,7 +72,7 @@ export function RemoveForm() {
             onChange={(event) => setReason(event.target.value)}
           />
           <p className="text-[10.5px] text-[#1c1917]/60">Please don’t include contact details; none are needed.</p>
-          <HumanCheck ref={human} check={state?.generator.human} onToken={setToken} />
+          <HumanCheck ref={human} check={state?.generator.human ?? FALLBACK_HUMAN} onToken={setToken} />
           <button type="submit" className="shipped-button w-full" disabled={busy}>
             {busy ? 'SENDING…' : 'REMOVE IT'}
           </button>

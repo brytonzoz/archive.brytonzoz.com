@@ -144,9 +144,12 @@ test('after a print the stage auto-tears; sponsors stay collapsed; Turnstile has
 
   const turnstile = fs.readFileSync(new URL('../components/shipped/Turnstile.tsx', import.meta.url), 'utf8');
   assert.match(turnstile, /Tap to verify/);
-  assert.match(turnstile, /askToVerify|setChallenge\(true\)/);
+  assert.match(turnstile, /showManaged|setChallenge\(true\)/);
+  assert.match(turnstile, /EXECUTE_MS = 4_000/);
+  assert.match(turnstile, /appearance: visible \? 'always' : 'execute'/);
   assert.match(turnstile, /api\.current\.reset/);
   assert.match(turnstile, /spent/);
+  assert.match(turnstile, /resetWidget\(true\)/);
 
   assert.match(stage, /forgetTorn\(\)/);
   assert.match(stage, /human\.current\?\.reset\(\)/);

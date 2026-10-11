@@ -271,11 +271,21 @@ test('og.png is not served as a sandboxed document', async () => {
   assert.match(other.headers.get('content-security-policy') ?? '', /sandbox/);
 });
 
+test('raceTimeout returns the fallback when the work hangs', async () => {
+  const start = Date.now();
+  const value = await guard.raceTimeout(new Promise(() => undefined), 30, 'fallback');
+  assert.equal(value, 'fallback');
+  assert.ok(Date.now() - start < 200);
+  assert.equal(await guard.raceTimeout(Promise.resolve('ok'), 200, 'fallback'), 'ok');
+});
+
 test('every page gets strict headers and a CSP without unsafe-inline scripts', async () => {
   const html = '<!doctype html><html><head><script>self.__x=1</script></head><body>hi</body></html>';
   const page = await guard.hardenPage(new Response(html, { headers: { 'content-type': 'text/html' } }));
   const csp = page.headers.get('content-security-policy');
   assert.match(csp, /frame-ancestors 'none'/);
+  assert.match(csp, /challenges\.cloudflare\.com/);
+  assert.match(csp, /child-src/);
   assert.match(csp, /script-src [^;]*'sha256-/);
   assert.doesNotMatch(csp.match(/script-src[^;]*/)[0], /unsafe-inline|'unsafe-eval'/, 'only WebAssembly compiling is allowed, never JS eval');
   assert.match(csp, /object-src 'none'/);

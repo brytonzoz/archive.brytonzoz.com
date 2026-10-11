@@ -178,13 +178,13 @@ export function SponsorBoard() {
         <span className="shipped-board-toggle-copy">
           <span className="shipped-board-toggle-lead">On the tape</span>
           <span className="shipped-board-toggle-from">
-            {SLOT_COUNT} paid spots · from {from}
+            {SLOT_COUNT} spots · from {from}
           </span>
         </span>
-        <span className="shipped-board-marks" aria-hidden>
-          {slots.map((slot) => (
-            <Mark key={slot.slot} slot={slot} />
-          ))}
+        <span className="shipped-board-stack" aria-hidden="true">
+          <i />
+          <i />
+          <i />
         </span>
         <span className="shipped-board-chevron" aria-hidden />
       </button>

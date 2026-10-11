@@ -12,6 +12,8 @@ import { HumanCheck, type HumanCheckHandle } from './HumanCheck';
 import { Machine, type Job, type Tone } from './Machine';
 import { Line, Rule, Tall } from './paper';
 import { Ticker } from './Ticker';
+import { SponsorBoard } from './SponsorBoard';
+import { DeskPins } from './DeskPins';
 import { refreshShippedState, useShippedClock, useShippedState } from './state';
 import { applyPrintChunk, fetchReceipt, followReceipt, forgetTorn, isReceiptOpen, readPrintResponse, readTorn, rememberTorn, type PrintChunk } from './print-stream';
 import { SharePill, VisitorReceipt, rememberPile, type Loaded } from './visitor';
@@ -132,17 +134,26 @@ function usePaperMax(focus: boolean, house: boolean) {
 /** "PRINTER SHUTS OFF IN 13d 4h": ticks against the server's clock, not the visitor's. */
 function Countdown() {
   const { left, closed } = useShippedClock();
-  if (left === null) return <p className="shipped-clock" aria-hidden="true">&nbsp;</p>;
+  if (left === null) {
+    return (
+      <p className="shipped-clock is-wait" aria-hidden="true">
+        <span className="shipped-clock-k">SHUT OFF</span>
+        <span className="shipped-clock-v">··</span>
+      </p>
+    );
+  }
   if (closed || left <= 0) {
     return (
       <p className="shipped-clock" role="status">
-        THE PRINTER IS OFF
+        <span className="shipped-clock-k">PRINTER</span>
+        <span className="shipped-clock-v">OFF</span>
       </p>
     );
   }
   return (
     <p className="shipped-clock" aria-live="off">
-      shuts off in {countdown(left)}
+      <span className="shipped-clock-k">SHUT OFF</span>
+      <span className="shipped-clock-v">{countdown(left)}</span>
     </p>
   );
 }
@@ -481,10 +492,14 @@ export function ShippedStage({ opening, title }: { opening: Opening; title: Reac
           </a>
         </div>
       ) : (
-        <div className="shipped-ticker-pin">
-          <Ticker />
-          <Countdown />
-        </div>
+        <>
+          <DeskPins />
+          <div className="shipped-ticker-pin">
+            <Ticker />
+            <Countdown />
+          </div>
+          <SponsorBoard />
+        </>
       )}
 
       <section className="shipped-counter" id="print" aria-labelledby="shipped-title">

@@ -3,7 +3,6 @@ import type { Metadata } from 'next';
 import { HouseSlip } from '../../components/shipped/HouseSlip';
 import { ShippedStage } from '../../components/shipped/ShippedStage';
 import { ReceiptWall } from '../../components/shipped/wall';
-import { SponsorBoard } from '../../components/shipped/SponsorBoard';
 import { SponsorDesk } from '../../components/shipped/SponsorDesk';
 import { SHIPPED_OG_IMAGE } from '../../lib/shipped';
 import { SHIPPED_DESCRIPTION, SHIPPED_TITLE } from '../../lib/shipped-brand';
@@ -57,7 +56,6 @@ export default function ShippedPage() {
   return (
     <>
       <ShippedStage opening={{ kind: 'house', content: <HouseSlip /> }} title="Print yours" />
-      <SponsorBoard />
       <SponsorDesk />
       <ReceiptWall />
       <p className="pb-8 text-center text-[11px] text-[#f3ead8]/45">

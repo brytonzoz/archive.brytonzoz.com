@@ -122,6 +122,15 @@ test('after a print the stage auto-tears; sponsors stay collapsed; Turnstile has
   const board = fs.readFileSync(new URL('../components/shipped/SponsorBoard.tsx', import.meta.url), 'utf8');
   assert.match(board, /useState\(false\)/);
   assert.match(board, /On the tape/);
+  assert.match(board, /shipped-board-stack/);
+  assert.match(board, /spots · from/);
+  assert.doesNotMatch(board, /shipped-board-marks/);
+
+  assert.match(stage, /SponsorBoard/);
+  assert.match(stage, /DeskPins/);
+  assert.match(stage, /shipped-clock-k/);
+  const home = fs.readFileSync(new URL('../app/shipped/page.tsx', import.meta.url), 'utf8');
+  assert.doesNotMatch(home, /SponsorBoard/);
 
   const feel = fs.readFileSync(new URL('../components/shipped/feel.ts', import.meta.url), 'utf8');
   assert.match(feel, /pressPrint/);
@@ -178,6 +187,10 @@ test('shared receipt pages are the hero; DATE/RECEIPT pairs do not collide; chec
   const css = fs.readFileSync(new URL('../app/shipped/receipt.css', import.meta.url), 'utf8');
   assert.match(css, /--shipped-pill-stack: 120px/);
   assert.match(css, /text-wrap: balance/);
+  assert.match(css, /grid-template-areas:/);
+  assert.match(css, /shipped-board-stack/);
+  assert.match(css, /shipped-clock-k/);
+  assert.match(css, /shipped-desk-pin/);
   assert.match(css, /\.shipped-printer\.is-hero \.shipped-printer-body/);
   assert.match(css, /\.shipped-printer\.is-hero \.shipped-tilt\.is-more::after/);
 

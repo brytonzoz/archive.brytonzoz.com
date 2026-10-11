@@ -209,7 +209,7 @@ export interface SourceProvider {
 
 const UA = 'brytonzoz.com-shipped (+https://shipped.brytonzoz.com/)';
 export const SOURCE_TIMEOUT_MS = 6000;
-export const OSS_TIMEOUT_MS = 28_000;
+export const OSS_TIMEOUT_MS = 6000;
 const TIMEOUT = SOURCE_TIMEOUT_MS;
 
 export async function raceTimeout<T>(work: Promise<T>, ms: number, fallback: T): Promise<T> {
@@ -1826,7 +1826,7 @@ export async function gather(
     gatherFresh(subject, resolved.profile, env, year, meter, tinyfish, resolved.notes, mode, opts?.onPartial, opts?.affiliation);
   if (opts?.rebuild && !opts.onPartial) return load();
   if (opts?.rebuild) return load();
-  const key = mode === 'full' ? `gather:full:v36:${year}:${resolved.cacheKey}` : `gather:v46:${year}:${resolved.cacheKey}`;
+  const key = mode === 'full' ? `gather:full:v37:${year}:${resolved.cacheKey}` : `gather:v47:${year}:${resolved.cacheKey}`;
   return cached(
     key,
     1440 * MIN,
@@ -2107,7 +2107,7 @@ async function gatherFresh(
             readText: async (url) => {
               const response = await fetch(url, {
                 headers: { 'user-agent': UA, accept: 'application/rss+xml, application/atom+xml, text/xml, */*' },
-                signal: AbortSignal.timeout(8000),
+                signal: AbortSignal.timeout(SOURCE_TIMEOUT_MS),
               }).catch(() => null);
               if (!response?.ok) return null;
               return (await response.text()).slice(0, 400_000);
@@ -2115,7 +2115,13 @@ async function gatherFresh(
           }).catch(() => ({ found: [] as Found[], ran: [] as string[], orgs: [] as string[] }));
         })()
       : Promise.resolve({ found: [] as Found[], ran: [] as string[], orgs: [] as string[] });
-  const [results, site, extraSites, searched, storeHarvest, githubOverview, ossHarvest, ownHarvest] = await Promise.all([
+  const ossP = raceTimeout(ossHarvestP, OSS_TIMEOUT_MS, { found: [] as Found[], ran: [] as string[], orgs: [] as string[] });
+  const ownP = raceTimeout(
+    harvestOwnProductSites(ownProducts, year, [profile.site, ...sitesOf(profile)]).catch(() => []),
+    OSS_TIMEOUT_MS,
+    [],
+  );
+  const [results, site, extraSites, searched, storeHarvest, githubOverview] = await Promise.all([
     Promise.allSettled(SOURCES.filter((source) => source.enabled(ctx)).map(async (source) => ({ id: source.id, found: await raceTimeout(source.run(ctx), SOURCE_TIMEOUT_MS, []) }))),
     homepage ? raceTimeout(readSite(homepage).catch(() => null), SOURCE_TIMEOUT_MS, null) : Promise.resolve(null),
     Promise.all(extraHomes.map((url) => raceTimeout(readSite(url).catch(() => null), SOURCE_TIMEOUT_MS, null))),
@@ -2133,13 +2139,7 @@ async function gatherFresh(
     ),
     companyStoreP,
     raceTimeout(githubOverviewP, SOURCE_TIMEOUT_MS, null),
-    raceTimeout(ossHarvestP, OSS_TIMEOUT_MS, { found: [] as Found[], ran: [] as string[], orgs: [] as string[] }),
-    raceTimeout(
-      harvestOwnProductSites(ownProducts, year, [profile.site, ...sitesOf(profile)]).catch(() => []),
-      OSS_TIMEOUT_MS,
-      [],
-    ),
-    raceTimeout(identityP, SOURCE_TIMEOUT_MS, undefined),
+    raceTimeout(identityP, SOURCE_TIMEOUT_MS, undefined).then(() => undefined),
   ]);
   if (site) ran.push('site');
   if (extraSites.some(Boolean)) ran.push('sites');
@@ -2171,19 +2171,21 @@ async function gatherFresh(
       found.push(...settled.value.found);
     } else failed.push(settled.reason instanceof SourceError ? settled.reason.code : 'error');
   }
-  if (ossHarvest.orgs?.length) {
-    profile.orgs = [...new Set([...(profile.orgs || []), ...ossHarvest.orgs])];
-  }
-  if (ossHarvest.found.length) {
-    found.push(...ossHarvest.found);
-    ran.push(...ossHarvest.ran, 'oss-harvest');
-  } else if (profile.github) {
-    ran.push(...ossHarvest.ran, 'oss-harvest:empty');
-  }
-  if (ownHarvest.length) {
-    found.push(...ownHarvest);
-    ran.push(`own-product-harvest:${ownHarvest.length}`);
-  }
+  const mergeSlowHarvest = (ossHarvest: { found: Found[]; ran: string[]; orgs?: string[] }, ownHarvest: Found[]) => {
+    if (ossHarvest.orgs?.length) {
+      profile.orgs = [...new Set([...(profile.orgs || []), ...ossHarvest.orgs])];
+    }
+    if (ossHarvest.found.length) {
+      found.push(...ossHarvest.found);
+      ran.push(...ossHarvest.ran, 'oss-harvest');
+    } else if (profile.github) {
+      ran.push(...ossHarvest.ran, 'oss-harvest:empty');
+    }
+    if (ownHarvest.length) {
+      found.push(...ownHarvest);
+      ran.push(`own-product-harvest:${ownHarvest.length}`);
+    }
+  };
 
   const ownPages = extraSites.filter((page): page is SiteInfo => Boolean(page));
   const newsletterHosts: string[] = [];
@@ -2201,10 +2203,14 @@ async function gatherFresh(
       newsletterHosts.push(`news.${apex}`);
     }
   }
-  for (const host of newsletterHosts.slice(0, 3)) {
-    const feedPage = await raceTimeout(readSite(`https://${host}/feed`).catch(() => null), SOURCE_TIMEOUT_MS, null);
-    if (!feedPage) continue;
-    ownPages.push(feedPage);
+  const feedPages = await Promise.all(
+    newsletterHosts.slice(0, 3).map((host) =>
+      raceTimeout(readSite(`https://${host}/feed`).catch(() => null), SOURCE_TIMEOUT_MS, null).then((page) => ({ host, page })),
+    ),
+  );
+  for (const { host, page } of feedPages) {
+    if (!page) continue;
+    ownPages.push(page);
     ran.push(`personal-feed:${host}`);
   }
   for (const extra of ownPages) {
@@ -2282,6 +2288,11 @@ async function gatherFresh(
     return snap;
   };
   emitPartial(found, 'partial:first-wave');
+  {
+    const [ossHarvest, ownHarvest] = await Promise.all([ossP, ownP]);
+    mergeSlowHarvest(ossHarvest, ownHarvest);
+    emitPartial(found, 'partial:oss');
+  }
 
   if (key) {
     try {

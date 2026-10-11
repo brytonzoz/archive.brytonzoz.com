@@ -169,7 +169,8 @@ async function printOne(query) {
       !echoNote(note, items) &&
       items.length >= ossFloor(query) &&
       !droppedToZero(query, items.length) &&
-      !employerSpill(query, titles).length,
+      !employerSpill(query, titles).length &&
+      (wall == null || wall === items.length),
   };
 }
 

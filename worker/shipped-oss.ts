@@ -769,7 +769,7 @@ export async function harvestOss(opts: {
   ran.push(`oss-orgs:${orgs.slice(0, 8).join(',') || 'none'}`);
 
   const started = Date.now();
-  const overBudget = () => Date.now() - started > 28_000;
+  const overBudget = () => Date.now() - started > 6_000;
   const orgRepos: OssRepo[] = [];
   const takeRepo = (repo: OssRepo | null | undefined) => {
     if (!repo) return;
@@ -789,20 +789,27 @@ export async function harvestOss(opts: {
     }
   }
 
-  for (const hit of eventHits.slice(0, 8)) {
-    if (isEmployerOrg(hit.owner) && !isOrgFounder({
-      org: hit.owner,
-      bio: opts.bio,
-      company: opts.affiliation?.company,
-      companyGithub: opts.affiliation?.companyGithub,
-      role: opts.affiliation?.role,
-      product: opts.affiliation?.product,
-    })) {
-      continue;
-    }
-    const meta = await memo(`oss:repo:${hit.owner}/${hit.name}`, 360 * 60, () =>
-      opts.get<Record<string, unknown>>(`/repos/${encodeURIComponent(hit.owner)}/${encodeURIComponent(hit.name)}`).catch(() => null),
-    );
+  const eventMetas = await Promise.all(
+    eventHits.slice(0, 8).map(async (hit) => {
+      if (isEmployerOrg(hit.owner) && !isOrgFounder({
+        org: hit.owner,
+        bio: opts.bio,
+        company: opts.affiliation?.company,
+        companyGithub: opts.affiliation?.companyGithub,
+        role: opts.affiliation?.role,
+        product: opts.affiliation?.product,
+      })) {
+        return null;
+      }
+      const meta = await memo(`oss:repo:${hit.owner}/${hit.name}`, 360 * 60, () =>
+        opts.get<Record<string, unknown>>(`/repos/${encodeURIComponent(hit.owner)}/${encodeURIComponent(hit.name)}`).catch(() => null),
+      );
+      return { hit, meta };
+    }),
+  );
+  for (const row of eventMetas) {
+    if (!row) continue;
+    const { hit, meta } = row;
     const repo =
       asRepo(hit.owner, meta || { name: hit.name, html_url: `https://github.com/${hit.owner}/${hit.name}`, stargazers_count: 1 }) ||
       ({
@@ -817,36 +824,41 @@ export async function harvestOss(opts: {
   }
 
   const pendingStats: { org: string; repos: OssRepo[] }[] = [];
-  for (const org of orgs.slice(0, 8)) {
-    if (overBudget()) break;
-    const founder = isOrgFounder({
-      org,
-      bio: opts.bio,
-      company: opts.affiliation?.company,
-      companyGithub: opts.affiliation?.companyGithub,
-      role: opts.affiliation?.role,
-      product: opts.affiliation?.product,
-    });
-    if (isEmployerOrg(org) && !founder) continue;
-    const rows = await memo(`oss:org-repos:${org.toLowerCase()}`, 360 * 60, () =>
-      opts.get<Record<string, unknown>[]>(`/orgs/${encodeURIComponent(org)}/repos?sort=pushed&per_page=50`).catch(() => []),
-    );
-    const repos = (Array.isArray(rows) ? rows : [])
-      .map((row) => asRepo(org, row))
-      .filter((row): row is OssRepo => Boolean(row))
-      .filter((row) => inYear(row.pushed_at, year) || inYear(row.created_at, year) || (row.stargazers_count ?? 0) >= 200)
-      .sort((a, b) => (b.stargazers_count ?? 0) - (a.stargazers_count ?? 0));
-    const mentioned = repos.filter(
-      (repo) =>
-        bioMentionsRepo(opts.bio, repo) ||
-        bioMentionsRepo(opts.affiliation?.product || opts.affiliation?.company || '', repo),
-    );
-    if (founder || mentioned.length) {
-      for (const repo of founder ? repos.slice(0, 20) : mentioned) takeRepo(repo);
-      ran.push(founder ? `oss-founder:${org}` : `oss-bio:${org}/${mentioned.map((row) => row.name).slice(0, 4).join(',')}`);
+  const orgPages = await Promise.all(
+    orgs.slice(0, 8).map(async (org) => {
+      const founder = isOrgFounder({
+        org,
+        bio: opts.bio,
+        company: opts.affiliation?.company,
+        companyGithub: opts.affiliation?.companyGithub,
+        role: opts.affiliation?.role,
+        product: opts.affiliation?.product,
+      });
+      if (isEmployerOrg(org) && !founder) return null;
+      const rows = await memo(`oss:org-repos:${org.toLowerCase()}`, 360 * 60, () =>
+        opts.get<Record<string, unknown>[]>(`/orgs/${encodeURIComponent(org)}/repos?sort=pushed&per_page=50`).catch(() => []),
+      );
+      const repos = (Array.isArray(rows) ? rows : [])
+        .map((row) => asRepo(org, row))
+        .filter((row): row is OssRepo => Boolean(row))
+        .filter((row) => inYear(row.pushed_at, year) || inYear(row.created_at, year) || (row.stargazers_count ?? 0) >= 200)
+        .sort((a, b) => (b.stargazers_count ?? 0) - (a.stargazers_count ?? 0));
+      const mentioned = repos.filter(
+        (repo) =>
+          bioMentionsRepo(opts.bio, repo) ||
+          bioMentionsRepo(opts.affiliation?.product || opts.affiliation?.company || '', repo),
+      );
+      return { org, founder, repos, mentioned };
+    }),
+  );
+  for (const page of orgPages) {
+    if (!page) continue;
+    if (page.founder || page.mentioned.length) {
+      for (const repo of page.founder ? page.repos.slice(0, 20) : page.mentioned) takeRepo(repo);
+      ran.push(page.founder ? `oss-founder:${page.org}` : `oss-bio:${page.org}/${page.mentioned.map((row) => row.name).slice(0, 4).join(',')}`);
       continue;
     }
-    pendingStats.push({ org, repos: repos.slice(0, 3) });
+    pendingStats.push({ org: page.org, repos: page.repos.slice(0, 3) });
   }
 
   const pinFounderOpts = {
@@ -876,14 +888,9 @@ export async function harvestOss(opts: {
   };
 
   const seenHarvest = new Set<string>();
-  const harvestRepos = async (repos: OssRepo[], tag: string) => {
-    for (const repo of repos) {
-      if (overBudget()) {
-        ran.push('oss-budget');
-        return;
-      }
+  const harvestOne = async (repo: OssRepo, tag: string) => {
       const key = `${repo.owner.toLowerCase()}/${repo.name.toLowerCase()}`;
-      if (seenHarvest.has(key)) continue;
+      if (seenHarvest.has(key) || overBudget()) return;
       seenHarvest.add(key);
       const source: OssFound['source'] = repo.owner.toLowerCase() === login.toLowerCase() ? 'github' : 'company';
       let releases = await memo(`oss:rel:${repo.owner}/${repo.name}`, 180 * 60, () =>
@@ -964,6 +971,16 @@ export async function harvestOss(opts: {
         found.push(...lines);
         ran.push(`${tag}:${repo.owner}/${repo.name}:${lines.length}`);
       }
+  };
+
+  const harvestRepos = async (repos: OssRepo[], tag: string) => {
+    const queue = repos.filter((repo) => !seenHarvest.has(`${repo.owner.toLowerCase()}/${repo.name.toLowerCase()}`));
+    for (let i = 0; i < queue.length; i += 6) {
+      if (overBudget()) {
+        ran.push('oss-budget');
+        return;
+      }
+      await Promise.all(queue.slice(i, i + 6).map((repo) => harvestOne(repo, tag)));
     }
   };
 

@@ -16,6 +16,7 @@ import {
   isJournalShip,
   looksLikeEssayTitle,
   looksLikeMonthlyRoundup,
+  rewriteShipTitle,
   shortenWordyTitle,
   spokenShipName,
   stripMarkup,
@@ -174,12 +175,14 @@ function cleanGroup(value: unknown): string | null {
 }
 
 function cleanTitle(value: unknown, fallback: string): string | null {
-  const raw = typeof value === 'string' && value.trim() ? value : fallback;
-  let text = stripMarkup(raw).replace(/\s+/g, ' ').trim();
-  if (!text) return null;
-  if (text.length > TITLE_MAX) text = wordClamp(text, TITLE_MAX);
-  if (!titleSanityOk(text)) return null;
-  return text;
+  const claude = typeof value === 'string' && value.trim() ? stripMarkup(value).replace(/\s+/g, ' ').trim() : '';
+  const raw = claude || stripMarkup(fallback).replace(/\s+/g, ' ').trim();
+  if (!raw) return null;
+  const clamped = raw.length > TITLE_MAX ? wordClamp(raw, TITLE_MAX) : raw;
+  if (clamped && titleSanityOk(clamped)) return clamped;
+  const short = rewriteShipTitle(raw);
+  if (short && titleSanityOk(short)) return short.slice(0, TITLE_MAX);
+  return null;
 }
 
 function toDraft(found: Found, title: string, significance: number): CuratedItem {
@@ -406,8 +409,8 @@ function companyHarvestCardOk(item: { link?: string | null; source?: string }, k
   return /cursor\.com\/(changelog|blog|news|docs)\//i.test(link) || (item.source === 'changelog' && /cursor\.com/i.test(link));
 }
 
-function cleanedHarvestName(raw: string): string {
-  const short = cleanShipTitle(raw) || shortenWordyTitle(raw) || '';
+function cleanedHarvestName(raw: string, link?: string | null): string {
+  const short = rewriteShipTitle(raw, link) || cleanShipTitle(raw) || shortenWordyTitle(raw) || '';
   return String(short || '').trim();
 }
 
@@ -428,7 +431,7 @@ export function expandCompanyHarvestWin<T extends { name?: string; link?: string
     if (harvested.length + extra.length >= 50) break;
     const raw = String(item.name || '').trim();
     if (!raw || !companyHarvestCardOk(item, kind)) continue;
-    const short = cleanedHarvestName(raw);
+    const short = cleanedHarvestName(raw, item.link);
     if (!short) continue;
     if (looksLikeEssayTitle(short) || isBlogEssayTitle(short) || looksLikeMonthlyRoundup(short)) continue;
     const words = short.split(/\s+/).filter(Boolean);
@@ -474,11 +477,13 @@ export function unionJournalShips<T extends { name?: string; link?: string | nul
   const extra: T[] = [];
   for (const item of harvested || []) {
     if (!isJournalShip(item)) continue;
-    const name = String(item.name || '').trim();
-    if (!name || looksLikeEssayTitle(name) || isBlogEssayTitle(name) || looksLikeMonthlyRoundup(name)) continue;
+    const raw = String(item.name || '').trim();
+    if (!raw || looksLikeEssayTitle(raw) || isBlogEssayTitle(raw) || looksLikeMonthlyRoundup(raw)) continue;
+    const name = rewriteShipTitle(raw, item.link) || raw;
+    if (!titleSanityOk(name)) continue;
     if (name.split(/\s+/).filter(Boolean).length >= 8 && !/\d+\.\d+/.test(name)) continue;
-    if (harvestAlreadyHas(tape, item) || harvestAlreadyHas(extra, item)) continue;
-    extra.push(item);
+    if (harvestAlreadyHas(tape, { ...item, name }) || harvestAlreadyHas(extra, { ...item, name })) continue;
+    extra.push({ ...item, name });
   }
   return extra.length ? [...extra, ...tape] : tape;
 }

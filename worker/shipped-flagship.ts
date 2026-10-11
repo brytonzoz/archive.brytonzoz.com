@@ -125,6 +125,12 @@ export function flagshipLaunchName(item: FlagshipItem): string | null {
   if (/\bagents window\b/i.test(name) || /\/agents-window\b/i.test(path)) return 'Agents Window';
   if ((/^origin$/i.test(name) || /\/(blog|changelog)\/origin$/i.test(path)) && /cursor\.com/i.test(link)) return 'Origin';
   if (/\bvercel agent\b/i.test(name) || /\/changelog\/vercel-agent\b/i.test(path)) return 'Vercel Agent';
+  if (
+    /^(?:we\s+launched\s+)?(?:introducing\s+)?ai gateway$/i.test(name) ||
+    /\/(blog|changelog)\/(?:introducing-)?ai-gateway$/i.test(path)
+  ) {
+    return 'AI Gateway';
+  }
   if (/^(?:introducing\s+)?(?:the\s+)?(?:new\s+)?v0(?:\s+(?:api|platform|themes?))?$/i.test(name) || /\/(blog|changelog)\/(?:introducing-the-new-)?v0\b/i.test(path)) {
     return /theme/i.test(name) ? 'v0 Themes' : /api|platform/i.test(name) || /v0-platform|v0-api/i.test(path) ? 'v0 Platform API' : 'v0';
   }

@@ -1011,21 +1011,21 @@ export function shortenWordyTitle(title: string): string {
     .replace(/\s+now (links?)\b.*$/i, '')
     .trim();
   if (!text) return '';
+  const launched = text.match(/^(?:we|i|i['’]ve|i['’]m)\s+(?:launched|shipped|released|built|made|added)\s+(.+)$/i);
+  if (launched?.[1]) text = launched[1].trim();
+  text = text
+    .replace(/\s+(?:is|are)\s+now\s+available\s+on\s+(?:the\s+)?(?:vercel\s+)?ai gateway\b.*$/i, '')
+    .replace(/\s+now\s+available\s+on\s+(?:the\s+)?(?:vercel\s+)?ai gateway\b.*$/i, '')
+    .replace(/\s+available\s+on\s+(?:the\s+)?(?:vercel\s+)?ai gateway(?:,\s*free)?\b.*$/i, '')
+    .replace(/\s+for free(?:\s+on every plan)?$/i, '')
+    .replace(/\s+on every plan$/i, '')
+    .replace(/\s+starts?\s+\d+%\s+faster$/i, '')
+    .replace(/\s+\d+%\s+faster$/i, '')
+    .replace(/\s+with the\s+.+$/i, '')
+    .trim();
+  if (!text) return '';
   if (/\d+\.\d+/.test(text) || /·\s*\d+\s+(updates?|releases?)/i.test(text)) return text;
   const originalWords = text.split(/\s+/).filter(Boolean);
-  if (originalWords.length >= 8) {
-    const stripped = text
-      .replace(/\s+for free(?:\s+on every plan)?$/i, '')
-      .replace(/\s+on every plan$/i, '')
-      .replace(/\s+starts?\s+\d+%\s+faster$/i, '')
-      .replace(/\s+\d+%\s+faster$/i, '')
-      .replace(/\s+with the\s+.+$/i, '')
-      .trim();
-    const next = stripped.split(/\s+/).filter(Boolean);
-    if (stripped && next.length >= 2 && next.length < 8 && !looksCutOff(stripped)) {
-      return stripped;
-    }
-  }
   if (originalWords.length < 8) return text;
   if (isMinorPlatformChange(text) || isMinorPlatformChange(title)) return text;
   const phrase = nounPhraseFromSentence(text);
@@ -1296,6 +1296,32 @@ export function titleSanityOk(title: string): boolean {
   if (SENTENCE_VERB.test(text) && !/\d+\.\d+/.test(text)) return false;
   if (text.length > TITLE_HARD_MAX && !/·\s*\d+\s+(updates?|releases?)/i.test(text)) return false;
   return true;
+}
+
+/** Claude title if it already prints; otherwise a deterministic product-name shortener. Never drop a rewriteable line. */
+export function rewriteShipTitle(title: string, link?: string | null): string {
+  const raw = stripMarkup(title).replace(/\s+/g, ' ').trim();
+  if (!raw) return '';
+  const flag = flagshipLaunchName({ name: raw, link: link || undefined });
+  if (flag && titleSanityOk(flag)) return flag;
+  if (titleSanityOk(raw) && raw.length <= TITLE_HARD_MAX) return raw;
+  const short = shortenWordyTitle(raw);
+  const printable = (text: string) =>
+    Boolean(
+      text &&
+        titleSanityOk(text) &&
+        !isVagueOrCutTitle(text) &&
+        !isNotAShipTitle(text) &&
+        !isDocsOrReferenceTitle(text) &&
+        !/^(released|updated|previewing|announcing)\b/i.test(text),
+    );
+  if (printable(short)) return short;
+  const words = (short || raw).split(/\s+/).filter(Boolean);
+  if (words.length >= 8) {
+    const clip = words.slice(0, 5).join(' ');
+    if (printable(clip)) return clip;
+  }
+  return '';
 }
 
 export function cleanDescription(value: unknown): string {
@@ -1767,14 +1793,13 @@ export function polishCandidates<T extends Polishable>(items: T[], opts: PolishO
     if (name) name = shortenWordyTitle(name);
     if (name) name = reconcileTitleWithHref(name, item.link);
     if (!name && (item.source === 'changelog' || isChangelogEntryHref(item.link))) {
-      const fallback = wordClamp(stripDateSuffix(tidy(item.name).replace(/\bcopy link to\b[\s\S]*/i, '')), TITLE_MAX);
+      const fallback = rewriteShipTitle(item.name, item.link) || wordClamp(stripDateSuffix(tidy(item.name).replace(/\bcopy link to\b[\s\S]*/i, '')), TITLE_MAX);
       const keepCard =
         fallback &&
-        fallback.split(/\s+/).length >= 3 &&
+        fallback.split(/\s+/).length >= 2 &&
         !looksCutOff(fallback) &&
         !looksMidWord(fallback) &&
         !looksFragment(fallback) &&
-        !isVagueOrCutTitle(item.name) &&
         !isVagueOrCutTitle(fallback) &&
         !/including:?$/i.test(String(item.name || '')) &&
         !isPrereleaseShip(fallback) &&
@@ -1832,8 +1857,13 @@ export function polishCandidates<T extends Polishable>(items: T[], opts: PolishO
       continue;
     }
     if (isJunkProductName(name, opts.handle || opts.owner?.github, who)) {
-      drop(item, 'github-junk');
-      continue;
+      if (flagship) {
+        logFlagshipGate(item, 'github-junk', flagship);
+        name = flagship;
+      } else {
+        drop(item, 'github-junk');
+        continue;
+      }
     }
     if (isLegacyNpmFamily(name)) {
       drop(item, 'legacy-family');
@@ -1929,11 +1959,13 @@ export function polishCandidates<T extends Polishable>(items: T[], opts: PolishO
   }
   const rolled = rollupCeoLeadCrumbs(capped, opts.affiliation);
   if (rolled.length < capped.length) drop({ name: `${capped.length - rolled.length} ceo-lead crumbs` }, 'ceo-rollup');
-  const sane = rolled.filter((item) => {
-    if (flagshipLaunchName(item) || /·\s*\d+\s+(updates?|releases?)\s+in\s+/i.test(item.name)) return true;
-    if (titleSanityOk(item.name)) return true;
+  const sane = rolled.flatMap((item) => {
+    if (/·\s*\d+\s+(updates?|releases?)\s+in\s+/i.test(item.name)) return [item];
+    if (titleSanityOk(item.name)) return [item];
+    const short = rewriteShipTitle(item.name, item.link);
+    if (short && titleSanityOk(short)) return [{ ...item, name: short }];
     drop(item, 'title-sanity');
-    return false;
+    return [];
   });
   return sane.sort((a, b) => (a.date ?? '9999').localeCompare(b.date ?? '9999'));
 }

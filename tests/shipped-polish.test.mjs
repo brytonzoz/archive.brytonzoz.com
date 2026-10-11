@@ -37,6 +37,15 @@ test('bylines, docs nav, week-of roundups, and articles about the person are jun
   assert.equal(polish.titleSanityOk('Protect production deployments for free on every plan'), false);
   assert.equal(polish.titleSanityOk('Agents can now buy domains with the Vercel CLI'), false);
   assert.equal(polish.titleSanityOk('Kevin Dawkins, Jerilyn Zheng, and 1 other'), false);
+  assert.match(polish.rewriteShipTitle('We launched AI Gateway'), /ai gateway/i);
+  assert.ok(polish.titleSanityOk(polish.rewriteShipTitle('We launched AI Gateway')));
+  assert.ok(polish.rewriteShipTitle('Agents can now buy domains with the Vercel CLI').split(/\s+/).length < 8);
+  assert.ok(polish.rewriteShipTitle('Protect production deployments for free on every plan').split(/\s+/).length < 8);
+  assert.match(polish.rewriteShipTitle('Claude Haiku 5.5 now available on AI Gateway'), /claude haiku 5\.5/i);
+  assert.match(
+    polish.rewriteShipTitle('Vercel Agent now installs private packages from npm and', 'https://vercel.com/changelog/vercel-agent'),
+    /vercel agent/i,
+  );
   assert.equal(polish.isJunkTitle('Cursor 2.0'), false);
 });
 
@@ -1315,7 +1324,7 @@ test('cheap filters strip markup, drop prereleases and other years, and dedupe U
   assert.equal(cheap.find((item) => item.name === 'Minor Changes')?.description, 'Minor Changes - 17ee736');
 });
 
-test('print-time polish drops 8+ word changelog sentences, person lists, and mashed duplicates', () => {
+test('print-time polish rewrites 8+ word changelog sentences and drops junk', () => {
   const gated = polish.gateReceiptItems(
     [
       found({
@@ -1329,6 +1338,11 @@ test('print-time polish drops 8+ word changelog sentences, person lists, and mas
         link: 'https://vercel.com/changelog/secure-compute-static-ip',
       }),
       found({
+        name: 'AI Gateway',
+        date: '2026-04-01',
+        link: 'https://vercel.com/changelog/ai-gateway',
+      }),
+      found({
         name: 'Kevin Dawkins, Jerilyn Zheng, and 1 other',
         date: '2026-09-12',
         link: 'https://vercel.com/blog/authors',
@@ -1339,7 +1353,7 @@ test('print-time polish drops 8+ word changelog sentences, person lists, and mas
         link: 'https://vercel.com/changelog/typesafe-compat',
       }),
       found({
-        name: 'Vercel Agent',
+        name: 'Vercel Agent now installs private packages from npm and',
         date: '2026-07-01',
         link: 'https://vercel.com/changelog/vercel-agent',
       }),
@@ -1349,7 +1363,7 @@ test('print-time polish drops 8+ word changelog sentences, person lists, and mas
         link: 'https://vercel.com/changelog/chat-sdk',
       }),
     ],
-    { year: 2026, who: 'Guillermo Rauch' },
+    { year: 2026, who: 'Guillermo Rauch', affiliation: { company: 'Vercel', role: 'ceo' } },
   );
   const names = gated.map((item) => item.name);
   assert.equal(
@@ -1358,6 +1372,9 @@ test('print-time polish drops 8+ word changelog sentences, person lists, and mas
     JSON.stringify(names),
   );
   assert.equal(names.some((name) => /dawkins|and 1 other|typesafe-compat typesafe-compat/i.test(name)), false, JSON.stringify(names));
+  assert.ok(names.some((name) => /protect production deployments/i.test(name)), JSON.stringify(names));
+  assert.ok(names.some((name) => /secure compute/i.test(name)), JSON.stringify(names));
+  assert.ok(names.some((name) => /ai gateway/i.test(name)), JSON.stringify(names));
   assert.ok(names.some((name) => /vercel agent/i.test(name)), JSON.stringify(names));
   assert.ok(names.some((name) => /chat sdk/i.test(name)), JSON.stringify(names));
 });

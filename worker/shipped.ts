@@ -663,6 +663,7 @@ async function generate(
       const resolved = gathered.profile.name && !hasBlockedWord(gathered.profile.name) ? gathered.profile.name : subject.display;
       subject.display = prettyPersonName(resolved) || clean(resolved, 60);
       const x = (gathered.profile.x && isXHandle(gathered.profile.x) ? gathered.profile.x : subject.kind === 'x' ? subject.id : null) || null;
+      const onWall = listed && !extra.growing;
       const receipt: Omit<YearReceipt, 'id'> = {
         version: 2,
         year,
@@ -673,7 +674,7 @@ async function generate(
         stats: next.stats,
         potential: next.potential,
         demo: state.demo,
-        listed,
+        listed: onWall,
         layout: next.layout,
         shipScore: shipScore({ items: next.items, potential: next.potential }),
         full: false,
@@ -689,10 +690,11 @@ async function generate(
       if (extra.id) {
         await db
           .prepare(
-            `UPDATE shipped_receipts SET login = ?, data = ?, demo = ?, model = ?, input_tokens = ?, output_tokens = ?, searches = ?, cost_micros = ? WHERE id = ? AND hidden != 1`,
+            `UPDATE shipped_receipts SET login = ?, data = ?, demo = ?, model = ?, input_tokens = ?, output_tokens = ?, searches = ?, cost_micros = ?, listed = ? WHERE id = ? AND hidden != 1`,
           )
-          .bind(subjectLabel(subject), JSON.stringify(receipt), state.demo ? 1 : 0, extra.model, extra.usage.input, extra.usage.output, extra.usage.searches, extra.usage.cost, extra.id)
+          .bind(subjectLabel(subject), JSON.stringify(receipt), state.demo ? 1 : 0, extra.model, extra.usage.input, extra.usage.output, extra.usage.searches, extra.usage.cost, onWall ? 1 : 0, extra.id)
           .run();
+        await dropListedCache(env, extra.id);
         return { id: extra.id };
       }
       const day = today();
@@ -706,11 +708,12 @@ async function generate(
            cost_micros = excluded.cost_micros, listed = excluded.listed, created_at = excluded.created_at
          WHERE shipped_receipts.hidden != 1 RETURNING id`,
         )
-        .bind(subjectLabel(subject), key, day, mode, JSON.stringify(receipt), state.demo ? 1 : 0, extra.model, extra.usage.input, extra.usage.output, extra.usage.searches, extra.usage.cost, listed ? 1 : 0, Date.now())
+        .bind(subjectLabel(subject), key, day, mode, JSON.stringify(receipt), state.demo ? 1 : 0, extra.model, extra.usage.input, extra.usage.output, extra.usage.searches, extra.usage.cost, onWall ? 1 : 0, Date.now())
         .first<{ id: number }>();
       if (!inserted) return null;
       await db.prepare('UPDATE shipped_receipts SET hidden = 0 WHERE id = ? AND hidden = 2').bind(inserted.id).run();
       if (!replaces) await bump(db, 'printed');
+      await dropListedCache(env, inserted.id);
       return inserted;
     };
 
@@ -847,6 +850,7 @@ async function generate(
     if (!replaces) {
       await bump(db, 'printed');
     }
+    await dropListedCache(env, inserted.id);
     console.log(
       JSON.stringify({
         shipped: 'print',
@@ -955,10 +959,13 @@ async function takedown(request: Request, env: ShippedEnv, ctx: ExecutionContext
 async function purgeReceipt(env: ShippedEnv, id: number, origin?: string): Promise<void> {
   await dropShareImages(env, id).catch(() => undefined);
   const origins = new Set([origin, env.SHIPPED_HOST ? `https://${env.SHIPPED_HOST}` : null, SHIPPED_URL].filter((o): o is string => Boolean(o)));
-  const paths = [RECEIPT_PATH(id), CARD_PATH(id), TALL_PATH(id), ROLLO_PATH(id), ROLLO_PNG_PATH(id), `/shipped${RECEIPT_PATH(id)}`, `/shipped${CARD_PATH(id)}`, `/shipped${TALL_PATH(id)}`, `/shipped${ROLLO_PATH(id)}`, `/shipped${ROLLO_PNG_PATH(id)}`, `/api/shipped/receipts/${id}`, '/api/shipped/state', '/api/shipped/pile'];
+  const paths = [RECEIPT_PATH(id), CARD_PATH(id), TALL_PATH(id), ROLLO_PATH(id), ROLLO_PNG_PATH(id), `/shipped${RECEIPT_PATH(id)}`, `/shipped${CARD_PATH(id)}`, `/shipped${TALL_PATH(id)}`, `/shipped${ROLLO_PATH(id)}`, `/shipped${ROLLO_PNG_PATH(id)}`];
   const cache = edgeCache();
   if (!cache) return;
-  await Promise.all([...origins].flatMap((o) => paths.map((path) => cache.delete(new Request(new URL(path, o))).catch(() => false))));
+  await Promise.all([
+    ...[...origins].flatMap((o) => paths.map((path) => cache.delete(new Request(new URL(path, o))).catch(() => false))),
+    dropListedCache(env, id),
+  ]);
 }
 
 /** The data center's cache (absent in tests and local dev). */
@@ -971,13 +978,19 @@ function isShareBot(request: Request): boolean {
   );
 }
 
+/** Cache API key for listed JSON. Must match `dropListedCache` / `purgeReceipt`. */
+export function listedCacheRequest(origin: string, path: string, seconds: number, salt = ''): Request {
+  const url = new URL(path, origin);
+  url.search = '';
+  url.hash = `m${seconds}${salt}`;
+  return new Request(url.toString(), { method: 'GET' });
+}
+
 /** Serves a GET from this data center's cache, or makes it, keeps it `seconds`, and serves that. */
 async function cached(request: Request, ctx: ExecutionContext, seconds: number, make: () => Promise<Response>, salt = ''): Promise<Response> {
   const cache = edgeCache();
   const url = new URL(request.url);
-  url.search = '';
-  url.hash = `m${seconds}${salt}`;
-  const key = new Request(url.toString(), { method: 'GET' });
+  const key = listedCacheRequest(url.origin, url.pathname, seconds, salt);
   const hit = cache ? await cache.match(key).catch(() => undefined) : undefined;
   if (hit) return hit;
   const response = await make();
@@ -1014,14 +1027,15 @@ type PileRow = { id: number; data: string; created_at: number };
 
 function pileEntry(row: PileRow): PileReceipt | null {
   const receipt = JSON.parse(row.data) as YearReceipt;
-  if (receipt.version !== 2) return null;
+  if (receipt.version !== 2 || receipt.growing) return null;
+  const items = realReceiptItems(receipt.items);
   return {
     id: row.id,
     who: subjectLabel(receipt.subject),
-    count: itemsShipped(receipt),
-    potential: receipt.potential || itemsShipped(receipt) === 0,
+    count: items.length,
+    potential: receipt.potential || items.length === 0,
     full: Boolean(receipt.full),
-    items: realReceiptItems(receipt.items).slice(0, 6).map((item) => ({ name: item.name, status: item.status })),
+    items: items.slice(0, 6).map((item) => ({ name: item.name, status: item.status })),
     printedAt: receipt.printedAt,
   };
 }
@@ -2050,12 +2064,10 @@ export async function handleShipped(request: Request, env: ShippedEnv, ctx: Exec
 
   const receipt = path.match(/^\/api\/shipped\/receipts\/(\d{1,9})$/);
   if (receipt && method === 'GET') {
-    return cached(request, ctx, 60, async () => {
-      const db = await database(env);
-      const found = db ? await loadReceipt(db, Number(receipt[1])) : null;
-      if (!found || !db) return json({ error: 'not-found' }, 404);
-      return json({ receipt: found, sponsors: await sponsorBlock(db, env) }, 200, 'public, max-age=60');
-    });
+    const db = await database(env);
+    const found = db ? await loadReceipt(db, Number(receipt[1])) : null;
+    if (!found || !db) return json({ error: 'not-found' }, 404);
+    return json({ receipt: found, sponsors: await sponsorBlock(db, env) }, 200, found.growing ? 'no-store' : 'public, max-age=5');
   }
   const asImage = async (response: Response) => {
     if (method === 'HEAD') return new Response(null, { status: response.status, headers: response.headers });
@@ -2130,8 +2142,15 @@ async function dropListedCache(env: ShippedEnv, id?: number) {
   const cache = edgeCache();
   if (!cache) return;
   const origins = new Set([env.SHIPPED_HOST ? `https://${env.SHIPPED_HOST}` : null, SHIPPED_URL].filter((o): o is string => Boolean(o)));
-  const paths = ['/api/shipped/state', '/api/shipped/pile', ...(id ? [`/api/shipped/receipts/${id}`] : [])];
-  await Promise.all([...origins].flatMap((origin) => paths.map((path) => cache.delete(new Request(new URL(path, origin))).catch(() => false))));
+  const keys = [
+    ['/api/shipped/state', 10],
+    ['/api/shipped/proof', 10],
+    ['/api/shipped/pile', 15],
+    ...(id ? ([[`/api/shipped/receipts/${id}`, 60]] as const) : []),
+  ] as const;
+  await Promise.all(
+    [...origins].flatMap((origin) => keys.map(([path, seconds]) => cache.delete(listedCacheRequest(origin, path, seconds)).catch(() => false))),
+  );
 }
 
 function subjectFromReceipt(data: YearReceipt, loginKey?: string, login?: string | null): Subject | null {
@@ -2215,10 +2234,10 @@ async function loadStoredNotes(db: D1Database, exceptId?: number): Promise<strin
   return notes;
 }
 
-// OSS harvest's own budget is 28s. The first-wave partial (including org
-// releases) must finish before this deadline or admin prints get an empty stub.
-export const ADMIN_GATHER_MS = 40_000;
-export const ADMIN_CURATE_MS = 20_000;
+// Fast sources and OSS are each time-boxed to ~6s. Admin still waits for the
+// full first wave so reprints are not empty stubs.
+export const ADMIN_GATHER_MS = 20_000;
+export const ADMIN_CURATE_MS = 14_000;
 
 function stubGathered(subject: Subject): Gathered {
   const profile = emptyProfile();

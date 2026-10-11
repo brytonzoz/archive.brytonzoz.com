@@ -124,6 +124,7 @@ test('title sanity is the only post-LLM title check', () => {
   assert.equal(polish.titleSanityOk('We launched AI Gateway'), false);
   assert.equal(polish.titleSanityOk('WE BUILT EMOJI SEARCH'), false);
   assert.equal(polish.titleSanityOk('AI Gateway'), true);
+  assert.equal(polish.rewriteShipTitle('We launched AI Gateway'), 'AI Gateway');
   assert.equal(polish.titleSanityOk('Find deployments faster with redesigned filters now live'), false);
 });
 
@@ -209,7 +210,7 @@ test('harvest wins when Claude keeps a highlight reel of a fat company tape', ()
   ];
   assert.equal(curate.harvestLooksLikeOssTape(bunPlusEssays), true);
   assert.equal(curate.harvestLooksLikeCommentaryTape(bunPlusEssays), false);
-  assert.ok(sources.OSS_TIMEOUT_MS >= 28_000);
+  assert.ok(sources.OSS_TIMEOUT_MS >= 6_000 && sources.OSS_TIMEOUT_MS <= 8_000);
   assert.equal(curate.harvestLooksLikeCommentaryTape([
     { name: "Brazil's CPF catch-22 makes booking hotels impossible" },
     { name: 'Tech insiders avoid touchscreens and smart homes because' },

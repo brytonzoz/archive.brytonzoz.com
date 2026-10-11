@@ -11,7 +11,7 @@ import { shipName } from './shipped-changelog';
 import { shareKeywords } from './shipped-decisions';
 import { isOssHarvestItem, ownerFromProfile, type OwnerContext } from './shipped-ownership';
 import { flagshipLaunchName, isFlagshipYearKeep, isJoinOrAcquire, isPriorYearJoin, logFlagshipGate } from './shipped-flagship';
-import { cheapHardFilter, cleanDescription, cleanShipTitle, cleanStatus, gateReceiptItems, isChangelogEntryHref, isOpenAiCompanyWide, noteCountMismatch, spokenShipName, titleSanityOk } from './shipped-polish';
+import { cheapHardFilter, cleanDescription, cleanShipTitle, cleanStatus, gateReceiptItems, isChangelogEntryHref, isOpenAiCompanyWide, noteCountMismatch, rewriteShipTitle, spokenShipName, titleSanityOk } from './shipped-polish';
 import { emptyAffiliation, type Affiliation } from './shipped-affiliation';
 import { looksLikePersonName } from './shipped-repos';
 import { RECEIPT_BUDGET_MICROS, formatReceiptStats, searchBudget, type SourcedStat } from './shipped-research';
@@ -1727,7 +1727,11 @@ export async function assembleReceipt(
     }
   }
   const fallbackItems = cheapHardFilter(harvested, year)
-    .filter((item) => titleSanityOk(item.name))
+    .flatMap((item) => {
+      if (titleSanityOk(item.name)) return [item];
+      const short = rewriteShipTitle(item.name, item.link);
+      return short && titleSanityOk(short) ? [{ ...item, name: short }] : [];
+    })
     .slice(0, CURATION_LINE_CAP);
   if (fallbackItems.length && !harvestLooksLikeCommentaryTape(fallbackItems)) {
     const sealed = finish(fallbackItems, '', seed, undefined, formatStats(fallbackItems, gathered.stats ?? []), {

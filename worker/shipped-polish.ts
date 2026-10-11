@@ -571,6 +571,23 @@ const FOREIGN_VENDOR_PRODUCT =
   /^(cursor cloud agents|gpt-[\d.]+(?:\s+sol)?)$/i;
 
 /** Another company's product on this company's tape, with no first-party feature phrasing. */
+const PREVIEW_CHANGELOG_HOST = /\.(vercel\.app|netlify\.app|pages\.dev)$/i;
+
+/** Another company's Vercel/Netlify preview changelog is not this builder's tape. */
+export function isOffCompanyChangelog(
+  item: { name?: string; link?: string | null; source?: string | null },
+  company?: string | null,
+): boolean {
+  if ((item.source || '') !== 'changelog') return false;
+  const host = hostOf(item.link);
+  if (!host) return false;
+  if (PREVIEW_CHANGELOG_HOST.test(host)) {
+    if (/vercel/i.test(company || '') && /vercel\.app$/i.test(host)) return false;
+    return true;
+  }
+  return false;
+}
+
 export function isForeignProductOnCompanyTape(
   name: string,
   company?: string | null,
@@ -1550,6 +1567,10 @@ export function polishCandidates<T extends Polishable>(items: T[], opts: PolishO
         drop(item, 'junk-title');
         continue;
       }
+    }
+    if (isOffCompanyChangelog({ ...item, name }, opts.affiliation?.company || junkOpts.company)) {
+      drop(item, 'off-company-changelog');
+      continue;
     }
     if (isForeignProductOnCompanyTape(name, opts.affiliation?.company || junkOpts.company)) {
       drop(item, 'foreign-vendor');

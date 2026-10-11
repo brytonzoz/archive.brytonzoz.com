@@ -78,6 +78,7 @@ export type DraftItem = {
   isRealShip?: number;
   inYear?: number;
   significance?: number;
+  kind?: string;
   /** Source / proper casing for notes (tsc-rs, BotID). */
   spoken?: string;
 };
@@ -943,6 +944,7 @@ function toDraftItem(item: Found, year: number): DraftItem | null {
     isRealShip: item.isRealShip,
     inYear: item.inYear,
     significance: item.significance,
+    kind: item.kind,
   };
 }
 

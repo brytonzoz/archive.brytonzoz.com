@@ -2081,9 +2081,9 @@ async function gatherFresh(
               if (!response?.ok) return null;
               return (await response.text()).slice(0, 400_000);
             },
-          }).catch(() => ({ found: [] as Found[], ran: [] as string[] }));
+          }).catch(() => ({ found: [] as Found[], ran: [] as string[], orgs: [] as string[] }));
         })()
-      : Promise.resolve({ found: [] as Found[], ran: [] as string[] });
+      : Promise.resolve({ found: [] as Found[], ran: [] as string[], orgs: [] as string[] });
   const [results, site, extraSites, searched, storeHarvest, githubOverview, ossHarvest] = await Promise.all([
     Promise.allSettled(SOURCES.filter((source) => source.enabled(ctx)).map(async (source) => ({ id: source.id, found: await raceTimeout(source.run(ctx), SOURCE_TIMEOUT_MS, []) }))),
     homepage ? raceTimeout(readSite(homepage).catch(() => null), SOURCE_TIMEOUT_MS, null) : Promise.resolve(null),
@@ -2102,7 +2102,7 @@ async function gatherFresh(
     ),
     companyStoreP,
     raceTimeout(githubOverviewP, SOURCE_TIMEOUT_MS, null),
-    raceTimeout(ossHarvestP, OSS_TIMEOUT_MS, { found: [] as Found[], ran: [] as string[] }),
+    raceTimeout(ossHarvestP, OSS_TIMEOUT_MS, { found: [] as Found[], ran: [] as string[], orgs: [] as string[] }),
     raceTimeout(identityP, SOURCE_TIMEOUT_MS, undefined),
   ]);
   if (site) ran.push('site');
@@ -2134,6 +2134,9 @@ async function gatherFresh(
       ran.push(settled.value.id);
       found.push(...settled.value.found);
     } else failed.push(settled.reason instanceof SourceError ? settled.reason.code : 'error');
+  }
+  if (ossHarvest.orgs?.length) {
+    profile.orgs = [...new Set([...(profile.orgs || []), ...ossHarvest.orgs])];
   }
   if (ossHarvest.found.length) {
     found.push(...ossHarvest.found);

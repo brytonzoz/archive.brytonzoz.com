@@ -34,6 +34,88 @@ test('prefixed tags still parse as semver', () => {
   assert.deepEqual(oss.parseSemver('v1.3.2'), { major: 1, minor: 3, patch: 2 });
 });
 
+test('event repos pin the flagship before site probes', async () => {
+  const order = [];
+  const get = async (path) => {
+    order.push(`get:${path.split('?')[0]}`);
+    if (path.startsWith('/users/Jarred-Sumner/repos')) return [];
+    if (path.startsWith('/users/Jarred-Sumner/orgs')) return [{ login: 'codeblog' }];
+    if (path.startsWith('/users/Jarred-Sumner/events')) return [{ type: 'PushEvent', repo: { name: 'oven-sh/bun' } }];
+    if (path === '/repos/oven-sh/bun') {
+      return { name: 'bun', html_url: 'https://github.com/oven-sh/bun', homepage: 'https://bun.com', stargazers_count: 96000, fork: false };
+    }
+    if (path.includes('/oven-sh/bun/releases')) {
+      return [
+        { tag_name: 'bun-v1.4.0', name: 'Bun 1.4', published_at: '2026-08-20T12:00:00Z', body: 'Bun 1.4 notes', html_url: 'https://github.com/oven-sh/bun/releases/tag/bun-v1.4.0' },
+        { tag_name: 'bun-v1.4.1', published_at: '2026-09-04T12:00:00Z', body: '', html_url: 'https://github.com/oven-sh/bun/releases/tag/bun-v1.4.1' },
+        { tag_name: 'bun-v1.4.2', published_at: '2026-09-05T12:00:00Z', body: '', html_url: 'https://github.com/oven-sh/bun/releases/tag/bun-v1.4.2' },
+        { tag_name: 'bun-v1.3.8', published_at: '2026-01-29T12:00:00Z', body: '', html_url: 'https://github.com/oven-sh/bun/releases/tag/bun-v1.3.8' },
+        { tag_name: 'bun-v1.3.7', published_at: '2026-01-27T12:00:00Z', body: '', html_url: 'https://github.com/oven-sh/bun/releases/tag/bun-v1.3.7' },
+      ];
+    }
+    return [];
+  };
+  const { found, ran } = await oss.harvestOss({
+    login: 'Jarred-Sumner',
+    year: 2026,
+    get,
+    orgs: ['codeblog'],
+    sites: ['https://jarredsumner.com/'],
+    readText: async (url) => {
+      order.push(`site:${url}`);
+      return '<meta name="description" content="Creator of Bun.">';
+    },
+  });
+  const rel = order.findIndex((row) => row.includes('/releases'));
+  const site = order.findIndex((row) => row.startsWith('site:'));
+  assert.ok(rel >= 0, JSON.stringify(order));
+  assert.ok(site < 0 || rel < site, JSON.stringify(order));
+  assert.ok(ran.some((tag) => /oss-event-repo:oven-sh\/bun/.test(tag)), JSON.stringify(ran));
+  assert.ok(found.some((item) => /bun 1\.4/i.test(item.name)), JSON.stringify(found.map((item) => item.name)));
+  assert.ok(found.some((item) => /RELEASES IN SEP/i.test(item.name)), JSON.stringify(found.map((item) => item.name)));
+});
+
+test('decisions keep oss harvest kind so monthly lines survive the second polish', async () => {
+  const decisions = await import('../worker/shipped-decisions.ts');
+  const item = {
+    name: 'Bun · 2 RELEASES IN SEP',
+    description: '2 Bun releases in SEP',
+    date: '2026-09-05',
+    link: 'https://github.com/oven-sh/bun/releases/tag/bun-v1.4.2',
+    source: 'company',
+    status: 'RELEASED',
+    score: 7,
+    thisYear: true,
+    kind: 'oss-release',
+  };
+  const owner = { name: 'Jarred Sumner', github: 'Jarred-Sumner' };
+  const verified = decisions.heuristicVerify([item], 2026, { company: null, role: 'founder' }, null, owner);
+  assert.equal(verified[0]?.kind, 'oss-release');
+  const again = polish.polishCandidates(verified, { year: 2026, who: 'Jarred Sumner', owner });
+  assert.ok(again.some((row) => /RELEASES IN SEP/i.test(row.name)), JSON.stringify(again.map((row) => row.name)));
+});
+
+test('preview-host changelogs from another company drop', () => {
+  assert.equal(
+    polish.isOffCompanyChangelog(
+      {
+        name: 'DATA API UPGRADE TO POSTGREST V14',
+        link: 'https://zone-www-dot-com.vercel.app/changelog/41288-data-api-upgrade-to-postgrest-v14',
+        source: 'changelog',
+      },
+      'VoidZero',
+    ),
+    true,
+  );
+  assert.equal(
+    polish.isOffCompanyChangelog(
+      { name: 'Vercel Agent', link: 'https://vercel.com/changelog/vercel-agent', source: 'changelog' },
+      'Vercel',
+    ),
+    false,
+  );
+});
+
 test('harvestOss adds hidden orgs from public events', async () => {
   const get = async (path) => {
     if (path.startsWith('/users/Jarred-Sumner/repos')) return [];

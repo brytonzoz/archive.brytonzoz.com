@@ -410,6 +410,16 @@ test('blocked challenge pages are dropped; TinyFish markdown still extracts date
   assert.equal(company.isPriorityCompanyUrl('https://developers.openai.com/codex/changelog'), true);
   assert.equal(company.isPriorityCompanyUrl('https://openai.com/products/release-notes'), true);
   assert.equal(company.isPriorityCompanyUrl('https://openai.com/careers'), false);
+  assert.equal(
+    company.isCompanyFirstPartyUrl('https://openai.com/changelog', ['https://openai.com/', 'https://voidzero.dev/']),
+    true,
+  );
+  assert.equal(
+    company.isCompanyFirstPartyUrl('https://zone-www-dot-com.vercel.app/changelog/41288-data-api-upgrade-to-postgrest-v14', [
+      'https://voidzero.dev/',
+    ]),
+    false,
+  );
   assert.ok(company.priorityCompanyScore('https://developers.openai.com/codex/changelog') < company.priorityCompanyScore('https://openai.com/blog'));
   const page = company.companyPageFromTinyfish({
     url: 'https://developers.openai.com/codex/changelog',

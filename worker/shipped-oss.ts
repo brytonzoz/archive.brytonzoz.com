@@ -493,6 +493,27 @@ function asRepo(owner: string, row: Record<string, unknown>): OssRepo | null {
   };
 }
 
+export function eventReposFromEvents(
+  events: { repo?: { name?: string }; type?: string }[] | null | undefined,
+  login: string,
+): { owner: string; name: string }[] {
+  const self = login.replace(/^@/, '').toLowerCase();
+  const out: { owner: string; name: string }[] = [];
+  const seen = new Set<string>();
+  for (const event of Array.isArray(events) ? events : []) {
+    const full = String(event.repo?.name || '');
+    const [owner, name] = full.split('/');
+    if (!owner || !name || !REPO_OK.test(name) || !/^[A-Za-z0-9-]{1,39}$/.test(owner)) continue;
+    if (owner.toLowerCase() === self) continue;
+    const key = `${owner.toLowerCase()}/${name.toLowerCase()}`;
+    if (seen.has(key)) continue;
+    seen.add(key);
+    out.push({ owner, name });
+    if (out.length >= 8) break;
+  }
+  return out;
+}
+
 export async function harvestOss(opts: {
   login: string;
   year: number;
@@ -503,7 +524,7 @@ export async function harvestOss(opts: {
   bio?: string;
   orgs?: string[];
   sites?: string[];
-}): Promise<{ found: OssFound[]; ran: string[] }> {
+}): Promise<{ found: OssFound[]; ran: string[]; orgs: string[] }> {
   const login = opts.login.replace(/^@/, '');
   const year = opts.year;
   const memo = opts.cache || (<T,>(_key: string, _ttl: number, load: () => Promise<T>) => load());
@@ -522,23 +543,46 @@ export async function harvestOss(opts: {
     );
     orgs = (rows || []).map((row) => String(row.login || '')).filter((org) => /^[A-Za-z0-9-]{1,39}$/.test(org));
   }
-  if (orgs.length < 8) {
-    const events = await memo(`oss:events:${login.toLowerCase()}`, 180 * 60, () =>
-      opts.get<{ repo?: { name?: string }; type?: string }[]>(`/users/${encodeURIComponent(login)}/events?per_page=30`).catch(() => []),
-    );
-    for (const event of Array.isArray(events) ? events : []) {
-      const full = String(event.repo?.name || '');
-      const org = full.split('/')[0] || '';
-      if (!org || org.toLowerCase() === login.toLowerCase() || !/^[A-Za-z0-9-]{1,39}$/.test(org)) continue;
-      if (!orgs.some((row) => row.toLowerCase() === org.toLowerCase())) orgs.push(org);
-      if (orgs.length >= 8) break;
-    }
-    if (events?.length) ran.push(`oss-events:${orgs.slice(0, 8).join(',')}`);
+  const events = await memo(`oss:events:${login.toLowerCase()}`, 180 * 60, () =>
+    opts.get<{ repo?: { name?: string }; type?: string }[]>(`/users/${encodeURIComponent(login)}/events?per_page=30`).catch(() => []),
+  );
+  const eventHits = eventReposFromEvents(events, login);
+  for (const hit of eventHits) {
+    if (!orgs.some((row) => row.toLowerCase() === hit.owner.toLowerCase())) orgs.push(hit.owner);
   }
+  if (eventHits.length) ran.push(`oss-events:${eventHits.map((hit) => `${hit.owner}/${hit.name}`).slice(0, 8).join(',')}`);
   ran.push(`oss-orgs:${orgs.slice(0, 8).join(',') || 'none'}`);
 
+  const started = Date.now();
+  const overBudget = () => Date.now() - started > 28_000;
   const orgRepos: OssRepo[] = [];
+  const takeRepo = (repo: OssRepo | null | undefined) => {
+    if (!repo) return;
+    const key = `${repo.owner.toLowerCase()}/${repo.name.toLowerCase()}`;
+    if (orgRepos.some((row) => `${row.owner.toLowerCase()}/${row.name.toLowerCase()}` === key)) return;
+    orgRepos.push(repo);
+  };
+
+  for (const hit of eventHits.slice(0, 8)) {
+    const meta = await memo(`oss:repo:${hit.owner}/${hit.name}`, 360 * 60, () =>
+      opts.get<Record<string, unknown>>(`/repos/${encodeURIComponent(hit.owner)}/${encodeURIComponent(hit.name)}`).catch(() => null),
+    );
+    const repo =
+      asRepo(hit.owner, meta || { name: hit.name, html_url: `https://github.com/${hit.owner}/${hit.name}`, stargazers_count: 1 }) ||
+      ({
+        owner: hit.owner,
+        name: hit.name,
+        html_url: `https://github.com/${hit.owner}/${hit.name}`,
+        stargazers_count: 1,
+      } satisfies OssRepo);
+    if (meta && (meta as { fork?: boolean }).fork) continue;
+    takeRepo(repo);
+    ran.push(`oss-event-repo:${hit.owner}/${hit.name}`);
+  }
+
+  const pendingStats: { org: string; repos: OssRepo[] }[] = [];
   for (const org of orgs.slice(0, 8)) {
+    if (overBudget()) break;
     const founder = isOrgFounder({
       org,
       bio: opts.bio,
@@ -561,45 +605,81 @@ export async function harvestOss(opts: {
         bioMentionsRepo(opts.affiliation?.product || opts.affiliation?.company || '', repo),
     );
     if (founder || mentioned.length) {
-      orgRepos.push(...(founder ? repos.slice(0, 20) : mentioned));
+      for (const repo of founder ? repos.slice(0, 20) : mentioned) takeRepo(repo);
       ran.push(founder ? `oss-founder:${org}` : `oss-bio:${org}/${mentioned.map((row) => row.name).slice(0, 4).join(',')}`);
       continue;
     }
-    const checked = repos.slice(0, 3);
-    for (const repo of checked) {
-      const stats = await Promise.race([
-        memo(`oss:stats:${org}/${repo.name}:${year}`, 360 * 60, () =>
-          opts.get<ContributorStat[]>(`/repos/${encodeURIComponent(org)}/${encodeURIComponent(repo.name)}/stats/contributors`).catch(() => []),
-        ),
-        new Promise<ContributorStat[]>((resolve) => setTimeout(resolve, 2500, [])),
-      ]);
-      if (isTopContributorInYear(Array.isArray(stats) ? stats : [], login, year, 3)) {
-        orgRepos.push(repo);
-        ran.push(`oss-top3:${org}/${repo.name}`);
-        continue;
+    pendingStats.push({ org, repos: repos.slice(0, 3) });
+  }
+
+  const seenHarvest = new Set<string>();
+  const harvestRepos = async (repos: OssRepo[], tag: string) => {
+    for (const repo of repos) {
+      if (overBudget()) {
+        ran.push('oss-budget');
+        return;
       }
-      const since = await memo(`oss:authored:${org}/${repo.name}:${login}:${year}`, 360 * 60, () =>
+      const key = `${repo.owner.toLowerCase()}/${repo.name.toLowerCase()}`;
+      if (seenHarvest.has(key)) continue;
+      seenHarvest.add(key);
+      const source: OssFound['source'] = repo.owner.toLowerCase() === login.toLowerCase() ? 'github' : 'company';
+      const releases = await memo(`oss:rel:${repo.owner}/${repo.name}`, 180 * 60, () =>
         opts
-          .get<{ sha?: string }[]>(
-            `/repos/${encodeURIComponent(org)}/${encodeURIComponent(repo.name)}/commits?author=${encodeURIComponent(login)}&since=${year}-01-01T00:00:00Z&per_page=1`,
-          )
+          .get<OssRelease[]>(`/repos/${encodeURIComponent(repo.owner)}/${encodeURIComponent(repo.name)}/releases?per_page=40`)
           .catch(() => []),
       );
-      if (Array.isArray(since) && since.length) {
-        orgRepos.push(repo);
-        ran.push(`oss-authored:${org}/${repo.name}`);
+      const yearReleases = (Array.isArray(releases) ? releases : [])
+        .filter((row) => !row.draft && !row.prerelease && !isPrereleaseTag(String(row.tag_name || row.name || '')))
+        .filter((row) => inYear(day(row.published_at), year));
+      let tags: OssTag[] = [];
+      if (yearReleases.length < 5) {
+        const rawTags = await memo(`oss:tags:${repo.owner}/${repo.name}`, 180 * 60, () =>
+          opts.get<OssTag[]>(`/repos/${encodeURIComponent(repo.owner)}/${encodeURIComponent(repo.name)}/tags?per_page=30`).catch(() => []),
+        );
+        const unused = (Array.isArray(rawTags) ? rawTags : [])
+          .filter((tag) => tag.name && !yearReleases.some((row) => String(row.tag_name || '').toLowerCase() === String(tag.name).toLowerCase()))
+          .filter((tag) => parseSemver(String(tag.name || '')) && !isPrereleaseTag(String(tag.name || '')))
+          .slice(0, 12);
+        tags = await Promise.all(
+          unused.map(async (tag) => {
+            const sha = tag.commit?.sha;
+            if (!sha) return { ...tag, date: null };
+            const commit = await memo(`oss:commit:${repo.owner}/${repo.name}/${sha}`, 360 * 60, () =>
+              opts
+                .get<{ commit?: { committer?: { date?: string }; author?: { date?: string } } }>(
+                  `/repos/${encodeURIComponent(repo.owner)}/${encodeURIComponent(repo.name)}/commits/${encodeURIComponent(sha)}`,
+                )
+                .catch(() => null),
+            );
+            return { ...tag, date: day(commit?.commit?.committer?.date || commit?.commit?.author?.date) };
+          }),
+        );
+      }
+      if (inYear(repo.created_at, year) && (repo.stargazers_count ?? 0) >= 100 && repo.readme == null) {
+        const readme = await memo(`oss:readme:${repo.owner}/${repo.name}`, 360 * 60, () =>
+          opts
+            .get<{ content?: string }>(`/repos/${encodeURIComponent(repo.owner)}/${encodeURIComponent(repo.name)}/readme`)
+            .then((row) => Boolean(row?.content || looksLikeProductReadme(repo.description || '')))
+            .catch(() => looksLikeProductReadme(repo.description || '')),
+        );
+        repo.readme = Boolean(readme);
+      }
+      const lines = linesFromOssRepo(repo, yearReleases, tags, year, source);
+      if (lines.length) {
+        found.push(...lines);
+        ran.push(`${tag}:${repo.owner}/${repo.name}:${lines.length}`);
       }
     }
-  }
+  };
+
+  await harvestRepos(orgRepos.slice(0, 8), 'oss-rel');
 
   let bio = opts.bio || '';
   const products = [opts.affiliation?.product, opts.affiliation?.company].filter((value): value is string => Boolean(value));
-  const probeHomes = [
-    ...(opts.sites || []),
-    ...products.flatMap((product) => productHostGuesses(product)),
-  ].filter((url, i, all) => url && all.indexOf(url) === i);
-  if (opts.readText) {
-    for (let i = 0; i < probeHomes.length && i < 8; i++) {
+  const probeHomes = [...(opts.sites || [])].filter((url, i, all) => url && all.indexOf(url) === i);
+  if (opts.readText && !overBudget()) {
+    const extraHomes = found.length ? 2 : 4;
+    for (let i = 0; i < probeHomes.length && i < extraHomes && !overBudget(); i++) {
       const home = probeHomes[i]!;
       const html = await memo(`oss:site:${home}`, 180 * 60, () => opts.readText!(home).catch(() => null));
       if (!html) continue;
@@ -613,7 +693,15 @@ export async function harvestOss(opts: {
         const fromBio = affiliationFromBio(bio);
         if (fromBio.company) products.push(fromBio.company);
         if (fromBio.product) products.push(fromBio.product);
-        for (const next of products.flatMap((product) => productHostGuesses(product))) {
+      }
+      for (const href of html.matchAll(/https?:\/\/[^\s"'<>]+/gi)) {
+        const next = publicUrl(href[0]);
+        if (!next || probeHomes.includes(next)) continue;
+        if (/github\.com|twitter\.com|x\.com|linkedin\.com/i.test(next)) continue;
+        probeHomes.push(next);
+      }
+      if (found.length === 0 && products.length) {
+        for (const next of products.flatMap((product) => productHostGuesses(product)).slice(0, 2)) {
           if (next && !probeHomes.includes(next)) probeHomes.push(next);
         }
       }
@@ -643,13 +731,13 @@ export async function harvestOss(opts: {
             stargazers_count: 1,
           } satisfies OssRepo);
         repo.homepage = repo.homepage || home;
-        orgRepos.push(repo);
+        takeRepo(repo);
         ran.push(`oss-site:${hit.owner}/${hit.name}`);
       }
     }
   }
 
-  if (products.length && opts.get && !orgRepos.some((repo) => products.some((product) => product.toLowerCase().replace(/[^a-z0-9]+/g, '') === repo.name.toLowerCase().replace(/[^a-z0-9]+/g, '')))) {
+  if (products.length && opts.get && !orgRepos.some((repo) => products.some((product) => product.toLowerCase().replace(/[^a-z0-9]+/g, '') === repo.name.toLowerCase().replace(/[^a-z0-9]+/g, ''))) && !overBudget()) {
     for (const product of products.slice(0, 2)) {
       const q = product.replace(/[^A-Za-z0-9._-]+/g, ' ').trim();
       if (q.length < 2) continue;
@@ -663,82 +751,59 @@ export async function harvestOss(opts: {
           bioMentionsRepo(bio, repo) ||
           products.some((name) => name.toLowerCase().replace(/[^a-z0-9]+/g, '') === repo.name.toLowerCase().replace(/[^a-z0-9]+/g, ''));
         if (!mentioned) continue;
-        orgRepos.push(repo);
+        takeRepo(repo);
         ran.push(`oss-search:${repo.owner}/${repo.name}`);
         break;
       }
     }
   }
 
-  const seenRepo = new Set<string>();
-  const targets: OssRepo[] = [];
-  const pinned = new Set(orgRepos.map((repo) => `${repo.owner.toLowerCase()}/${repo.name.toLowerCase()}`));
-  for (const repo of [...orgRepos, ...owned]) {
-    const key = `${repo.owner.toLowerCase()}/${repo.name.toLowerCase()}`;
-    if (seenRepo.has(key)) continue;
-    seenRepo.add(key);
-    targets.push(repo);
-  }
-  const ranked = [
-    ...targets.filter((repo) => pinned.has(`${repo.owner.toLowerCase()}/${repo.name.toLowerCase()}`)).slice(0, 8),
-    ...targets
-      .filter((repo) => !pinned.has(`${repo.owner.toLowerCase()}/${repo.name.toLowerCase()}`))
-      .sort((a, b) => (b.stargazers_count ?? 0) - (a.stargazers_count ?? 0))
-      .slice(0, 8),
-  ];
+  await harvestRepos(
+    orgRepos.filter((repo) => !seenHarvest.has(`${repo.owner.toLowerCase()}/${repo.name.toLowerCase()}`)).slice(0, 8),
+    'oss-rel',
+  );
 
-  const started = Date.now();
-  for (const repo of ranked) {
-    if (Date.now() - started > 28_000) {
-      ran.push('oss-budget');
-      break;
+  if (found.length < 8 && !overBudget()) {
+    for (const pending of pendingStats) {
+      if (overBudget() || found.length >= 8) break;
+      for (const repo of pending.repos) {
+        const stats = await Promise.race([
+          memo(`oss:stats:${pending.org}/${repo.name}:${year}`, 360 * 60, () =>
+            opts.get<ContributorStat[]>(`/repos/${encodeURIComponent(pending.org)}/${encodeURIComponent(repo.name)}/stats/contributors`).catch(() => []),
+          ),
+          new Promise<ContributorStat[]>((resolve) => setTimeout(resolve, 2500, [])),
+        ]);
+        if (isTopContributorInYear(Array.isArray(stats) ? stats : [], login, year, 3)) {
+          takeRepo(repo);
+          ran.push(`oss-top3:${pending.org}/${repo.name}`);
+          continue;
+        }
+        const since = await memo(`oss:authored:${pending.org}/${repo.name}:${login}:${year}`, 360 * 60, () =>
+          opts
+            .get<{ sha?: string }[]>(
+              `/repos/${encodeURIComponent(pending.org)}/${encodeURIComponent(repo.name)}/commits?author=${encodeURIComponent(login)}&since=${year}-01-01T00:00:00Z&per_page=1`,
+            )
+            .catch(() => []),
+        );
+        if (Array.isArray(since) && since.length) {
+          takeRepo(repo);
+          ran.push(`oss-authored:${pending.org}/${repo.name}`);
+        }
+      }
     }
-    const source: OssFound['source'] = repo.owner.toLowerCase() === login.toLowerCase() ? 'github' : 'company';
-    const releases = await memo(`oss:rel:${repo.owner}/${repo.name}`, 180 * 60, () =>
-      opts
-        .get<OssRelease[]>(`/repos/${encodeURIComponent(repo.owner)}/${encodeURIComponent(repo.name)}/releases?per_page=40`)
-        .catch(() => []),
-    );
-    const yearReleases = (Array.isArray(releases) ? releases : []).filter((row) => inYear(day(row.published_at), year));
-    let tags: OssTag[] = [];
-    if (yearReleases.length < 5) {
-      const rawTags = await memo(`oss:tags:${repo.owner}/${repo.name}`, 180 * 60, () =>
-        opts.get<OssTag[]>(`/repos/${encodeURIComponent(repo.owner)}/${encodeURIComponent(repo.name)}/tags?per_page=30`).catch(() => []),
-      );
-      const unused = (Array.isArray(rawTags) ? rawTags : [])
-        .filter((tag) => tag.name && !yearReleases.some((row) => String(row.tag_name || '').toLowerCase() === String(tag.name).toLowerCase()))
-        .filter((tag) => parseSemver(String(tag.name || '')) && !isPrereleaseTag(String(tag.name || '')))
-        .slice(0, 12);
-      tags = await Promise.all(
-        unused.map(async (tag) => {
-          const sha = tag.commit?.sha;
-          if (!sha) return { ...tag, date: null };
-          const commit = await memo(`oss:commit:${repo.owner}/${repo.name}/${sha}`, 360 * 60, () =>
-            opts
-              .get<{ commit?: { committer?: { date?: string }; author?: { date?: string } } }>(
-                `/repos/${encodeURIComponent(repo.owner)}/${encodeURIComponent(repo.name)}/commits/${encodeURIComponent(sha)}`,
-              )
-              .catch(() => null),
-          );
-          return { ...tag, date: day(commit?.commit?.committer?.date || commit?.commit?.author?.date) };
-        }),
-      );
-    }
-    if (inYear(repo.created_at, year) && (repo.stargazers_count ?? 0) >= 100 && repo.readme == null) {
-      const readme = await memo(`oss:readme:${repo.owner}/${repo.name}`, 360 * 60, () =>
-        opts
-          .get<{ content?: string }>(`/repos/${encodeURIComponent(repo.owner)}/${encodeURIComponent(repo.name)}/readme`)
-          .then((row) => Boolean(row?.content || looksLikeProductReadme(repo.description || '')))
-          .catch(() => looksLikeProductReadme(repo.description || '')),
-      );
-      repo.readme = Boolean(readme);
-    }
-    found.push(...linesFromOssRepo(repo, yearReleases, tags, year, source));
   }
 
-  const homes = [...new Set(ranked.map((repo) => publicUrl(repo.homepage)).filter((url): url is string => Boolean(url)))].slice(0, 6);
-  if (opts.readText) {
+  const leftover = orgRepos.filter((repo) => !seenHarvest.has(`${repo.owner.toLowerCase()}/${repo.name.toLowerCase()}`));
+  const ownedLeft = owned
+    .filter((repo) => !seenHarvest.has(`${repo.owner.toLowerCase()}/${repo.name.toLowerCase()}`))
+    .sort((a, b) => (b.stargazers_count ?? 0) - (a.stargazers_count ?? 0))
+    .slice(0, 8);
+  await harvestRepos([...leftover, ...ownedLeft].slice(0, 8), 'oss-rel');
+
+  const homes = [...new Set(orgRepos.map((repo) => publicUrl(repo.homepage)).filter((url): url is string => Boolean(url)))].slice(0, 6);
+  if (opts.readText && !overBudget()) {
     for (const home of homes) {
+      if (overBudget()) break;
       for (const feed of blogFeedUrls(home).slice(0, 4)) {
         const xml = await memo(`oss:feed:${feed}`, 180 * 60, () => opts.readText!(feed).catch(() => null));
         if (!xml || !/<item\b|<entry\b/i.test(xml)) continue;
@@ -753,5 +818,5 @@ export async function harvestOss(opts: {
   }
 
   ran.push(`oss-lines:${found.length}`);
-  return { found, ran };
+  return { found, ran, orgs };
 }

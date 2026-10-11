@@ -5,7 +5,7 @@ import type { Attribution, Affiliation } from './shipped-affiliation';
 import { defaultAttribution, leadProductTokens, matchesLeadProduct } from './shipped-affiliation';
 import { flagshipLaunchName } from './shipped-flagship';
 import { looksLikePersonName } from './shipped-repos';
-import { ownedByBuilder, ownershipEvidence, type OwnerContext } from './shipped-ownership';
+import { isOssHarvestItem, ownedByBuilder, ownershipEvidence, type OwnerContext } from './shipped-ownership';
 import type { Found } from './shipped-sources';
 import { clean } from './shipped-sources';
 
@@ -320,7 +320,7 @@ export function applyMark(item: Found, mark: DecisionMark, via: string | null): 
     inYear: mark.inYear,
     significance: mark.significance,
     attribution: mark.attribution,
-    kind: mark.kind,
+    kind: isOssHarvestItem(item) ? item.kind : mark.kind,
     score: item.score + mark.significance * 2 + mark.confidence,
   };
 }

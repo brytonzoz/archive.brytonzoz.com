@@ -481,6 +481,18 @@ function sameRegistrable(a: string | null, b: string | null): boolean {
   return left.length >= 3 && left === right;
 }
 
+const PREVIEW_HOST = /\.(vercel\.app|netlify\.app|pages\.dev|herokuapp\.com|web\.app)$/i;
+
+/** Search hits must stay on the company's own hosts. A `/changelog` URL is not enough. */
+export function isCompanyFirstPartyUrl(url: string, homes: string[]): boolean {
+  const host = hostOf(url);
+  if (!host) return false;
+  if (/github\.com$/i.test(host)) return true;
+  const own = homes.map((home) => hostOf(home)).filter((value): value is string => Boolean(value));
+  if (PREVIEW_HOST.test(host) && !own.includes(host)) return false;
+  return own.some((home) => sameRegistrable(host, home));
+}
+
 async function pagesForCompany(
   site: string,
   year: number,
@@ -1051,7 +1063,12 @@ export async function harvestCompany(opts: {
           ...new Set(
             hits
               .map((hit) => publicUrl(hit.url))
-              .filter((url): url is string => Boolean(url) && (isPriorityCompanyUrl(url) || /changelog|releases?|whats-new|docs\//i.test(url)))
+              .filter(
+                (url): url is string =>
+                  Boolean(url) &&
+                  isCompanyFirstPartyUrl(url, [...seeds, ...liveOrigins]) &&
+                  (isPriorityCompanyUrl(url) || /changelog|releases?|whats-new|docs\//i.test(url)),
+              )
               .flatMap((url) => {
                 const out = [url];
                 try {

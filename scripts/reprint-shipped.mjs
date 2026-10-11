@@ -96,8 +96,24 @@ async function readReceipt(id) {
   return body.receipt ?? body;
 }
 
+function titlesOf(receipt) {
+  return (receipt?.items || [])
+    .filter((item) => item && item.name && item.name !== 'YOUR POTENTIAL' && item.source !== 'none')
+    .map((item) => item.name);
+}
+
+function usageOf(body) {
+  return {
+    costMicros: Number.isFinite(Number(body?.costMicros)) ? Number(body.costMicros) : null,
+    inputTokens: Number.isFinite(Number(body?.inputTokens)) ? Number(body.inputTokens) : null,
+    outputTokens: Number.isFinite(Number(body?.outputTokens)) ? Number(body.outputTokens) : null,
+    count: Number.isFinite(Number(body?.count)) ? Number(body.count) : null,
+  };
+}
+
 async function reprint(id) {
   const affiliation = AFFILIATION_BY_ID[id];
+  const started = Date.now();
   const res = await fetch(`${origin}/api/admin/shipped`, {
     method: 'POST',
     headers,
@@ -116,6 +132,8 @@ async function reprint(id) {
     error: body.error || null,
     note: typeof body.note === 'string' ? body.note : null,
     noteCandidates: Array.isArray(body.noteCandidates) ? body.noteCandidates : [],
+    ms: Date.now() - started,
+    ...usageOf(body),
   };
 }
 
@@ -147,8 +165,10 @@ for (const target of TARGETS) {
     after = (await readReceipt(target.id)) || before;
   }
   const items = realCount(after) || (after?.potential ? 0 : prior);
+  const titles = titlesOf(after);
   const url = `${origin}${RECEIPT_PATH(target.id)}`;
-  console.log(`#${target.id} ${who} → ${items} items ${url}`);
+  console.log(`#${target.id} ${who} → ${items} items ${last.costMicros ?? '?'}µs ${last.ms}ms ${url}`);
+  console.log(JSON.stringify({ shipped: 'reprint', id: target.id, who, items, titles, note: last.note, costMicros: last.costMicros, inputTokens: last.inputTokens, outputTokens: last.outputTokens, ms: last.ms }));
   if (last.noteCandidates?.length || last.note) {
     console.log(
       JSON.stringify({
@@ -160,10 +180,24 @@ for (const target of TARGETS) {
       }),
     );
   }
-  rows.push({ id: target.id, who, items, url, skipped: false, note: last.note, noteCandidates: last.noteCandidates });
+  rows.push({
+    id: target.id,
+    who,
+    items,
+    titles,
+    url,
+    skipped: false,
+    note: last.note,
+    noteCandidates: last.noteCandidates,
+    costMicros: last.costMicros,
+    inputTokens: last.inputTokens,
+    outputTokens: last.outputTokens,
+    ms: last.ms,
+  });
 }
 
 async function printSubject(q) {
+  const started = Date.now();
   const res = await fetch(`${origin}/api/admin/shipped`, {
     method: 'POST',
     headers,
@@ -183,6 +217,8 @@ async function printSubject(q) {
     id: Number(body.id) || 0,
     note: typeof body.note === 'string' ? body.note : null,
     noteCandidates: Array.isArray(body.noteCandidates) ? body.noteCandidates : [],
+    ms: Date.now() - started,
+    ...usageOf(body),
   };
 }
 
@@ -206,9 +242,11 @@ for (const q of PRINT_SUBJECTS) {
   }
   const who = after?.subject?.display || after?.login || `@${q}`;
   const items = realCount(after);
+  const titles = titlesOf(after);
   const note = last.note || after?.note || null;
   const url = last.id ? `${origin}${RECEIPT_PATH(last.id)}` : origin;
-  console.log(`#${last.id} ${who} → ${items} items ${url}`);
+  console.log(`#${last.id} ${who} → ${items} items ${last.costMicros ?? '?'}µs ${last.ms}ms ${url}`);
+  console.log(JSON.stringify({ shipped: 'print-subject', q, id: last.id, who, items, titles, note, costMicros: last.costMicros, inputTokens: last.inputTokens, outputTokens: last.outputTokens, ms: last.ms }));
   if (note) {
     console.log(
       JSON.stringify({
@@ -221,7 +259,27 @@ for (const q of PRINT_SUBJECTS) {
       }),
     );
   }
-  rows.push({ id: last.id, who, items, url, skipped: false, fresh: true, q, note, noteCandidates: last.noteCandidates });
+  rows.push({
+    id: last.id,
+    who,
+    items,
+    titles,
+    url,
+    skipped: false,
+    fresh: true,
+    q,
+    note,
+    noteCandidates: last.noteCandidates,
+    costMicros: last.costMicros,
+    inputTokens: last.inputTokens,
+    outputTokens: last.outputTokens,
+    ms: last.ms,
+  });
 }
 
-console.log(JSON.stringify({ origin, receipts: rows }, null, 2));
+const report = { origin, xai: 'off', sha: process.env.GITHUB_SHA || null, receipts: rows };
+console.log(JSON.stringify(report, null, 2));
+const reportPath = process.env.SHIPPED_REPORT;
+if (reportPath) {
+  await import('node:fs/promises').then((fs) => fs.writeFile(reportPath, JSON.stringify(report, null, 2)));
+}

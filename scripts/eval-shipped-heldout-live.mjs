@@ -112,6 +112,7 @@ for (const query of QUERIES) {
 const summary = {
   origin,
   xai: 'off',
+  sha: process.env.GITHUB_SHA || null,
   rows: rows.map((row) => ({
     query: row.query,
     id: row.id,
@@ -121,6 +122,8 @@ const summary = {
     echoNote: row.echoNote,
     junk: row.junk,
     costMicros: row.costMicros,
+    inputTokens: row.inputTokens,
+    outputTokens: row.outputTokens,
     ms: row.ms,
     ok: row.ok,
     error: row.error,
@@ -129,5 +132,9 @@ const summary = {
 };
 console.log('\n--- held-out live ---\n');
 console.log(JSON.stringify(summary, null, 2));
+const reportPath = process.env.SHIPPED_REPORT;
+if (reportPath) {
+  await import('node:fs/promises').then((fs) => fs.writeFile(reportPath, JSON.stringify(summary, null, 2)));
+}
 const failed = rows.filter((row) => !row.ok);
 process.exit(failed.length ? 1 : 0);

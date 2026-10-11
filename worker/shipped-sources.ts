@@ -23,7 +23,6 @@ import {
   extraSitePaths,
   guessHandleDotCom,
   githubLoginsFromText,
-  PROFILE_HOSTS,
   handleTokens,
   handleVariants,
   isJunkProfileText,
@@ -204,7 +203,7 @@ export interface SourceProvider {
 
 const UA = 'brytonzoz.com-shipped (+https://shipped.brytonzoz.com/)';
 export const SOURCE_TIMEOUT_MS = 6000;
-const OSS_TIMEOUT_MS = 22_000;
+const OSS_TIMEOUT_MS = 40_000;
 const TIMEOUT = SOURCE_TIMEOUT_MS;
 
 export async function raceTimeout<T>(work: Promise<T>, ms: number, fallback: T): Promise<T> {
@@ -1482,27 +1481,19 @@ async function resolveProductMaker(
   return { x: x.slice(0, 4), github: github.slice(0, 4), names: names.slice(0, 3), sites: sites.slice(0, 4) };
 }
 
-async function followSitesForGithub(
-  urls: string[],
-  notes: string[],
-): Promise<{ logins: string[]; sites: string[]; bio: string | null }> {
+async function followSitesForGithub(urls: string[], notes: string[]): Promise<string[]> {
   const logins: string[] = [];
-  const sites: string[] = [];
-  let bio: string | null = null;
-  for (const url of urls.slice(0, 4)) {
-    const page = await readSite(url).catch(() => null);
+  for (const url of urls.slice(0, 2)) {
+    const page = await Promise.race([
+      readSite(url).catch(() => null),
+      new Promise<null>((resolve) => setTimeout(resolve, 1500, null)),
+    ]);
     if (!page) continue;
-    const blob = `${page.title}\n${page.description}\n${page.text}\n${page.links.map((l) => l.url).join('\n')}`;
-    const found = githubLoginsFromText(blob);
+    const found = githubLoginsFromText(`${page.text}\n${page.links.map((l) => l.url).join('\n')}`);
     if (found.length) notes.push(`site-github:${hostOf(url)}=${found.join(',')}`);
     for (const login of found) if (!logins.some((v) => v.toLowerCase() === login.toLowerCase())) logins.push(login);
-    if (!bio && page.description && !isJunkProfileText(page.description)) bio = page.description;
-    for (const link of page.links) {
-      const href = publicUrl(link.url);
-      if (href && !PROFILE_HOSTS.test(hostOf(href) ?? '')) sites.push(href);
-    }
   }
-  return { logins: logins.slice(0, 6), sites: sites.slice(0, 8), bio };
+  return logins.slice(0, 6);
 }
 
 export async function resolveIdentityFresh(subject: Subject, env: SourceEnv, tinyfish: TinyfishAccess): Promise<ResolvedIdentity> {
@@ -1562,9 +1553,9 @@ export async function resolveIdentityFresh(subject: Subject, env: SourceEnv, tin
     profile.github ||= xProfile.github[0];
   }
 
-  const followed = await followSitesForGithub(mergeSites(profile.sites, [profile.site]), notes);
-  if (followed.bio && !profile.bio) profile.bio = followed.bio;
-  profile.sites = mergeSites(profile.sites, followed.sites);
+  const followed = profile.github
+    ? []
+    : await followSitesForGithub(mergeSites(profile.sites, [profile.site]), notes);
   const knownLogins = [
     ...companyLogins(parts.name || subject.id, parts.company),
     ...nameLogins(profile.name || parts.name || ''),
@@ -1572,7 +1563,7 @@ export async function resolveIdentityFresh(subject: Subject, env: SourceEnv, tin
     ...handleVariants(profile.x ?? ''),
     ...handleTokens(subject.id),
     ...handleTokens(profile.x ?? ''),
-    ...followed.logins,
+    ...followed,
     ...(xProfile?.github ?? []),
     profile.github,
     collided,

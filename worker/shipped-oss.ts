@@ -1,6 +1,7 @@
 /** Free GitHub OSS harvest: owned repos + founder/top-3 org repos → 2026 releases, tags, blogs, launches. */
 
 import { itemsFromFeedXml } from './shipped-changelog';
+import { affiliationFromBio } from './shipped-affiliation';
 import { githubReposFromText, productHostGuesses } from './shipped-identity';
 import { isPrereleaseShip } from './shipped-polish';
 import { looksLikeProductReadme } from './shipped-repos';
@@ -578,22 +579,38 @@ export async function harvestOss(opts: {
     }
   }
 
+  let bio = opts.bio || '';
   const products = [opts.affiliation?.product, opts.affiliation?.company].filter((value): value is string => Boolean(value));
   const probeHomes = [
     ...(opts.sites || []),
     ...products.flatMap((product) => productHostGuesses(product)),
   ].filter((url, i, all) => url && all.indexOf(url) === i);
   if (opts.readText) {
-    for (const home of probeHomes.slice(0, 8)) {
+    for (let i = 0; i < probeHomes.length && i < 8; i++) {
+      const home = probeHomes[i]!;
       const html = await memo(`oss:site:${home}`, 180 * 60, () => opts.readText!(home).catch(() => null));
       if (!html) continue;
+      if (!bio) {
+        const fromSite = html.match(/<meta[^>]+(?:name|property)=["'](?:og:description|description)["'][^>]+content=["']([^"']+)/i)?.[1]
+          || html.match(/content=["']([^"']+)["'][^>]+(?:name|property)=["'](?:og:description|description)["']/i)?.[1]
+          || '';
+        if (fromSite) bio = fromSite;
+      }
+      if (!products.length && bio) {
+        const fromBio = affiliationFromBio(bio);
+        if (fromBio.company) products.push(fromBio.company);
+        if (fromBio.product) products.push(fromBio.product);
+        for (const next of products.flatMap((product) => productHostGuesses(product))) {
+          if (next && !probeHomes.includes(next)) probeHomes.push(next);
+        }
+      }
       for (const hit of githubReposFromText(html)) {
         const mentioned =
-          bioMentionsRepo(opts.bio, hit) ||
+          bioMentionsRepo(bio, hit) ||
           products.some((product) => product.toLowerCase().replace(/[^a-z0-9]+/g, '') === hit.name.toLowerCase().replace(/[^a-z0-9]+/g, ''));
         const founder = isOrgFounder({
           org: hit.owner,
-          bio: opts.bio,
+          bio,
           company: opts.affiliation?.company,
           companyGithub: opts.affiliation?.companyGithub,
           role: opts.affiliation?.role,
@@ -630,7 +647,7 @@ export async function harvestOss(opts: {
         const repo = asRepo(String((row.owner as { login?: string } | undefined)?.login || ''), row);
         if (!repo) continue;
         const mentioned =
-          bioMentionsRepo(opts.bio, repo) ||
+          bioMentionsRepo(bio, repo) ||
           products.some((name) => name.toLowerCase().replace(/[^a-z0-9]+/g, '') === repo.name.toLowerCase().replace(/[^a-z0-9]+/g, ''));
         if (!mentioned) continue;
         orgRepos.push(repo);

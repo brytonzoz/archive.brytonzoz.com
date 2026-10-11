@@ -34,6 +34,36 @@ test('prefixed tags still parse as semver', () => {
   assert.deepEqual(oss.parseSemver('v1.3.2'), { major: 1, minor: 3, patch: 2 });
 });
 
+test('harvestOss follows a personal site to the product homepage when GitHub bio is empty', async () => {
+  const get = async (path) => {
+    if (path.startsWith('/users/Jarred-Sumner/repos')) return [];
+    if (path.startsWith('/users/Jarred-Sumner/orgs')) return [{ login: 'codeblog' }];
+    if (path.includes('/oven-sh/bun/releases')) {
+      return [{ tag_name: 'bun-v1.4.0', name: 'Bun 1.4', published_at: '2026-08-20T12:00:00Z', body: 'Bun 1.4 notes', html_url: 'https://github.com/oven-sh/bun/releases/tag/bun-v1.4.0' }];
+    }
+    if (path === '/repos/oven-sh/bun') {
+      return { name: 'bun', html_url: 'https://github.com/oven-sh/bun', homepage: 'https://bun.com', stargazers_count: 96000 };
+    }
+    return [];
+  };
+  const { found, ran } = await oss.harvestOss({
+    login: 'Jarred-Sumner',
+    year: 2026,
+    get,
+    orgs: ['codeblog'],
+    sites: ['https://jarredsumner.com/'],
+    readText: async (url) => {
+      if (/jarredsumner\.com/i.test(url)) {
+        return '<meta name="description" content="Creator of Bun. Working at Anthropic."><a href="https://bun.com">Bun</a>';
+      }
+      if (/bun\.com/i.test(url)) return 'Bun runtime <a href="https://github.com/oven-sh/bun">source</a>';
+      return null;
+    },
+  });
+  assert.ok(ran.some((tag) => /oss-site:oven-sh\/bun|oss-search:oven-sh\/bun/.test(tag)), JSON.stringify(ran));
+  assert.ok(found.some((item) => /bun 1\.4/i.test(item.name)), JSON.stringify(found.map((item) => item.name)));
+});
+
 test('harvestOss takes a flagship repo linked from the maker site when the org is hidden', async () => {
   const calls = [];
   const get = async (path) => {

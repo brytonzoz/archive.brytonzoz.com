@@ -6,6 +6,7 @@ import React, { useEffect, useRef, useState } from 'react';
 import { moneyShort } from '../../lib/shipped-receipt';
 import { slotLabel } from '../../lib/shipped-sponsors';
 import { displayCount, stepCount, wholeCount } from '../../lib/shipped-ticker';
+import { press } from './feel';
 import { Line, Rule, Ticket } from './paper';
 import { countdown } from '../../lib/shipped-event';
 import { useShippedClock, useShippedState } from './state';
@@ -103,7 +104,12 @@ function ProofSheet({ onClose }: { onClose: () => void }) {
           <Rule />
         </div>
         {proof === 'loading' ? (
-          <p className="mt-3 text-center text-[12px]">Loading…</p>
+          <div className="shipped-proof-skel" aria-hidden="true">
+            <span />
+            <span />
+            <span />
+            <span />
+          </div>
         ) : !proof ? (
           <p className="mt-3 text-center text-[12px]">Couldn’t load the counters. Try again.</p>
         ) : (
@@ -190,6 +196,7 @@ export function Ticker({ compact = false }: { compact?: boolean }) {
         type="button"
         className={`shipped-ticker${compact ? ' is-slim' : ''}`}
         aria-label={live && state ? `Printed ${fmt(printed)}, shared ${fmt(shared)}, mailed ${fmt(shipped)}, views ${fmt(views)}. Open proof.` : 'Open proof.'}
+        onPointerDown={press}
         onClick={() => setOpen(true)}
       >
         <span className="shipped-ticker-primary">

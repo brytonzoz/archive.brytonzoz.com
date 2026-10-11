@@ -1,6 +1,6 @@
 'use client';
 
-// Collapsed by default: one rail (“Sponsors · 10 spots · from $1”) with a row of marks.
+// Collapsed by default: a desk plaque (“On the tape · 10 paid spots · from $1”) with a row of marks.
 // Opens into a compact list — logo, name, price, one Bid — with a height spring.
 import React, { useEffect, useId, useState } from 'react';
 import { countdown } from '../../lib/shipped-event';
@@ -176,9 +176,9 @@ export function SponsorBoard() {
         onClick={() => setOpen((v) => !v)}
       >
         <span className="shipped-board-toggle-copy">
-          <span className="shipped-board-toggle-lead">Sponsors</span>
+          <span className="shipped-board-toggle-lead">On the tape</span>
           <span className="shipped-board-toggle-from">
-            {SLOT_COUNT} spots · from {from}
+            {SLOT_COUNT} paid spots · from {from}
           </span>
         </span>
         <span className="shipped-board-marks" aria-hidden>

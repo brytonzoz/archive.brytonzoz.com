@@ -5,6 +5,7 @@
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import type { PileReceipt, PileResponse } from '../../../lib/shipped-pile';
 import { layoutWall, readCrumpled, setCrumpled, wallColumns, wallGutter, type WallCard } from '../../../lib/shipped-wall';
+import { press } from '../feel';
 import { WallFocus } from './WallFocus';
 import { WallSlip } from './WallSlip';
 
@@ -190,6 +191,7 @@ function WallPin({
         transform: `translate3d(${card.x}px, ${card.y}px, 0) rotate(${rotate}deg)`,
       }}
       aria-label={`${receipt.who}, ${receipt.potential ? 'potential' : `${receipt.count} shipped`}${crumpled ? ', crumpled for you' : ''}`}
+      onPointerDown={press}
       onClick={onOpen}
     >
       {card.kind === 'pin' ? (

@@ -8,7 +8,7 @@
 // counter, and the stub left in the slot is the other half of the tear. A torn receipt tilts toward a mouse.
 // prefers-reduced-motion: the receipt is already printed and torn, nothing moves.
 import React, { useCallback, useEffect, useRef, useState } from 'react';
-import { press } from './feel';
+import { press, pressPrint, pressTear } from './feel';
 import { Ticket } from './paper';
 import { rubber, spring, springStep, stubClip, tornEdge, type SpringConfig } from './physics';
 import { click, motorOff, motorOn, rip, tick, useSound } from './sound';
@@ -526,7 +526,10 @@ export function Machine({ job, display, tone, onPrinted, onTorn, tearSignal = 0,
         className="shipped-key is-tear"
         disabled={phase !== 'hanging'}
         aria-disabled={phase !== 'hanging'}
-        onPointerDown={press}
+        onPointerDown={() => {
+          if (phase !== 'hanging') return;
+          pressTear();
+        }}
         onClick={() => {
           if (phase !== 'hanging') return;
           click();
@@ -540,7 +543,10 @@ export function Machine({ job, display, tone, onPrinted, onTorn, tearSignal = 0,
           type="button"
           className="shipped-key is-print"
           disabled={desk.closed || desk.printing}
-          onPointerDown={press}
+          onPointerDown={() => {
+            if (desk.closed || desk.printing) return;
+            pressPrint();
+          }}
           onClick={() => {
             if (desk.closed || desk.printing) return;
             desk.onPrint();

@@ -121,6 +121,11 @@ test('after a print the stage auto-tears; sponsors stay collapsed; Turnstile has
 
   const board = fs.readFileSync(new URL('../components/shipped/SponsorBoard.tsx', import.meta.url), 'utf8');
   assert.match(board, /useState\(false\)/);
+  assert.match(board, /On the tape/);
+
+  const feel = fs.readFileSync(new URL('../components/shipped/feel.ts', import.meta.url), 'utf8');
+  assert.match(feel, /pressPrint/);
+  assert.match(feel, /pressTear/);
 
   const css = fs.readFileSync(new URL('../app/shipped/receipt.css', import.meta.url), 'utf8');
   assert.match(css, /\.shipped-board-panel \{[\s\S]*max-height: 0;/);
@@ -146,6 +151,8 @@ test('after a print the stage auto-tears; sponsors stay collapsed; Turnstile has
   const machine = fs.readFileSync(new URL('../components/shipped/Machine.tsx', import.meta.url), 'utf8');
   assert.match(machine, /printed \+ line/);
   assert.match(machine, /stepMs/);
+  assert.match(machine, /pressPrint/);
+  assert.match(machine, /pressTear/);
 });
 
 test('shared receipt pages are the hero; DATE/RECEIPT pairs do not collide; checkout returns to the same receipt', () => {
@@ -179,6 +186,7 @@ test('shared receipt pages are the hero; DATE/RECEIPT pairs do not collide; chec
   assert.match(css, /\.shipped-wall-focus-canvas\.is-on/);
 
   const visitor = fs.readFileSync(new URL('../components/shipped/visitor.tsx', import.meta.url), 'utf8');
+  assert.match(visitor, /This slip/);
   assert.match(visitor, /params\.get\('paid'\)/);
   assert.match(visitor, /canceled/);
 

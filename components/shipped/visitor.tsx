@@ -529,7 +529,7 @@ export function SharePill({
                 onPointerCancel={onHandleUp}
               />
               <div className="shipped-pill-head">
-                <p className="shipped-pill-kicker">Share</p>
+                <p className="shipped-pill-kicker">This slip</p>
                 <button type="button" className="shipped-pill-x" aria-label="Close" onPointerDown={press} onClick={close}>
                   ×
                 </button>

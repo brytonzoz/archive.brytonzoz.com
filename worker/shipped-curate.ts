@@ -269,15 +269,15 @@ export function harvestShouldWin(
   const brand = String(company || '').trim();
   const flagshipCeo = /^ceo$/i.test(role || '') && /^(vercel|openai|cursor)$/i.test(brand);
   const openaiLead = /^lead$/i.test(role || '') && /^openai$/i.test(brand);
-  const companyTape = flagshipCeo || openaiLead;
-  const ossMaintainer = /^(founder|owner)$/i.test(role || '') && !/^(vercel|openai|cursor)$/i.test(brand);
-  const indie = !role || !/^(ceo|founder|lead|owner)$/i.test(role);
-  if (!companyTape && !ossMaintainer && !indie) return false;
-  if (harvestedCount < (companyTape ? 12 : 8)) return false;
-  if (typeof cheapCount === 'number' && cheapCount < harvestedCount * 0.5) return false;
-  const floor = companyTape ? 25 : 15;
-  const minKeep = Math.max(floor, Math.ceil(harvestedCount * 0.45));
-  return curatedCount < minKeep;
+  if (flagshipCeo || openaiLead) {
+    if (harvestedCount < 12) return false;
+    if (typeof cheapCount === 'number' && cheapCount < harvestedCount * 0.5) return false;
+    return curatedCount < Math.max(25, Math.ceil(harvestedCount * 0.45));
+  }
+  // Indie / OSS: restore only a tiny highlight reel of short release names, never a tweet dump.
+  if (harvestedCount < 8) return false;
+  if (typeof cheapCount === 'number' && cheapCount < harvestedCount * 0.7) return false;
+  return curatedCount < 12;
 }
 
 export function customerFromProfile(

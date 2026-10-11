@@ -119,7 +119,7 @@ async function printOne(query) {
     junk,
     emptyVerified: isVerifiedBuilder(query) && items.length === 0,
     employerSpill: employerSpill(query, titles),
-    costMicros: printed.costMicros ?? loaded.cost_micros ?? loaded.costMicros ?? null;
+    costMicros: printed.costMicros ?? loaded.cost_micros ?? loaded.costMicros ?? null,
     inputTokens: printed.inputTokens ?? loaded.input_tokens ?? loaded.inputTokens ?? null,
     outputTokens: printed.outputTokens ?? loaded.output_tokens ?? loaded.outputTokens ?? null,
     ms: Date.now() - started,
@@ -163,7 +163,7 @@ const summary = {
     junk: row.junk,
     emptyVerified: row.emptyVerified,
     employerSpill: row.employerSpill,
-    costMicros: row.costMicros;
+    costMicros: row.costMicros,
     inputTokens: row.inputTokens,
     outputTokens: row.outputTokens,
     ms: row.ms,

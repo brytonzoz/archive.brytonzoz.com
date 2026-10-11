@@ -683,6 +683,7 @@ test('identity tables are not an eval cheat sheet', () => {
     jarredsumner: 'Jarred-Sumner',
     youyuxi: 'yyx990803',
     dan_abramov: 'gaearon',
+    rich_harris: 'Rich-Harris',
   });
   const realJarred = identity.scoreGithubMatch({
     user: { login: 'Jarred-Sumner', name: 'Jarred Sumner', bio: '', blog: 'https://jarredsumner.com', x: 'jarredsumner', repos: 280 },

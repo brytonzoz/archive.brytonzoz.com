@@ -41,6 +41,7 @@ export const IDENTITY_COLLISIONS: Record<string, string> = {
   jarredsumner: 'Jarred-Sumner',
   youyuxi: 'yyx990803',
   dan_abramov: 'gaearon',
+  rich_harris: 'Rich-Harris',
 };
 
 export function collisionOverride(handle: string): string | null {

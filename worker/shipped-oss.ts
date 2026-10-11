@@ -600,30 +600,61 @@ export async function harvestOss(opts: {
           product: opts.affiliation?.product,
         });
         if (!mentioned && !founder) continue;
-        orgRepos.push({
-          owner: hit.owner,
-          name: hit.name,
-          html_url: `https://github.com/${hit.owner}/${hit.name}`,
-          homepage: home,
-          stargazers_count: 0,
-        });
+        const meta = await memo(`oss:repo:${hit.owner}/${hit.name}`, 360 * 60, () =>
+          opts.get<Record<string, unknown>>(`/repos/${encodeURIComponent(hit.owner)}/${encodeURIComponent(hit.name)}`).catch(() => null),
+        );
+        const repo =
+          asRepo(hit.owner, meta || { name: hit.name, html_url: `https://github.com/${hit.owner}/${hit.name}`, homepage: home, stargazers_count: 1 }) ||
+          ({
+            owner: hit.owner,
+            name: hit.name,
+            html_url: `https://github.com/${hit.owner}/${hit.name}`,
+            homepage: home,
+            stargazers_count: 1,
+          } satisfies OssRepo);
+        repo.homepage = repo.homepage || home;
+        orgRepos.push(repo);
         ran.push(`oss-site:${hit.owner}/${hit.name}`);
+      }
+    }
+  }
+
+  if (products.length && opts.get && !orgRepos.some((repo) => products.some((product) => product.toLowerCase().replace(/[^a-z0-9]+/g, '') === repo.name.toLowerCase().replace(/[^a-z0-9]+/g, '')))) {
+    for (const product of products.slice(0, 2)) {
+      const q = product.replace(/[^A-Za-z0-9._-]+/g, ' ').trim();
+      if (q.length < 2) continue;
+      const data = await memo(`oss:search:${q.toLowerCase()}`, 180 * 60, () =>
+        opts.get<{ items?: Record<string, unknown>[] }>(`/search/repositories?q=${encodeURIComponent(`${q} in:name stars:>500`)}&per_page=5`).catch(() => null),
+      );
+      for (const row of data?.items || []) {
+        const repo = asRepo(String((row.owner as { login?: string } | undefined)?.login || ''), row);
+        if (!repo) continue;
+        const mentioned =
+          bioMentionsRepo(opts.bio, repo) ||
+          products.some((name) => name.toLowerCase().replace(/[^a-z0-9]+/g, '') === repo.name.toLowerCase().replace(/[^a-z0-9]+/g, ''));
+        if (!mentioned) continue;
+        orgRepos.push(repo);
+        ran.push(`oss-search:${repo.owner}/${repo.name}`);
+        break;
       }
     }
   }
 
   const seenRepo = new Set<string>();
   const targets: OssRepo[] = [];
-  for (const repo of [...owned, ...orgRepos]) {
+  const pinned = new Set(orgRepos.map((repo) => `${repo.owner.toLowerCase()}/${repo.name.toLowerCase()}`));
+  for (const repo of [...orgRepos, ...owned]) {
     const key = `${repo.owner.toLowerCase()}/${repo.name.toLowerCase()}`;
     if (seenRepo.has(key)) continue;
     seenRepo.add(key);
     targets.push(repo);
   }
-  const ranked = targets
-    .slice()
-    .sort((a, b) => (b.stargazers_count ?? 0) - (a.stargazers_count ?? 0))
-    .slice(0, 24);
+  const ranked = [
+    ...targets.filter((repo) => pinned.has(`${repo.owner.toLowerCase()}/${repo.name.toLowerCase()}`)),
+    ...targets
+      .filter((repo) => !pinned.has(`${repo.owner.toLowerCase()}/${repo.name.toLowerCase()}`))
+      .sort((a, b) => (b.stargazers_count ?? 0) - (a.stargazers_count ?? 0)),
+  ].slice(0, 24);
 
   for (const repo of ranked) {
     const source: OssFound['source'] = repo.owner.toLowerCase() === login.toLowerCase() ? 'github' : 'company';

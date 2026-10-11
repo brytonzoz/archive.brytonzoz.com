@@ -123,6 +123,7 @@ test('title sanity is the only post-LLM title check', () => {
   assert.equal(polish.titleSanityOk('We launched AI Gateway'), false);
   assert.equal(polish.titleSanityOk('WE BUILT EMOJI SEARCH'), false);
   assert.equal(polish.titleSanityOk('AI Gateway'), true);
+  assert.equal(polish.titleSanityOk('Find deployments faster with redesigned filters now live'), false);
 });
 
 test('harvest wins when Claude keeps a highlight reel of a fat company tape', () => {
@@ -169,6 +170,34 @@ test('harvest wins when Claude keeps a highlight reel of a fat company tape', ()
     { name: 'I flew to Lisbon', kind: 'post' },
     { name: 'Best tools 2026', kind: 'post' },
     { name: 'A thread', kind: 'post' },
+  ]), false);
+  assert.equal(curate.harvestLooksLikeOssTape([
+    { name: 'DUB TS 0.70' },
+    { name: 'DUB GO 0.23' },
+    { name: 'DUB PYTHON 0.34' },
+    { name: 'DUB TS 0.71' },
+    { name: 'DUB GO 0.24' },
+    { name: 'DUB PYTHON 0.35' },
+    { name: 'DUB PHP 0.15' },
+    { name: 'DUB RUBY 0.12' },
+    { name: 'DUB TS 0.72' },
+    { name: 'DUB GO 0.25' },
+  ]), false);
+  assert.equal(curate.harvestLooksLikeCommentaryTape([
+    { name: "Brazil's CPF catch-22 makes booking hotels impossible" },
+    { name: 'Tech insiders avoid touchscreens and smart homes because' },
+    { name: 'Europeans are all captivated by the mind virus' },
+    { name: 'Winning my first big Stripe dispute in a decade' },
+    { name: 'Leiden might be the best Dutch city to visit instead' },
+    { name: 'Hotel in the Netherlands sets AC minimum at 23' },
+    { name: 'Luxury products are really just meant for poor people' },
+    { name: 'Ignoring mind viruses leads to a slippery slope' },
+  ]), true);
+  assert.equal(curate.harvestLooksLikeCommentaryTape([
+    { name: 'Bun 1.4', kind: 'oss-release' },
+    { name: 'Bun 1.3.6', kind: 'oss-release' },
+    { name: 'Vite 8' },
+    { name: 'Vue 3.5.27' },
   ]), false);
 });
 

@@ -34,6 +34,7 @@
 // worker/shipped-guard.ts; the threat list is docs/shipped-security.md.
 // Tables are created (and new columns added) on first use; see SCHEMA below.
 import { CURATION_RESERVE_MICROS, DEFAULT_MODEL, PrintError, assembleReceipt, demoReceipt, finish, harvestItems, maxSearches, promptFor, worstCaseMicros, type AiEnv, type DraftItem } from './shipped-ai';
+import { harvestLooksLikeCommentaryTape } from './shipped-curate';
 import { cheapHardFilter, titleSanityOk } from './shipped-polish';
 import { ICON_HASH, bytesDataUri, iconDataUri, iconKey, reencodeLogo, storeIcon } from './shipped-icons';
 import { houseMark } from './shipped-marks';
@@ -551,11 +552,8 @@ async function withLogos(items: DraftItem[], env: ShippedEnv): Promise<YearItem[
 
 async function blocked(db: D1Database, key: string): Promise<boolean> {
   const row = await db
-    .prepare(
-      `SELECT 1 AS x FROM shipped_takedowns WHERE subject_key = ? AND status = 'removed'
-       UNION ALL SELECT 1 AS x FROM shipped_receipts WHERE login_key = ? AND hidden = 1 LIMIT 1`,
-    )
-    .bind(key, key)
+    .prepare(`SELECT 1 AS x FROM shipped_takedowns WHERE subject_key = ? AND status = 'removed' LIMIT 1`)
+    .bind(key)
     .first();
   return Boolean(row);
 }
@@ -2280,7 +2278,7 @@ async function assembleForAdmin(
     if (error instanceof PrintError && error.code === 'out-of-credit') throw error;
   }
   const found = cheapHardFilter(gathered.found, year).filter((item) => titleSanityOk(item.name));
-  const fallback = harvestItems({ ...gathered, found }, year).slice(0, 20);
+  const fallback = harvestLooksLikeCommentaryTape(found) ? [] : harvestItems({ ...gathered, found }, year).slice(0, 20);
   return {
     draft: {
       ...finish(fallback, '', seed, undefined, undefined, {

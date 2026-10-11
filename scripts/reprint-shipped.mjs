@@ -38,7 +38,7 @@ const origin = (process.argv[2] || process.env.SHIPPED_ORIGIN || 'https://shippe
 const password = process.env.ADMIN_PASSWORD || '';
 const FORCE = process.env.SHIPPED_REPRINT_FORCE === '1';
 const WALL = process.env.SHIPPED_REPRINT_WALL === '1';
-const KEEP_IDS = new Set([6, 7, 13, 16, 17, 18, 19, 20, 21, 22]);
+const KEEP_IDS = new Set([6, 7, 13, 16, 17, 18, 19, 20, 21, 22, 26, 28]);
 const BROKEN_TITLE = [
   /###/,
   /<\/?[a-z]/i,

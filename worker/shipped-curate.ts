@@ -258,19 +258,36 @@ export function applyCuration(
   return { items: rollupGroups(kept), notes: parsed.notes.slice(0, 3) };
 }
 
-/** Short OSS version / monthly-release tapes — not tweet dumps or employer changelogs. */
-export function harvestLooksLikeOssTape(items: { name?: string; kind?: string; source?: string }[]): boolean {
+/** Short OSS version / monthly-release tapes — not tweet dumps, SDK ports, or employer changelogs. */
+export function harvestLooksLikeOssTape(items: { name?: string; kind?: string; source?: string; link?: string | null }[]): boolean {
   const rows = Array.isArray(items) ? items : [];
   if (rows.length < 8) return false;
+  if (rows.filter((item) => /^VERCEL \d/i.test(String(item.name || ''))).length >= 8) return false;
+  if (rows.filter((item) => /^@[\w.-]+\//.test(String(item.name || ''))).length >= 3) return false;
   const oss = rows.filter((item) => {
     const kind = String(item.kind || '');
     const name = String(item.name || '');
+    const link = String(item.link || '');
     if (item.source === 'x' || kind === 'post') return false;
+    if (/github\.com\/[^/]+\/[^/]+\/releases/i.test(link)) return true;
     if (/^(oss-release|oss-launch|oss-blog)$/.test(kind)) return true;
     if (/·\s*\d+\s+releases?\s+in\s+/i.test(name)) return true;
-    return /^[A-Za-z][\w.+-]*(?:\s+[A-Za-z][\w.+-]*){0,3}\s+v?\d+\.\d+/i.test(name);
+    return false;
   });
   return oss.length >= Math.max(8, Math.ceil(rows.length * 0.6));
+}
+
+/** Opinion / travel / tweet dumps. Prefer an empty drawer over printing these. */
+export function harvestLooksLikeCommentaryTape(items: { name?: string; kind?: string; source?: string }[]): boolean {
+  const rows = Array.isArray(items) ? items : [];
+  if (rows.length < 8) return false;
+  const commentary = rows.filter((item) => {
+    if (item.source === 'x' || String(item.kind || '') === 'post') return true;
+    const name = String(item.name || '');
+    if (/\d+\.\d+/.test(name) || /·\s*\d+\s+(updates?|releases?)/i.test(name)) return false;
+    return name.trim().split(/\s+/).filter(Boolean).length >= 6;
+  });
+  return commentary.length >= Math.max(8, Math.ceil(rows.length * 0.5));
 }
 
 /** Claude highlight-reels a fat harvest — keep the gated tape and only take the notes. */

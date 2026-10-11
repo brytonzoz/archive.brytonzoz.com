@@ -11,7 +11,7 @@ import { shipName } from './shipped-changelog';
 import { shareKeywords } from './shipped-decisions';
 import { isOssHarvestItem, ownerFromProfile, type OwnerContext } from './shipped-ownership';
 import { flagshipLaunchName, isFlagshipYearKeep, isJoinOrAcquire, isPriorYearJoin, logFlagshipGate } from './shipped-flagship';
-import { cheapHardFilter, cleanDescription, cleanShipTitle, cleanStatus, gateReceiptItems, isChangelogEntryHref, isOpenAiCompanyWide, noteCountMismatch, spokenShipName } from './shipped-polish';
+import { cheapHardFilter, cleanDescription, cleanShipTitle, cleanStatus, gateReceiptItems, isChangelogEntryHref, isOpenAiCompanyWide, noteCountMismatch, spokenShipName, titleSanityOk } from './shipped-polish';
 import { emptyAffiliation, type Affiliation } from './shipped-affiliation';
 import { looksLikePersonName } from './shipped-repos';
 import { RECEIPT_BUDGET_MICROS, formatReceiptStats, searchBudget, type SourcedStat } from './shipped-research';
@@ -23,6 +23,7 @@ import {
   cachedSystem,
   curationUserPrompt,
   customerFromProfile,
+  harvestLooksLikeCommentaryTape,
   harvestLooksLikeOssTape,
   harvestShouldWin,
   packCandidates,
@@ -1601,8 +1602,6 @@ export async function assembleReceipt(
   const want = thin && !xaiRan && harvested.length < 3 && !(companyRan && harvested.length > 0) ? searches : 0;
   const searchCap = searchBudget({ remainingMicros: Math.min(budgetMicros, RECEIPT_BUDGET_MICROS), want, searchMicros: SEARCH_MICROS });
   if (want > searchCap) gathered.coverageCapped = true;
-  const toolSets: unknown[][] = searchCap ? [[{ type: 'web_search_20250305', name: 'web_search', max_uses: searchCap }], []] : [[]];
-  const user = { role: 'user', content: promptFor(subject, gathered, year) };
 
   const usage = { input: 0, output: 0, searches: 0 };
   const spent = () => costMicros(model, usage.input, usage.output, usage.searches);
@@ -1657,6 +1656,7 @@ export async function assembleReceipt(
       });
       if (curated) {
         if (
+          !harvestLooksLikeCommentaryTape(harvested) &&
           harvestShouldWin(harvested.length, curated.items.length, affiliation?.role, affiliation?.company, cheap.length, {
             ossHeavy: harvestLooksLikeOssTape(harvested),
           })
@@ -1700,8 +1700,10 @@ export async function assembleReceipt(
       console.log(JSON.stringify({ shipped: 'curate-fallback', who: gathered.profile.name || subject.display, reason: error instanceof Error ? error.message : 'error' }));
     }
   }
-  const fallbackItems = cheapHardFilter(harvested, year).slice(0, CURATION_LINE_CAP);
-  if (fallbackItems.length) {
+  const fallbackItems = cheapHardFilter(harvested, year)
+    .filter((item) => titleSanityOk(item.name))
+    .slice(0, CURATION_LINE_CAP);
+  if (fallbackItems.length && !harvestLooksLikeCommentaryTape(fallbackItems)) {
     const sealed = finish(fallbackItems, '', seed, undefined, formatStats(fallbackItems, gathered.stats ?? []), {
       role: affiliation?.role,
       company: affiliation?.company,
@@ -1812,64 +1814,14 @@ export async function assembleReceipt(
     return { ...draft, model, inputTokens: usage.input, outputTokens: usage.output, searches: 0, costMicros: cost, noteCandidates };
   }
 
-  let tools = toolSets[0];
-  let messages: unknown[] = [user];
-  let blocks: Block[] = [];
-  let message: Message | null = null;
-  // Thinking off: the whole token budget goes to the JSON (with it on, long replies ran out before any text).
-  let thinking: unknown = { type: 'disabled' };
-  for (let turn = 0; turn < TURNS; turn++) {
-    let response: Response | null = null;
-    for (let i = toolSets.indexOf(tools); i < toolSets.length; i++) {
-      tools = toolSets[i];
-      const request = { model, max_tokens: MAX_TOKENS, system: systemPrompt(year, tools.length ? searchCap : 0), messages, ...(tools.length ? { tools } : {}), ...(thinking ? { thinking } : {}) };
-      response = await call(request);
-      if (response.ok) break;
-      let text = await response.clone().text();
-      if (response.status === 400 && thinking && /thinking/i.test(text)) {
-        thinking = null;
-        response = await call({ ...request, thinking: undefined });
-        if (response.ok) break;
-        text = await response.clone().text();
-      }
-      // Out of credits: stop here. No retries, no fallbacks; the caller turns the machine off.
-      if (isCreditError(response.status, text)) {
-        console.error('shipped: anthropic out of credit', response.status, text.slice(0, 200));
-        throw fail('out-of-credit');
-      }
-      if (response.status !== 400) break;
-      console.error('shipped: anthropic rejected request', text.slice(0, 300));
-    }
-    if (!response?.ok) {
-      const text = response ? (await response.text()).slice(0, 300) : '';
-      if (response) console.error('shipped: anthropic error', response.status, text);
-      const error = fail(response && (response.status === 429 || response.status === 529) ? 'ai-busy' : 'ai-error');
-      error.detail = `anthropic ${response?.status ?? 'no response'}: ${upstreamError(text)}`;
-      throw error;
-    }
-    message = (await response.json()) as Message;
-    const u = message.usage ?? {};
-    usage.input += (u.input_tokens ?? 0) + (u.cache_creation_input_tokens ?? 0) + (u.cache_read_input_tokens ?? 0);
-    usage.output += u.output_tokens ?? 0;
-    usage.searches += u.server_tool_use?.web_search_requests ?? 0;
-    const content = message.content ?? [];
-    resultUrls(content, allowed);
-    blocks = blocks.concat(content);
-    // A long search turn can pause; sending the assistant's turn back lets it carry on.
-    if (message.stop_reason !== 'pause_turn') break;
-    messages = [user, { role: 'assistant', content: blocks }];
-    // Each extra turn re-sends everything; stop early if this print is already expensive.
-    if (spent() > budgetMicros) break;
-  }
-
-  const finalText = (message?.content ?? []).filter((block) => block.type === 'text');
-  const parsed = message?.stop_reason === 'refusal' ? null : parseJson(finalText.length ? finalText : blocks);
-  const cost = spent();
-  console.log(JSON.stringify({ shipped: 'ai', model, inputTokens: usage.input, outputTokens: usage.output, searches: usage.searches, costMicros: cost, stop: message?.stop_reason, ok: Boolean(parsed) }));
-  if (!parsed) {
-    const error = fail('ai-error');
-    error.detail = `unparsable reply (stop: ${message?.stop_reason ?? 'none'}, ${finalText.length} text blocks)`;
-    throw error;
-  }
-  return { ...normalize(parsed, gathered, allowed, year, seed), model, inputTokens: usage.input, outputTokens: usage.output, searches: usage.searches, costMicros: cost };
+  const empty = finish([], '', seed, undefined, undefined, {
+    role: affiliation?.role,
+    company: affiliation?.company,
+    who: gathered.profile.name,
+    handle: gathered.profile.x,
+    year,
+    affiliation,
+    apiDown: true,
+  });
+  return { ...empty, model, inputTokens: usage.input, outputTokens: usage.output, searches: 0, costMicros: spent() };
 }

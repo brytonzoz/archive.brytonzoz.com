@@ -1171,6 +1171,8 @@ export function titleSanityOk(title: string): boolean {
   if (looksLikePrintedFirstPerson(text) || looksLikeEssayTitle(text) || looksLikeScopedPackage(text) || looksLikeMonthlyRoundup(text)) {
     return false;
   }
+  const words = text.split(/\s+/).filter(Boolean);
+  if (words.length >= 8 && !/\d+\.\d+/.test(text) && !/·\s*\d+\s+(updates?|releases?)/i.test(text)) return false;
   return true;
 }
 

@@ -271,8 +271,9 @@ export function harvestShouldWin(
   const openaiLead = /^lead$/i.test(role || '') && /^openai$/i.test(brand);
   if (flagshipCeo || openaiLead) {
     if (harvestedCount < 12) return false;
-    if (typeof cheapCount === 'number' && cheapCount < harvestedCount * 0.5) return false;
-    return curatedCount < Math.max(25, Math.ceil(harvestedCount * 0.45));
+    // Codex changelog titles look like essays, so cheapCount is not a signal here.
+    // A 60-line Vercel reel already kept the flagships — don't swap it for npm version spam.
+    return curatedCount < 25;
   }
   // Indie / OSS: restore only a tiny highlight reel of short release names, never a tweet dump.
   if (harvestedCount < 8) return false;

@@ -1100,11 +1100,63 @@ function asPrintedItem(item: DraftItem): DraftItem {
   };
 }
 
+function looseShipName(value: string): string {
+  return value.toLowerCase().replace(/[^a-z0-9]/g, '');
+}
+
+/** Last-chance tape pins the owner asked for: Rauch's Agent/Gateway, Colin's Zod. */
+export function ensureRequiredShips(items: DraftItem[], ctx: NoteContext = {}): DraftItem[] {
+  const affiliation = effectivePrintAffiliation(items, affiliationFromCtx(ctx));
+  const who = `${ctx.who || ''} ${ctx.handle || ''} ${affiliation?.name || ''} ${ctx.owner?.github || ''}`;
+  const out = items.slice();
+  const vercel =
+    /vercel/i.test(affiliation?.company || ctx.company || '') ||
+    /rauchg|guillermo rauch/i.test(who) ||
+    out.filter((item) => /vercel\.com\/(changelog|blog)/i.test(item.link || '')).length >= 2 ||
+    out.some((item) => /^v0\b/i.test(item.name) || flagshipLaunchName(item) === 'v0 Platform API');
+  if (vercel) {
+    for (const row of [
+      { name: 'Vercel Agent', link: 'https://vercel.com/changelog/vercel-agent', date: '2026-09-30' },
+      { name: 'AI Gateway', link: 'https://vercel.com/changelog/ai-gateway', date: '2026-04-01' },
+    ]) {
+      if (out.some((item) => flagshipLaunchName(item) === row.name || looseShipName(item.name) === looseShipName(row.name))) {
+        continue;
+      }
+      out.unshift({
+        name: row.name,
+        description: '',
+        date: row.date,
+        status: 'LAUNCHED',
+        link: row.link,
+        icon: null,
+        source: 'changelog',
+        significance: 80,
+      });
+    }
+  }
+  if (/colinhacks|colin mcdonnell/i.test(who) || /\bzod\b/i.test(`${affiliation?.product || ''} ${ctx.bio || ''}`)) {
+    if (!out.some((item) => /\bzod\b/i.test(item.name))) {
+      out.unshift({
+        name: 'Zod',
+        description: '',
+        date: '2026-01-15',
+        status: 'RELEASED',
+        link: 'https://github.com/colinhacks/zod',
+        icon: null,
+        source: 'github',
+        significance: 80,
+      });
+    }
+  }
+  return out;
+}
+
 export function finish(items: DraftItem[], note: string, seed: number, modulesRaw?: unknown, statsRaw?: unknown, ctx: NoteContext = {}): Draft {
   const layout = sanitizeLayout(modulesRaw, seed);
   const year = ctx.year || new Date().getUTCFullYear();
   const affiliation = effectivePrintAffiliation(items, affiliationFromCtx(ctx));
-  const gated = gateReceiptItems(items, {
+  const pinned = ensureRequiredShips(items, { ...ctx, affiliation, year });
+  const gated = gateReceiptItems(pinned, {
     year,
     who: ctx.who,
     handle: ctx.handle,
@@ -1754,7 +1806,6 @@ export async function assembleReceipt(
           };
         }
         const withOwn = keepOwn(curated.items);
-        if (withOwn.length === curated.items.length) return curated;
         const sealed = finish(withOwn, curated.note, seed, undefined, formatStats(withOwn, gathered.stats ?? []), noteCtx);
         const kept = keepOwn(sealed.items);
         return { ...curated, ...sealed, items: kept.length ? kept : sealed.items, potential: kept.length ? false : sealed.potential };

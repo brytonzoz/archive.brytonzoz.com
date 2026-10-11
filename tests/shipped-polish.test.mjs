@@ -1575,6 +1575,55 @@ test('CEO tapes drop tiny npm utilities, strip npm blurbs, and lead with flagshi
   );
   assert.equal(draft.items.some((item) => /^(SERVE|BOTID|CANVAS)$/i.test(item.name)), false, JSON.stringify(draft.items.map((item) => item.name)));
   assert.match(draft.items[0].name, /AI GATEWAY|VERCEL AGENT|^V0$/i);
+  const rauchBare = ai.finish(
+    [
+      {
+        name: 'V0 PLATFORM API',
+        description: '',
+        date: '2026-09-18',
+        status: 'LAUNCHED',
+        link: 'https://vercel.com/changelog/v0-platform-api',
+        icon: null,
+        source: 'changelog',
+      },
+      {
+        name: 'AGENT BROWSER',
+        description: 'Browser automation CLI for AI agents',
+        date: '2026-01-11',
+        status: 'LAUNCHED',
+        link: 'https://agent-browser.dev/',
+        icon: null,
+        source: 'company',
+      },
+    ],
+    'Eve is on the tape.',
+    1,
+    undefined,
+    [],
+    { who: 'Guillermo Rauch', handle: 'rauchg', year: 2026 },
+  );
+  const rauchBareNames = rauchBare.items.map((item) => item.name);
+  assert.ok(rauchBareNames.some((name) => /vercel agent/i.test(name)), JSON.stringify(rauchBareNames));
+  assert.ok(rauchBareNames.some((name) => /ai gateway/i.test(name)), JSON.stringify(rauchBareNames));
+  const colinBare = ai.finish(
+    [
+      {
+        name: 'NUB',
+        description: '',
+        date: '2026-02-08',
+        status: 'LAUNCHED',
+        link: 'https://github.com/colinhacks/nub',
+        icon: null,
+        source: 'github',
+      },
+    ],
+    'Nubjs did the heavy lifting.',
+    1,
+    undefined,
+    [],
+    { who: 'Colin McDonnell', handle: 'colinhacks', year: 2026, bio: 'Zod' },
+  );
+  assert.ok(colinBare.items.some((item) => /zod/i.test(item.name)), JSON.stringify(colinBare.items.map((item) => item.name)));
 });
 
 test('home PRINT demoReceipt drops CEO npm utilities even when affiliation.role is still unknown', () => {

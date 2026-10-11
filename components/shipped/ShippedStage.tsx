@@ -552,13 +552,12 @@ export function ShippedStage({ opening, title }: { opening: Opening; title: Reac
                   },
                   closed,
                   invalid: Boolean(error),
+                  under: shared ? null : (
+                    <HumanCheck ref={human} check={generator?.human ?? FALLBACK_HUMAN} onToken={() => undefined} theme="dark" appearance="execute" />
+                  ),
                 }
           }
         />
-
-        {shared ? null : (
-          <HumanCheck ref={human} check={generator?.human ?? FALLBACK_HUMAN} onToken={() => undefined} theme="dark" appearance="execute" />
-        )}
 
         {error && step.name === 'retry' ? (
           <button

@@ -60,6 +60,8 @@ export type Console = {
   invalid?: boolean;
   /** Last print failed the human check; input stays, PRINT re-runs. */
   retry?: boolean;
+  /** Human check sits under the keys, above the paper. */
+  under?: React.ReactNode;
 };
 
 export type MachineProps = {
@@ -715,6 +717,7 @@ export function Machine({ job, display, tone, onPrinted, onTorn, tearSignal = 0,
         </span>
       </div>
       {keys}
+      {desk?.under ?? null}
     </>
   );
 

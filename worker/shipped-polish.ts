@@ -169,7 +169,12 @@ function hostOf(url: string | null | undefined): string | null {
 function hrefKey(url: string): string {
   try {
     const parsed = new URL(url);
-    return `${parsed.hostname.replace(/^www\./, '').toLowerCase()}${parsed.pathname.replace(/\/+$/, '')}`.toLowerCase();
+    const host = parsed.hostname.replace(/^www\./, '').toLowerCase();
+    const path = parsed.pathname.replace(/\/+$/, '');
+    const hash = parsed.hash.replace(/^#/, '').toLowerCase();
+    const list = !path || isShipListHref(`${parsed.protocol}//${parsed.host}${parsed.pathname}`);
+    if (hash && list) return `${host}${path}#${hash}`;
+    return `${host}${path}`.toLowerCase();
   } catch {
     return url.replace(/[?#].*$/, '').replace(/\/+$/, '').toLowerCase();
   }
@@ -1969,14 +1974,13 @@ export function cheapHardFilter<T extends Polishable>(items: T[], year: number):
     }
     if (!cheapYearOk(item, year)) continue;
     if (isPrereleaseShip(name) || isPrereleaseShip(item.name)) continue;
-    if (
-      !journal &&
-      (looksLikeEssayTitle(name) ||
-        isBlogEssayTitle(name) ||
-        looksLikeScopedPackage(name) ||
-        looksLikeMonthlyRoundup(name))
-    ) {
+    if (!journal && (looksLikeEssayTitle(name) || isBlogEssayTitle(name) || looksLikeMonthlyRoundup(name))) {
       continue;
+    }
+    if (looksLikeScopedPackage(name)) {
+      const family = npmFamilyKey(name);
+      if (!family) continue;
+      name = family;
     }
     const listedOnly = /^Listed on /i.test(String(item.description || ''));
     if (listedOnly && name.split(/\s+/).filter(Boolean).length >= 5 && !/\d+\.\d+/.test(name)) continue;

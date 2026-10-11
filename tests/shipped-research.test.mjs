@@ -14,6 +14,9 @@ test('handle variants stitch X spellings to GitHub logins', () => {
   assert.equal(identity.handleVariants('tibo_maker').includes('tibo'), false);
   assert.ok(identity.handleTokens('fofrAI').includes('fofr'));
   assert.equal(identity.handleVariants('fofrAI').includes('fofr'), false);
+  assert.ok(identity.handleVariants('alex').includes('alexio'));
+  assert.equal(identity.handleVariants('levelsio').includes('levelsioio'), false);
+  assert.ok(identity.handleVariants('steventey').includes('steven-tey'));
 });
 
 test('name queries split "Tibo from OpenAI"', () => {
@@ -78,6 +81,17 @@ test('a 0-repo decoy GitHub account scores below the real one', () => {
   });
   assert.ok(copiedBlog <= 6, `0-repo blog copy scored ${copiedBlog}`);
   assert.ok(realFofr > copiedBlog, `${realFofr} vs ${copiedBlog}`);
+  const parkedHandle = identity.scoreGithubMatch({
+    user: { login: 'alex', name: '', bio: '', blog: null, x: null, repos: 1 },
+    wantX: 'alex',
+  });
+  const realIo = identity.scoreGithubMatch({
+    user: { login: 'alexio', name: 'Alex', bio: '', blog: 'https://alex.io', x: 'alex', repos: 400 },
+    wantX: 'alex',
+    wantName: 'Alex',
+  });
+  assert.ok(parkedHandle <= 12, `parked exact login scored ${parkedHandle}`);
+  assert.ok(realIo > parkedHandle, `${realIo} vs ${parkedHandle}`);
 });
 
 test('undated own-site products become found items; other years do not', () => {
@@ -772,6 +786,7 @@ test('identity tables are not an eval cheat sheet', () => {
   ]);
   assert.equal(identity.parseProductQuery('the guy who made Photo AI'), 'Photo AI');
   assert.ok(identity.productHostGuesses('Photo AI').some((u) => /photoai\.com/i.test(u)));
+  assert.ok(identity.productHostGuesses('Dub').some((u) => /dub\.co/i.test(u)));
   assert.ok(identity.githubLoginsFromText('see github.com/tony-dinh/app').includes('tony-dinh'));
   assert.ok(identity.xHandlesFromText('built by @levelsio on photoai.com').includes('levelsio'));
   assert.ok(identity.makerMentions('Built by @levelsio').x.includes('levelsio'));

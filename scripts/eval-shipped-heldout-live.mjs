@@ -119,7 +119,16 @@ async function receiptOf(id) {
   return response.json();
 }
 
-async function pileCount(id) {
+async function pileCount(id, expect) {
+  for (let i = 0; i < 4; i++) {
+    const response = await fetch(`${origin}/api/shipped/pile?limit=200&t=${Date.now()}`, { cache: 'no-store' });
+    if (!response.ok) return null;
+    const body = await response.json();
+    const row = (body.receipts || []).find((entry) => entry.id === id);
+    const count = row ? row.count : null;
+    if (count == null || expect == null || count === expect) return count;
+    await new Promise((resolve) => setTimeout(resolve, 400));
+  }
   const response = await fetch(`${origin}/api/shipped/pile?limit=200&t=${Date.now()}`, { cache: 'no-store' });
   if (!response.ok) return null;
   const body = await response.json();
@@ -133,7 +142,7 @@ async function printOne(query) {
   const loaded = await receiptOf(printed.id);
   const receipt = loaded.receipt || loaded;
   const items = realItems(receipt);
-  const wall = await pileCount(printed.id);
+  const wall = await pileCount(printed.id, items.length);
   const titles = items.map((item) => item.name);
   const junk = titles.filter((name) => JUNK.some((re) => re.test(name)) || essayTitle(name));
   const note = String(receipt.note || printed.note || '');

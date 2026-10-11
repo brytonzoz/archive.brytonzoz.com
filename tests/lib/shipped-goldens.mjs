@@ -109,11 +109,18 @@ export function evaluateLiveReceipt(id, receipt, helpers) {
   const note = String(receipt?.note || '');
   const specId = LIVE_RECEIPT_SPECS[id];
   const spec = specId ? { ...tapes[specId], ...(LIVE_SPEC_OVERRIDE[specId] || {}) } : { min: 1, required: [], forbidden: [] };
-  return evaluateGolden(spec || { min: 1 }, items, note, {
+  const result = evaluateGolden(spec || { min: 1 }, items, note, {
     ...helpers,
     junkHit: junkKeys({
       who: spec.who,
       company: spec.profile?.affiliation?.company,
     }),
   });
+  const wordy = result.names.filter((name) => {
+    const text = String(name || '');
+    const words = text.trim().split(/\s+/).filter(Boolean);
+    return words.length >= 8 && !/\d+\.\d+/.test(text) && !/·\s*\d+\s+(updates?|releases?)/i.test(text);
+  });
+  if (wordy.length) result.failures.push(`8+ word titles ${JSON.stringify(wordy)}`);
+  return { ...result, ok: result.failures.length === 0 };
 }

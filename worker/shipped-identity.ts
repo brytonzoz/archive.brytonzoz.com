@@ -113,7 +113,7 @@ export function productHostGuesses(product: string): string[] {
   const slug = product.toLowerCase().replace(/[^a-z0-9]+/g, '');
   const hyphen = product.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '');
   const out: string[] = [];
-  for (const tld of ['com', 'ai', 'io', 'dev', 'so', 'app']) {
+  for (const tld of ['com', 'co', 'ai', 'io', 'dev', 'so', 'app']) {
     if (slug.length >= 3) out.push(`https://${slug}.${tld}/`);
     if (hyphen && hyphen !== slug && hyphen.length >= 3) out.push(`https://${hyphen}.${tld}/`);
   }
@@ -257,7 +257,13 @@ export function handleVariants(handle: string): string[] {
   const parts = id.split(/[_-]/).filter(Boolean);
   // A short first token ("tibo", "tdinh") is too generic to try as a GitHub login.
   if (parts.length > 1 && parts[0].length >= 6) add(parts[0]);
-  return out.filter((v) => isGithubLogin(v) || isXHandle(v)).slice(0, 8);
+  // X handle + io is a common GitHub login (swyx → swyxio). Not a person table.
+  if (id.length >= 4 && id.length <= 12 && !/(io|ai|app|dev|so)$/i.test(id)) add(`${id}io`);
+  // Concatenated first+last: steventey → steven-tey.
+  if (id.length >= 8 && id.length <= 14 && !/[_-]/.test(id)) {
+    for (let i = 4; i <= id.length - 3; i++) add(`${id.slice(0, i)}-${id.slice(i)}`);
+  }
+  return out.filter((v) => isGithubLogin(v) || isXHandle(v)).slice(0, 10);
 }
 
 /** `fofrAI` → `fofr`; `tdinh_me` → `tdinh`. Generic suffixes (ai, me, io) are dropped. */
@@ -304,6 +310,16 @@ export function scoreGithubMatch(opts: {
   if (user.repos > 0 && score > 0) score += Math.min(8, Math.round(Math.log10(1 + user.repos) * 3));
   // Empty accounts that copy a blog or X handle are decoys (fofrAI → fofrai).
   if (user.repos === 0) return Math.min(score, 6);
+  // Parked exact-login accounts (1 repo, no X/blog) lose to the real variant (swyx vs swyxio).
+  if (
+    user.repos < 5 &&
+    wantX &&
+    user.login.toLowerCase() === wantX.toLowerCase() &&
+    !xLinked &&
+    !siteHit
+  ) {
+    return Math.min(score, 12);
+  }
   if (wantX && !xLinked && !variantHit && !siteHit && user.login.toLowerCase() !== wantX.toLowerCase()) return Math.min(score, 6);
   return score;
 }

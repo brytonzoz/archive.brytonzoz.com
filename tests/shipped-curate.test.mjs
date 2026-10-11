@@ -259,6 +259,18 @@ test('harvest wins when Claude keeps a highlight reel of a fat company tape', ()
   assert.ok(expanded.some((item) => /sandbox routing/i.test(item.name)), JSON.stringify(expanded));
   assert.ok(expanded.some((item) => /persistent memory/i.test(item.name)), JSON.stringify(expanded));
   assert.equal(expanded.some((item) => /what.?s new in svelte/i.test(item.name)), false, JSON.stringify(expanded));
+  const essayRss = [
+    { name: 'Luxury hotels are mathematically bad value', kind: 'oss-blog', link: 'https://levels.io/luxury-hotels' },
+    { name: "I've been coding almost solely on my VPS", kind: 'oss-blog', link: 'https://levels.io/vps' },
+    { name: 'Europe has gotten very poor fast', kind: 'oss-blog', link: 'https://levels.io/europe' },
+    { name: 'Congratulations Europe you killed 1000 people', kind: 'oss-blog', link: 'https://levels.io/heat' },
+    { name: 'Places the most attractive rich nomads visit', kind: 'oss-blog', link: 'https://levels.io/nomads-visit' },
+    { name: 'This is how you do a great startup video', kind: 'oss-blog', link: 'https://levels.io/video' },
+    { name: 'Bitcoin 4-year cycles are not dead', kind: 'oss-blog', link: 'https://levels.io/bitcoin' },
+    { name: 'Smartest people I know have strong opinions', kind: 'oss-blog', link: 'https://levels.io/opinions' },
+  ];
+  assert.equal(curate.harvestLooksLikeOssTape(essayRss), false);
+  assert.equal(curate.harvestLooksLikeCommentaryTape(essayRss), true);
   const restored = curate.unionHarvestWin(
     [
       { name: 'NEXT.JS 16.4', link: 'https://vercel.com/changelog/next-16-4' },

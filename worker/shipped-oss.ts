@@ -3,8 +3,9 @@
 import { itemsFromFeedXml } from './shipped-changelog';
 import { affiliationFromBio } from './shipped-affiliation';
 import { githubReposFromText, productHostGuesses } from './shipped-identity';
-import { isPrereleaseShip } from './shipped-polish';
+import { isBlogEssayTitle, isPrereleaseShip, looksLikeEssayTitle } from './shipped-polish';
 import { pinnedReposFromHtml } from './shipped-products';
+import { looksLikePersonalShip } from './shipped-research';
 import { looksLikeProductReadme } from './shipped-repos';
 
 export type OssRelease = {
@@ -472,6 +473,13 @@ export function blogFeedUrls(homepage: string): string[] {
 export function linesFromBlogFeed(xml: string, year: number, source: OssFound['source'] = 'changelog'): OssFound[] {
   return itemsFromFeedXml(xml, year)
     .filter((item) => item.name && !isPrereleaseTag(item.name))
+    .filter((item) => {
+      const blob = `${item.name} ${item.description || ''}`;
+      if (looksLikePersonalShip(item.name) || looksLikePersonalShip(blob)) return true;
+      if (/\d+\.\d+/.test(item.name) || /·\s*\d+\s+releases?\s+in\s+/i.test(item.name)) return true;
+      if (looksLikeEssayTitle(item.name) || isBlogEssayTitle(item.name)) return false;
+      return item.name.trim().split(/\s+/).filter(Boolean).length <= 5;
+    })
     .map((item) =>
       asFound({
         name: item.name,

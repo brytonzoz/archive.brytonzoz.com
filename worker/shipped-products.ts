@@ -283,12 +283,15 @@ export async function harvestOwnProductSites(
   const found: ChangelogFound[] = [];
   const seen = new Set<string>();
   const targets = products
-    .map((product) => {
-      const site = product.site || (product.github ? null : productHostGuesses(product.name)[0]) || null;
-      return site ? { product, site } : null;
+    .flatMap((product) => {
+      const sites = product.site
+        ? [product.site]
+        : product.github
+          ? []
+          : productHostGuesses(product.name).slice(0, 2);
+      return sites.map((site) => ({ product, site }));
     })
-    .filter((row): row is { product: OwnProduct; site: string } => Boolean(row))
-    .slice(0, 5);
+    .slice(0, 6);
   const personal = homes
     .filter((url): url is string => Boolean(url))
     .filter((url, i, all) => all.findIndex((row) => hostOf(row) === hostOf(url)) === i)

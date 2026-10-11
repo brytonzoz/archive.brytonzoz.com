@@ -661,6 +661,21 @@ test('project blog alternate feed is preferred over /blog/rss.xml 404s', async (
   assert.ok(ran.some((tag) => /oss-blog:bun\.com/.test(tag)), JSON.stringify(ran));
 });
 
+test('project blog feeds keep versioned ships and drop essay firehoses', () => {
+  const xml = `<?xml version="1.0"?><rss><channel>
+    <item><title>Bun 1.4</title><link>https://bun.com/blog/bun-v1.4</link><pubDate>Thu, 20 Aug 2026 00:53:44 GMT</pubDate></item>
+    <item><title>Rewriting Bun in Rust</title><link>https://bun.com/blog/rewriting-bun-in-rust</link><pubDate>Wed, 08 Jul 2026 16:00:00 GMT</pubDate></item>
+    <item><title>Luxury hotels are mathematically bad value</title><link>https://levels.io/luxury-hotels</link><pubDate>Sat, 01 Aug 2026 12:00:00 GMT</pubDate></item>
+    <item><title>I made hotelist.com to fix Airbnb ratings</title><link>https://levels.io/hotelist</link><pubDate>Sun, 05 Oct 2026 12:00:00 GMT</pubDate></item>
+  </channel></rss>`;
+  const items = oss.linesFromBlogFeed(xml, 2026);
+  const names = items.map((item) => item.name);
+  assert.ok(names.some((name) => /bun 1\.4/i.test(name)), JSON.stringify(names));
+  assert.ok(names.some((name) => /rewriting bun in rust/i.test(name)), JSON.stringify(names));
+  assert.ok(names.some((name) => /hotelist/i.test(name)), JSON.stringify(names));
+  assert.equal(names.some((name) => /luxury hotels/i.test(name)), false, JSON.stringify(names));
+});
+
 test('live prints keep the writer note; empty CI notes use the sentence fallback', () => {
   const items = [
     {

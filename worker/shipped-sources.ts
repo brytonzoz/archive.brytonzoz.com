@@ -21,6 +21,7 @@ import {
   collisionOverride,
   companyLogins,
   extraSitePaths,
+  guessHandleHomes,
   splitHandleHomes,
   githubLoginsFromText,
   handleTokens,
@@ -1441,7 +1442,7 @@ async function githubRepoOwners(product: string, env: SourceEnv): Promise<string
 
 /** Expand a typed subject to GitHub, X, sites, PH/npm usernames. Cached 24h. */
 export async function resolveIdentity(subject: Subject, env: SourceEnv, tinyfish: TinyfishAccess = null): Promise<ResolvedIdentity> {
-  return cached(`id:v10:${subject.kind}:${subject.id.toLowerCase()}:${loose(subject.display)}:${subject.x || ''}`, 1440 * MIN, () => resolveIdentityFresh(subject, env, tinyfish));
+  return cached(`id:v11:${subject.kind}:${subject.id.toLowerCase()}:${loose(subject.display)}:${subject.x || ''}`, 1440 * MIN, () => resolveIdentityFresh(subject, env, tinyfish));
 }
 
 async function resolveProductMaker(
@@ -1491,7 +1492,7 @@ async function resolveProductMaker(
 
 async function followSitesForGithub(urls: string[], notes: string[]): Promise<string[]> {
   const logins: string[] = [];
-  for (const url of urls.slice(0, 2)) {
+  for (const url of urls.slice(0, 4)) {
     const page = await Promise.race([
       readSite(url).catch(() => null),
       new Promise<null>((resolve) => setTimeout(resolve, 1500, null)),
@@ -1564,7 +1565,10 @@ export async function resolveIdentityFresh(subject: Subject, env: SourceEnv, tin
 
   const followed = profile.github
     ? []
-    : await followSitesForGithub(mergeSites(profile.sites, [profile.site]), notes);
+    : await followSitesForGithub(
+        mergeSites(profile.sites, [profile.site], guessHandleHomes(subject.id), guessHandleHomes(profile.x ?? '')),
+        notes,
+      );
   const knownLogins = [
     ...companyLogins(parts.name || subject.id, parts.company),
     ...nameLogins(profile.name || parts.name || ''),
@@ -1822,7 +1826,7 @@ export async function gather(
     gatherFresh(subject, resolved.profile, env, year, meter, tinyfish, resolved.notes, mode, opts?.onPartial, opts?.affiliation);
   if (opts?.rebuild && !opts.onPartial) return load();
   if (opts?.rebuild) return load();
-  const key = mode === 'full' ? `gather:full:v35:${year}:${resolved.cacheKey}` : `gather:v44:${year}:${resolved.cacheKey}`;
+  const key = mode === 'full' ? `gather:full:v36:${year}:${resolved.cacheKey}` : `gather:v45:${year}:${resolved.cacheKey}`;
   return cached(
     key,
     1440 * MIN,

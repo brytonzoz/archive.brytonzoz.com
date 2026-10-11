@@ -1216,6 +1216,36 @@ test('cheap filters strip markup, drop prereleases and other years, and dedupe U
     false,
     JSON.stringify(journal.map((item) => item.name)),
   );
+  const sameHome = polish.cheapHardFilter(
+    [
+      found({
+        name: 'hotelist.com',
+        date: '2026-10-05',
+        link: 'https://levels.io/#hotelist-com',
+        source: 'site',
+        description: 'Announced 2026-10-05 on levels.io',
+      }),
+      found({
+        name: 'nomads.com',
+        date: '2026-09-05',
+        link: 'https://levels.io/#nomads-com',
+        source: 'site',
+        description: 'Announced 2026-09-05 on levels.io',
+      }),
+      found({
+        name: 'Photo AI feature',
+        date: '2026-08-01',
+        link: 'https://levels.io/#photo-ai-feature',
+        source: 'site',
+        description: 'Announced 2026-08-01 on levels.io',
+      }),
+    ],
+    2026,
+  );
+  assert.equal(sameHome.length, 3, JSON.stringify(sameHome.map((item) => item.name)));
+  assert.ok(sameHome.some((item) => /hotelist/i.test(item.name)));
+  assert.ok(sameHome.some((item) => /nomads/i.test(item.name)));
+  assert.ok(sameHome.some((item) => /photo ai/i.test(item.name)));
   const essays = polish.cheapHardFilter(
     [
       found({

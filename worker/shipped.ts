@@ -2395,7 +2395,13 @@ async function reprintReceipt(
     const x = (gathered.profile.x && isXHandle(gathered.profile.x) ? gathered.profile.x : subject.kind === 'x' ? subject.id : null) || null;
     const realNew = (draft.items || []).filter((item) => item?.name && item.name !== 'YOUR POTENTIAL' && item.source !== 'none');
     const realOld = (current.items || []).filter((item) => item?.name && item.name !== 'YOUR POTENTIAL' && item.source !== 'none');
-    if (!realNew.length && realOld.length && !remappedGithub && !tapeLooksBroken(current.items)) {
+    if (
+      !realNew.length &&
+      realOld.length &&
+      !remappedGithub &&
+      !tapeLooksBroken(current.items) &&
+      !harvestLooksLikeCommentaryTape(realOld)
+    ) {
       console.log(JSON.stringify({ shipped: 'reprint-keep', id: row.id, kept: realOld.length, why: 'empty-harvest' }));
       const keptItems = current.items as DraftItem[];
       const keptNote = current.note || '';

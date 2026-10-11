@@ -693,11 +693,9 @@ export function unionCeoDatedFlagships<T extends { name?: string; link?: string 
 ): T[] {
   const kind = companyHarvestWinKind(role, company);
   if (!kind) return tape;
+  const flagships: T[] = [];
   const extra: T[] = [];
   for (const item of found || []) {
-    if (tape.length + extra.length >= 50) break;
-    if (year && item.date && !String(item.date).startsWith(String(year))) continue;
-    if (year && !item.date) continue;
     if (!companyHarvestCardOk(item, kind)) continue;
     const raw = String(item.name || '').trim();
     if (!raw) continue;
@@ -707,10 +705,21 @@ export function unionCeoDatedFlagships<T extends { name?: string; link?: string 
     const words = short.split(/\s+/).filter(Boolean);
     if (words.length >= 8 && !/\d+\.\d+/.test(short) && !/·\s*\d+\s+(updates?|releases?)/i.test(short)) continue;
     if (!titleSanityOk(short)) continue;
-    if (harvestExpandHas(tape, { ...item, name: short }) || harvestExpandHas(extra, { ...item, name: short })) continue;
-    extra.push({ ...item, name: short });
+    const named = { ...item, name: short };
+    const flag = flagshipLaunchName(named);
+    if (year && item.date && !String(item.date).startsWith(String(year))) continue;
+    // Named flagships stay even when the sitemap row has no day; crumbs still need a year date.
+    if (year && !item.date && !flag) continue;
+    if (harvestExpandHas(tape, named) || harvestExpandHas(flagships, named) || harvestExpandHas(extra, named)) continue;
+    if (flag) {
+      flagships.push(named);
+      continue;
+    }
+    if (tape.length + extra.length >= 50) continue;
+    extra.push(named);
   }
-  return extra.length ? [...tape, ...extra] : tape;
+  if (!flagships.length && !extra.length) return tape;
+  return [...flagships, ...tape, ...extra];
 }
 
 export function customerFromProfile(

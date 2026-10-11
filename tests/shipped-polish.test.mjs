@@ -249,6 +249,23 @@ test('source lines are via Brand · host with no sitemap metadata', () => {
   );
   assert.ok((polish.cleanDescription('- Fixed the empty tweet state on the profile') || '').length <= 60);
   assert.equal(polish.cleanDescription('Updated dependencies'), '');
+  assert.equal(polish.cleanDescription('To install Bun v1.3.14 Windows: bash powershell'), '');
+  assert.equal(polish.cleanDescription('96e1bb1: Promote @vercel/passport to stable'), '');
+  assert.equal(polish.cleanDescription('Breaking changes - LLVM is the only code generation'), '');
+  assert.equal(polish.cleanDescription("See What's new in V5 for an overview of changes between"), '');
+  assert.equal(
+    polish.cleanDescription('XDR Boost is an open source alternative to Vivid without'),
+    'XDR Boost is an open source alternative to Vivid',
+  );
+  assert.equal(polish.looksIncompleteSubline('XDR Boost is an open source alternative to Vivid without'), true);
+  assert.equal(
+    polish.printedDescription({
+      name: 'BUN · 3 RELEASES IN JAN',
+      description: '3 Bun releases in JAN',
+      source: 'github',
+    }),
+    '',
+  );
   assert.equal(polish.isUpdatedDependenciesOnly({ name: 'Updated dependencies', description: '' }), true);
   assert.equal(polish.isUpdatedDependenciesOnly({ name: 'FUN 1.3', description: 'Patch Changes - Updated dependencies' }), false);
   assert.equal(polish.isUpdatedDependenciesOnly({ name: 'FUN 1.3', description: 'update tar version' }), false);

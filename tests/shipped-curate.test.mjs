@@ -502,6 +502,41 @@ test('harvest wins when Claude keeps a highlight reel of a fat company tape', ()
   }));
   const rauch = curate.unionCeoDatedFlagships(rauch17, [...rauch17, ...vercelCards], 'ceo', 'Vercel', 2026);
   assert.ok(rauch.length >= 30, JSON.stringify(rauch.map((item) => item.name).slice(-8)));
+  const rauchFull = Array.from({ length: 51 }, (_, i) => ({
+    name: `NEXT.JS 16.${i}`,
+    date: `2026-0${(i % 9) + 1}-01`,
+    source: 'changelog',
+    link: `https://vercel.com/changelog/next-16-${i}`,
+  }));
+  const rauchFlagships = curate.unionCeoDatedFlagships(
+    rauchFull,
+    [
+      ...rauchFull,
+      { name: 'Vercel Agent', date: null, source: 'changelog', link: 'https://vercel.com/changelog/vercel-agent' },
+      { name: 'We launched AI Gateway', date: null, source: 'changelog', link: 'https://vercel.com/changelog/ai-gateway' },
+    ],
+    'ceo',
+    'Vercel',
+    2026,
+  );
+  const rauchFlagshipNames = rauchFlagships.map((item) => item.name);
+  assert.ok(rauchFlagshipNames.some((name) => /vercel agent/i.test(name)), JSON.stringify(rauchFlagshipNames.slice(0, 8)));
+  assert.ok(rauchFlagshipNames.some((name) => /ai gateway/i.test(name)), JSON.stringify(rauchFlagshipNames.slice(0, 8)));
+  const colinZod = curate.unionOwnDatedShips(
+    [{ name: 'NUB', date: '2026-02-08', kind: 'oss-launch', source: 'github', link: 'https://github.com/colinhacks/nub' }],
+    [
+      {
+        name: 'Zod 4.1.0',
+        date: '2026-01-15',
+        kind: 'oss-release',
+        source: 'github',
+        link: 'https://github.com/colinhacks/zod/releases/tag/v4.1.0',
+      },
+    ],
+    2026,
+    { github: 'colinhacks', orgs: ['colinhacks'], site: 'https://colinhacks.com' },
+  );
+  assert.ok(colinZod.some((item) => /zod/i.test(item.name)), JSON.stringify(colinZod));
   const hashed = curate.packCandidates(
     [found({ name: 'Composer 2', date: '2026-03-19', link: 'https://cursor.com/blog/composer-2' })],
     2026,

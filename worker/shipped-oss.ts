@@ -402,7 +402,7 @@ export function linesFromOssRepo(
     found.push(
       asFound({
         name: formatOssMonthRollup(product, list.length, month),
-        description: `${list.length} ${product} releases in ${MONTHS[Number(month.slice(5, 7)) - 1] || month}`,
+        description: '',
         date: latest.date,
         link: latest.url,
         icon: null,

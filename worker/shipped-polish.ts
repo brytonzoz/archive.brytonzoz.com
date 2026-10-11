@@ -46,7 +46,7 @@ const PLATFORM_POLICY =
   /\b(deployment retention|default to \d+[-\s]?day|retain(?:s|ed|ing)? (fewer )?deployments|skip sending|request bodies|routing middleware|billing begins|spend management|per-user budgets|hobby projects now retain|edge requests are now called|no longer caches|timestamp attributes are now supported)\b/i;
 const CHOPPED_GATEWAY = /^microsoft decision[- ]?1$/i;
 const TRAILING_PREP =
-  /(?:^|[\s/])(of|in|to|for|and|or|the|a|an|with|on|as|by|from|into|longer|kind|new|our|your|through|their|its|vs|lower|higher|more|less|day|days|every|managed|security|controlled|trusted|general|advanced|remote|task|chat|now|key|third|are|image|usage|delay|preview|zero|has|accepts|service|except)$/i;
+  /(?:^|[\s/])(of|in|to|for|and|or|the|a|an|with|on|as|by|from|into|longer|kind|new|our|your|through|their|its|vs|lower|higher|more|less|day|days|every|managed|security|controlled|trusted|general|advanced|remote|task|chat|now|key|third|are|image|usage|delay|preview|zero|has|accepts|service|except|without|between|within|against|among|across|during|including|using)$/i;
 export const CUT_OFF_ENDINGS =
   /^(now|and|with|for|of|the|on|key|third|are|image|usage|delay|preview|zero|has|accepts|service|except)$/i;
 const TITLE_START_BAD =
@@ -228,7 +228,7 @@ export function endsWithCutOffWord(text: string): boolean {
   const words = tidy(text).split(/\s+/).filter(Boolean);
   const last = words[words.length - 1] || '';
   if (/^[A-Za-z]{1,2}$/.test(last) && words.length >= 2 && !KEEP_TAIL_ACRONYM.test(last)) return true;
-  if (/^(now|and|with|for|of|the|on|key|third|are|zero|has|accepts|except)$/i.test(last) && words.length >= 2) return true;
+  if (/^(now|and|with|for|of|the|on|key|third|are|zero|has|accepts|except|without|between)$/i.test(last) && words.length >= 2) return true;
   if (/^(image|usage|delay|preview)$/i.test(last) && words.length >= 4) return true;
   if (words.length >= 5 && /^[A-Za-z]{3,4}$/.test(last) && !KEEP_TAIL_ACRONYM.test(last) && !/\d/.test(last)) {
     return true;
@@ -1212,6 +1212,16 @@ const DESC_VERSION_HEADER = /^\d+\.\d+(?:\.\d+)?(?:\s*\([^)]{0,40}\))?/;
 const DESC_CHANGELOG_LABEL =
   /^(?:#{1,6}\s*)?(?:(?:patch|minor|major)\s+changes|features|fixes|changelog|release notes|what's new)\b/i;
 const DESC_UPDATED_DEPS = /^(?:[-*+]\s*)?(?:patch changes[:\s-]*)?updated dependencies\.?$/i;
+const DESC_HASH_PREFIX = /^[0-9a-f]{7,40}\b[:\s-]/i;
+const DESC_INSTALL =
+  /^(to install|install(?:ing|ation)?\b[:\s]|npx |npm i(?:nstall)?\s|yarn add |pnpm (?:add|i) |bun add |curl |powershell|brew install|winget )/i;
+const DESC_INSTALL_CMD = /:\s*(bash|sh|zsh|powershell|cmd|npx|npm|yarn|pnpm|bun|curl)\b/i;
+const DESC_BREAKING = /\bbreaking changes\b/i;
+const DESC_SEE_POINTER = /^(see|see also)\b/i;
+const DESC_INCOMPLETE_TAIL =
+  /(?:^|[\s/])(without|between|within|against|among|across|during|including|using|versus|via|until|unless|though|although|because|while|where|when|if|than|that|which|who|whose|whom|into|onto|from|with|for|and|or|but|the|a|an|of|in|to|on|as|by|at)\s*$/i;
+const DESC_ROLLUP_RESTATE =
+  /^\d+\s+\S+(?:\s+\S+)?\s+releases?\s+in\s+(jan|feb|mar|apr|may|jun|jul|aug|sep|oct|nov|dec)\b/i;
 
 /** Strip markdown and HTML so harvest text never prints as `###` / `<h3>`. */
 export function stripMarkup(value: unknown): string {
@@ -1338,6 +1348,39 @@ export function isUpdatedDependenciesOnly(item: { name?: string; description?: s
   return false;
 }
 
+/** Sub-line: a short complete phrase. Incomplete clauses and pointers never print. */
+export function looksIncompleteSubline(text: string): boolean {
+  const trimmed = tidy(text);
+  if (!trimmed) return true;
+  if (looksCutOff(trimmed) || looksMidWord(trimmed) || looksFragment(trimmed)) return true;
+  if (DESC_INCOMPLETE_TAIL.test(trimmed)) return true;
+  if (/[,;:·|&…]\s*$/.test(trimmed) || /\([^)]*$/.test(trimmed)) return true;
+  return false;
+}
+
+function completeSubline(text: string): string {
+  const trimmed = tidy(text);
+  if (!trimmed) return '';
+  if (trimmed.length <= DESC_MAX && !looksIncompleteSubline(trimmed)) return trimmed;
+  const window = trimmed.slice(0, DESC_MAX);
+  const dash = window.match(/^(.{12,}?)\s*[—–]\s/);
+  if (dash?.[1] && !looksIncompleteSubline(dash[1])) return dash[1].trim();
+  const sentence = window.match(/^(.{12,}?[.!?])(?:\s|$)/);
+  if (sentence?.[1]) {
+    const clause = sentence[1].replace(/[.!?]+$/, '').trim();
+    if (clause && !looksIncompleteSubline(clause)) return clause;
+  }
+  let cut = trimmed.length <= DESC_MAX ? trimmed : wordClamp(trimmed, DESC_MAX);
+  while (cut && looksIncompleteSubline(cut)) {
+    const words = cut.split(/\s+/).filter(Boolean);
+    if (words.length < 3) return '';
+    words.pop();
+    cut = words.join(' ').replace(/[,:;–—-]+$/, '').trim();
+  }
+  if (cut && cut.length >= 8 && !looksIncompleteSubline(cut)) return cut;
+  return '';
+}
+
 export function cleanDescription(value: unknown): string {
   let text = stripMarkup(value);
   if (!text || META_DESC.test(text) || HOST_ONLY.test(text)) return '';
@@ -1356,6 +1399,9 @@ export function cleanDescription(value: unknown): string {
   text = text.replace(/^(?:chore|feat|fix|docs|refactor):\s*/i, '').trim();
   text = text.replace(/^\s*[-*+]\s+/g, '').replace(/\(#[0-9a-f]+\)/gi, '').replace(/#\d+\b/g, '').trim();
   if (!text || DESC_UPDATED_DEPS.test(text) || DESC_CHANGELOG_LABEL.test(text) || /^[0-9a-f]{7,40}$/i.test(text)) return '';
+  if (DESC_HASH_PREFIX.test(text) || DESC_INSTALL.test(text) || DESC_INSTALL_CMD.test(text) || DESC_BREAKING.test(text) || DESC_SEE_POINTER.test(text)) {
+    return '';
+  }
   if (
     /<\/?[a-z]|align=["']|^(p|h[1-6]|div|span|img|ul|ol|li|picture|source)\b|\b(srcset|prefers-color-scheme|media=["'])/i.test(text)
   )
@@ -1363,10 +1409,7 @@ export function cleanDescription(value: unknown): string {
   if (/[#*_`\[\]]|https?:\/\//.test(text)) return '';
   text = text.replace(/\b(\w+)\s+\1\b/gi, '$1');
   if (!text || DESC_UPDATED_DEPS.test(text)) return '';
-  if (text.length <= DESC_MAX) return text;
-  const cut = wordClamp(text, DESC_MAX);
-  if (!cut || looksCutOff(cut) || looksMidWord(cut)) return '';
-  return cut;
+  return completeSubline(text);
 }
 
 export function prettyBrand(company: string | null | undefined, host?: string | null): string {
@@ -1610,9 +1653,18 @@ export function isCeoNpmUtility(
   return true;
 }
 
-export function printedDescription(item: { description?: string; source?: string | null; link?: string | null }): string {
+export function printedDescription(item: { name?: string; description?: string; source?: string | null; link?: string | null }): string {
   if (isNpmPackageItem(item)) return '';
-  return cleanDescription(item.description);
+  if (PACKAGE_ROLLUP.test(item.name || '') || MONTH_LINE.test(item.name || '')) return '';
+  const desc = cleanDescription(item.description);
+  if (!desc) return '';
+  if (DESC_ROLLUP_RESTATE.test(desc)) return '';
+  const title = loose(item.name || '');
+  const body = loose(desc);
+  if (title && body && (title === body || (title.length >= 8 && body.length >= 8 && (title.includes(body) || body.includes(title))))) {
+    return '';
+  }
+  return desc;
 }
 
 /** Significance-3 / named flagships print first (top ~5), then the rest by date. */

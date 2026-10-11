@@ -39,6 +39,19 @@ test('pinned repo HTML is parsed from the GitHub profile markup', () => {
   assert.ok(pins.some((row) => row.name === 'zod'));
 });
 
+test('live GitHub pin markup keeps an org-owned pin after nested divs', () => {
+  const pad = '<div class="Box"><div class="inner">'.repeat(80) + '</div></div>'.repeat(80);
+  const html = `
+    <div class="js-pinned-items-reorder-container">
+      <span data-view-component="true"><a data-hydro-click="{&quot;event_type&quot;:&quot;user_profile.click&quot;,&quot;payload&quot;:{&quot;target&quot;:&quot;PINNED_REPO&quot;}}" href="/colinhacks/zod" class="Link mr-1 text-bold">zod</a></span>
+      ${pad}
+      <span data-view-component="true"><a data-hydro-click="{&quot;event_type&quot;:&quot;user_profile.click&quot;,&quot;payload&quot;:{&quot;target&quot;:&quot;PINNED_REPO&quot;}}" href="/nubjs/nub" class="Link mr-1 tmp-mr-1 text-bold wb-break-word"><span class="owner">nubjs/</span><span class="repo">nub</span></a></span>
+    </div>`;
+  const pins = products.pinnedReposFromHtml(html);
+  assert.ok(pins.some((row) => row.owner === 'colinhacks' && row.name === 'zod'), JSON.stringify(pins));
+  assert.ok(pins.some((row) => row.owner === 'nubjs' && row.name === 'nub'), JSON.stringify(pins));
+});
+
 test('employer npm rollups never land on an employee who is not the CEO or lead', () => {
   const item = { name: 'VERCEL · 128 RELEASES IN JUL', source: 'npm', link: 'https://www.npmjs.com/package/vercel' };
   const employee = { ...affiliation.emptyAffiliation(), role: 'employee', company: 'Vercel' };
@@ -65,4 +78,8 @@ test('printed titles stay noun phrases at 48 characters', () => {
   const title = polish.cleanShipTitle('AWS DATABASES ARE NOW LIVE ON THE VERCEL MARKETPLACE AND V0');
   assert.ok(!title || title.length <= 48);
   assert.equal(Boolean(title && /\b(are now|now live)\b/i.test(title)), false);
+  const plugin = polish.cleanShipTitle('VERCEL PLUGIN NOW SUPPORTED ON OPENAI CODEX AND CODEX');
+  assert.ok(plugin);
+  assert.ok(plugin.length <= 48, plugin);
+  assert.equal(/\bnow supported\b/i.test(plugin), false);
 });

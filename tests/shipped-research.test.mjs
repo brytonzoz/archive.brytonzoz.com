@@ -821,6 +821,8 @@ test('a /projects page dated 2026 becomes found items', () => {
   assert.equal(friends.some((item) => /datafast|shipfast|indiepage/i.test(item.name)), false);
   assert.equal(identity.guessHandleDotCom('jackfriks'), 'https://jackfriks.com/');
   assert.equal(identity.guessHandleDotCom('www'), null);
+  assert.ok(identity.guessHandleHomes('levelsio').includes('https://levelsio.com/'));
+  assert.ok(identity.guessHandleHomes('levelsio').includes('https://levels.io/'));
 });
 
 test('indie blog month archives become dated ships and skip commentary', () => {

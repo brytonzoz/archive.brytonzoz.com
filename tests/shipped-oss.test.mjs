@@ -28,6 +28,40 @@ test('major/minor releases with notes become product lines; patches roll up by m
   assert.equal(names.some((name) => /canary/i.test(name)), false);
 });
 
+test('a pinned product with only 2026 canaries still prints a product line', () => {
+  const lines = oss.linesFromOssRepo(
+    {
+      owner: 'nubjs',
+      name: 'nub',
+      html_url: 'https://github.com/nubjs/nub',
+      description: 'TypeScript runtime',
+      pushed_at: '2026-10-06T12:00:00Z',
+      stargazers_count: 400,
+    },
+    [
+      {
+        tag_name: 'v0.9.6-canary.20261006.547',
+        published_at: '2026-10-06T12:00:00Z',
+        prerelease: true,
+        html_url: 'https://github.com/nubjs/nub/releases/tag/v0.9.6-canary.20261006.547',
+      },
+      {
+        tag_name: 'v0.9.5-canary.20260926.535',
+        published_at: '2026-09-26T12:00:00Z',
+        prerelease: true,
+        html_url: 'https://github.com/nubjs/nub/releases/tag/v0.9.5-canary.20260926.535',
+      },
+    ],
+    [],
+    2026,
+    'github',
+    { includePrereleases: true },
+  );
+  const names = lines.map((item) => item.name);
+  assert.ok(names.some((name) => /nub/i.test(name)), JSON.stringify(names));
+  assert.equal(names.some((name) => /canary/i.test(name)), false);
+});
+
 test('prefixed tags still parse as semver', () => {
   assert.deepEqual(oss.parseSemver('bun-v1.4.0'), { major: 1, minor: 4, patch: 0 });
   assert.deepEqual(oss.parseSemver('svelte@5.20.0'), { major: 5, minor: 20, patch: 0 });

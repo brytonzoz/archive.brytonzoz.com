@@ -21,7 +21,7 @@ import {
   collisionOverride,
   companyLogins,
   extraSitePaths,
-  guessHandleDotCom,
+  guessHandleHomes,
   githubLoginsFromText,
   handleTokens,
   handleVariants,
@@ -1335,7 +1335,7 @@ async function apiUser(login: string, env: SourceEnv): Promise<GithubUser | null
 /** Who this GitHub login is: the profile page, else TinyFish reading it, else the API. Null = no such account. */
 export async function githubUser(login: string, env: SourceEnv, tinyfish: TinyfishAccess = null): Promise<GithubUser | null> {
   if (!isGithubLogin(login) || NOT_USERS.has(login.toLowerCase())) return null;
-  return cached(`gh:user:${login.toLowerCase()}`, 360 * MIN, async () => {
+  return cached(`gh:user:v2:${login.toLowerCase()}`, 360 * MIN, async () => {
     try {
       const html = await githubPage(`/${login}`);
       if (!html) return null;
@@ -1441,7 +1441,7 @@ async function githubRepoOwners(product: string, env: SourceEnv): Promise<string
 
 /** Expand a typed subject to GitHub, X, sites, PH/npm usernames. Cached 24h. */
 export async function resolveIdentity(subject: Subject, env: SourceEnv, tinyfish: TinyfishAccess = null): Promise<ResolvedIdentity> {
-  return cached(`id:v9:${subject.kind}:${subject.id.toLowerCase()}:${loose(subject.display)}:${subject.x || ''}`, 1440 * MIN, () => resolveIdentityFresh(subject, env, tinyfish));
+  return cached(`id:v10:${subject.kind}:${subject.id.toLowerCase()}:${loose(subject.display)}:${subject.x || ''}`, 1440 * MIN, () => resolveIdentityFresh(subject, env, tinyfish));
 }
 
 async function resolveProductMaker(
@@ -2076,10 +2076,10 @@ async function gatherFresh(
       })()
     : Promise.resolve(null);
 
-  const guessedSite = guessHandleDotCom(profile.github) || guessHandleDotCom(profile.x);
-  if (guessedSite) {
-    if (!profile.site) profile.site = guessedSite;
-    profile.sites = mergeSites(profile.sites, [guessedSite]);
+  const guessedHomes = [...guessHandleHomes(profile.github), ...guessHandleHomes(profile.x)];
+  if (guessedHomes.length) {
+    if (!profile.site) profile.site = guessedHomes[0] || null;
+    profile.sites = mergeSites(profile.sites, guessedHomes);
   }
   const homepage = profile.site;
   const extraHomes = [
@@ -2134,7 +2134,11 @@ async function gatherFresh(
     companyStoreP,
     raceTimeout(githubOverviewP, SOURCE_TIMEOUT_MS, null),
     raceTimeout(ossHarvestP, OSS_TIMEOUT_MS, { found: [] as Found[], ran: [] as string[], orgs: [] as string[] }),
-    raceTimeout(harvestOwnProductSites(ownProducts, year).catch(() => []), SOURCE_TIMEOUT_MS, []),
+    raceTimeout(
+      harvestOwnProductSites(ownProducts, year, [profile.site, ...sitesOf(profile)]).catch(() => []),
+      OSS_TIMEOUT_MS,
+      [],
+    ),
     raceTimeout(identityP, SOURCE_TIMEOUT_MS, undefined),
   ]);
   if (site) ran.push('site');
@@ -2494,7 +2498,8 @@ async function gatherFresh(
   const meanConfidence =
     deduped.length > 0 ? deduped.reduce((sum, item) => sum + (item.confidence ?? 0), 0) / deduped.length : 0;
   const capped = ran.some((tag) => tag.startsWith('xai-capped')) || leftover > 0;
-  const thinVerified = !deep && Boolean(profile.x) && deduped.length < 5;
+  const thinVerified =
+    !deep && Boolean(profile.x) && (Boolean(profile.xVerified) || ownProducts.length > 0) && deduped.length < 5;
   const incomplete =
     !deep &&
     (thinVerified ||

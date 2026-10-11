@@ -54,7 +54,7 @@ const TITLE_END_BAD = /\b(of|a|an|the|with|and|or|security|controlled|trusted|ge
 const TITLE_VERB =
   /^(announces|announce|announced|connects|connect|built|builds|building|works|working|uses|using|used|launched|ships|shipped|released|added|adds|created|makes|made|lets|can|will|is|are|was|were|gives|reaches|joins|keeps|combines|deprecated)$/i;
 const SENTENCE_VERB =
-  /\b(announces|announce|announced|connects|gives|reaches|joins|keeps|combines|deprecated|also added|is now|are now|now live|now keeps|now display)\b/i;
+  /\b(announces|announce|announced|connects|gives|reaches|joins|keeps|combines|deprecated|also added|is now|are now|now live|now keeps|now display|now supported|now shows?|now includes?|now calculates?|now provides?|now returns?)\b/i;
 const BARE_MODEL = /^gpt-[3-5]$/i;
 const CODE_TITLE = /^[a-z][\w-]*\.[a-z][\w-]*\.[a-z]/i;
 const MID_WORD =
@@ -951,6 +951,8 @@ export function cleanShipTitle(raw: unknown, max = TITLE_MAX): string {
     .replace(/\s+is now\b.*$/i, '')
     .replace(/\s+support for\b.*$/i, '')
     .replace(/\s+now supports?\b.*$/i, '')
+    .replace(/\s+now supported\b.*$/i, '')
+    .replace(/\s+now (shows?|includes?|calculates?|provides?|returns?|uses?)\b.*$/i, '')
     .replace(/\s+(release|launch) notes\.?$/i, '')
     .replace(/\s+reconnects?$/i, '')
     .replace(/\s+,/g, ',')

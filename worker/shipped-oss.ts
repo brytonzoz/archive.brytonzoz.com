@@ -288,22 +288,24 @@ export function linesFromOssRepo(
   tags: OssTag[],
   year: number,
   source: OssFound['source'] = 'github',
+  opts?: { includePrereleases?: boolean },
 ): OssFound[] {
   const product = productNameFromRepo(repo.name, repo.homepage);
   const repoUrl = publicUrl(repo.html_url) || `https://github.com/${repo.owner}/${repo.name}`;
   const seen = new Set<string>();
   const dated: { tag: string; date: string; url: string; body: string; notable: boolean }[] = [];
+  const includePre = Boolean(opts?.includePrereleases);
 
   const take = (tag: string, date: string | null, url: string | null, body: string, notable: boolean) => {
     const key = tag.replace(/^v/i, '').toLowerCase();
     if (!key || seen.has(key) || !inYear(date, year)) return;
-    if (isPrereleaseTag(tag)) return;
+    if (isPrereleaseTag(tag) && !includePre) return;
     seen.add(key);
     dated.push({ tag, date: date!, url: url || repoUrl, body, notable });
   };
 
   for (const release of releases) {
-    if (release.draft || release.prerelease) continue;
+    if (release.draft || (release.prerelease && !includePre)) continue;
     const tag = String(release.tag_name || release.name || '');
     take(tag, day(release.published_at), publicUrl(release.html_url), String(release.body || ''), hasNotes(release.body) || Boolean(release.name && release.name !== release.tag_name));
   }
@@ -389,6 +391,21 @@ export function linesFromOssRepo(
         }),
       );
     }
+  }
+  if (includePre && !found.length && inYear(repo.pushed_at, year) && !SKIP_REPO.test(repo.name) && REPO_OK.test(repo.name)) {
+    found.push(
+      asFound({
+        name: product,
+        description: tidy(repo.description, 140) || `${product} activity in ${year}`,
+        date: day(repo.pushed_at),
+        link: publicUrl(repo.homepage) || repoUrl,
+        icon: null,
+        source,
+        status: 'SHIPPED',
+        score: 6,
+        kind: 'oss-pin',
+      }),
+    );
   }
   return found.filter((item) => item.name);
 }
@@ -803,6 +820,23 @@ export async function harvestOss(opts: {
     pendingStats.push({ org, repos: repos.slice(0, 3) });
   }
 
+  const pinKeys = new Set((opts.pins || []).map((pin) => `${pin.owner}/${pin.name}`.toLowerCase()));
+  const productKeys = [...(opts.products || []), opts.affiliation?.product]
+    .filter((value): value is string => Boolean(value))
+    .map((value) => value.toLowerCase().replace(/[^a-z0-9]/g, ''));
+  const isOwnProductRepo = (repo: OssRepo) => {
+    if (pinKeys.has(`${repo.owner}/${repo.name}`.toLowerCase())) return true;
+    const name = repo.name.toLowerCase().replace(/[^a-z0-9]/g, '');
+    const owner = repo.owner.toLowerCase().replace(/[^a-z0-9]/g, '');
+    return productKeys.some(
+      (product) =>
+        product &&
+        (product === name ||
+          product === owner ||
+          (product.length >= 3 && (name.includes(product) || owner.includes(product) || product.includes(name)))),
+    );
+  };
+
   const seenHarvest = new Set<string>();
   const harvestRepos = async (repos: OssRepo[], tag: string) => {
     for (const repo of repos) {
@@ -844,7 +878,9 @@ export async function harvestOss(opts: {
         releases = [...releases, ...more];
         if (more.length < 30) break;
       }
-      const yearReleases = yearStable();
+      const ownProduct = isOwnProductRepo(repo);
+      const yearPublished = releases.filter((row) => !row.draft && inYear(day(row.published_at), year));
+      const yearReleases = ownProduct ? yearPublished : yearStable();
       let tags: OssTag[] = [];
       if (yearReleases.length < 5) {
         const rawTags = await memo(`oss:tags:${repo.owner}/${repo.name}`, 180 * 60, () =>
@@ -878,7 +914,7 @@ export async function harvestOss(opts: {
         );
         repo.readme = Boolean(readme);
       }
-      const lines = linesFromOssRepo(repo, yearReleases, tags, year, source);
+      const lines = linesFromOssRepo(repo, yearReleases, tags, year, source, { includePrereleases: ownProduct });
       if (lines.length) {
         found.push(...lines);
         ran.push(`${tag}:${repo.owner}/${repo.name}:${lines.length}`);

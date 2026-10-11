@@ -13,6 +13,7 @@ import {
   productNameFromHost,
   urlsFromText,
 } from './shipped-identity';
+import { itemsFromDatedJournal, itemsFromPersonalFeed } from './shipped-research';
 
 export type OwnProduct = {
   name: string;
@@ -130,21 +131,21 @@ export function pinnedReposFromHtml(html: string): { owner: string; name: string
   const seen = new Set<string>();
   const add = (owner: string, name: string) => {
     if (!/^[A-Za-z0-9-]{1,39}$/.test(owner) || !/^[A-Za-z0-9._-]{1,100}$/.test(name)) return;
-    if (/^(sponsors|issues|pulls|settings|marketplace|topics|orgs|apps)$/i.test(name)) return;
+    if (/^(sponsors|issues|pulls|settings|marketplace|topics|orgs|apps|stargazers|forks)$/i.test(name)) return;
     const key = `${owner.toLowerCase()}/${name.toLowerCase()}`;
     if (seen.has(key)) return;
     seen.add(key);
     out.push({ owner, name });
   };
-  const block =
-    html.match(/pinned-items-list[\s\S]{0,12000}?(?:<\/ol>|<\/ul>|js-pinned-items-reorder-container)/i)?.[0] ||
-    html.match(/js-pinned-items-reorder-container[\s\S]{0,12000}?(?:<\/ol>|<\/div>\s*<\/div>)/i)?.[0] ||
-    '';
-  const hay = block || html;
-  for (const match of hay.matchAll(/pinned-item-list-item[\s\S]{0,500}?href="\/([A-Za-z0-9-]+)\/([A-Za-z0-9._-]+)"/gi)) {
+  // Live GitHub wraps each pin in nested divs; a non-greedy </div></div> cut the block
+  // before the second pin (nubjs/nub sits ~6k after zod). Read the full page instead.
+  for (const match of html.matchAll(/"target":"PINNED_REPO"[\s\S]{0,900}?href="\/([A-Za-z0-9-]+)\/([A-Za-z0-9._-]+)"/gi)) {
     add(match[1], match[2].replace(/\.git$/i, ''));
   }
-  for (const match of hay.matchAll(/href="\/([A-Za-z0-9-]+)\/([A-Za-z0-9._-]+)"[^>]*class="[^"]*(?:Link|text-bold|mr-1)[^"]*"/gi)) {
+  for (const match of html.matchAll(/pinned-item-list-item[\s\S]{0,4000}?href="\/([A-Za-z0-9-]+)\/([A-Za-z0-9._-]+)"/gi)) {
+    add(match[1], match[2].replace(/\.git$/i, ''));
+  }
+  for (const match of html.matchAll(/href="\/([A-Za-z0-9-]+)\/([A-Za-z0-9._-]+)"[^>]*class="[^"]*(?:Link|text-bold|mr-1)[^"]*"/gi)) {
     add(match[1], match[2].replace(/\.git$/i, ''));
   }
   if (!out.length) {
@@ -179,14 +180,15 @@ export function productsFromSurfaces(opts: {
   return out.slice(0, 8);
 }
 
-const PRODUCT_PATHS = ['/changelog', '/releases', '/whats-new', '/release-notes', '/updates', ...FEED_PATHS.slice(0, 8)];
+const PRODUCT_PATHS = ['/changelog', '/releases', '/whats-new', '/release-notes', '/updates', '/rss', '/blog', ...FEED_PATHS.slice(0, 6)];
+const HOME_PATHS = ['/rss', '/', '/blog', '/feed'];
 
 async function readText(url: string): Promise<string | null> {
   try {
     const response = await safeFetch(url, {
       accept: 'text/html, application/rss+xml, application/atom+xml, text/xml, */*',
       timeoutMs: 4500,
-      maxBytes: 400_000,
+      maxBytes: 800_000,
     });
     return new TextDecoder('utf-8').decode(response.bytes);
   } catch {
@@ -198,8 +200,74 @@ function asFound(row: ChangelogFound): ChangelogFound {
   return { ...row, source: row.source === 'site' ? 'changelog' : row.source };
 }
 
-/** First-party changelog / RSS / release notes for the builder's own products. */
-export async function harvestOwnProductSites(products: OwnProduct[], year: number): Promise<ChangelogFound[]> {
+function takeRows(found: ChangelogFound[], seen: Set<string>, rows: ChangelogFound[], fallback: string): void {
+  for (const row of rows) {
+    const key = `${loose(row.name)}|${row.link || ''}`;
+    if (!key || seen.has(key)) continue;
+    seen.add(key);
+    found.push({
+      ...asFound(row),
+      description: row.description || fallback,
+    });
+  }
+}
+
+function fromJournal(row: {
+  name: string;
+  description: string;
+  date: string | null;
+  dateConfidence?: ChangelogFound['dateConfidence'];
+  link: string | null;
+  status?: string;
+  score: number;
+  thisYear?: boolean;
+}): ChangelogFound {
+  const status =
+    row.status === 'RELEASED' || row.status === 'SHIPPED' || row.status === 'LIVE' || row.status === 'LAUNCHED'
+      ? row.status
+      : 'LAUNCHED';
+  return {
+    name: row.name,
+    description: row.description,
+    date: row.date,
+    dateConfidence: row.dateConfidence || (row.date ? 'exact' : 'unknown'),
+    link: row.link,
+    icon: null,
+    source: 'site',
+    status,
+    score: row.score,
+    thisYear: row.thisYear !== false,
+  };
+}
+
+function pageText(html: string): string {
+  return html
+    .replace(/<(script|style|noscript|svg)[\s\S]*?<\/\1>/gi, ' ')
+    .replace(/<(br|hr)\b[^>]*>/gi, '\n')
+    .replace(/<\/(p|div|li|h[1-6]|tr|section|article|blockquote)>/gi, '\n')
+    .replace(/<[^>]+>/g, ' ')
+    .replace(/[ \t]+\n/g, '\n')
+    .replace(/\n{3,}/g, '\n\n');
+}
+
+function rowsFromPage(html: string, url: string, year: number): ChangelogFound[] {
+  if (/<item\b|<entry\b/i.test(html)) {
+    return [...itemsFromFeedXml(html, year), ...itemsFromPersonalFeed({ text: html, url, year }).map(fromJournal)];
+  }
+  const text = pageText(html);
+  return [
+    ...itemsFromCompanyPage({ text, html, url, year }),
+    ...itemsFromDatedJournal({ text, url, year }).map(fromJournal),
+    ...itemsFromPersonalFeed({ text: html, url, year }).map(fromJournal),
+  ];
+}
+
+/** First-party changelog / RSS / release notes / personal launch posts for own products. */
+export async function harvestOwnProductSites(
+  products: OwnProduct[],
+  year: number,
+  homes: (string | null | undefined)[] = [],
+): Promise<ChangelogFound[]> {
   const found: ChangelogFound[] = [];
   const seen = new Set<string>();
   const targets = products
@@ -208,36 +276,45 @@ export async function harvestOwnProductSites(products: OwnProduct[], year: numbe
       return site ? { product, site } : null;
     })
     .filter((row): row is { product: OwnProduct; site: string } => Boolean(row))
-    .slice(0, 4);
+    .slice(0, 5);
+  const personal = homes
+    .filter((url): url is string => Boolean(url))
+    .filter((url, i, all) => all.findIndex((row) => hostOf(row) === hostOf(url)) === i)
+    .slice(0, 3);
 
-  await Promise.all(
-    targets.map(async ({ product, site }) => {
+  await Promise.all([
+    ...targets.map(async ({ product, site }) => {
       let origin = '';
       try {
         origin = new URL(site).origin;
       } catch {
         return;
       }
-      const urls = [...new Set(PRODUCT_PATHS.map((path) => `${origin}${path}`))].slice(0, 4);
+      const urls = [...new Set(PRODUCT_PATHS.map((path) => `${origin}${path}`))].slice(0, 5);
       const pages = await Promise.all(urls.map((url) => readText(url)));
       for (let i = 0; i < pages.length; i++) {
         const html = pages[i];
         const url = urls[i]!;
         if (!html) continue;
-        const rows = /<item\b|<entry\b/i.test(html)
-          ? itemsFromFeedXml(html, year)
-          : itemsFromCompanyPage({ text: html, html, url, year });
-        for (const row of rows) {
-          const key = `${loose(row.name)}|${row.link || ''}`;
-          if (!key || seen.has(key)) continue;
-          seen.add(key);
-          found.push({
-            ...asFound(row),
-            description: row.description || `${product.name} release`,
-          });
-        }
+        takeRows(found, seen, rowsFromPage(html, url, year), `${product.name} release`);
       }
     }),
-  );
+    ...personal.map(async (home) => {
+      let origin = '';
+      try {
+        origin = new URL(home).origin;
+      } catch {
+        return;
+      }
+      const urls = [...new Set(HOME_PATHS.map((path) => (path === '/' ? `${origin}/` : `${origin}${path}`)))];
+      const pages = await Promise.all(urls.map((url) => readText(url)));
+      for (let i = 0; i < pages.length; i++) {
+        const html = pages[i];
+        const url = urls[i]!;
+        if (!html) continue;
+        takeRows(found, seen, rowsFromPage(html, url, year), 'Personal launch');
+      }
+    }),
+  ]);
   return found.slice(0, 80);
 }

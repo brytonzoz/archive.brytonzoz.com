@@ -475,10 +475,18 @@ export function mergeSites(...lists: (string | null | undefined)[][]): string[] 
 
 /** `jackfriks` → `https://jackfriks.com/` when the handle is a personal brand. */
 export function guessHandleDotCom(handle: string | null | undefined): string | null {
+  return guessHandleHomes(handle)[0] || null;
+}
+
+/** Personal brand homes: `.com`, `.io`, and `nameio` → `name.io`. */
+export function guessHandleHomes(handle: string | null | undefined): string[] {
   const id = (handle || '').replace(/^@/, '').toLowerCase();
-  if (!/^[a-z][a-z0-9]{3,22}$/.test(id)) return null;
-  if (SKIP_GH.has(id) || /^(admin|root|www|mail|blog|shop|store|news|api|test|demo)$/.test(id)) return null;
-  return `https://${id}.com/`;
+  if (!/^[a-z][a-z0-9]{3,22}$/.test(id)) return [];
+  if (SKIP_GH.has(id) || /^(admin|root|www|mail|blog|shop|store|news|api|test|demo)$/.test(id)) return [];
+  const out = [`https://${id}.com/`, `https://${id}.io/`];
+  const split = id.match(/^([a-z][a-z0-9]{3,18})(io|ai|app|dev|so)$/);
+  if (split) out.push(`https://${split[1]}.${split[2]}/`);
+  return [...new Set(out)];
 }
 
 export function extraSitePaths(siteUrl: string): string[] {

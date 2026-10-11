@@ -30,9 +30,7 @@ test('packCandidates keeps cheap filters and assigns stable ids', () => {
   );
   assert.ok(packed.some((row) => row.id === 'c0' && row.raw_title === 'Composer 2'));
   assert.equal(packed.some((row) => /canary/i.test(row.raw_title)), false);
-  const minor = packed.find((row) => /minor/i.test(row.raw_title));
-  assert.ok(minor);
-  assert.equal(minor.short_desc.includes('###'), false);
+  assert.equal(packed.some((row) => /minor changes/i.test(row.raw_title)), false);
 });
 
 test('applyCuration keeps owned ids, rewrites titles, and rolls up groups', () => {
@@ -388,11 +386,12 @@ test('harvest wins when Claude keeps a highlight reel of a fat company tape', ()
   const journalBack = curate.unionJournalShips(
     [{ name: 'INFINITESLOP.AI', link: 'https://github.com/levelsio/infiniteslop', kind: 'oss-release' }],
     [
-      { name: 'hotelist.com', link: 'https://levels.io/#hotelist-com', source: 'site', kind: 'journal-ship' },
-      { name: 'nomads.com free', link: 'https://levels.io/#nomads-com', source: 'site' },
-      { name: 'Photo AI feature', link: 'https://levels.io/#photo-ai-feature', source: 'site' },
-      { name: 'Luxury hotels are mathematically bad value', link: 'https://levels.io/luxury-hotels', source: 'site' },
+      { name: 'hotelist.com', date: '2026-10-05', link: 'https://levels.io/#hotelist-com', source: 'site', kind: 'journal-ship' },
+      { name: 'nomads.com free', date: '2026-09-05', link: 'https://levels.io/#nomads-com', source: 'site' },
+      { name: 'Photo AI feature', date: '2026-08-01', link: 'https://levels.io/#photo-ai-feature', source: 'site' },
+      { name: 'Luxury hotels are mathematically bad value', date: '2026-07-01', link: 'https://levels.io/luxury-hotels', source: 'site' },
     ],
+    2026,
   );
   assert.ok(journalBack.some((item) => /hotelist/i.test(item.name)), JSON.stringify(journalBack));
   assert.ok(journalBack.some((item) => /nomads/i.test(item.name)), JSON.stringify(journalBack));
@@ -400,15 +399,27 @@ test('harvest wins when Claude keeps a highlight reel of a fat company tape', ()
   assert.equal(journalBack.some((item) => /luxury hotels/i.test(item.name)), false, JSON.stringify(journalBack));
   const journalRewritten = curate.unionJournalShips(
     [{ name: 'INFINITESLOP.AI', link: 'https://github.com/levelsio/infiniteslop', kind: 'oss-release' }],
-    [{ name: 'I made hotelist.com to fix Airbnb ratings', link: 'https://levels.io/#hotelist-com', source: 'site', kind: 'journal-ship' }],
+    [{ name: 'I made hotelist.com to fix Airbnb ratings', date: '2026-10-05', link: 'https://levels.io/#hotelist-com', source: 'site', kind: 'journal-ship' }],
+    2026,
   );
   assert.ok(journalRewritten.some((item) => /hotelist/i.test(item.name)), JSON.stringify(journalRewritten));
   assert.ok(journalRewritten.every((item) => item.name.trim().split(/\s+/).length < 8), JSON.stringify(journalRewritten));
   const hotelistVsList = curate.unionJournalShips(
     [{ name: 'List', link: 'https://example.com/list', source: 'github' }],
-    [{ name: 'hotelist.com', link: 'https://levels.io/#hotelist-com', source: 'site', kind: 'journal-ship' }],
+    [{ name: 'hotelist.com', date: '2026-10-05', link: 'https://levels.io/#hotelist-com', source: 'site', kind: 'journal-ship' }],
+    2026,
   );
   assert.ok(hotelistVsList.some((item) => /hotelist/i.test(item.name)), JSON.stringify(hotelistVsList));
+  const history = curate.unionJournalShips(
+    [{ name: 'hotelist.com', date: '2026-10-05', link: 'https://levels.io/#hotelist-com', source: 'site', kind: 'journal-ship' }],
+    [
+      { name: 'FIRST HOMEPAGE IN 1996', date: '2026-01-15', link: 'https://levels.io/#first-homepage', source: 'site', kind: 'journal-ship' },
+      { name: 'HOMEPAGE FOR MY BROTHER JEROEN IN 1997', date: '2026-01-16', link: 'https://levels.io/#jeroen', source: 'site', kind: 'journal-ship' },
+      { name: 'I made my first homepage in 1996', date: '2026-01-15', link: 'https://levels.io/#first-homepage-raw', source: 'site', kind: 'journal-ship' },
+    ],
+    2026,
+  );
+  assert.equal(history.some((item) => /1996|1997|jeroen|first homepage/i.test(item.name)), false, JSON.stringify(history));
   const essayRss = [
     { name: 'Luxury hotels are mathematically bad value', kind: 'oss-blog', link: 'https://levels.io/luxury-hotels' },
     { name: "I've been coding almost solely on my VPS", kind: 'oss-blog', link: 'https://levels.io/vps' },

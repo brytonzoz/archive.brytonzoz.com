@@ -1153,11 +1153,8 @@ export function gateShipTitle(raw: string, cleaned = ''): string {
 
 export function otherYearProduct(name: string, year: number): boolean {
   if (OLD_PRODUCT.test(name)) return true;
-  const prior = year - 1;
-  for (let y = 2010; y <= prior; y++) {
-    if (new RegExp(`\\b${y}\\b`).test(name)) return true;
-  }
-  return false;
+  const years = String(name || '').match(/\b(?:19|20)\d{2}\b/g);
+  return Boolean(years && years.some((token) => Number(token) !== year));
 }
 
 export function isScrapeDate(value: unknown, now = new Date()): boolean {
@@ -1209,7 +1206,12 @@ export function cleanStatus(value: unknown): ItemStatus {
   return (ITEM_STATUSES as string[]).includes(text) ? (text as ItemStatus) : 'LAUNCHED';
 }
 
-const DESC_MAX = 90;
+const DESC_MAX = 60;
+const DESC_URL = /https?:\/\/\S+/gi;
+const DESC_VERSION_HEADER = /^\d+\.\d+(?:\.\d+)?(?:\s*\([^)]{0,40}\))?/;
+const DESC_CHANGELOG_LABEL =
+  /^(?:#{1,6}\s*)?(?:(?:patch|minor|major)\s+changes|features|fixes|changelog|release notes|what's new)\b/i;
+const DESC_UPDATED_DEPS = /^(?:[-*+]\s*)?(?:patch changes[:\s-]*)?updated dependencies\.?$/i;
 
 /** Strip markdown and HTML so harvest text never prints as `###` / `<h3>`. */
 export function stripMarkup(value: unknown): string {
@@ -1218,7 +1220,7 @@ export function stripMarkup(value: unknown): string {
     .replace(/`+/g, '')
     .replace(/!\[([^\]]*)\]\([^)]+\)/g, '$1')
     .replace(/\[([^\]]+)\]\([^)]+\)/g, '$1')
-    .replace(/^#{1,6}\s+/gm, '')
+    .replace(/#{1,6}\s+/g, ' ')
     .replace(/<\/?[a-z][^>]*>/gi, ' ')
     .replace(/\b(p|h[1-6]|div|span|img|a|ul|ol|li|br)\s+(align|class|src|href|style)=["'][^"']*["']/gi, ' ')
     .replace(/[*_~]{1,3}/g, '')
@@ -1324,22 +1326,42 @@ export function rewriteShipTitle(title: string, link?: string | null): string {
   return '';
 }
 
+/** Changelog / changeset rows whose only payload is a dependency bump. */
+export function isUpdatedDependenciesOnly(item: { name?: string; description?: string | null }): boolean {
+  const name = stripMarkup(item.name);
+  const desc = stripMarkup(item.description);
+  if (DESC_UPDATED_DEPS.test(name)) return true;
+  if (DESC_CHANGELOG_LABEL.test(name) && name.split(/\s+/).filter(Boolean).length <= 4) return true;
+  if (DESC_UPDATED_DEPS.test(desc) && (!name || DESC_VERSION_HEADER.test(name) || DESC_CHANGELOG_LABEL.test(name))) {
+    return true;
+  }
+  return false;
+}
+
 export function cleanDescription(value: unknown): string {
   let text = stripMarkup(value);
   if (!text || META_DESC.test(text) || HOST_ONLY.test(text)) return '';
   if (/\bopens in a new window\b|\bcopy link to\b/i.test(text) && text.split(/\s+/).length <= 14) return '';
   text = text
+    .replace(DESC_URL, ' ')
     .replace(/\s*\(opens in a new window\)\.?/gi, '')
     .replace(/\bopens in a new window\b/gi, '')
     .replace(/\bcopy link to\b[\s\S]*/gi, '')
+    .replace(/^\s*[-*+]\s+/g, '')
     .replace(/\s+/g, ' ')
     .trim();
+  text = text.replace(DESC_VERSION_HEADER, '').trim();
+  text = text.replace(/^(?:patch|minor|major)\s+changes\b[:\s-]*/i, '').trim();
+  text = text.replace(/^(?:features|fixes|changelog|release notes|what's new)\b[:\s-]*/i, '').trim();
+  text = text.replace(/^\s*[-*+]\s+/g, '').replace(/\(#[0-9a-f]+\)/gi, '').replace(/#\d+\b/g, '').trim();
+  if (!text || DESC_UPDATED_DEPS.test(text) || DESC_CHANGELOG_LABEL.test(text) || /^[0-9a-f]{7,40}$/i.test(text)) return '';
   if (
-    !text ||
     /<\/?[a-z]|align=["']|^(p|h[1-6]|div|span|img|ul|ol|li|picture|source)\b|\b(srcset|prefers-color-scheme|media=["'])/i.test(text)
   )
     return '';
+  if (/[#*_`\[\]]|https?:\/\//.test(text)) return '';
   text = text.replace(/\b(\w+)\s+\1\b/gi, '$1');
+  if (!text || DESC_UPDATED_DEPS.test(text)) return '';
   if (text.length <= DESC_MAX) return text;
   const cut = wordClamp(text, DESC_MAX);
   if (!cut || looksCutOff(cut) || looksMidWord(cut)) return '';
@@ -1930,6 +1952,14 @@ export function polishCandidates<T extends Polishable>(items: T[], opts: PolishO
       drop(item, 'ceo-npm-utility');
       continue;
     }
+    if (isUpdatedDependenciesOnly(item)) {
+      drop(item, 'updated-deps');
+      continue;
+    }
+    if (isJournalShip(item) && !String(item.date || '').startsWith(String(year))) {
+      drop(item, 'journal-date');
+      continue;
+    }
     if (
       !flagship &&
       !isJournalShip(item) &&
@@ -2255,6 +2285,9 @@ export function cheapHardFilter<T extends Polishable>(items: T[], year: number):
       if (rewritten) name = rewritten;
     }
     if (!cheapYearOk(item, year)) continue;
+    if (otherYearProduct(name, year) && !flagshipLaunchName({ ...item, name })) continue;
+    if (journal && !String(item.date || '').startsWith(String(year))) continue;
+    if (isUpdatedDependenciesOnly({ ...item, name })) continue;
     if (isPrereleaseShip(name) || isPrereleaseShip(item.name)) continue;
     if (!journal && (looksLikeEssayTitle(name) || isBlogEssayTitle(name) || looksLikeMonthlyRoundup(name))) {
       continue;

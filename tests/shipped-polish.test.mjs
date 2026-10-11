@@ -235,9 +235,22 @@ test('source lines are via Brand · host with no sitemap metadata', () => {
   assert.equal(polish.cleanDescription('p align="center" h1 TypeScript loader'), '');
   assert.equal(polish.cleanDescription('picture source media="(prefers-color-scheme: dark)" srcset=" 25px" alt="G'), '');
   const clipped = polish.cleanDescription('Standalone TypeScript loader for Node.js from the Nub project — TypeScript, JSX, tsconfig paths, and data-format imports through a native transform');
-  assert.ok(clipped.length <= 91);
-  assert.ok(/…$/.test(clipped) || clipped.length < 90);
+  assert.ok(clipped.length <= 60, clipped);
   assert.doesNotMatch(clipped, /tr$/);
+  assert.equal(
+    polish.cleanDescription('1.3.0 (2026-01-30) ### Features update tar version ([#128](https://github.com/vercel/fun/pull/128))'),
+    'update tar version',
+  );
+  assert.equal(polish.cleanDescription('Patch Changes - Updated dependencies'), '');
+  assert.equal(polish.cleanDescription('- Fixed the empty tweet state on the profile'), 'Fixed the empty tweet state on the profile');
+  assert.ok((polish.cleanDescription('- Fixed the empty tweet state on the profile') || '').length <= 60);
+  assert.equal(polish.cleanDescription('Updated dependencies'), '');
+  assert.equal(polish.isUpdatedDependenciesOnly({ name: 'Updated dependencies', description: '' }), true);
+  assert.equal(polish.isUpdatedDependenciesOnly({ name: 'FUN 1.3', description: 'Patch Changes - Updated dependencies' }), false);
+  assert.equal(polish.isUpdatedDependenciesOnly({ name: 'FUN 1.3', description: 'update tar version' }), false);
+  assert.equal(polish.otherYearProduct('FIRST HOMEPAGE IN 1996', 2026), true);
+  assert.equal(polish.otherYearProduct('HOMEPAGE FOR MY BROTHER JEROEN IN 1997', 2026), true);
+  assert.equal(polish.otherYearProduct('hotelist.com', 2026), false);
 });
 
 test('platform npm packages roll into the parent name', () => {
@@ -1177,7 +1190,7 @@ test('cheap filters strip markup, drop prereleases and other years, and dedupe U
   assert.equal(polish.stripMarkup('### Minor Changes - 17ee736'), 'Minor Changes - 17ee736');
   assert.equal(polish.stripMarkup('h3Dub.co…/h3').replace(/\.{3}/g, '…'), 'h3Dub.co…/h3');
   assert.equal(polish.stripMarkup('<h3>Dub.co</h3>'), 'Dub.co');
-  assert.equal(polish.cleanDescription('### Minor Changes - 17ee736'), 'Minor Changes - 17ee736');
+  assert.equal(polish.cleanDescription('### Minor Changes - 17ee736'), '');
   assert.equal(polish.titleSanityOk('Commission analytics you can'), false);
   assert.equal(polish.titleSanityOk('Teams &'), false);
   assert.equal(polish.titleSanityOk('Composer 2'), true);
@@ -1320,8 +1333,38 @@ test('cheap filters strip markup, drop prereleases and other years, and dedupe U
     false,
     JSON.stringify(names),
   );
-  assert.ok(names.includes('Minor Changes'), JSON.stringify(names));
-  assert.equal(cheap.find((item) => item.name === 'Minor Changes')?.description, 'Minor Changes - 17ee736');
+  assert.equal(names.includes('Minor Changes'), false, JSON.stringify(names));
+  const history = polish.cheapHardFilter(
+    [
+      found({
+        name: 'FIRST HOMEPAGE IN 1996',
+        date: '2026-01-15',
+        link: 'https://levels.io/#first-homepage',
+        source: 'site',
+        kind: 'journal-ship',
+        description: 'Announced 2026-01-15 on levels.io',
+      }),
+      found({
+        name: 'Updated dependencies',
+        date: '2026-01-30',
+        link: 'https://github.com/vercel/fun/releases/1',
+        description: 'Patch Changes - Updated dependencies',
+      }),
+      found({
+        name: 'FUN 1.3',
+        date: '2026-01-30',
+        link: 'https://github.com/vercel/fun/releases/tag/1.3.0',
+        description: '1.3.0 (2026-01-30) ### Features update tar version ([#128](https://github.com/vercel/fun/pull/128))',
+      }),
+    ],
+    2026,
+  );
+  const historyNames = history.map((item) => item.name);
+  assert.equal(historyNames.some((name) => /1996|updated dependencies/i.test(name)), false, JSON.stringify(historyNames));
+  const fun = history.find((item) => /fun 1\.3/i.test(item.name));
+  assert.ok(fun, JSON.stringify(historyNames));
+  assert.equal(fun?.description, 'update tar version');
+  assert.ok((fun?.description || '').length <= 60);
 });
 
 test('print-time polish rewrites 8+ word changelog sentences and drops junk', () => {

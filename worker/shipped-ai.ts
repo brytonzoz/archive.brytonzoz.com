@@ -1717,6 +1717,7 @@ export async function assembleReceipt(
                 role: affiliation?.role,
               }),
               pool,
+              year,
             ),
             pool,
             affiliation?.role,

@@ -103,8 +103,10 @@ export function itemsFromProjectList(opts: { text: string; url: string; year: nu
   const found: Found[] = [];
   const seen = new Set<string>();
   const add = (name: string, date: string | null, hint?: string) => {
+    if (titleMentionsOtherYear(name, year)) return;
     const trimmed = clean(name.replace(/\b(active|shipped|live|sunset|killed|paused)\b/gi, ''), 40);
     if (!trimmed || trimmed.length < 2) return;
+    if (titleMentionsOtherYear(trimmed, year)) return;
     const key = loose(trimmed);
     if (key.length < 2 || seen.has(key)) return;
     if (/^(home|about|blog|contact|projects?|changelog)$/i.test(trimmed)) return;
@@ -212,6 +214,50 @@ const MONTH_NUM: Record<string, string> = {
 const PERSON_SHIP =
   /\b(i (?:made|built|launched|shipped|released|added|published|open[- ]sourced|vibe ?coded|registered|ported|remade)|i have made|just (?:launched|shipped|released|built)|now (?:live|free|out)\b|hit (?:a new )?(?:record )?\$|passed \$\s?\d|registered [a-z0-9-]+\.(?:com|ai|io|app|dev|co))\b/i;
 
+const FULL_MONTH: Record<string, string> = {
+  jan: 'January',
+  january: 'January',
+  feb: 'February',
+  february: 'February',
+  mar: 'March',
+  march: 'March',
+  apr: 'April',
+  april: 'April',
+  may: 'May',
+  jun: 'June',
+  june: 'June',
+  jul: 'July',
+  july: 'July',
+  aug: 'August',
+  august: 'August',
+  sep: 'September',
+  sept: 'September',
+  september: 'September',
+  oct: 'October',
+  october: 'October',
+  nov: 'November',
+  november: 'November',
+  dec: 'December',
+  december: 'December',
+};
+
+/** "First homepage in 1996" is not a 2026 ship, even under a 2026 month heading. */
+export function titleMentionsOtherYear(text: string, year: number): boolean {
+  const years = String(text || '').match(/\b(?:19|20)\d{2}\b/g);
+  return Boolean(years && years.some((token) => Number(token) !== year));
+}
+
+function expandBulletYear(raw: string | undefined, fallback: number): number | null {
+  if (!raw) return fallback;
+  const digits = raw.replace(/\D/g, '');
+  if (digits.length === 4) return Number(digits);
+  if (digits.length === 2) {
+    const n = Number(digits);
+    return n >= 90 ? 1900 + n : 2000 + n;
+  }
+  return fallback;
+}
+
 /** Indie blog / X-style posts that are actually ships, not commentary. */
 export function looksLikePersonalShip(title: string): boolean {
   const text = title.trim();
@@ -250,11 +296,14 @@ export function itemsFromDatedJournal(opts: { text: string; url: string; year: n
   const { text, url, year } = opts;
   const found: Found[] = [];
   const seen = new Set<string>();
-  const monthRe = new RegExp(`(?:^|\\n)\\s*(?:#{1,3}\\s*)?(${MONTH_NAME})\\s+${year}\\b`, 'gi');
+  const monthRe = new RegExp(`(?:^|\\n)\\s*(?:#{1,3}\\s*)?(${MONTH_NAME})\\s+((?:19|20)\\d\\d)\\b`, 'gi');
   const marks = [...text.matchAll(monthRe)];
   const add = (name: string, date: string, hint: string) => {
+    if (!date.startsWith(String(year))) return;
+    if (titleMentionsOtherYear(name, year)) return;
     const trimmed = journalShipName(name);
     if (!trimmed || trimmed.length < 2) return;
+    if (titleMentionsOtherYear(trimmed, year)) return;
     const key = loose(trimmed);
     if (key.length < 2 || seen.has(key)) return;
     seen.add(key);
@@ -276,6 +325,8 @@ export function itemsFromDatedJournal(opts: { text: string; url: string; year: n
   };
 
   for (let i = 0; i < marks.length; i++) {
+    const headingYear = Number(marks[i][2]);
+    if (headingYear !== year) continue;
     const monthToken = (marks[i][1] || '').toLowerCase().replace(/[^a-z]/g, '');
     const month = MONTH_NUM[monthToken] || MONTH_NUM[monthToken.slice(0, 3)];
     if (!month) continue;
@@ -283,12 +334,14 @@ export function itemsFromDatedJournal(opts: { text: string; url: string; year: n
     const end = i + 1 < marks.length ? (marks[i + 1].index ?? text.length) : Math.min(text.length, start + 8000);
     const chunk = text.slice(start, end);
     const bulletRe = new RegExp(
-      `(?:^|[\\n•●\\-]|\\s)\\s*(\\d{1,2})\\s+(${MONTH_NAME})(?:\\s+'?\\d{2,4})?\\s+(.+?)(?=(?:\\s+[\\-*•●]?\\s*\\d{1,2}\\s+(?:${MONTH_NAME}))|\\s+(?:${MONTH_NAME})\\s+${year}\\b|\\n|$)`,
+      `(?:^|[\\n•●\\-]|\\s)\\s*(\\d{1,2})\\s+(${MONTH_NAME})(?:\\s+'?(\\d{2,4}))?\\s+(.+?)(?=(?:\\s+[\\-*•●]?\\s*\\d{1,2}\\s+(?:${MONTH_NAME}))|\\s+(?:${MONTH_NAME})\\s+(?:19|20)\\d\\d\\b|\\n|$)`,
       'gi',
     );
     for (const match of chunk.matchAll(bulletRe)) {
       const day = match[1].padStart(2, '0');
-      const raw = match[3].replace(/𝕏/g, '').replace(/\s+/g, ' ').trim();
+      const ownYear = expandBulletYear(match[3], year);
+      if (ownYear !== year) continue;
+      const raw = match[4].replace(/𝕏/g, '').replace(/\s+/g, ' ').trim();
       if (!looksLikePersonalShip(raw)) continue;
       add(raw, `${year}-${month}-${day}`, `Announced ${year}-${month}-${day} on ${hostOf(url) ?? 'their site'}`);
     }
@@ -310,18 +363,25 @@ export function journalCopyFromHtml(html: string): string {
       .replace(/&#(\d+);/g, (_, code: string) => String.fromCharCode(Number(code)))
       .replace(/&#x([0-9a-f]+);/gi, (_, code: string) => String.fromCharCode(parseInt(code, 16)));
   const marks: { at: number; line: string }[] = [];
-  const headingRe = new RegExp(`>(\\s*)(${MONTH_NAME.replace(/\|/g, '|')})\\s+(20\\d\\d)\\s*<`, 'gi');
+  const headingRe = new RegExp(`>(\\s*)(${MONTH_NAME.replace(/\|/g, '|')})\\s+((?:19|20)\\d\\d)\\s*<`, 'gi');
   for (const match of html.matchAll(headingRe)) {
     const month = match[2] || '';
     if (!/^(January|February|March|April|May|June|July|August|September|October|November|December)$/i.test(month)) continue;
     marks.push({ at: match.index ?? 0, line: `${month} ${match[3]}` });
   }
   const timeRe = new RegExp(
-    `<time[^>]*>\\s*(\\d{1,2})\\s+(${MONTH_NAME})\\s*</time>[\\s\\S]{0,900}?title="([^"]+)"`,
+    `<time([^>]*)>\\s*(\\d{1,2})\\s+(${MONTH_NAME})\\s*</time>[\\s\\S]{0,900}?title="([^"]+)"`,
     'gi',
   );
   for (const match of html.matchAll(timeRe)) {
-    marks.push({ at: match.index ?? 0, line: `- ${match[1]} ${match[2]} ${decodeEntities(match[3])}` });
+    const attrs = match[1] || '';
+    const datetime = attrs.match(/datetime=["']([^"']+)["']/i)?.[1] || '';
+    const dtYear = datetime.match(/\b((?:19|20)\d{2})\b/)?.[1];
+    const monthToken = (match[3] || '').toLowerCase().replace(/[^a-z]/g, '');
+    const fullMonth = FULL_MONTH[monthToken] || FULL_MONTH[monthToken.slice(0, 3)];
+    const at = match.index ?? 0;
+    if (dtYear && fullMonth) marks.push({ at: Math.max(0, at - 1), line: `${fullMonth} ${dtYear}` });
+    marks.push({ at, line: `- ${match[2]} ${match[3]}${dtYear ? ` ${dtYear}` : ''} ${decodeEntities(match[4])}` });
   }
   if (!marks.some((row) => row.line.startsWith('- '))) return '';
   marks.sort((a, b) => a.at - b.at);
@@ -360,7 +420,10 @@ export function itemsFromPersonalFeed(opts: { text: string; url: string; year: n
   const pageHost = hostOf(opts.url);
   const listedOn = `Listed on ${pageHost ?? 'their site'}`;
   const add = (name: string, date: string | null, link: string | null, desc: string) => {
+    if (!date || !date.startsWith(String(opts.year))) return;
+    if (titleMentionsOtherYear(name, opts.year)) return;
     const trimmed = clean(name, 48);
+    if (titleMentionsOtherYear(trimmed, opts.year)) return;
     const key = loose(trimmed);
     if (!trimmed || key.length < 2 || seen.has(key)) return;
     seen.add(key);
@@ -374,7 +437,7 @@ export function itemsFromPersonalFeed(opts: { text: string; url: string; year: n
       source: 'site',
       status: 'LAUNCHED',
       score: 7.5,
-      thisYear: true,
+      thisYear: Boolean(date && date.startsWith(String(opts.year))),
       kind: 'journal-ship',
     });
   };
@@ -641,8 +704,10 @@ export function itemsFromEmbeddedPortfolio(opts: { html: string; url: string; ye
   const found: Found[] = [];
   const seen = new Set<string>();
   const add = (name: string, date: string, href: string | null, hint: string) => {
+    if (!date.startsWith(String(opts.year)) || titleMentionsOtherYear(name, opts.year)) return;
     const trimmed = clean(name, 40);
     if (!trimmed || trimmed.length < 2) return;
+    if (titleMentionsOtherYear(trimmed, opts.year)) return;
     const key = loose(trimmed);
     if (key.length < 2 || seen.has(key)) return;
     if (/^(home|about|blog|contact|projects?|changelog|indie page)$/i.test(trimmed)) return;

@@ -893,6 +893,40 @@ August 2026
   assert.match(copied, /hotelist\.com/);
   const fromHtml = research.itemsFromDatedJournal({ text: copied, url: 'https://levels.io/', year: 2026 });
   assert.ok(fromHtml.some((item) => /hotelist/i.test(item.name)), fromHtml.map((item) => item.name).join(' | '));
+  const history = `January 2026
+- 15 Jan I made hotelist.com to fix Airbnb ratings
+- 12 Jan I made my first homepage in 1996
+- 11 Jan I built a homepage for my brother Jeroen in 1997
+January 1997
+- 2 Jan I built a homepage for my brother Jeroen
+January 1996
+- 1 Jan I made my first homepage
+`;
+  const historyItems = research.itemsFromDatedJournal({ text: history, url: 'https://levels.io/', year: 2026 });
+  assert.ok(historyItems.some((item) => /hotelist/i.test(item.name)), historyItems.map((item) => item.name).join(' | '));
+  assert.equal(
+    historyItems.some((item) => /1996|1997|jeroen|first homepage/i.test(item.name)),
+    false,
+    historyItems.map((item) => `${item.name} ${item.date}`).join(' | '),
+  );
+  const historyHtml = `<div>January 2026</div>
+    <time>15 Jan</time><a title="I made hotelist.com to fix Airbnb ratings"></a>
+    <div>January 1996</div>
+    <time datetime="1996-01-01">1 Jan</time><a title="I made my first homepage in 1996"></a>
+    <div>January 1997</div>
+    <time datetime="1997-01-02">2 Jan</time><a title="I built a homepage for my brother Jeroen in 1997"></a>`;
+  const historyCopy = research.journalCopyFromHtml(historyHtml);
+  assert.match(historyCopy, /January 1996/);
+  assert.match(historyCopy, /January 1997/);
+  const fromHistoryHtml = research.itemsFromDatedJournal({ text: historyCopy, url: 'https://levels.io/', year: 2026 });
+  assert.ok(fromHistoryHtml.some((item) => /hotelist/i.test(item.name)), fromHistoryHtml.map((item) => item.name).join(' | '));
+  assert.equal(
+    fromHistoryHtml.some((item) => /1996|1997|jeroen|first homepage/i.test(item.name)),
+    false,
+    fromHistoryHtml.map((item) => `${item.name} ${item.date}`).join(' | '),
+  );
+  assert.equal(research.titleMentionsOtherYear('FIRST HOMEPAGE IN 1996', 2026), true);
+  assert.equal(research.titleMentionsOtherYear('hotelist.com', 2026), false);
 });
 
 test('Indie Page __NEXT_DATA__ keeps 2026 startups and drops older ones', () => {

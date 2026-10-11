@@ -1,6 +1,6 @@
 // Scan every public /r/<id>/ page (and receipt API) for junk sub-line patterns.
 //   node scripts/scan-shipped-junk.mjs [origin] [maxId]
-import './resolve-ts.mjs';
+import '../tests/resolve-ts.mjs';
 const { storedSublineLooksJunk, receiptItemSublineIsClean } = await import('../worker/shipped-polish.ts');
 
 const origin = (process.argv[2] || process.env.SHIPPED_ORIGIN || 'https://shipped-staging.brytonzoz.com').replace(/\/+$/, '');

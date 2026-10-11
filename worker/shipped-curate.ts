@@ -10,6 +10,7 @@ import {
   TITLE_MAX,
   cheapHardFilter,
   cleanDescription,
+  cleanShipTitle,
   cleanStatus,
   isBlogEssayTitle,
   isJournalShip,
@@ -374,6 +375,72 @@ function harvestAlreadyHas<T extends { name?: string; link?: string | null }>(ta
   });
 }
 
+type CompanyWinKind = 'vercel-ceo' | 'openai' | 'cursor-ceo';
+
+function companyHarvestWinKind(role?: string | null, company?: string | null): CompanyWinKind | null {
+  const brand = String(company || '').trim();
+  if (/^ceo$/i.test(role || '') && /^vercel$/i.test(brand)) return 'vercel-ceo';
+  if (/^ceo$/i.test(role || '') && /^cursor$/i.test(brand)) return 'cursor-ceo';
+  if ((/^ceo$/i.test(role || '') || /^lead$/i.test(role || '')) && /^openai$/i.test(brand)) return 'openai';
+  return null;
+}
+
+function companyHarvestFloor(kind: CompanyWinKind, floor?: number): number {
+  if (Number.isFinite(floor) && (floor as number) > 0) return floor as number;
+  if (kind === 'openai') return 35;
+  if (kind === 'cursor-ceo') return 40;
+  return 30;
+}
+
+function companyHarvestCardOk(item: { link?: string | null; source?: string }, kind: CompanyWinKind): boolean {
+  const link = String(item.link || '');
+  if (kind === 'vercel-ceo') {
+    return /vercel\.com\/(changelog|blog)\//i.test(link) || item.source === 'changelog';
+  }
+  if (kind === 'openai') {
+    if (/developers\.openai\.com|chatgpt\.com/i.test(link)) return true;
+    if (/openai\.com\/(index|changelog|codex|news|blog|gpt-|gpt\/|sora|chatgpt|research)/i.test(link)) return true;
+    if (/openai\.com\/(codex|sora|chatgpt|news)\/?$/i.test(link)) return true;
+    return item.source === 'changelog' && /openai\.com|chatgpt\.com/i.test(link);
+  }
+  return /cursor\.com\/(changelog|blog|news|docs)\//i.test(link) || (item.source === 'changelog' && /cursor\.com/i.test(link));
+}
+
+function cleanedHarvestName(raw: string): string {
+  const short = cleanShipTitle(raw) || shortenWordyTitle(raw) || '';
+  return String(short || '').trim();
+}
+
+/** Put first-party changelog cards back when polish thinned a company CEO/lead tape. */
+export function expandCompanyHarvestWin<T extends { name?: string; link?: string | null; source?: string }>(
+  harvested: T[],
+  found: T[],
+  role?: string | null,
+  company?: string | null,
+  floor?: number,
+): T[] {
+  const kind = companyHarvestWinKind(role, company);
+  if (!kind) return harvested;
+  const need = companyHarvestFloor(kind, floor);
+  if (harvested.length >= need) return harvested;
+  const extra: T[] = [];
+  for (const item of found || []) {
+    if (harvested.length + extra.length >= 50) break;
+    const raw = String(item.name || '').trim();
+    if (!raw || !companyHarvestCardOk(item, kind)) continue;
+    const short = cleanedHarvestName(raw);
+    if (!short) continue;
+    if (looksLikeEssayTitle(short) || isBlogEssayTitle(short) || looksLikeMonthlyRoundup(short)) continue;
+    const words = short.split(/\s+/).filter(Boolean);
+    if (words.length < 1) continue;
+    if (words.length >= 8 && !/\d+\.\d+/.test(short) && !/·\s*\d+\s+(updates?|releases?)/i.test(short)) continue;
+    if (!titleSanityOk(short)) continue;
+    if (harvestAlreadyHas(harvested, item) || harvestAlreadyHas(extra, { ...item, name: short })) continue;
+    extra.push({ ...item, name: short });
+  }
+  return extra.length ? [...harvested, ...extra] : harvested;
+}
+
 /** When polish thinned a Vercel CEO tape under the Rauch floor, put changelog cards back. */
 export function expandCeoHarvestWin<T extends { name?: string; link?: string | null; source?: string }>(
   harvested: T[],
@@ -382,22 +449,21 @@ export function expandCeoHarvestWin<T extends { name?: string; link?: string | n
   company?: string | null,
   floor = 30,
 ): T[] {
-  if (!/^ceo$/i.test(role || '') || !/^vercel$/i.test(String(company || '').trim())) return harvested;
-  if (harvested.length >= floor) return harvested;
-  const extra: T[] = [];
-  for (const item of found || []) {
-    if (harvested.length + extra.length >= 50) break;
-    const name = String(item.name || '').trim();
-    const link = String(item.link || '');
-    if (!name || name.split(/\s+/).length < 3) continue;
-    if (looksLikeEssayTitle(name) || isBlogEssayTitle(name) || looksLikeMonthlyRoundup(name)) continue;
-    if (!/vercel\.com\/(changelog|blog)\//i.test(link) && item.source !== 'changelog') continue;
-    const short = shortenWordyTitle(name) || name;
-    if (short.split(/\s+/).filter(Boolean).length >= 8 && !/\d+\.\d+/.test(short)) continue;
-    if (harvestAlreadyHas(harvested, item) || harvestAlreadyHas(extra, { ...item, name: short })) continue;
-    extra.push({ ...item, name: short });
+  return expandCompanyHarvestWin(harvested, found, role, company, floor);
+}
+
+/** Company CEOs/leads keep the full changelog tape; OSS maintainers keep release lines only. */
+export function harvestWinSource<T extends { name?: string; kind?: string; source?: string; link?: string | null }>(
+  harvested: T[],
+  found: T[],
+  role?: string | null,
+  company?: string | null,
+): T[] {
+  if (companyHarvestWinKind(role, company)) {
+    return expandCompanyHarvestWin(harvested, found, role, company);
   }
-  return extra.length ? [...harvested, ...extra] : harvested;
+  if (harvestLooksLikeOssTape(harvested)) return ossWinTape(harvested);
+  return harvested;
 }
 
 /** Put first-person journal launches back when Claude kept only GitHub toys. */

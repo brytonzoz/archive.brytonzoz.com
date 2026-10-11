@@ -281,6 +281,88 @@ test('harvest wins when Claude keeps a highlight reel of a fat company tape', ()
     wordyWin.every((item) => item.name.trim().split(/\s+/).length < 8 || /\d+\.\d+/.test(item.name)),
     JSON.stringify(wordyWin.map((item) => item.name)),
   );
+  const cleanedNowLive = curate.expandCeoHarvestWin(
+    [{ name: 'NEXT.JS 16.4', link: 'https://vercel.com/changelog/next-16-4', source: 'changelog' }],
+    [
+      {
+        name: 'AI SDK 6 is now available for everyone',
+        link: 'https://vercel.com/changelog/ai-sdk-6',
+        source: 'changelog',
+      },
+      {
+        name: 'Workflow is now available',
+        link: 'https://vercel.com/changelog/workflow',
+        source: 'changelog',
+      },
+      { name: 'AI Gateway', link: 'https://vercel.com/changelog/ai-gateway', source: 'changelog' },
+    ],
+    'ceo',
+    'Vercel',
+    30,
+  );
+  assert.ok(cleanedNowLive.some((item) => /^ai sdk 6$/i.test(item.name)), JSON.stringify(cleanedNowLive));
+  assert.ok(cleanedNowLive.some((item) => /^workflow$/i.test(item.name)), JSON.stringify(cleanedNowLive));
+  assert.ok(cleanedNowLive.some((item) => /^ai gateway$/i.test(item.name)), JSON.stringify(cleanedNowLive));
+  assert.equal(cleanedNowLive.some((item) => /is now available/i.test(item.name)), false, JSON.stringify(cleanedNowLive));
+  const ossHeavyVercel = [
+    { name: 'Next.js 16.4.0', kind: 'oss-release', link: 'https://github.com/vercel/next.js/releases/tag/v16.4.0' },
+    { name: 'Next.js 16.3.2', kind: 'oss-release', link: 'https://github.com/vercel/next.js/releases/tag/v16.3.2' },
+    { name: 'Next.js 16.3.1', kind: 'oss-release', link: 'https://github.com/vercel/next.js/releases/tag/v16.3.1' },
+    { name: 'Next.js 16.3.0', kind: 'oss-release', link: 'https://github.com/vercel/next.js/releases/tag/v16.3.0' },
+    { name: 'Next.js 16.2.1', kind: 'oss-release', link: 'https://github.com/vercel/next.js/releases/tag/v16.2.1' },
+    { name: 'Next.js 16.2.0', kind: 'oss-release', link: 'https://github.com/vercel/next.js/releases/tag/v16.2.0' },
+    { name: 'Next.js 16.1.4', kind: 'oss-release', link: 'https://github.com/vercel/next.js/releases/tag/v16.1.4' },
+    { name: 'Next.js 16.1.3', kind: 'oss-release', link: 'https://github.com/vercel/next.js/releases/tag/v16.1.3' },
+    { name: 'V0 PLATFORM API', source: 'changelog', link: 'https://vercel.com/changelog/v0-platform-api' },
+    { name: 'AI GATEWAY', source: 'changelog', link: 'https://vercel.com/changelog/ai-gateway' },
+    { name: 'VERCEL AGENT', source: 'changelog', link: 'https://vercel.com/changelog/vercel-agent' },
+    { name: 'SANDBOX', source: 'changelog', link: 'https://vercel.com/changelog/sandbox' },
+    { name: 'WORKFLOW', source: 'changelog', link: 'https://vercel.com/changelog/workflow' },
+    { name: 'NEXT.JS 16.4', source: 'changelog', link: 'https://vercel.com/changelog/next-16-4' },
+    { name: 'BOTID', source: 'changelog', link: 'https://vercel.com/changelog/botid' },
+  ];
+  const vercelFound = [
+    ...ossHeavyVercel,
+    {
+      name: 'Persistent memory for eve agents is now available',
+      source: 'changelog',
+      link: 'https://vercel.com/changelog/persistent-memory',
+    },
+    { name: 'Fluid compute', source: 'changelog', link: 'https://vercel.com/changelog/fluid' },
+    { name: 'Rolling releases', source: 'changelog', link: 'https://vercel.com/changelog/rolling-releases' },
+  ];
+  assert.equal(curate.harvestLooksLikeOssTape(ossHeavyVercel), true);
+  const ossOnlyVercel = curate.ossWinTape(ossHeavyVercel);
+  assert.ok(ossOnlyVercel.length < 15, JSON.stringify(ossOnlyVercel));
+  const vercelWin = curate.harvestWinSource(ossHeavyVercel, vercelFound, 'ceo', 'Vercel');
+  assert.ok(vercelWin.length >= 15, JSON.stringify(vercelWin.map((item) => item.name)));
+  assert.ok(vercelWin.some((item) => /v0 platform api/i.test(item.name)), JSON.stringify(vercelWin));
+  assert.ok(vercelWin.some((item) => /ai gateway/i.test(item.name)), JSON.stringify(vercelWin));
+  assert.ok(vercelWin.some((item) => /persistent memory/i.test(item.name)), JSON.stringify(vercelWin));
+  assert.ok(vercelWin.some((item) => /fluid compute/i.test(item.name)), JSON.stringify(vercelWin));
+  assert.equal(curate.harvestShouldWin(vercelWin.length, 15, 'ceo', 'Vercel'), true);
+  const openaiHarvested = Array.from({ length: 33 }, (_, i) => ({
+    name: `CODEX CLI 0.${100 + i}`,
+    kind: 'oss-release',
+    link: `https://github.com/openai/codex/releases/tag/0.${100 + i}`,
+  }));
+  const openaiFound = [
+    ...openaiHarvested,
+    { name: 'Codex Cloud is now available', source: 'changelog', link: 'https://developers.openai.com/codex/cloud' },
+    { name: 'GPT-5.3-Codex', source: 'changelog', link: 'https://developers.openai.com/codex/gpt-5-3' },
+    { name: 'Codex app for macOS', source: 'changelog', link: 'https://openai.com/codex' },
+    { name: 'How Oracle turns days of work into minutes with ChatGPT', link: 'https://openai.com/index/oracle' },
+  ];
+  assert.equal(curate.harvestLooksLikeOssTape(openaiHarvested), true);
+  const openaiWin = curate.harvestWinSource(openaiHarvested, openaiFound, 'lead', 'OpenAI');
+  assert.ok(openaiWin.length >= 35, JSON.stringify(openaiWin.map((item) => item.name).slice(-8)));
+  assert.ok(openaiWin.some((item) => /codex cloud/i.test(item.name)), JSON.stringify(openaiWin.slice(-8)));
+  assert.ok(openaiWin.some((item) => /gpt-5\.3-codex/i.test(item.name)), JSON.stringify(openaiWin.slice(-8)));
+  assert.equal(openaiWin.some((item) => /oracle turns days/i.test(item.name)), false);
+  assert.equal(curate.harvestShouldWin(openaiWin.length, 33, 'lead', 'OpenAI'), true);
+  const bunWin = curate.harvestWinSource(bunPlusEssays, bunPlusEssays, null, null);
+  assert.ok(bunWin.every((item) => !/cpf catch-22|mind virus|stripe dispute/i.test(item.name)), JSON.stringify(bunWin));
+  assert.ok(bunWin.length >= 8, JSON.stringify(bunWin));
   const journalBack = curate.unionJournalShips(
     [{ name: 'INFINITESLOP.AI', link: 'https://github.com/levelsio/infiniteslop', kind: 'oss-release' }],
     [

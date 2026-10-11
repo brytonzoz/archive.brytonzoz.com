@@ -23,11 +23,10 @@ import {
   cachedSystem,
   curationUserPrompt,
   customerFromProfile,
-  expandCeoHarvestWin,
   harvestLooksLikeCommentaryTape,
   harvestLooksLikeOssTape,
   harvestShouldWin,
-  ossWinTape,
+  harvestWinSource,
   packCandidates,
   unionHarvestWin,
   unionJournalShips,
@@ -1660,9 +1659,12 @@ export async function assembleReceipt(
       });
       if (curated) {
         const ossHeavy = harvestLooksLikeOssTape(harvested);
-        const winSource = ossHeavy
-          ? ossWinTape(harvested)
-          : expandCeoHarvestWin(harvested, gathered.found as typeof harvested, affiliation?.role, affiliation?.company);
+        const winSource = harvestWinSource(
+          harvested,
+          gathered.found as typeof harvested,
+          affiliation?.role,
+          affiliation?.company,
+        );
         if (
           !harvestLooksLikeCommentaryTape(harvested) &&
           harvestShouldWin(winSource.length, curated.items.length, affiliation?.role, affiliation?.company, cheap.length, {

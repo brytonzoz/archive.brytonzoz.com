@@ -2367,13 +2367,12 @@ export function cheapHardFilter<T extends Polishable>(items: T[], year: number):
     const description = cleanDescription(item.description);
     out.push({ ...item, name, description });
   }
-  return out
-    .slice()
-    .sort((a, b) => {
-      const date = (b.date ?? '').localeCompare(a.date ?? '');
-      if (date) return date;
-      return (b.score ?? 0) - (a.score ?? 0);
-    })
-    .slice(0, CHEAP_CANDIDATE_CAP)
-    .sort((a, b) => (a.date ?? '9999').localeCompare(b.date ?? '9999'));
+  const ranked = out.slice().sort((a, b) => {
+    const date = (b.date ?? '').localeCompare(a.date ?? '');
+    if (date) return date;
+    return (b.score ?? 0) - (a.score ?? 0);
+  });
+  const flags = ranked.filter((item) => flagshipLaunchName(item));
+  const rest = ranked.filter((item) => !flagshipLaunchName(item)).slice(0, CHEAP_CANDIDATE_CAP);
+  return [...flags, ...rest].sort((a, b) => (a.date ?? '9999').localeCompare(b.date ?? '9999'));
 }

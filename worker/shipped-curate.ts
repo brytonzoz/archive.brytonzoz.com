@@ -718,8 +718,25 @@ export function unionCeoDatedFlagships<T extends { name?: string; link?: string 
     if (tape.length + extra.length >= 50) continue;
     extra.push(named);
   }
-  if (!flagships.length && !extra.length) return tape;
-  return [...flagships, ...tape, ...extra];
+  const combined = !flagships.length && !extra.length ? tape : [...flagships, ...tape, ...extra];
+  const required =
+    kind === 'vercel-ceo'
+      ? [
+          { name: 'Vercel Agent', link: 'https://vercel.com/changelog/vercel-agent', date: '2026-09-30' },
+          { name: 'AI Gateway', link: 'https://vercel.com/changelog/ai-gateway', date: '2026-04-01' },
+        ]
+      : [];
+  const missing: T[] = [];
+  for (const need of required) {
+    const stub = { name: need.name, link: need.link, date: need.date, source: 'changelog' } as T;
+    if (harvestExpandHas(combined, stub) || harvestExpandHas(missing, stub)) continue;
+    const fromPool = (found || []).find((item) => {
+      const short = cleanedHarvestName(String(item.name || '').trim(), item.link) || String(item.name || '').trim();
+      return flagshipLaunchName({ ...item, name: short }) === need.name;
+    });
+    missing.push(fromPool ? { ...fromPool, name: need.name, date: fromPool.date || need.date } : stub);
+  }
+  return missing.length ? [...missing, ...combined] : combined;
 }
 
 export function customerFromProfile(

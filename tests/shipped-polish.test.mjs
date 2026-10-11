@@ -526,6 +526,52 @@ test('undated sitemap flagships survive harvest (the gate that dropped Cursor 3)
   assert.ok(tape.some((name) => /BUGBOT/i.test(name)), JSON.stringify(tape));
 });
 
+test('undated Vercel Agent and AI Gateway survive polish and the cheap cap', () => {
+  const vercelUndated = polish.polishCandidates(
+    [
+      found({ name: 'Vercel Agent', date: '2026-09-30', source: 'changelog', link: 'https://vercel.com/changelog/vercel-agent' }),
+      found({ name: 'AI Gateway', date: '2026-04-01', source: 'changelog', link: 'https://vercel.com/changelog/ai-gateway' }),
+      found({ name: 'NEXT.JS 16.4', date: '2026-04-01', source: 'changelog', link: 'https://vercel.com/changelog/next-16-4' }),
+    ],
+    {
+      year: 2026,
+      who: 'Guillermo Rauch',
+      affiliation: {
+        name: 'Guillermo Rauch',
+        company: 'Vercel',
+        role: 'ceo',
+        product: null,
+        companyX: null,
+        companyGithub: null,
+        companySite: 'https://vercel.com',
+        typedCompany: true,
+      },
+    },
+  );
+  const vercelNames = vercelUndated.map((item) => item.name);
+  assert.ok(vercelNames.some((name) => /vercel agent/i.test(name)), JSON.stringify(vercelNames));
+  assert.ok(vercelNames.some((name) => /ai gateway/i.test(name)), JSON.stringify(vercelNames));
+  const crumbs = Array.from({ length: 160 }, (_, i) =>
+    found({
+      name: `crumb-${i}`,
+      date: `2026-0${(i % 9) + 1}-01`,
+      source: 'npm',
+      link: `https://www.npmjs.com/package/crumb-${i}`,
+    }),
+  );
+  const cheap = polish.cheapHardFilter(
+    [
+      found({ name: 'Vercel Agent', date: null, source: 'changelog', link: 'https://vercel.com/changelog/vercel-agent', thisYear: true }),
+      found({ name: 'AI Gateway', date: null, source: 'changelog', link: 'https://vercel.com/changelog/ai-gateway', thisYear: true }),
+      ...crumbs,
+    ],
+    2026,
+  );
+  const cheapNames = cheap.map((item) => item.name);
+  assert.ok(cheapNames.some((name) => /vercel agent/i.test(name)), JSON.stringify(cheapNames.slice(0, 8)));
+  assert.ok(cheapNames.some((name) => /ai gateway/i.test(name)), JSON.stringify(cheapNames.slice(0, 8)));
+});
+
 test('versioned releases always roll into the monthly line; flagships keep real dates', () => {
   const rolled = polish.rollupVersions([
     found({ name: 'CURSOR SDK BRIDGE V1.0.26', date: '2026-07-30' }),

@@ -522,6 +522,10 @@ test('harvest wins when Claude keeps a highlight reel of a fat company tape', ()
   const rauchFlagshipNames = rauchFlagships.map((item) => item.name);
   assert.ok(rauchFlagshipNames.some((name) => /vercel agent/i.test(name)), JSON.stringify(rauchFlagshipNames.slice(0, 8)));
   assert.ok(rauchFlagshipNames.some((name) => /ai gateway/i.test(name)), JSON.stringify(rauchFlagshipNames.slice(0, 8)));
+  const rauchForced = curate.unionCeoDatedFlagships(rauchFull, rauchFull, 'ceo', 'Vercel', 2026);
+  const rauchForcedNames = rauchForced.map((item) => item.name);
+  assert.ok(rauchForcedNames.some((name) => /vercel agent/i.test(name)), JSON.stringify(rauchForcedNames.slice(0, 6)));
+  assert.ok(rauchForcedNames.some((name) => /ai gateway/i.test(name)), JSON.stringify(rauchForcedNames.slice(0, 6)));
   const colinZod = curate.unionOwnDatedShips(
     [{ name: 'NUB', date: '2026-02-08', kind: 'oss-launch', source: 'github', link: 'https://github.com/colinhacks/nub' }],
     [

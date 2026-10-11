@@ -1412,6 +1412,30 @@ export function cleanDescription(value: unknown): string {
   return completeSubline(text);
 }
 
+/** True when a stored (uncleaned) sub-line still matches junk we strip at print time. */
+export function storedSublineLooksJunk(desc: string | undefined | null): boolean {
+  const raw = tidy(desc);
+  if (!raw) return false;
+  const markup = String(desc ?? '');
+  if (DESC_HASH_PREFIX.test(raw) || /^[0-9a-f]{7,40}(?:\b|[:\s-])/i.test(raw)) return true;
+  if (DESC_INSTALL.test(raw) || DESC_INSTALL_CMD.test(raw) || DESC_BREAKING.test(raw) || DESC_SEE_POINTER.test(raw)) return true;
+  if (DESC_CHANGELOG_LABEL.test(raw) || /\bpatch changes\b/i.test(raw) || /\bwhat'?s changed\b/i.test(raw)) return true;
+  if (/https?:\/\//i.test(markup) || /[#*_`\[\]]/.test(markup) || /<\/?[a-z]/i.test(markup)) return true;
+  if (looksIncompleteSubline(raw)) return true;
+  const printed = cleanDescription(desc);
+  if (!printed) return true;
+  return false;
+}
+
+/** Receipt item sub-line is canonical when it matches the deterministic printer output and is not junk. */
+export function receiptItemSublineIsClean(item: { name?: string; description?: string; source?: string | null; link?: string | null }): boolean {
+  const want = printedDescription(item);
+  const have = tidy(item.description);
+  if (have !== want) return false;
+  if (!have) return true;
+  return !storedSublineLooksJunk(have);
+}
+
 export function prettyBrand(company: string | null | undefined, host?: string | null): string {
   if (host && HOST_BRAND[host]) return HOST_BRAND[host];
   const paren = tidy(company).match(/\(([^)]+)\)/)?.[1];

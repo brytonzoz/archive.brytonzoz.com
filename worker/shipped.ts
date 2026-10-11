@@ -28,14 +28,21 @@
 //   GET  /shipped/r/<id>/rollo.pdf     4-inch Rollo PDF (812 dots / 203 dpi, ?download=1)
 //   GET  /shipped/r/<id>/rollo.png     4-inch Rollo PNG (same layout)
 //   /api/admin/shipped*                moderation, takedowns, bids, the print queue, spend; behind the /admin password
-//   POST /api/admin/shipped            reprint-receipt { id } · print-subject { q } (fresh name, xAI off)
+//   POST /api/admin/shipped            reprint-receipt { id } · print-subject { q } · sanitize-receipt-sublines { dryRun? }
 //
 // Every guardrail (rate limits, locks, the budget, kill switches, the human check, headers) lives in
 // worker/shipped-guard.ts; the threat list is docs/shipped-security.md.
 // Tables are created (and new columns added) on first use; see SCHEMA below.
 import { CURATION_RESERVE_MICROS, DEFAULT_MODEL, PrintError, assembleReceipt, demoReceipt, finish, harvestItems, maxSearches, promptFor, worstCaseMicros, type AiEnv, type DraftItem } from './shipped-ai';
 import { harvestLooksLikeCommentaryTape } from './shipped-curate';
-import { RECEIPT_LINE_CAP, cheapHardFilter, isBlogEssayTitle, looksLikeEssayTitle } from './shipped-polish';
+import {
+  RECEIPT_LINE_CAP,
+  cheapHardFilter,
+  isBlogEssayTitle,
+  looksLikeEssayTitle,
+  printedDescription,
+  receiptItemSublineIsClean,
+} from './shipped-polish';
 import { ICON_HASH, bytesDataUri, iconDataUri, iconKey, reencodeLogo, storeIcon } from './shipped-icons';
 import { houseMark } from './shipped-marks';
 import { yearCardPng, yearRolloPdf, yearRolloPng, yearTallPng, type LogoResolver } from './shipped-og';
@@ -2459,6 +2466,83 @@ async function assembleForAdmin(
   };
 }
 
+/** Re-apply deterministic sub-line cleaner to every stored receipt (ids/serials unchanged; no AI). */
+async function sanitizeAllReceiptSublines(env: ShippedEnv, db: D1Database, dryRun: boolean): Promise<Response> {
+  const { results } = await db.prepare('SELECT id, data FROM shipped_receipts WHERE hidden != 1 ORDER BY id').all<{ id: number; data: string }>();
+  const maxRow = await db.prepare('SELECT MAX(id) AS n FROM shipped_receipts').first<{ n: number }>();
+  let receiptsFixed = 0;
+  let itemsFixed = 0;
+  const touchedIds: number[] = [];
+  const scanned: { id: number; data: YearReceipt }[] = [];
+
+  for (const row of results) {
+    let data: YearReceipt;
+    try {
+      data = JSON.parse(row.data) as YearReceipt;
+    } catch {
+      continue;
+    }
+    let rowChanged = false;
+    const items = (data.items || []).map((item) => {
+      if (!item?.name || item.name === 'YOUR POTENTIAL' || item.source === 'none') return item;
+      const nextDesc = printedDescription(item);
+      const prev = item.description ?? '';
+      if (prev !== nextDesc) {
+        rowChanged = true;
+        itemsFixed++;
+        return { ...item, description: nextDesc };
+      }
+      return item;
+    });
+    if (rowChanged) {
+      receiptsFixed++;
+      touchedIds.push(row.id);
+      data = { ...data, items };
+      if (!dryRun) {
+        await db.prepare('UPDATE shipped_receipts SET data = ? WHERE id = ?').bind(JSON.stringify(data), row.id).run();
+      }
+    }
+    scanned.push({ id: row.id, data });
+  }
+
+  if (!dryRun && touchedIds.length) {
+    await dropListedCache(env);
+    await Promise.all(touchedIds.map((id) => dropShareImages(env, id).catch(() => undefined)));
+  }
+
+  const remainingJunk: { id: number; name: string; description: string }[] = [];
+  for (const { id, data } of scanned) {
+    for (const item of data.items || []) {
+      if (!item?.name || item.name === 'YOUR POTENTIAL' || item.source === 'none') continue;
+      if (!receiptItemSublineIsClean(item)) {
+        remainingJunk.push({ id, name: item.name, description: String(item.description ?? '').slice(0, 120) });
+      }
+    }
+  }
+
+  console.log(
+    JSON.stringify({
+      shipped: 'sanitize-sublines',
+      dryRun,
+      receipts: results.length,
+      receiptsFixed,
+      itemsFixed,
+      remainingJunk: remainingJunk.length,
+    }),
+  );
+
+  return json({
+    ok: true,
+    dryRun,
+    receipts: results.length,
+    receiptsFixed,
+    itemsFixed,
+    touchedIds,
+    maxId: maxRow?.n ?? 0,
+    remainingJunk,
+  });
+}
+
 /** Re-run gather + assemble for an existing row. Same id; listed/hidden stay as they are. */
 async function reprintReceipt(
   env: ShippedEnv,
@@ -2854,6 +2938,9 @@ export async function adminShipped(request: Request, env: ShippedEnv): Promise<R
           ? (body.affiliation as Partial<import('./shipped-affiliation').Affiliation>)
           : undefined;
       return reprintReceipt(env, db, id, hint);
+    }
+    if (body.action === 'sanitize-receipt-sublines') {
+      return sanitizeAllReceiptSublines(env, db, body.dryRun === true);
     }
     if (body.action === 'print-subject') {
       const q = typeof body.q === 'string' ? body.q : typeof body.handle === 'string' ? body.handle : '';

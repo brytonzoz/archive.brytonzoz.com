@@ -258,6 +258,26 @@ test('source lines are via Brand · host with no sitemap metadata', () => {
     'XDR Boost is an open source alternative to Vivid',
   );
   assert.equal(polish.looksIncompleteSubline('XDR Boost is an open source alternative to Vivid without'), true);
+  assert.equal(polish.storedSublineLooksJunk('96e1bb1: Promote @vercel/passport to stable'), true);
+  assert.equal(polish.storedSublineLooksJunk('Breaking changes - LLVM is the only code generation'), true);
+  assert.equal(polish.storedSublineLooksJunk('To install Bun v1.3.14 Windows: bash powershell'), true);
+  assert.equal(polish.storedSublineLooksJunk('Fixed the empty tweet state on the profile'), false);
+  assert.equal(
+    polish.receiptItemSublineIsClean({
+      name: 'PROFILE',
+      description: 'Fixed the empty tweet state on the profile',
+      source: 'github',
+    }),
+    true,
+  );
+  assert.equal(
+    polish.receiptItemSublineIsClean({
+      name: 'PASSPORT',
+      description: '96e1bb1: Promote @vercel/passport to stable',
+      source: 'github',
+    }),
+    false,
+  );
   assert.equal(
     polish.printedDescription({
       name: 'BUN · 3 RELEASES IN JAN',

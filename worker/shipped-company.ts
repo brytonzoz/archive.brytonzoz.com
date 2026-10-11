@@ -4,7 +4,7 @@
 import { extraResearchPaths, itemsFromProjectList } from './shipped-research';
 import { looksLikeNotAShip } from './shipped-decisions';
 import { flagshipLaunchName, flagshipProbePaths, knownFlagshipDate, logFlagshipGate } from './shipped-flagship';
-import { isBlogEssayTitle, isCodeOrBugfixTitle, isDocsOrReferenceTitle, isPrereleaseShip, isVagueOrCutTitle, prettyBrand, versionParts } from './shipped-polish';
+import { isBlogEssayTitle, isCodeOrBugfixTitle, isDocsOrReferenceTitle, isGatewayModelListing, isPrereleaseShip, isVagueOrCutTitle, prettyBrand, versionParts } from './shipped-polish';
 import { blogFeedUrls, linesFromBlogFeed, linesFromOssRepo, type OssRelease } from './shipped-oss';
 import { companyOrgGuess, companyScope, companySlug, companyTokens, matchesLeadProduct, type Affiliation } from './shipped-affiliation';
 import { type XaiEnv, type XaiSpend, emptyXaiSpend } from './shipped-xai';
@@ -267,7 +267,7 @@ export function compactCompanyFound(found: Found[], cap = COMPANY_CACHE_CAP): Fo
     ) {
       return;
     }
-    if (/now available on ai gateway|\/ai-gateway/i.test(`${item.name} ${item.link || ''}`) && !/new models on ai gateway/i.test(item.name)) {
+    if (isGatewayModelListing(item.name, item.link, item.description) && !/new models on ai gateway/i.test(item.name)) {
       return;
     }
     if (looksLikeNotAShip(item) && flagshipLaunchName(item)) logFlagshipGate(item, 'company-compact-not-a-ship', flagshipLaunchName(item));
@@ -316,6 +316,17 @@ export function compactCompanyFound(found: Found[], cap = COMPANY_CACHE_CAP): Fo
     accept(item, seen, out);
   }
   for (const item of rest) accept(item, seen, out);
+  const hasGateway = out.some((item) => /new models on ai gateway/i.test(item.name));
+  if (!hasGateway) {
+    const models = ranked.filter(
+      (item) => isGatewayModelListing(item.name, item.link, item.description) && !/new models on ai gateway/i.test(item.name),
+    );
+    if (models.length) {
+      const latest = models.slice().sort((a, b) => (b.date ?? '').localeCompare(a.date ?? ''))[0]!;
+      if (out.length >= cap) out.pop();
+      accept({ ...latest, name: 'New models on AI Gateway', description: '' }, seen, out);
+    }
+  }
   return out;
 }
 

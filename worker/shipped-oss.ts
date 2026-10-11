@@ -195,6 +195,32 @@ export function bioMentionsRepo(bio: string | undefined, repo: { name: string; h
   return names.some((name) => name.length >= 3 && hay.includes(name));
 }
 
+/** Employer platform orgs — harvest only when this person founded them. */
+export function isEmployerOrg(org: string): boolean {
+  return /^(vercel|openai|cursor|anthropic)$/i.test(String(org || '').replace(/^@/, ''));
+}
+
+const OSS_ORG_ALIASES: Record<string, string[]> = {
+  bun: ['ovensh', 'oven'],
+  svelte: ['sveltejs'],
+  sveltekit: ['sveltejs'],
+  vue: ['vuejs'],
+  vite: ['vitejs'],
+  react: ['react', 'facebook'],
+  rails: ['rails', 'rubyonrails'],
+};
+
+function orgMatchesProduct(org: string, raw: string): boolean {
+  const slug = org.replace(/^@/, '').toLowerCase().replace(/[^a-z0-9]/g, '');
+  const token = String(raw || '')
+    .toLowerCase()
+    .replace(/^@/, '')
+    .replace(/[^a-z0-9]/g, '');
+  if (!slug || token.length < 2) return false;
+  if (token === slug || slug.includes(token) || (token.length >= 4 && token.includes(slug))) return true;
+  return (OSS_ORG_ALIASES[token] || []).includes(slug);
+}
+
 export function isOrgFounder(opts: {
   org: string;
   bio?: string;
@@ -207,20 +233,14 @@ export function isOrgFounder(opts: {
   const roleFounder = opts.role === 'founder' || opts.role === 'ceo';
   const gh = (opts.companyGithub || '').replace(/^@/, '').toLowerCase();
   if (gh && gh === org && roleFounder) return true;
-  const hay = `${opts.bio || ''}`;
-  const saidFounder = /\b(creator|founder|co-?founder|maker|author)\b/i.test(hay) || roleFounder;
-  if (!saidFounder) return false;
-  const tokens = [opts.company, opts.product, opts.companyGithub, ...((opts.bio || '').match(/[A-Za-z][A-Za-z0-9._-]{1,39}/g) || [])]
-    .filter(Boolean)
-    .map((value) =>
-      String(value)
-        .toLowerCase()
-        .replace(/^@/, '')
-        .replace(/[^a-z0-9]/g, ''),
-    )
-    .filter((value) => value.length >= 2);
-  const slug = org.replace(/[^a-z0-9]/g, '');
-  return tokens.some((token) => token === slug || slug.includes(token) || (token.length >= 4 && token.includes(slug)));
+  const phrase = String(opts.bio || '').match(
+    /\b(?:creator|founder|co-?founder|maker|author)\s+(?:of|at|for|@)?\s*([A-Za-z][A-Za-z0-9._-]*)/i,
+  );
+  if (phrase?.[1] && orgMatchesProduct(org, phrase[1])) return true;
+  if (roleFounder) {
+    return [opts.company, opts.product, opts.companyGithub].filter(Boolean).some((value) => orgMatchesProduct(org, String(value)));
+  }
+  return false;
 }
 
 function tidy(value: unknown, max: number): string {
@@ -669,6 +689,16 @@ export async function harvestOss(opts: {
   );
   const eventHits = eventReposFromEvents(events, login);
   for (const hit of eventHits) {
+    if (isEmployerOrg(hit.owner) && !isOrgFounder({
+      org: hit.owner,
+      bio: opts.bio,
+      company: opts.affiliation?.company,
+      companyGithub: opts.affiliation?.companyGithub,
+      role: opts.affiliation?.role,
+      product: opts.affiliation?.product,
+    })) {
+      continue;
+    }
     if (!orgs.some((row) => row.toLowerCase() === hit.owner.toLowerCase())) orgs.push(hit.owner);
   }
   if (eventHits.length) ran.push(`oss-events:${eventHits.map((hit) => `${hit.owner}/${hit.name}`).slice(0, 8).join(',')}`);
@@ -685,6 +715,16 @@ export async function harvestOss(opts: {
   };
 
   for (const hit of eventHits.slice(0, 8)) {
+    if (isEmployerOrg(hit.owner) && !isOrgFounder({
+      org: hit.owner,
+      bio: opts.bio,
+      company: opts.affiliation?.company,
+      companyGithub: opts.affiliation?.companyGithub,
+      role: opts.affiliation?.role,
+      product: opts.affiliation?.product,
+    })) {
+      continue;
+    }
     const meta = await memo(`oss:repo:${hit.owner}/${hit.name}`, 360 * 60, () =>
       opts.get<Record<string, unknown>>(`/repos/${encodeURIComponent(hit.owner)}/${encodeURIComponent(hit.name)}`).catch(() => null),
     );
@@ -712,6 +752,7 @@ export async function harvestOss(opts: {
       role: opts.affiliation?.role,
       product: opts.affiliation?.product,
     });
+    if (isEmployerOrg(org) && !founder) continue;
     const rows = await memo(`oss:org-repos:${org.toLowerCase()}`, 360 * 60, () =>
       opts.get<Record<string, unknown>[]>(`/orgs/${encodeURIComponent(org)}/repos?sort=pushed&per_page=50`).catch(() => []),
     );

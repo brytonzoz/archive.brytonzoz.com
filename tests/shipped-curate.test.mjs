@@ -142,6 +142,27 @@ test('harvest wins when Claude keeps a highlight reel of a fat company tape', ()
   assert.equal(curate.harvestShouldWin(101, 9, null, null, 90), false);
   assert.equal(curate.harvestShouldWin(97, 18, 'founder', 'VoidZero'), false);
   assert.equal(curate.harvestShouldWin(101, 15, null, null, 100), false);
+  assert.equal(curate.harvestShouldWin(16, 1, null, null, 16, { ossHeavy: true }), true);
+  assert.equal(curate.harvestShouldWin(16, 16, null, null, 16, { ossHeavy: true }), false);
+  assert.equal(curate.harvestShouldWin(13, 4, null, null, 13, { ossHeavy: true }), true);
+  assert.equal(curate.harvestShouldWin(20, 16, null, null, 20, { ossHeavy: true }), false);
+  assert.equal(curate.harvestLooksLikeOssTape([
+    { name: 'Bun 1.4', kind: 'oss-release' },
+    { name: 'Bun 1.3.6', kind: 'oss-release' },
+    { name: 'Bun · 3 RELEASES IN JAN', kind: 'oss-release' },
+    { name: 'Bun 1.3.11', kind: 'oss-release' },
+    { name: 'Bun · 2 RELEASES IN FEB', kind: 'oss-release' },
+    { name: 'Bun 1.3.14', kind: 'oss-release' },
+    { name: 'Bun · 2 RELEASES IN APR', kind: 'oss-release' },
+    { name: 'Bun 1.4.3', kind: 'oss-release' },
+    { name: 'Bun · 2 RELEASES IN SEP', kind: 'oss-release' },
+    { name: 'Bun 1.3.8', kind: 'oss-release' },
+  ]), true);
+  assert.equal(curate.harvestLooksLikeOssTape([
+    { name: 'I flew to Lisbon', kind: 'post' },
+    { name: 'Best tools 2026', kind: 'post' },
+    { name: 'A thread', kind: 'post' },
+  ]), false);
 });
 
 test('rollup keeps an existing monthly RELEASES IN label', () => {

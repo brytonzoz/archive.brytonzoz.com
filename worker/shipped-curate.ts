@@ -258,6 +258,20 @@ export function applyCuration(
   return { items: rollupGroups(kept), notes: parsed.notes.slice(0, 3) };
 }
 
+/** Short OSS version / monthly-release tapes — not tweet dumps or employer changelogs. */
+export function harvestLooksLikeOssTape(items: { name?: string; kind?: string }[]): boolean {
+  const rows = Array.isArray(items) ? items : [];
+  if (rows.length < 8) return false;
+  const oss = rows.filter((item) => {
+    const kind = String(item.kind || '');
+    const name = String(item.name || '');
+    if (/^(oss-release|oss-launch|oss-blog)$/.test(kind)) return true;
+    if (/·\s*\d+\s+releases?\s+in\s+/i.test(name)) return true;
+    return /^[A-Za-z][\w.+-]*(?:\s+[A-Za-z][\w.+-]*){0,3}\s+v?\d+\.\d+/i.test(name);
+  });
+  return oss.length >= Math.max(8, Math.ceil(rows.length * 0.6));
+}
+
 /** Claude highlight-reels a fat harvest — keep the gated tape and only take the notes. */
 export function harvestShouldWin(
   harvestedCount: number,
@@ -265,6 +279,7 @@ export function harvestShouldWin(
   role?: string | null,
   company?: string | null,
   cheapCount?: number,
+  opts?: { ossHeavy?: boolean },
 ): boolean {
   const brand = String(company || '').trim();
   const flagshipCeo = /^ceo$/i.test(role || '') && /^(vercel|openai|cursor)$/i.test(brand);
@@ -277,8 +292,12 @@ export function harvestShouldWin(
     const floor = /^cursor$/i.test(brand) ? 40 : 35;
     return curatedCount < floor;
   }
-  // Everyone else: keep Claude's tape. Restoring harvest reintroduces employer
-  // changelogs, tweets, monthly blogs, and scoped npm ids.
+  // OSS maintainers: restore the release tape when Claude keeps a highlight reel.
+  // Tweet dumps and employer changelogs stay curated (ossHeavy is false for those).
+  if (opts?.ossHeavy && harvestedCount >= 10) {
+    const floor = harvestedCount >= 15 ? 15 : 10;
+    return curatedCount < floor;
+  }
   return false;
 }
 

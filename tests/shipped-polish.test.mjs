@@ -932,6 +932,7 @@ test('prereleases, starters, and Gateway model listings are not ships', () => {
   assert.equal(polish.isCustomerStoryTitle('GPT-6.1 Sol'), false);
   assert.equal(polish.isCustomerStoryTitle("Warp's big bet on building open source with GPT-5.5"), true);
   assert.equal(polish.isCustomerStoryTitle('Nokia analyzes 50M+ network events with Cursor'), true);
+  assert.equal(polish.isCustomerStoryTitle('Grab put Cursor in the hands of design, ops, and engineering'), true);
   assert.equal(polish.looksCutOff('SPEED INSIGHTS NOW HAS'), true);
   assert.equal(polish.looksCutOff('VERCEL CONNECT NOW ACCEPTS SERVICE'), true);
   assert.equal(polish.looksCutOff('TEAMS &'), true);
@@ -1109,7 +1110,11 @@ test('undated HeadshotPro drops; leftover cut-offs and customer-story metrics dr
         link: 'https://dannypostma.com/agentbar',
       }),
       found({ name: 'SPEED INSIGHTS NOW HAS', date: '2026-04-11', source: 'changelog', link: 'https://vercel.com/changelog/speed' }),
+      found({ name: 'BEST AI HEADSHOT GENERATORS 2026', date: '2026-01-08', source: 'site', link: 'https://dannypostma.com/best-ai-headshot-generators-2026' }),
       found({ name: 'NOKIA ANALYZES 50M+ NETWORK EVENTS WITH CURSOR', date: '2026-06-02', source: 'changelog', link: 'https://cursor.com/blog/nokia' }),
+      found({ name: 'GRAB PUT CURSOR IN THE HANDS OF DESIGN, OPS, AND ENGINEERING', date: '2026-08-01', source: 'changelog', link: 'https://cursor.com/blog/grab' }),
+      found({ name: 'LOCEAN DROPLET, CONFIGURE SSH ACCESS, AND CONNECT', date: '2026-04-02', source: 'changelog', link: 'https://developers.openai.com/codex/changelog' }),
+      found({ name: 'CURSOR CAN NOW READ, WRITE, AND ACT ACROSS YOUR GOOGLE', date: '2026-07-12', source: 'changelog', link: 'https://cursor.com/changelog/google' }),
       found({ name: 'TEAMS &', date: '2026-06-04', source: 'changelog', link: 'https://cursor.com/blog/teams' }),
     ],
     {
@@ -1130,7 +1135,11 @@ test('undated HeadshotPro drops; leftover cut-offs and customer-story metrics dr
     },
   );
   const names = gated.map((item) => item.name);
-  assert.equal(names.some((name) => /headshotpro|speed insights|nokia|teams\s*&/i.test(name)), false, JSON.stringify(names));
+  assert.equal(
+    names.some((name) => /headshotpro|headshot generators|speed insights|nokia|grab put|locean|across your google|teams\s*&/i.test(name)),
+    false,
+    JSON.stringify(names),
+  );
   assert.ok(names.some((name) => /agentbar/i.test(name)), JSON.stringify(names));
 });
 

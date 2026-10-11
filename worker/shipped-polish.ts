@@ -241,6 +241,7 @@ export function looksCutOff(text: string): boolean {
   const trimmed = text.trim();
   if (/[,;·|&:]\s*$/.test(trimmed)) return true;
   if (/\bnow\s+(has|accepts)(\s+\w+){0,2}$/i.test(trimmed) && trimmed.split(/\s+/).length >= 3) return true;
+  if (/\bacross your\s+\w+$/i.test(trimmed) && trimmed.split(/\s+/).length >= 6) return true;
   if (/[A-Za-z0-9]-$/.test(trimmed)) return true;
   if (/\([^)]*$/.test(trimmed)) return true;
   if (TRAILING_PREP.test(trimmed) && trimmed.split(/\s+/).length >= 3) return true;
@@ -337,6 +338,9 @@ export function isCustomerStoryTitle(title: string): boolean {
   }
   if (/\bbig bet\b/i.test(text)) return true;
   if (COMPANY_METRIC.test(text)) return true;
+  if (/^[A-Z][A-Za-z0-9.&'’-]+(?:\s+[A-Z][A-Za-z0-9.&'’-]+){0,2}\s+(puts?|placed?)\b.+\bin the hands\b/i.test(text)) {
+    return true;
+  }
   return false;
 }
 
@@ -667,6 +671,7 @@ export function isVagueOrCutTitle(name: string): boolean {
   if (/\bconnections to api\.openai\.com\b|\bcan now use ipv6\b|\bipv6\b/i.test(text)) return true;
   if (/^server-side compaction\b|\bcompaction in the responses api\b/i.test(text)) return true;
   if (/^(pets|cloud|new)\s+[a-z]+$/i.test(text) && !/\b(cli|app|sdk|api|gpt|codex|cursor|chatgpt)\b/i.test(text)) return true;
+  if (/\bdroplet\b/i.test(text) && /\b(configure|ssh|connect)\b/i.test(text)) return true;
   return false;
 }
 
@@ -1579,6 +1584,10 @@ export function polishCandidates<T extends Polishable>(items: T[], opts: PolishO
       isCeoApiMinutiae(item.name, item.link)
     ) {
       drop(item, 'ceo-api-minutiae');
+      continue;
+    }
+    if (!flagship && isBlogEssayTitle(item.name)) {
+      drop(item, 'essay-title');
       continue;
     }
     if (!inYearStrict(item, year)) {

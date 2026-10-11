@@ -743,6 +743,43 @@ test('OpenAI compact reserves company-wide launches beside a Codex dump', () => 
   assert.ok(compact.some((item) => /health/i.test(item.name)), JSON.stringify(compact.map((i) => i.name)));
 });
 
+test('Vercel compact keeps one AI Gateway rollup instead of dropping the listings', () => {
+  const listings = [
+    {
+      name: 'Kimi K2.5 now available on AI Gateway',
+      date: '2026-09-12',
+      link: 'https://vercel.com/changelog/kimi-k2-5-available-on-ai-gateway',
+      source: 'changelog',
+      status: 'LAUNCHED',
+      score: 6,
+      thisYear: true,
+    },
+    {
+      name: 'GLM-5 now available on AI Gateway',
+      date: '2026-09-28',
+      link: 'https://vercel.com/changelog/glm-5-available-on-ai-gateway',
+      source: 'changelog',
+      status: 'LAUNCHED',
+      score: 6,
+      thisYear: true,
+    },
+    {
+      name: 'Vercel Agent',
+      date: '2026-09-30',
+      link: 'https://vercel.com/changelog/vercel-agent',
+      source: 'changelog',
+      status: 'LAUNCHED',
+      score: 9,
+      thisYear: true,
+    },
+  ].map((row) => ({ description: '', icon: null, ...row }));
+  const compact = company.compactCompanyFound(listings, 20);
+  const names = compact.map((item) => item.name);
+  assert.ok(names.some((name) => /new models on ai gateway/i.test(name)), JSON.stringify(names));
+  assert.ok(names.some((name) => /vercel agent/i.test(name)), JSON.stringify(names));
+  assert.equal(names.filter((name) => /kimi|glm-5/i.test(name)).length, 0, JSON.stringify(names));
+});
+
 test('off-worker cache is preferred and scoped on read', async () => {
   const storeMod = await import('../worker/shipped-company-store.ts');
   const cached = [

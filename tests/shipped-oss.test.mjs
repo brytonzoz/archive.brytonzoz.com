@@ -75,6 +75,51 @@ test('event repos pin the flagship before site probes', async () => {
   assert.ok(found.some((item) => /RELEASES IN SEP/i.test(item.name)), JSON.stringify(found.map((item) => item.name)));
 });
 
+test('employer org event repos stay off an OSS maintainer tape', async () => {
+  const get = async (path) => {
+    if (path.startsWith('/users/Rich-Harris/repos')) return [];
+    if (path.startsWith('/users/Rich-Harris/orgs')) return [{ login: 'sveltejs' }];
+    if (path.startsWith('/users/Rich-Harris/events')) {
+      return [
+        { type: 'PushEvent', repo: { name: 'vercel/vercel' } },
+        { type: 'PushEvent', repo: { name: 'sveltejs/svelte' } },
+      ];
+    }
+    if (path === '/repos/sveltejs/svelte') {
+      return { name: 'svelte', html_url: 'https://github.com/sveltejs/svelte', homepage: 'https://svelte.dev', stargazers_count: 80000, fork: false };
+    }
+    if (path === '/repos/vercel/vercel') {
+      return { name: 'vercel', html_url: 'https://github.com/vercel/vercel', homepage: 'https://vercel.com', stargazers_count: 14000, fork: false };
+    }
+    if (path.includes('/sveltejs/svelte/releases')) {
+      return [
+        { tag_name: 'svelte@5.20.0', name: 'Svelte 5.20', published_at: '2026-03-02T12:00:00Z', body: 'Svelte 5.20', html_url: 'https://github.com/sveltejs/svelte/releases/tag/svelte@5.20.0' },
+      ];
+    }
+    if (path.includes('/vercel/vercel/releases')) {
+      return [
+        { tag_name: 'vercel@58.0.0', name: 'Vercel 58', published_at: '2026-07-02T12:00:00Z', body: 'cli', html_url: 'https://github.com/vercel/vercel/releases/tag/vercel@58.0.0' },
+      ];
+    }
+    if (path.startsWith('/orgs/sveltejs/repos')) {
+      return [{ name: 'svelte', html_url: 'https://github.com/sveltejs/svelte', homepage: 'https://svelte.dev', stargazers_count: 80000, pushed_at: '2026-09-01T00:00:00Z' }];
+    }
+    return [];
+  };
+  const { found, ran } = await oss.harvestOss({
+    login: 'Rich-Harris',
+    year: 2026,
+    get,
+    bio: 'Creator of Svelte.',
+    affiliation: { company: 'Vercel', role: 'unknown', product: 'Svelte' },
+    orgs: ['sveltejs', 'vercel'],
+  });
+  const names = found.map((item) => item.name);
+  assert.equal(ran.some((tag) => /vercel/i.test(tag) && /oss-event-repo|oss-founder|oss-rel|oss-authored|oss-top3/.test(tag)), false, JSON.stringify(ran));
+  assert.equal(names.some((name) => /vercel/i.test(name)), false, JSON.stringify(names));
+  assert.ok(names.some((name) => /svelte 5\.20/i.test(name)), JSON.stringify(names));
+});
+
 test('release page 2 still loads when page 1 already has eight recent stables', async () => {
   const fetched = [];
   const page1 = [
@@ -329,6 +374,11 @@ test('founder orgs skip contributor stats; top-3 is 2026 commits', () => {
     true,
   );
   assert.equal(oss.isOrgFounder({ org: 'vercel', bio: 'I write blogs.', role: 'unknown' }), false);
+  assert.equal(oss.isOrgFounder({ org: 'vercel', bio: 'Creator of Svelte.', company: 'Vercel', role: 'unknown', product: 'Svelte' }), false);
+  assert.equal(oss.isOrgFounder({ org: 'sveltejs', bio: 'Creator of Svelte.', company: 'Vercel', product: 'Svelte' }), true);
+  assert.equal(oss.isOrgFounder({ org: 'oven-sh', bio: 'Creator of Bun.', company: 'Bun' }), true);
+  assert.equal(oss.isEmployerOrg('vercel'), true);
+  assert.equal(oss.isEmployerOrg('sveltejs'), false);
   assert.equal(oss.bioMentionsRepo('I write and ship React tools.', { name: 'react', homepage: 'https://react.dev' }), true);
   assert.equal(oss.bioMentionsRepo('I write blogs.', { name: 'react', homepage: 'https://react.dev' }), false);
   const stats = [
@@ -369,6 +419,9 @@ test('leftover cut-offs and customer-story+metric titles drop', () => {
   assert.equal(polish.cleanShipTitle('REMOTE CONTROL IS ON BY DEFAULT FOR EVERYONE EXCEPT'), '');
   assert.equal(polish.looksCutOff('PARTNER SITES, STARTING WITH AIRTABLE, GI'), true);
   assert.equal(polish.isCustomerStoryTitle('Nokia analyzes 50M+ network events with Cursor'), true);
+  assert.equal(polish.isCustomerStoryTitle('Grab put Cursor in the hands of design, ops, and engineering'), true);
+  assert.equal(polish.looksCutOff('CURSOR CAN NOW READ, WRITE, AND ACT ACROSS YOUR GOOGLE'), true);
+  assert.equal(polish.isVagueOrCutTitle('LOCEAN DROPLET, CONFIGURE SSH ACCESS, AND CONNECT'), true);
   assert.equal(polish.isBlogEssayTitle('Cursor is an applied research team building the best'), true);
   assert.equal(polish.isBlogEssayTitle('Both are available today on Teams and Enterprise'), true);
   assert.equal(polish.isBlogEssayTitle('BEST AI HEADSHOT GENERATORS 2026'), true);

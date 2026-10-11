@@ -23,6 +23,7 @@ import {
   cachedSystem,
   curationUserPrompt,
   customerFromProfile,
+  harvestLooksLikeOssTape,
   harvestShouldWin,
   packCandidates,
   parseCurationJson,
@@ -1655,7 +1656,11 @@ export async function assembleReceipt(
         spent,
       });
       if (curated) {
-        if (harvestShouldWin(harvested.length, curated.items.length, affiliation?.role, affiliation?.company, cheap.length)) {
+        if (
+          harvestShouldWin(harvested.length, curated.items.length, affiliation?.role, affiliation?.company, cheap.length, {
+            ossHeavy: harvestLooksLikeOssTape(harvested),
+          })
+        ) {
           console.log(
             JSON.stringify({
               shipped: 'curate-thin',

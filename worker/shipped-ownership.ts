@@ -138,6 +138,7 @@ export function ownershipEvidence(
   if (isForeignProduct(item, owner)) return 'none';
   if (TOOLS_HINT.test(desc) || PUBLIC_PAGE.test(desc)) return 'none';
   if (isOssHarvestItem(item)) return 'developer';
+  if (String(item.kind || '') === 'journal-ship') return 'portfolio';
   if (COMPANY_SOURCE.test(source) && owner?.company) return 'company';
   if (githubOwned(item.link, owner) || githubOrgOwned(item.link, owner)) return 'developer';
   if (source === 'github') return 'none';

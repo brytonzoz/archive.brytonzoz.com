@@ -533,6 +533,168 @@ export function unionHarvestWin<T extends { name?: string; link?: string | null 
   return extra.length ? [...extra, ...harvested] : harvested;
 }
 
+function fnv1aHex(text: string): string {
+  let hash = 2166136261;
+  for (let i = 0; i < text.length; i++) {
+    hash ^= text.charCodeAt(i);
+    hash = Math.imul(hash, 16777619);
+  }
+  return (hash >>> 0).toString(16);
+}
+
+/** Stable id of the candidate list Claude saw — same inputs always hit the same cache key. */
+export function candidateListHash(
+  candidates: { id?: string; raw_title?: string; date?: string | null; kind?: string; source_host?: string }[],
+): string {
+  const payload = (candidates || [])
+    .map((row) => `${row.id || ''}\t${row.raw_title || ''}\t${row.date || ''}\t${row.kind || ''}\t${row.source_host || ''}`)
+    .join('\n');
+  return fnv1aHex(payload);
+}
+
+export function curationCacheKey(subject: string, year: number, hash: string): string {
+  const who = String(subject || '')
+    .trim()
+    .toLowerCase()
+    .replace(/^@/, '')
+    .replace(/[^a-z0-9._-]+/g, '-')
+    .slice(0, 80);
+  return `curate:v1:${year}:${who || 'unknown'}:${hash}`;
+}
+
+export type OwnDatedOwner = {
+  github?: string | null;
+  orgs?: string[];
+  sites?: string[];
+  site?: string | null;
+  company?: string | null;
+  companyGithub?: string | null;
+  role?: string | null;
+};
+
+function githubOwnerOf(link: string): string {
+  const match = String(link || '').match(/github\.com\/([^/]+)/i);
+  return (match?.[1] || '').replace(/^@/, '').toLowerCase();
+}
+
+function ownerHosts(owner: OwnDatedOwner): Set<string> {
+  const hosts = new Set<string>();
+  for (const url of [owner.site, ...(owner.sites || [])]) {
+    try {
+      if (url) hosts.add(new URL(url).hostname.replace(/^www\./, '').toLowerCase());
+    } catch {
+      /* skip */
+    }
+  }
+  return hosts;
+}
+
+function ownerLogins(owner: OwnDatedOwner): Set<string> {
+  const logins = new Set<string>();
+  const add = (value?: string | null) => {
+    const login = String(value || '')
+      .replace(/^@/, '')
+      .trim()
+      .toLowerCase();
+    if (login) logins.add(login);
+  };
+  add(owner.github);
+  add(owner.companyGithub);
+  for (const org of owner.orgs || []) add(org);
+  return logins;
+}
+
+function datedInYear(item: { date?: string | null; thisYear?: boolean }, year: number): boolean {
+  const date = String(item.date || '');
+  if (date.startsWith(String(year))) return true;
+  return false;
+}
+
+function isGithubReleaseLine(item: { kind?: string; source?: string; link?: string | null }): boolean {
+  const link = String(item.link || '');
+  if (/github\.com\/[^/]+\/[^/]+\/releases/i.test(link)) return true;
+  return item.source === 'github' || /^(oss-release|oss-launch)$/.test(String(item.kind || ''));
+}
+
+function isFirstPartyChangelog(item: { source?: string; link?: string | null }): boolean {
+  const link = String(item.link || '');
+  if (item.source === 'changelog' || item.source === 'company') return true;
+  return /\/(changelog|releases)\//i.test(link) && !/github\.com\/.*\/releases/i.test(link);
+}
+
+/** Own 2026 GitHub releases / first-party changelog cards Claude may not drop. */
+export function isOwnDatedShip(
+  item: { name?: string; date?: string | null; link?: string | null; source?: string; kind?: string; thisYear?: boolean },
+  year: number,
+  owner: OwnDatedOwner,
+): boolean {
+  if (!datedInYear(item, year)) return false;
+  const name = String(item.name || '').trim();
+  if (!name) return false;
+  if (looksLikeEssayTitle(name) || isBlogEssayTitle(name) || looksLikeMonthlyRoundup(name)) return false;
+  const logins = ownerLogins(owner);
+  if (isGithubReleaseLine(item)) {
+    const who = githubOwnerOf(String(item.link || ''));
+    if (who && logins.has(who)) return true;
+    return String(item.kind || '') === 'oss-release' && Boolean(who || item.source === 'github');
+  }
+  if (!isFirstPartyChangelog(item)) return false;
+  const host = hostOf(item.link);
+  if (host && ownerHosts(owner).has(host)) return true;
+  const kind = companyHarvestWinKind(owner.role, owner.company);
+  return Boolean(kind && companyHarvestCardOk(item, kind));
+}
+
+export function unionOwnDatedShips<T extends { name?: string; link?: string | null; date?: string | null; source?: string; kind?: string }>(
+  tape: T[],
+  harvested: T[],
+  year: number,
+  owner: OwnDatedOwner,
+): T[] {
+  const extra: T[] = [];
+  for (const item of harvested || []) {
+    if (!isOwnDatedShip(item, year, owner)) continue;
+    const raw = String(item.name || '').trim();
+    const name = cleanedHarvestName(raw, item.link) || raw;
+    if (!name) continue;
+    if (looksLikeEssayTitle(name) || isBlogEssayTitle(name) || looksLikeMonthlyRoundup(name)) continue;
+    if (!titleSanityOk(name) && !isJournalShip({ ...item, name })) continue;
+    if (harvestAlreadyHas(tape, { ...item, name }) || harvestAlreadyHas(extra, { ...item, name })) continue;
+    extra.push({ ...item, name });
+  }
+  return extra.length ? [...tape, ...extra] : tape;
+}
+
+/** CEO/lead first-party changelog cards with shortened titles — Rauch floor is 30+. */
+export function unionCeoDatedFlagships<T extends { name?: string; link?: string | null; date?: string | null; source?: string }>(
+  tape: T[],
+  found: T[],
+  role?: string | null,
+  company?: string | null,
+  year?: number,
+): T[] {
+  const kind = companyHarvestWinKind(role, company);
+  if (!kind) return tape;
+  const extra: T[] = [];
+  for (const item of found || []) {
+    if (tape.length + extra.length >= 50) break;
+    if (year && item.date && !String(item.date).startsWith(String(year))) continue;
+    if (year && !item.date) continue;
+    if (!companyHarvestCardOk(item, kind)) continue;
+    const raw = String(item.name || '').trim();
+    if (!raw) continue;
+    const short = cleanedHarvestName(raw, item.link);
+    if (!short) continue;
+    if (looksLikeEssayTitle(short) || isBlogEssayTitle(short) || looksLikeMonthlyRoundup(short)) continue;
+    const words = short.split(/\s+/).filter(Boolean);
+    if (words.length >= 8 && !/\d+\.\d+/.test(short) && !/·\s*\d+\s+(updates?|releases?)/i.test(short)) continue;
+    if (!titleSanityOk(short)) continue;
+    if (harvestExpandHas(tape, { ...item, name: short }) || harvestExpandHas(extra, { ...item, name: short })) continue;
+    extra.push({ ...item, name: short });
+  }
+  return extra.length ? [...tape, ...extra] : tape;
+}
+
 export function customerFromProfile(
   profile: {
     name?: string | null;

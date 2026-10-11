@@ -67,11 +67,12 @@ import {
   githubEtagCacheKey,
   githubRequestHeaders,
   isFreshSourceHarvest,
+  preferJournalHarvest,
   preferSourceHarvest,
   readSourceHarvest,
   SOURCE_CACHE_TTL_SEC,
   sourceHarvestKey,
-  WARM_SOURCE_MS,
+  sourceWaitMs,
   writeSourceHarvest,
   type SourceCacheStore,
 } from './shipped-source-cache';
@@ -187,6 +188,8 @@ export type PageInfo = { url: string; title: string; description: string; publis
 
 export type Gathered = {
   found: Found[];
+  /** Pre-polish harvest so journal / own 2026 ships survive Claude + title-sanity. */
+  rawFound?: Found[];
   web: WebResult[];
   pages: PageInfo[];
   site: SiteInfo | null;
@@ -250,7 +253,10 @@ async function harvestOrCache(
   coldMs: number,
 ): Promise<{ found: Found[]; from: 'live' | 'cache' | 'merge' }> {
   const cached = await readSourceHarvest(env.sourceCache, key);
-  const wait = isFreshSourceHarvest(cached) ? WARM_SOURCE_MS : coldMs;
+  const wait = sourceWaitMs(cached, coldMs);
+  if (wait === 0 && cached?.found.length) {
+    return { found: cached.found, from: 'cache' };
+  }
   const live = await raceTimeout(liveP.catch(() => [] as Found[]), wait, null as Found[] | null);
   const picked = preferSourceHarvest(live, cached?.found);
   if (picked.items.length && (picked.from === 'live' || picked.from === 'merge' || !cached?.found.length)) {
@@ -1865,7 +1871,7 @@ export async function gather(
     gatherFresh(subject, resolved.profile, env, year, meter, tinyfish, resolved.notes, mode, opts?.onPartial, opts?.affiliation);
   if (opts?.rebuild && !opts.onPartial) return load();
   if (opts?.rebuild) return load();
-  const key = mode === 'full' ? `gather:full:v38:${year}:${resolved.cacheKey}` : `gather:v48:${year}:${resolved.cacheKey}`;
+  const key = mode === 'full' ? `gather:full:v39:${year}:${resolved.cacheKey}` : `gather:v49:${year}:${resolved.cacheKey}`;
   return cached(
     key,
     1440 * MIN,
@@ -2160,7 +2166,14 @@ async function gatherFresh(
   const ownCacheKey = sourceHarvestKey('own', year, ossSubject);
   const ossP = (async () => {
     const cached = await ossCachedP;
-    const wait = isFreshSourceHarvest(cached) ? WARM_SOURCE_MS : OSS_TIMEOUT_MS;
+    const wait = sourceWaitMs(cached, OSS_TIMEOUT_MS);
+    if (wait === 0 && cached?.found.length) {
+      return {
+        found: cached.found,
+        ran: [...(cached.ran || []), 'oss-cache'],
+        orgs: cached.orgs || [],
+      };
+    }
     const live = await raceTimeout(
       ossHarvestP,
       wait,
@@ -2196,7 +2209,13 @@ async function gatherFresh(
       }),
     ),
     homepage ? raceTimeout(readSite(homepage, HOME_TIMEOUT_MS).catch(() => null), HOME_TIMEOUT_MS, null) : Promise.resolve(null),
-    Promise.all(extraHomes.map((url) => raceTimeout(readSite(url).catch(() => null), SOURCE_TIMEOUT_MS, null))),
+    Promise.all(
+      extraHomes.map((url) => {
+        const feed = /\/(rss|feed)(\.xml)?$/i.test(url);
+        const ms = feed ? HOME_TIMEOUT_MS : SOURCE_TIMEOUT_MS;
+        return raceTimeout(readSite(url, ms).catch(() => null), ms, null);
+      }),
+    ),
     Promise.all(
       queries.map((query) =>
         raceTimeout(
@@ -2300,6 +2319,7 @@ async function gatherFresh(
 
   const projectPages = [site, ...ownPages].filter((page): page is SiteInfo => Boolean(page));
   const journalLive: Found[] = [];
+  let journalWarm = false;
   for (const page of projectPages) {
     const text = `${page.title}\n${page.description}\n${page.text}`;
     found.push(...itemsFromProjectList({ text, url: page.url, year }));
@@ -2312,7 +2332,8 @@ async function gatherFresh(
   {
     const journalKey = sourceHarvestKey('journal', year, ossSubject);
     const journalCached = await readSourceHarvest(env.sourceCache, journalKey);
-    const journal = preferSourceHarvest(journalLive, journalCached?.found);
+    journalWarm = isFreshSourceHarvest(journalCached) && (journalCached?.found.length ?? 0) > 0;
+    const journal = preferJournalHarvest(journalLive, journalCached?.found);
     if (journal.from !== 'live') {
       const extra = journal.items.filter((item) => !found.some((row) => row.link && item.link && row.link === item.link));
       if (extra.length) {
@@ -2389,13 +2410,18 @@ async function gatherFresh(
     emitPartial(found, 'partial:oss');
   }
 
-  if (key) {
+  const ossCachedRow = await ossCachedP;
+  const ossWarm = isFreshSourceHarvest(ossCachedRow) && (ossCachedRow?.found.length ?? 0) > 0;
+  const skipTinyfish = ossWarm && found.length >= 8;
+  if (key && !skipTinyfish) {
     try {
       pages = (await tinyfishFetch(crawlTargets.slice(0, 12), key, meter!)).map(toPage).filter((page): page is PageInfo => Boolean(page));
       if (crawlTargets.length) ran.push('tinyfish-fetch');
     } catch (error) {
       failed.push(`tinyfish-fetch:${(error as Error).message}`);
     }
+  } else if (skipTinyfish) {
+    ran.push(`tinyfish-skipped:warm-cache${journalWarm ? '+journal' : ''}`);
   }
   found.push(...itemsFromWebEvidence({ profile, site, pages, web, year }));
   for (const page of pages) {
@@ -2474,10 +2500,8 @@ async function gatherFresh(
     failed.push('pin-dates');
   }
 
-  deduped = polishCandidates(
-    dedupeFound(found).map((item) => ({ ...item, description: describeWithStat(item) })),
-    polishOpts(),
-  );
+  const rawFound = dedupeFound(found).map((item) => ({ ...item, description: describeWithStat(item) }));
+  deduped = polishCandidates(rawFound, polishOpts());
   emitPartial(deduped, 'partial:company');
   const via = viaLabel(affiliation, defaultAttribution(affiliation.role, affiliation.typedCompany));
   try {
@@ -2615,6 +2639,7 @@ async function gatherFresh(
   return {
     ...draft,
     found: deduped,
+    rawFound,
     profile,
     stats,
     gaps: finalGaps,

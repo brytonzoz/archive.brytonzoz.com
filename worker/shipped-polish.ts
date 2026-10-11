@@ -1887,7 +1887,12 @@ export function polishCandidates<T extends Polishable>(items: T[], opts: PolishO
       drop(item, 'company-github');
       continue;
     }
-    if (opts.owner && ownerCanProve(opts.owner) && !ownedByBuilder({ ...item, name }, opts.owner)) {
+    if (
+      !isJournalShip({ ...item, name }) &&
+      opts.owner &&
+      ownerCanProve(opts.owner) &&
+      !ownedByBuilder({ ...item, name }, opts.owner)
+    ) {
       if (flagship) logFlagshipGate(item, 'not-owned', flagship);
       else {
         drop(item, 'not-owned');
@@ -1961,6 +1966,7 @@ export function polishCandidates<T extends Polishable>(items: T[], opts: PolishO
   if (rolled.length < capped.length) drop({ name: `${capped.length - rolled.length} ceo-lead crumbs` }, 'ceo-rollup');
   const sane = rolled.flatMap((item) => {
     if (/·\s*\d+\s+(updates?|releases?)\s+in\s+/i.test(item.name)) return [item];
+    if (isJournalShip(item) && item.name) return [item];
     if (titleSanityOk(item.name)) return [item];
     const short = rewriteShipTitle(item.name, item.link);
     if (short && titleSanityOk(short)) return [{ ...item, name: short }];

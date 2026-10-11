@@ -56,3 +56,22 @@ test('source harvest keys are stable per subject', () => {
   assert.equal(cache.sourceHarvestKey('oss', 2026, '@yyx990803'), cache.sourceHarvestKey('oss', 2026, 'yyx990803'));
   assert.match(cache.githubEtagCacheKey('token', '/repos/vitejs/vite/releases'), /gh:etag:v1:token:/);
 });
+
+test('a fresh harvest cache does not wait on a live refresh', () => {
+  const fresh = { at: Date.now(), found: [item('Vite 8', 'https://github.com/vitejs/vite/releases/tag/v8.0.0')] };
+  assert.equal(cache.sourceWaitMs(fresh, 28_000), 0);
+  assert.equal(cache.sourceWaitMs({ at: Date.now() - 25 * 60 * 60 * 1000, found: fresh.found }, 28_000), 28_000);
+  assert.equal(cache.sourceWaitMs(null, 6000), 6000);
+});
+
+test('journal harvest keeps hotelist when a live parse misses it', () => {
+  const cached = [
+    item('hotelist.com', 'https://levels.io/#hotelist-com'),
+    item('nomads.com free', 'https://levels.io/#nomads-com'),
+  ];
+  const live = [item('infiniteslop.ai', 'https://levels.io/#infiniteslop')];
+  const picked = cache.preferJournalHarvest(live, cached);
+  assert.equal(picked.from, 'merge');
+  assert.ok(picked.items.some((row) => /hotelist/i.test(row.name)), JSON.stringify(picked.items));
+  assert.ok(picked.items.some((row) => /infiniteslop/i.test(row.name)));
+});

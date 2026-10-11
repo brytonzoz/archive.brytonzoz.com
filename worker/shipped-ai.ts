@@ -11,10 +11,10 @@ import { shipName } from './shipped-changelog';
 import { shareKeywords } from './shipped-decisions';
 import { isOssHarvestItem, ownerFromProfile, type OwnerContext } from './shipped-ownership';
 import { flagshipLaunchName, isFlagshipYearKeep, isJoinOrAcquire, isPriorYearJoin, logFlagshipGate } from './shipped-flagship';
-import { cheapHardFilter, cleanDescription, cleanShipTitle, cleanStatus, gateReceiptItems, isChangelogEntryHref, isOpenAiCompanyWide, noteCountMismatch, rewriteShipTitle, spokenShipName, titleSanityOk } from './shipped-polish';
+import { cheapHardFilter, cleanDescription, cleanShipTitle, cleanStatus, gateReceiptItems, isChangelogEntryHref, isJournalShip, isOpenAiCompanyWide, noteCountMismatch, rewriteShipTitle, spokenShipName, titleSanityOk } from './shipped-polish';
 import { emptyAffiliation, type Affiliation } from './shipped-affiliation';
 import { looksLikePersonName } from './shipped-repos';
-import { RECEIPT_BUDGET_MICROS, formatReceiptStats, searchBudget, type SourcedStat } from './shipped-research';
+import { RECEIPT_BUDGET_MICROS, formatReceiptStats, journalShipName, looksLikePersonalShip, searchBudget, type SourcedStat } from './shipped-research';
 import {
   CURATION_LINE_CAP,
   CURATION_MAX_TOKENS,
@@ -27,11 +27,16 @@ import {
   harvestLooksLikeOssTape,
   harvestShouldWin,
   harvestWinSource,
+  candidateListHash,
+  curationCacheKey,
   packCandidates,
+  unionCeoDatedFlagships,
   unionHarvestWin,
   unionJournalShips,
+  unionOwnDatedShips,
   parseCurationJson,
 } from './shipped-curate';
+import { readCurationCache, writeCurationCache } from './shipped-source-cache';
 
 export interface AiEnv {
   ANTHROPIC_API_KEY?: string;
@@ -923,7 +928,8 @@ export const potentialItem = (): DraftItem => ({
 
 function toDraftItem(item: Found, year: number): DraftItem | null {
   const flagship = flagshipLaunchName(item);
-  let name = cleanShipTitle(item.name);
+  const journal = isJournalShip(item) && looksLikePersonalShip(item.name);
+  let name = journal ? cleanShipTitle(journalShipName(item.name) || item.name) : cleanShipTitle(item.name);
   if (flagship && (!name || name.split(/\s+/).length <= 1)) name = flagship;
   if (!name || !ok(name) || !publicUrl(item.link)) {
     if (flagship) logFlagshipGate(item, !name ? 'draft-title' : 'draft-link', null);
@@ -1485,9 +1491,12 @@ async function curateTape(opts: {
   const affiliation = opts.gathered.profile.affiliation;
   const customer = customerFromProfile(opts.gathered.profile, opts.gathered.profile.x || opts.gathered.profile.github);
   const user = curationUserPrompt(customer, packed, opts.year);
+  const cacheKey = curationCacheKey(opts.subject.id || opts.subject.display, opts.year, candidateListHash(packed));
+  const cached = await readCurationCache(cacheKey);
   const request = {
     model: opts.model,
     max_tokens: CURATION_MAX_TOKENS,
+    temperature: 0,
     system: cachedSystem(),
     messages: [{ role: 'user', content: user }],
     thinking: { type: 'disabled' },
@@ -1496,8 +1505,10 @@ async function curateTape(opts: {
     const raw = parseCurationJson(parsed);
     return raw ? applyCuration(raw, packed) : null;
   };
-  let tape = await tryParse(await askClaudeJson(opts.call, request, opts.usage));
-  if (!tape && opts.spent() < CURATION_RESERVE_MICROS - 2_000) {
+  let tape = cached
+    ? { items: cached.items as NonNullable<Awaited<ReturnType<typeof applyCuration>>>['items'], notes: cached.notes }
+    : await tryParse(await askClaudeJson(opts.call, request, opts.usage));
+  if (!tape && !cached && opts.spent() < CURATION_RESERVE_MICROS - 2_000) {
     const retry = {
       ...request,
       messages: [
@@ -1530,7 +1541,7 @@ async function curateTape(opts: {
   let noteCandidates = noteCandidateLog(ranked);
   logNoteReject(noteCtx, ranked, false);
   let note = ranked.find((row) => !row.hard)?.note ?? '';
-  if (!note && tape.notes.length && opts.spent() < CURATION_RESERVE_MICROS - 2_000) {
+  if (!note && !cached && tape.notes.length && opts.spent() < CURATION_RESERVE_MICROS - 2_000) {
     const reasons = ranked
       .filter((row) => row.hard)
       .map((row) => `- "${row.note}" (${row.hard})`)
@@ -1557,12 +1568,15 @@ async function curateTape(opts: {
     }
   }
   const draft = finish(tape.items as DraftItem[], note, opts.seed, undefined, stats, { ...noteCtx, apiDown: false });
+  if (!cached && draft.items.length) {
+    await writeCurationCache(cacheKey, { at: Date.now(), items: tape.items, notes: tape.notes });
+  }
   const cost = opts.spent();
   console.log(
     JSON.stringify({
       shipped: 'ai',
       model: opts.model,
-      mode: 'curate',
+      mode: cached ? 'curate-cache' : 'curate',
       candidates: packed.length,
       items: draft.items.length,
       inputTokens: opts.usage.input,
@@ -1665,6 +1679,39 @@ export async function assembleReceipt(
           affiliation?.role,
           affiliation?.company,
         );
+        const owner = ownerFromProfile(gathered.profile, affiliation);
+        const pool = [...(gathered.rawFound || []), ...harvested, ...(gathered.found as typeof harvested)];
+        const noteCtx: NoteContext = {
+          role: affiliation?.role,
+          company: affiliation?.company,
+          who: gathered.profile.name,
+          handle: gathered.profile.x,
+          bio: gathered.profile.bio,
+          usedNotes,
+          year,
+          affiliation,
+          owner,
+          apiDown: false,
+        };
+        const keepOwn = (items: typeof curated.items) =>
+          unionCeoDatedFlagships(
+            unionJournalShips(
+              unionOwnDatedShips(items, pool, year, {
+                github: gathered.profile.github,
+                orgs: gathered.profile.orgs,
+                sites: gathered.profile.sites,
+                site: gathered.profile.site,
+                company: affiliation?.company,
+                companyGithub: affiliation?.companyGithub,
+                role: affiliation?.role,
+              }),
+              pool,
+            ),
+            pool,
+            affiliation?.role,
+            affiliation?.company,
+            year,
+          );
         if (
           !harvestLooksLikeCommentaryTape(harvested) &&
           harvestShouldWin(winSource.length, curated.items.length, affiliation?.role, affiliation?.company, cheap.length, {
@@ -1681,22 +1728,11 @@ export async function assembleReceipt(
               role: affiliation?.role || null,
             }),
           );
-          const noteCtx: NoteContext = {
-            role: affiliation?.role,
-            company: affiliation?.company,
-            who: gathered.profile.name,
-            handle: gathered.profile.x,
-            bio: gathered.profile.bio,
-            usedNotes,
-            year,
-            affiliation,
-            owner: ownerFromProfile(gathered.profile, affiliation),
-            apiDown: false,
-          };
-          const tape = unionJournalShips(unionHarvestWin(winSource, curated.items), harvested);
+          const tape = keepOwn(unionHarvestWin(winSource, curated.items));
           const sealed = finish(tape, curated.note, seed, undefined, formatStats(tape, gathered.stats ?? []), noteCtx);
+          const kept = keepOwn(sealed.items);
           return {
-            ...sealed,
+            ...(kept.length === sealed.items.length ? sealed : { ...sealed, items: kept, potential: false }),
             model: curated.model,
             inputTokens: curated.inputTokens,
             outputTokens: curated.outputTokens,
@@ -1705,21 +1741,11 @@ export async function assembleReceipt(
             noteCandidates: curated.noteCandidates,
           };
         }
-        const withJournal = unionJournalShips(curated.items, harvested);
-        if (withJournal.length === curated.items.length) return curated;
-        const sealed = finish(withJournal, curated.note, seed, undefined, formatStats(withJournal, gathered.stats ?? []), {
-          role: affiliation?.role,
-          company: affiliation?.company,
-          who: gathered.profile.name,
-          handle: gathered.profile.x,
-          bio: gathered.profile.bio,
-          usedNotes,
-          year,
-          affiliation,
-          owner: ownerFromProfile(gathered.profile, affiliation),
-          apiDown: false,
-        });
-        return { ...curated, ...sealed };
+        const withOwn = keepOwn(curated.items);
+        if (withOwn.length === curated.items.length) return curated;
+        const sealed = finish(withOwn, curated.note, seed, undefined, formatStats(withOwn, gathered.stats ?? []), noteCtx);
+        const kept = keepOwn(sealed.items);
+        return { ...curated, ...sealed, items: kept.length ? kept : sealed.items, potential: kept.length ? false : sealed.potential };
       }
     } catch (error) {
       if (error instanceof PrintError && error.code === 'out-of-credit') throw error;

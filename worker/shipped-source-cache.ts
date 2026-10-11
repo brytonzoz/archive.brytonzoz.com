@@ -4,8 +4,18 @@ import type { Found } from './shipped-sources';
 
 export const SOURCE_CACHE_TTL_MS = 24 * 60 * 60 * 1000;
 export const SOURCE_CACHE_TTL_SEC = 24 * 60 * 60;
-/** Live refresh when a fresh cache already streamed to the printer. */
-export const WARM_SOURCE_MS = 6000;
+/** Unused on the warm path — a fresh cache returns immediately (3cbfd74 latency). */
+export const WARM_SOURCE_MS = 0;
+
+/** Cached harvest with items: do not wait on a live refresh. Cold path keeps the source timeout. */
+export function sourceWaitMs(
+  cached: CachedSourceHarvest | null | undefined,
+  coldMs: number,
+  now = Date.now(),
+): number {
+  if (isFreshSourceHarvest(cached, now) && (cached?.found.length ?? 0) > 0) return 0;
+  return coldMs;
+}
 
 export type CachedSourceHarvest = {
   at: number;
@@ -76,6 +86,48 @@ export function preferSourceHarvest<T extends { name?: string; link?: string | n
   if (fresh.length >= Math.ceil(prior.length * 0.9)) return { items: fresh, from: 'live' };
   const extra = fresh.filter((item) => !alreadyHas(prior, item));
   return { items: extra.length ? [...prior, ...extra] : prior, from: extra.length ? 'merge' : 'cache' };
+}
+
+/** Journal ships are monotonic: a thin live parse must not drop hotelist.com from cache. */
+export function preferJournalHarvest<T extends { name?: string; link?: string | null; kind?: string }>(
+  live: T[] | null | undefined,
+  cached: T[] | null | undefined,
+): { items: T[]; from: 'live' | 'cache' | 'merge' } {
+  const fresh = Array.isArray(live) ? live : [];
+  const prior = Array.isArray(cached) ? cached : [];
+  if (!fresh.length) return { items: prior, from: prior.length ? 'cache' : 'live' };
+  if (!prior.length) return { items: fresh, from: 'live' };
+  const extra = prior.filter((item) => !alreadyHas(fresh, item));
+  return { items: extra.length ? [...fresh, ...extra] : fresh, from: extra.length ? 'merge' : 'live' };
+}
+
+export type CachedCuration = {
+  at: number;
+  items: unknown[];
+  notes: string[];
+};
+
+export function parseCachedCuration(raw: unknown): CachedCuration | null {
+  if (!raw || typeof raw !== 'object') return null;
+  const row = raw as CachedCuration;
+  if (!Array.isArray(row.items) || !row.items.length) return null;
+  const at = Number(row.at);
+  const notes = Array.isArray(row.notes) ? row.notes.filter((note): note is string => typeof note === 'string') : [];
+  return { at: Number.isFinite(at) ? at : 0, items: row.items, notes };
+}
+
+export function isFreshCuration(row: CachedCuration | null | undefined, now = Date.now()): boolean {
+  return Boolean(row && now - row.at < SOURCE_CACHE_TTL_MS);
+}
+
+export async function readCurationCache(key: string): Promise<CachedCuration | null> {
+  const parsed = parseCachedCuration(await cacheGet<CachedCuration>(key));
+  return isFreshCuration(parsed) ? parsed : null;
+}
+
+export async function writeCurationCache(key: string, value: CachedCuration): Promise<void> {
+  if (!value.items.length) return;
+  await cachePut(key, value);
 }
 
 export function isFreshSourceHarvest(row: CachedSourceHarvest | null | undefined, now = Date.now()): boolean {

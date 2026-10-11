@@ -433,6 +433,65 @@ test('harvest wins when Claude keeps a highlight reel of a fat company tape', ()
   assert.ok(restoredNames.some((name) => /vercel agent/i.test(name)), JSON.stringify(restoredNames));
   assert.equal(restoredNames.filter((name) => /v0/i.test(name)).length, 1, JSON.stringify(restoredNames));
   assert.equal(restoredNames.filter((name) => /next\.js 16\.4/i.test(name)).length, 1, JSON.stringify(restoredNames));
+  const ownKept = curate.unionOwnDatedShips(
+    [{ name: 'SVELTE 5.29', link: 'https://github.com/sveltejs/svelte/releases/tag/svelte%405.29.0' }],
+    [
+      {
+        name: 'Svelte 5.30',
+        date: '2026-04-01',
+        kind: 'oss-release',
+        source: 'github',
+        link: 'https://github.com/sveltejs/svelte/releases/tag/svelte%405.30.0',
+      },
+      { name: 'A travel essay about Lisbon', date: '2026-04-02', source: 'site', link: 'https://example.com/lisbon' },
+    ],
+    2026,
+    { github: 'Rich-Harris', orgs: ['sveltejs'] },
+  );
+  assert.ok(ownKept.some((item) => /svelte 5\.30/i.test(item.name)), JSON.stringify(ownKept));
+  assert.equal(ownKept.some((item) => /lisbon/i.test(item.name)), false);
+  const rauch17 = Array.from({ length: 17 }, (_, i) => ({
+    name: `NEXT.JS 16.${i}`,
+    date: `2026-0${(i % 9) + 1}-01`,
+    source: 'changelog',
+    link: `https://vercel.com/changelog/next-16-${i}`,
+  }));
+  const vercelNames = [
+    'AI Gateway',
+    'Vercel Agent',
+    'Fluid Compute',
+    'Rolling Releases',
+    'Persistent Memory',
+    'v0 Platform API',
+    'BotID',
+    'Workflow DevKit',
+    'Sandbox',
+    'Sign in with Vercel',
+    'Image Generation',
+    'Web Analytics',
+    'Speed Insights',
+    'Firewall',
+    'Drains',
+    'Secure Compute',
+    'Edge Config',
+    'Flags Explorer',
+    'Storage',
+    'Cron Jobs',
+  ];
+  const vercelCards = vercelNames.map((name, i) => ({
+    name,
+    date: `2026-0${(i % 9) + 1}-15`,
+    source: 'changelog',
+    link: `https://vercel.com/changelog/${name.toLowerCase().replace(/\s+/g, '-')}`,
+  }));
+  const rauch = curate.unionCeoDatedFlagships(rauch17, [...rauch17, ...vercelCards], 'ceo', 'Vercel', 2026);
+  assert.ok(rauch.length >= 30, JSON.stringify(rauch.map((item) => item.name).slice(-8)));
+  const hashed = curate.packCandidates(
+    [found({ name: 'Composer 2', date: '2026-03-19', link: 'https://cursor.com/blog/composer-2' })],
+    2026,
+  );
+  assert.equal(curate.candidateListHash(hashed), curate.candidateListHash(hashed));
+  assert.equal(curate.curationCacheKey('rauchg', 2026, 'abc'), curate.curationCacheKey('@rauchg', 2026, 'abc'));
 });
 
 test('rollup keeps an existing monthly RELEASES IN label', () => {

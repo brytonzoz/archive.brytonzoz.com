@@ -75,6 +75,52 @@ test('event repos pin the flagship before site probes', async () => {
   assert.ok(found.some((item) => /RELEASES IN SEP/i.test(item.name)), JSON.stringify(found.map((item) => item.name)));
 });
 
+test('release page 2 still loads when page 1 already has eight recent stables', async () => {
+  const fetched = [];
+  const page1 = [
+    { tag_name: 'bun-v1.4.3', published_at: '2026-10-02T12:00:00Z', body: '', html_url: 'https://github.com/oven-sh/bun/releases/tag/bun-v1.4.3' },
+    { tag_name: 'bun-v1.4.2', published_at: '2026-09-20T12:00:00Z', body: '', html_url: 'https://github.com/oven-sh/bun/releases/tag/bun-v1.4.2' },
+    { tag_name: 'bun-v1.4.1', published_at: '2026-09-10T12:00:00Z', body: '', html_url: 'https://github.com/oven-sh/bun/releases/tag/bun-v1.4.1' },
+    { tag_name: 'bun-v1.4.0', name: 'Bun 1.4', published_at: '2026-08-20T12:00:00Z', body: '', html_url: 'https://github.com/oven-sh/bun/releases/tag/bun-v1.4.0' },
+    { tag_name: 'bun-v1.3.14', published_at: '2026-05-12T12:00:00Z', body: '', html_url: 'https://github.com/oven-sh/bun/releases/tag/bun-v1.3.14' },
+    { tag_name: 'bun-v1.3.13', published_at: '2026-04-20T12:00:00Z', body: '', html_url: 'https://github.com/oven-sh/bun/releases/tag/bun-v1.3.13' },
+    { tag_name: 'bun-v1.3.12', published_at: '2026-04-09T12:00:00Z', body: '', html_url: 'https://github.com/oven-sh/bun/releases/tag/bun-v1.3.12' },
+    { tag_name: 'bun-v1.3.11', published_at: '2026-03-18T12:00:00Z', body: '', html_url: 'https://github.com/oven-sh/bun/releases/tag/bun-v1.3.11' },
+    ...Array.from({ length: 32 }, (_, i) => ({
+      tag_name: `bun-v1.4.3-canary.${i + 1}`,
+      published_at: `2026-10-01T${String(10 + (i % 10)).padStart(2, '0')}:00:00Z`,
+      prerelease: true,
+      body: 'canary',
+    })),
+  ];
+  const page2 = [
+    { tag_name: 'bun-v1.3.10', published_at: '2026-02-26T12:00:00Z', body: '', html_url: 'https://github.com/oven-sh/bun/releases/tag/bun-v1.3.10' },
+    { tag_name: 'bun-v1.3.9', published_at: '2026-02-08T12:00:00Z', body: '', html_url: 'https://github.com/oven-sh/bun/releases/tag/bun-v1.3.9' },
+    { tag_name: 'bun-v1.3.8', published_at: '2026-01-29T12:00:00Z', body: '', html_url: 'https://github.com/oven-sh/bun/releases/tag/bun-v1.3.8' },
+    { tag_name: 'bun-v1.3.7', published_at: '2026-01-27T12:00:00Z', body: '', html_url: 'https://github.com/oven-sh/bun/releases/tag/bun-v1.3.7' },
+    { tag_name: 'bun-v1.3.6', published_at: '2026-01-13T12:00:00Z', body: '', html_url: 'https://github.com/oven-sh/bun/releases/tag/bun-v1.3.6' },
+    { tag_name: 'bun-v1.2.23', published_at: '2025-12-20T12:00:00Z', body: '', html_url: 'https://github.com/oven-sh/bun/releases/tag/bun-v1.2.23' },
+  ];
+  const get = async (path) => {
+    fetched.push(path);
+    if (path.startsWith('/users/Jarred-Sumner/repos')) return [];
+    if (path.startsWith('/users/Jarred-Sumner/orgs')) return [];
+    if (path.startsWith('/users/Jarred-Sumner/events')) return [{ type: 'PushEvent', repo: { name: 'oven-sh/bun' } }];
+    if (path === '/repos/oven-sh/bun') {
+      return { name: 'bun', html_url: 'https://github.com/oven-sh/bun', homepage: 'https://bun.com', stargazers_count: 96000, fork: false };
+    }
+    if (path.includes('/oven-sh/bun/releases') && /page=2/.test(path)) return page2;
+    if (path.includes('/oven-sh/bun/releases')) return page1;
+    return [];
+  };
+  const { found } = await oss.harvestOss({ login: 'Jarred-Sumner', year: 2026, get });
+  const names = found.map((item) => item.name);
+  assert.ok(fetched.some((path) => /releases\?.*page=2/.test(path)), JSON.stringify(fetched));
+  assert.ok(names.some((name) => /bun 1\.4$/i.test(name)), JSON.stringify(names));
+  assert.ok(names.some((name) => /RELEASES IN JAN/i.test(name)), JSON.stringify(names));
+  assert.ok(names.some((name) => /RELEASES IN FEB/i.test(name)), JSON.stringify(names));
+});
+
 test('decisions keep oss harvest kind so monthly lines survive the second polish', async () => {
   const decisions = await import('../worker/shipped-decisions.ts');
   const item = {
@@ -318,9 +364,14 @@ test('leftover cut-offs and customer-story+metric titles drop', () => {
   assert.equal(polish.looksCutOff('SPEED INSIGHTS NOW HAS'), true);
   assert.equal(polish.looksCutOff('VERCEL CONNECT NOW ACCEPTS SERVICE'), true);
   assert.equal(polish.looksCutOff('TEAMS &'), true);
+  assert.equal(polish.looksCutOff('REMOTE CONTROL IS ON BY DEFAULT FOR EVERYONE EXCEPT'), true);
+  assert.equal(polish.isVagueOrCutTitle('REMOTE CONTROL IS ON BY DEFAULT'), true);
+  assert.equal(polish.cleanShipTitle('REMOTE CONTROL IS ON BY DEFAULT FOR EVERYONE EXCEPT'), '');
+  assert.equal(polish.looksCutOff('PARTNER SITES, STARTING WITH AIRTABLE, GI'), true);
   assert.equal(polish.isCustomerStoryTitle('Nokia analyzes 50M+ network events with Cursor'), true);
   assert.equal(polish.isBlogEssayTitle('Cursor is an applied research team building the best'), true);
   assert.equal(polish.isBlogEssayTitle('Both are available today on Teams and Enterprise'), true);
+  assert.equal(polish.isBlogEssayTitle('BEST AI HEADSHOT GENERATORS 2026'), true);
   assert.equal(polish.cleanShipTitle('SO VISIBLE-TAB ROUTING AND ANNOTATIONS PERSIST'), '');
   assert.equal(polish.isStaleBioProduct({ name: 'HeadshotPro', date: null }, { company: 'HeadshotPro', product: null }, 2026), true);
   assert.equal(polish.isStaleBioProduct({ name: 'HeadshotPro', date: '2024-08-01' }, { company: 'HeadshotPro' }, 2026), true);

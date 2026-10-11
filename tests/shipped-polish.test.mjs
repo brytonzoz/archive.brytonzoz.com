@@ -935,6 +935,11 @@ test('prereleases, starters, and Gateway model listings are not ships', () => {
   assert.equal(polish.looksCutOff('SPEED INSIGHTS NOW HAS'), true);
   assert.equal(polish.looksCutOff('VERCEL CONNECT NOW ACCEPTS SERVICE'), true);
   assert.equal(polish.looksCutOff('TEAMS &'), true);
+  assert.equal(polish.looksCutOff('REMOTE CONTROL IS ON BY DEFAULT FOR EVERYONE EXCEPT'), true);
+  assert.equal(polish.isVagueOrCutTitle('REMOTE CONTROL IS ON BY DEFAULT'), true);
+  assert.equal(polish.cleanShipTitle('REMOTE CONTROL IS ON BY DEFAULT FOR EVERYONE EXCEPT'), '');
+  assert.equal(polish.looksCutOff('PARTNER SITES, STARTING WITH AIRTABLE, GI'), true);
+  assert.equal(polish.isBlogEssayTitle('BEST AI HEADSHOT GENERATORS 2026'), true);
   assert.equal(polish.looksCutOff('BROWSER EXTENSIONS, SITE TOOLS, AND CLOUD SIGN-IN'), false);
   assert.equal(polish.isJunkTitle('BROWSER EXTENSIONS, SITE TOOLS, AND CLOUD SIGN-IN'), false);
   assert.match(polish.cleanShipTitle('BROWSER EXTENSIONS, SITE TOOLS, AND CLOUD SIGN-IN'), /sign-in/i);

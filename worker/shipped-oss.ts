@@ -754,13 +754,25 @@ export async function harvestOss(opts: {
         releases
           .filter((row) => !row.draft && !row.prerelease && !isPrereleaseTag(String(row.tag_name || row.name || '')))
           .filter((row) => inYear(day(row.published_at), year));
-      if (yearStable().length < 8 && releases.length >= 30 && !overBudget()) {
-        const more = await memo(`oss:rel2:${repo.owner}/${repo.name}`, 180 * 60, () =>
+      const walkedBeforeYear = () =>
+        releases.some((row) => {
+          const when = day(row.published_at);
+          return Boolean(when && when < `${year}-01-01`);
+        });
+      // Recent stables plus canaries can fill page 1 (and 2) without reaching January.
+      let releasePage = 1;
+      while (!walkedBeforeYear() && releases.length >= 30 && releasePage < 4 && !overBudget()) {
+        releasePage += 1;
+        const more = await memo(`oss:rel${releasePage}:${repo.owner}/${repo.name}`, 180 * 60, () =>
           opts
-            .get<OssRelease[]>(`/repos/${encodeURIComponent(repo.owner)}/${encodeURIComponent(repo.name)}/releases?per_page=40&page=2`)
+            .get<OssRelease[]>(
+              `/repos/${encodeURIComponent(repo.owner)}/${encodeURIComponent(repo.name)}/releases?per_page=40&page=${releasePage}`,
+            )
             .catch(() => []),
         );
-        if (Array.isArray(more) && more.length) releases = [...releases, ...more];
+        if (!Array.isArray(more) || !more.length) break;
+        releases = [...releases, ...more];
+        if (more.length < 30) break;
       }
       const yearReleases = yearStable();
       let tags: OssTag[] = [];

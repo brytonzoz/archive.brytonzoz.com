@@ -42,9 +42,9 @@ const PLATFORM_POLICY =
   /\b(deployment retention|default to \d+[-\s]?day|retain(?:s|ed|ing)? (fewer )?deployments|skip sending|request bodies|routing middleware|billing begins|spend management|per-user budgets|hobby projects now retain|edge requests are now called|no longer caches|timestamp attributes are now supported)\b/i;
 const CHOPPED_GATEWAY = /^microsoft decision[- ]?1$/i;
 const TRAILING_PREP =
-  /(?:^|[\s/])(of|in|to|for|and|or|the|a|an|with|on|as|by|from|into|longer|kind|new|our|your|through|their|its|vs|lower|higher|more|less|day|days|every|managed|security|controlled|trusted|general|advanced|remote|task|chat|now|key|third|are|image|usage|delay|preview|zero|has|accepts|service)$/i;
+  /(?:^|[\s/])(of|in|to|for|and|or|the|a|an|with|on|as|by|from|into|longer|kind|new|our|your|through|their|its|vs|lower|higher|more|less|day|days|every|managed|security|controlled|trusted|general|advanced|remote|task|chat|now|key|third|are|image|usage|delay|preview|zero|has|accepts|service|except)$/i;
 export const CUT_OFF_ENDINGS =
-  /^(now|and|with|for|of|the|on|key|third|are|image|usage|delay|preview|zero|has|accepts|service)$/i;
+  /^(now|and|with|for|of|the|on|key|third|are|image|usage|delay|preview|zero|has|accepts|service|except)$/i;
 const TITLE_START_BAD =
   /^(in|on|at|for|with|from|to|of|by|as|a|an|the|and|or|so|both|use|using|start|starting|lines|line|built|build|building|run|running|join|joining|announce|announces|announcing|added|add|fixed|fix|connect|review|share|more|ways|preview|control|give|let|take|work|choose|scan|create|organize|talk|try|visit|explore|download|get|see|read|learn|follow|watch|make|making|how|when|while|after|before|without|inside|beyond|under|over|my|our|your|quitting)\b/i;
 const TITLE_END_BAD = /\b(of|a|an|the|with|and|or|security|controlled|trusted|general|advanced|remote|task|chat)\s*$/i;
@@ -218,8 +218,8 @@ const KEEP_TAIL_ACRONYM =
 export function endsWithCutOffWord(text: string): boolean {
   const words = tidy(text).split(/\s+/).filter(Boolean);
   const last = words[words.length - 1] || '';
-  if (/^[A-Za-z]$/.test(last) && words.length >= 2) return true;
-  if (/^(now|and|with|for|of|the|on|key|third|are|zero|has|accepts)$/i.test(last) && words.length >= 2) return true;
+  if (/^[A-Za-z]{1,2}$/.test(last) && words.length >= 2 && !KEEP_TAIL_ACRONYM.test(last)) return true;
+  if (/^(now|and|with|for|of|the|on|key|third|are|zero|has|accepts|except)$/i.test(last) && words.length >= 2) return true;
   if (/^(image|usage|delay|preview)$/i.test(last) && words.length >= 4) return true;
   if (words.length >= 5 && /^[A-Za-z]{3,4}$/.test(last) && !KEEP_TAIL_ACRONYM.test(last) && !/\d/.test(last)) {
     return true;
@@ -364,6 +364,9 @@ export function isBlogEssayTitle(title: string): boolean {
   if (/^[A-Za-z][\w.-]*\s+is an?\s+(applied research|engineering|product|research) team\b/i.test(text)) return true;
   if (/^both are available\b|^available today on\b/i.test(text)) return true;
   if (/^(latest|top|best)\s+(articles?|posts?|stories|news)\b/i.test(text)) return true;
+  if (/^best\b/i.test(text) && /\b(20\d{2}|generators?|tools?|apps?)\b/i.test(text) && text.split(/\s+/).length >= 4) {
+    return true;
+  }
   if (/\barticles? about\b/i.test(text)) return true;
   if (/^openai delivers\b/i.test(text) || /\b(at scale|in production)\s+engineering\b/i.test(text)) return true;
   if (/\bhelps run\b.+\bexperiments\b/i.test(text) || /\bquantum computing experiments\b/i.test(text)) return true;
@@ -648,6 +651,9 @@ export function isVagueOrCutTitle(name: string): boolean {
   if (/^(also released|connections to api):?$/i.test(text)) return true;
   if (/joining$/i.test(text) && text.split(/\s+/).length <= 3) return true;
   if (/including:?$/i.test(text) || /alerts\s*&?$/i.test(text)) return true;
+  if (/\b(is on by default|on by default|for everyone(?:\s+except)?)\b/i.test(text) && text.split(/\s+/).length >= 4) {
+    return true;
+  }
   if (/^(updated|released|previewing)\b/i.test(text) && /\b(including|navigation for|budget alerts|model snapshot)\b/i.test(text)) {
     return true;
   }

@@ -287,14 +287,9 @@ export function harvestShouldWin(
   const openaiLead = /^lead$/i.test(role || '') && /^openai$/i.test(brand);
   if (flagshipCeo || openaiLead) {
     if (harvestedCount < 12) return false;
-    // A 193-line npm dump is worse than Claude's short reel. A compact 25–80
-    // company tape (now including AI Gateway) can restore a thinned CEO year.
-    if (/^vercel$/i.test(brand)) {
-      if (harvestedCount < 25 || harvestedCount > 80) return false;
-      return curatedCount < 25;
-    }
-    // Codex / Cursor harvests still hold the year when Claude highlight-reels them.
-    const floor = /^cursor$/i.test(brand) ? 40 : 35;
+    // Vercel: Claude's 11-line reel has the flagships but sits under the Rauch floor of 30.
+    // Compact now keeps New models on AI Gateway, so restoring harvest keeps the needle.
+    const floor = /^cursor$/i.test(brand) ? 40 : /^vercel$/i.test(brand) ? 30 : 35;
     return curatedCount < floor;
   }
   // OSS maintainers: restore the release tape when Claude keeps a highlight reel.

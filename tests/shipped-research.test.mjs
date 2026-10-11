@@ -309,6 +309,31 @@ test('cashier note and stats are specific to the items, never stock copy', () =>
   );
   assert.equal(
     ai.hardRejectNote(
+      'Vue 3.5 and Vite 7 kept the year moving.',
+      [
+        { name: 'VUE 3.5', spoken: 'Vue 3.5' },
+        { name: 'VITE 7', spoken: 'Vite 7' },
+        { name: 'ESLINT-PLUGIN-VUE', spoken: 'eslint-plugin-vue' },
+      ],
+      [],
+      { who: 'Evan You', handle: 'youyuxi' },
+    ),
+    null,
+  );
+  assert.equal(
+    ai.hardRejectNote(
+      'React 19.3 shipped and the monthly rollups filled the rest of the tape.',
+      [
+        { name: 'REACT 19.3', spoken: 'React 19.3' },
+        { name: 'REACT-DOM', spoken: 'react-dom' },
+      ],
+      [],
+      { who: 'Dan Abramov', handle: 'dan_abramov' },
+    ),
+    null,
+  );
+  assert.equal(
+    ai.hardRejectNote(
       'Six printed items, one of them a drone simulator. The bio is a menu of incomes, and the receipt is just the receipt.',
       [{ name: 'PHOTOAI', spoken: 'PhotoAI', source: 'site' }],
       [],

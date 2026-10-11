@@ -9,7 +9,7 @@ import { REQUIRED_MODULES, sanitizeLayout, type ModuleId } from '../lib/shipped-
 import { clean, hostOf, inYearCount, publicUrl, readSite, type Found, type Gathered } from './shipped-sources';
 import { shipName } from './shipped-changelog';
 import { shareKeywords } from './shipped-decisions';
-import { ownerFromProfile, type OwnerContext } from './shipped-ownership';
+import { isOssHarvestItem, ownerFromProfile, type OwnerContext } from './shipped-ownership';
 import { flagshipLaunchName, isFlagshipYearKeep, isJoinOrAcquire, isPriorYearJoin, logFlagshipGate } from './shipped-flagship';
 import { cleanDescription, cleanShipTitle, cleanStatus, gateReceiptItems, isChangelogEntryHref, isOpenAiCompanyWide, noteCountMismatch, spokenShipName } from './shipped-polish';
 import { emptyAffiliation, type Affiliation } from './shipped-affiliation';
@@ -265,7 +265,7 @@ export function noteFailsVoice(note: string): boolean {
 }
 
 const NOTE_NAME_OK =
-  /^(jan(?:uary)?|feb(?:uary)?|mar(?:ch)?|apr(?:il)?|may|jun(?:e)?|jul(?:y)?|aug(?:ust)?|sep(?:t(?:ember)?)?|oct(?:ober)?|nov(?:ember)?|dec(?:ember)?|monday|tuesday|wednesday|thursday|friday|saturday|sunday|openai|vercel|anthropic|github|chatgpt|gpt|cursor|aws|cdn|dns|sql|rss|http|they|them|this|that|year|just|same|weekly|public|nothing|everything|someone|anyone|desktop|spotlight|honest|receipt|launch|launches|ship|ships|update|updates|app|cli|sdk|api|mcp)$/i;
+  /^(jan(?:uary)?|feb(?:uary)?|mar(?:ch)?|apr(?:il)?|may|jun(?:e)?|jul(?:y)?|aug(?:ust)?|sep(?:t(?:ember)?)?|oct(?:ober)?|nov(?:ember)?|dec(?:ember)?|monday|tuesday|wednesday|thursday|friday|saturday|sunday|openai|vercel|anthropic|github|chatgpt|gpt|cursor|aws|cdn|dns|sql|rss|http|they|them|this|that|year|just|same|weekly|public|nothing|everything|someone|anyone|desktop|spotlight|honest|receipt|launch|launches|ship|ships|update|updates|app|cli|sdk|api|mcp|vue|vite|react|rolldown|bun|svelte|sveltekit|rails|preact|oxc|nitro)$/i;
 
 function spokenOf(item: { name: string; spoken?: string }): string {
   return item.spoken || spokenShipName(item.name);
@@ -844,8 +844,9 @@ export function sentenceFallbackNote(items: DraftItem[], ctx: NoteContext = {}):
       : `is ${lead}`
     : '';
   const next = items.length > 1 ? spokenOf(items.find((row) => spokenOf(row) !== spoken) || items[1]!) : '';
+  const rollupSpoken = /releases?\s+in\s+/i.test(spoken);
   const candidates = [
-    leadClause && foldNote(does) !== foldNote(spoken) ? `Keep an eye on ${spoken}, which ${leadClause}` : '',
+    leadClause && !rollupSpoken && foldNote(does) !== foldNote(spoken) ? `Keep an eye on ${spoken}, which ${leadClause}` : '',
     who ? `${spoken} is ${who}'s ${kind} printed on this receipt.` : '',
     items.length > 1 && next
       ? `${spoken} and ${next} are both on this ${items.length}-ship receipt.`
@@ -918,7 +919,7 @@ function toDraftItem(item: Found, year: number): DraftItem | null {
     if (flagship) logFlagshipGate(item, 'draft-year', null);
     return null;
   }
-  if (dated === null && (item.source === 'changelog' || item.source === 'company') && !flagship) {
+  if (dated === null && (item.source === 'changelog' || item.source === 'company') && !flagship && !isOssHarvestItem(item)) {
     if (!isChangelogEntryHref(item.link)) return null;
   }
   const description = cleanDescription(item.description);
@@ -930,11 +931,13 @@ function toDraftItem(item: Found, year: number): DraftItem | null {
     date:
       typeof dated === 'string'
         ? dated
-        : isFlagshipYearKeep(item, year) && item.date
+        : isOssHarvestItem(item) && item.date
           ? String(item.date).slice(0, 10)
-          : item.source === 'changelog' || item.source === 'company'
-            ? null
-            : item.date,
+          : isFlagshipYearKeep(item, year) && item.date
+            ? String(item.date).slice(0, 10)
+            : item.source === 'changelog' || item.source === 'company'
+              ? null
+              : item.date,
     status: cleanStatus(item.status),
     link: item.link,
     icon: item.icon,

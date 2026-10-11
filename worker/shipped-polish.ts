@@ -14,7 +14,7 @@ import {
   stripDateSuffix,
 } from './shipped-flagship';
 import { isLegacyNpmFamily } from './shipped-dates';
-import { ownedByBuilder, ownerCanProve, undatedPassesGate, type OwnerContext } from './shipped-ownership';
+import { isOssHarvestItem, ownedByBuilder, ownerCanProve, undatedPassesGate, type OwnerContext } from './shipped-ownership';
 import type { ItemStatus } from '../lib/shipped-year';
 import { ITEM_STATUSES } from '../lib/shipped-year';
 
@@ -1065,7 +1065,7 @@ export function inYearStrict(item: Polishable, year: number): boolean {
   const company = item.source === 'changelog' || item.source === 'company';
   if (company && isScrapeDate(item.date) && !flagshipLaunchName(item)) return false;
   if (company && item.date && !inYearDate(item.date, year) && !isFlagshipYearKeep(item, year)) return false;
-  if (company && !item.date && !knownFlagshipDate(item, year)) return false;
+  if (company && !item.date && !knownFlagshipDate(item, year) && !isOssHarvestItem(item)) return false;
   return true;
 }
 
@@ -1245,7 +1245,7 @@ function isNotableOssVersion(version: string): boolean {
 }
 
 function versionFamily(item: Polishable): { product: string; count: number } | null {
-  if (item.kind === 'oss-release' || item.kind === 'oss-launch' || item.kind === 'oss-blog') return null;
+  if (isOssHarvestItem(item) || item.kind === 'oss-release' || item.kind === 'oss-launch' || item.kind === 'oss-blog') return null;
   if (/·\s*\d+\s+releases?\s+in\s+/i.test(item.name)) return null;
   if (isCursorModelNote(item) || /^(grok|claude|gemini)[-.\s]?\d/i.test(item.name)) return null;
   const rolled = tidy(item.name).match(MONTH_LINE);
@@ -1255,6 +1255,14 @@ function versionFamily(item: Polishable): { product: string; count: number } | n
   if (flagshipLaunchName(item)) return null;
   if (/^(grok|claude|gemini)$/i.test(parts.product)) return null;
   if (isNotableOssVersion(parts.version) && !parts.extra) return null;
+  if (
+    /^(bun|vite|vue|react|svelte|sveltekit|rolldown|rails|preact|oxc|nitro|tanstack query|code hike|partykit)\b/i.test(
+      parts.product,
+    ) &&
+    !parts.extra
+  ) {
+    return null;
+  }
   return { product: parts.product, count: versionCount(item) };
 }
 
@@ -1594,6 +1602,7 @@ export function polishCandidates<T extends Polishable>(items: T[], opts: PolishO
     }
     if (
       !flagship &&
+      !isOssHarvestItem(item) &&
       /\/blog\//i.test(item.link || '') &&
       !/changelog/i.test(item.link || '') &&
       (isBlogEssayTitle(name) || /\bships\b/i.test(name) || /\b(engineers?|customers?|teams?)\b/i.test(name))

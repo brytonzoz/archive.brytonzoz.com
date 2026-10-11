@@ -60,7 +60,8 @@ const SKIP_REPO =
 
 export function parseSemver(raw: string): { major: number; minor: number; patch: number } | null {
   const text = String(raw || '').trim();
-  const candidates = [text.replace(/^v/i, ''), text.replace(/^[A-Za-z][\w.-]*?[@/-]v?/i, '')];
+  const tail = text.match(/v?(\d{1,4}\.\d{1,4}(?:\.\d{1,4})?)\s*$/i)?.[1] || '';
+  const candidates = [text.replace(/^v/i, ''), text.replace(/^[A-Za-z][\w.-]*?[@/-]v?/i, ''), tail];
   for (const candidate of candidates) {
     const match = candidate.match(/^(\d{1,4})\.(\d{1,4})(?:\.(\d{1,4}))?(?:[-+].*)?$/);
     if (match) return { major: Number(match[1]), minor: Number(match[2]), patch: Number(match[3] || 0) };
@@ -295,8 +296,7 @@ export function linesFromOssRepo(
   const patches = new Map<string, typeof dated>();
   for (const row of dated) {
     const sem = parseSemver(row.tag);
-    const majorMinor = Boolean(sem && sem.patch === 0 && row.notable);
-    if (majorMinor && sem) {
+    if (sem && sem.patch === 0) {
       found.push(
         asFound({
           name: formatOssLine(product, row.tag),
@@ -373,6 +373,28 @@ export function linesFromOssRepo(
   return found.filter((item) => item.name);
 }
 
+function resolveHref(pageUrl: string, href?: string | null): string | null {
+  if (!href) return null;
+  try {
+    return publicUrl(new URL(href, pageUrl).toString());
+  } catch {
+    return publicUrl(href);
+  }
+}
+
+/** `<link rel="alternate" type="application/rss+xml" href="/rss.xml">` on the project blog. */
+export function alternateFeedUrls(html: string, pageUrl: string): string[] {
+  const out: string[] = [];
+  for (const tag of String(html || '').matchAll(/<link\b[^>]*>/gi)) {
+    const text = tag[0];
+    if (!/rss|atom|feed/i.test(text)) continue;
+    if (!/alternate|application\/(rss|atom)|rss\+xml|atom\+xml/i.test(text)) continue;
+    const abs = resolveHref(pageUrl, text.match(/\bhref=["']([^"']+)/i)?.[1]);
+    if (abs) out.push(abs);
+  }
+  return [...new Set(out)];
+}
+
 export function blogFeedUrls(homepage: string): string[] {
   const raw = publicUrl(homepage);
   if (!raw) return [];
@@ -390,7 +412,19 @@ export function blogFeedUrls(homepage: string): string[] {
   if (/\/blog\b/i.test(path)) roots.add(`${origin}${path.split('/blog')[0]}`);
   const out: string[] = [];
   for (const root of roots) {
-    for (const suffix of ['/blog/rss.xml', '/blog/feed.xml', '/blog/atom.xml', '/blog/rss', '/blog/feed', '/rss.xml', '/feed.xml', '/atom.xml', '/rss', '/feed']) {
+    for (const suffix of [
+      '/rss.xml',
+      '/feed.xml',
+      '/atom.xml',
+      '/blog/rss.xml',
+      '/blog/feed.xml',
+      '/blog/atom.xml',
+      '/blog/rss',
+      '/blog/feed',
+      '/rss',
+      '/feed',
+      '/blog/index.xml',
+    ]) {
       out.push(`${root}${suffix}`);
     }
   }
@@ -413,6 +447,93 @@ export function linesFromBlogFeed(xml: string, year: number, source: OssFound['s
         kind: 'oss-blog',
       }),
     );
+}
+
+const MONTH_NAME: Record<string, string> = {
+  jan: '01',
+  january: '01',
+  feb: '02',
+  february: '02',
+  mar: '03',
+  march: '03',
+  apr: '04',
+  april: '04',
+  may: '05',
+  jun: '06',
+  june: '06',
+  jul: '07',
+  july: '07',
+  aug: '08',
+  august: '08',
+  sep: '09',
+  sept: '09',
+  september: '09',
+  oct: '10',
+  october: '10',
+  nov: '11',
+  november: '11',
+  dec: '12',
+  december: '12',
+};
+
+function dateNear(text: string, year: number): string | null {
+  const iso = text.match(new RegExp(`\\b(${year})-(\\d{2})-(\\d{2})\\b`));
+  if (iso) return `${iso[1]}-${iso[2]}-${iso[3]}`;
+  const named = text.match(
+    new RegExp(
+      `\\b(jan(?:uary)?|feb(?:ruary)?|mar(?:ch)?|apr(?:il)?|may|jun(?:e)?|jul(?:y)?|aug(?:ust)?|sep(?:t(?:ember)?)?|oct(?:ober)?|nov(?:ember)?|dec(?:ember)?)\\s+(\\d{1,2})(?:st|nd|rd|th)?,?\\s+${year}\\b`,
+      'i',
+    ),
+  );
+  if (named) {
+    const month = MONTH_NAME[named[1]!.toLowerCase()];
+    if (month) return `${year}-${month}-${named[2]!.padStart(2, '0')}`;
+  }
+  return null;
+}
+
+/** Project blog listing when RSS 404s: dated `/blog/slug` cards. */
+export function linesFromBlogHtml(html: string, year: number, pageUrl: string): OssFound[] {
+  const found: OssFound[] = [];
+  const seen = new Set<string>();
+  for (const match of String(html || '').matchAll(/<a\b[^>]*href=["']([^"']+)["'][^>]*>([\s\S]*?)<\/a>/gi)) {
+    const href = resolveHref(pageUrl, match[1]);
+    if (!href || !/\/blog\/[A-Za-z0-9._-]+/i.test(href) || /\/blog\/(tag|page|category|author)\b/i.test(href)) continue;
+    const name = tidy(match[2]!.replace(/<[^>]+>/g, ' '), 80);
+    if (!name || isPrereleaseTag(name) || name.length < 4) continue;
+    const around = String(html || '').slice(Math.max(0, match.index! - 240), (match.index || 0) + match[0].length + 240);
+    const date = dateNear(around.replace(/<[^>]+>/g, ' '), year);
+    if (!date) continue;
+    const key = name.toLowerCase().replace(/[^a-z0-9]+/g, '');
+    if (!key || seen.has(key)) continue;
+    seen.add(key);
+    found.push(
+      asFound({
+        name,
+        description: `${name} on the project blog`,
+        date,
+        link: href,
+        icon: null,
+        source: 'changelog',
+        status: 'SHIPPED',
+        score: 6,
+        kind: 'oss-blog',
+      }),
+    );
+  }
+  return found;
+}
+
+function sameOssVersion(a: string, b: string): boolean {
+  const left = parseSemver(a);
+  const right = parseSemver(b);
+  if (!left || !right) return a.toLowerCase().replace(/[^a-z0-9]+/g, '') === b.toLowerCase().replace(/[^a-z0-9]+/g, '');
+  const product = (name: string) =>
+    name
+      .replace(/v?\d+\.\d+(?:\.\d+)?.*$/i, '')
+      .toLowerCase()
+      .replace(/[^a-z0-9]+/g, '');
+  return left.major === right.major && left.minor === right.minor && left.patch === right.patch && product(a) === product(b);
 }
 
 export type OssFixtureRepo = {
@@ -623,14 +744,25 @@ export async function harvestOss(opts: {
       if (seenHarvest.has(key)) continue;
       seenHarvest.add(key);
       const source: OssFound['source'] = repo.owner.toLowerCase() === login.toLowerCase() ? 'github' : 'company';
-      const releases = await memo(`oss:rel:${repo.owner}/${repo.name}`, 180 * 60, () =>
+      let releases = await memo(`oss:rel:${repo.owner}/${repo.name}`, 180 * 60, () =>
         opts
           .get<OssRelease[]>(`/repos/${encodeURIComponent(repo.owner)}/${encodeURIComponent(repo.name)}/releases?per_page=40`)
           .catch(() => []),
       );
-      const yearReleases = (Array.isArray(releases) ? releases : [])
-        .filter((row) => !row.draft && !row.prerelease && !isPrereleaseTag(String(row.tag_name || row.name || '')))
-        .filter((row) => inYear(day(row.published_at), year));
+      if (!Array.isArray(releases)) releases = [];
+      const yearStable = () =>
+        releases
+          .filter((row) => !row.draft && !row.prerelease && !isPrereleaseTag(String(row.tag_name || row.name || '')))
+          .filter((row) => inYear(day(row.published_at), year));
+      if (yearStable().length < 8 && releases.length >= 30 && !overBudget()) {
+        const more = await memo(`oss:rel2:${repo.owner}/${repo.name}`, 180 * 60, () =>
+          opts
+            .get<OssRelease[]>(`/repos/${encodeURIComponent(repo.owner)}/${encodeURIComponent(repo.name)}/releases?per_page=40&page=2`)
+            .catch(() => []),
+        );
+        if (Array.isArray(more) && more.length) releases = [...releases, ...more];
+      }
+      const yearReleases = yearStable();
       let tags: OssTag[] = [];
       if (yearReleases.length < 5) {
         const rawTags = await memo(`oss:tags:${repo.owner}/${repo.name}`, 180 * 60, () =>
@@ -673,6 +805,55 @@ export async function harvestOss(opts: {
   };
 
   await harvestRepos(orgRepos.slice(0, 8), 'oss-rel');
+
+  const alreadyHave = (item: OssFound): boolean =>
+    found.some((row) => sameOssVersion(row.name, item.name) || row.link === item.link);
+
+  const harvestBlogs = async (homes: string[]) => {
+    if (!opts.readText || overBudget()) return;
+    for (const home of homes) {
+      if (overBudget()) break;
+      let origin = '';
+      try {
+        origin = new URL(home).origin;
+      } catch {
+        continue;
+      }
+      const blogPage = /\/blog\b/i.test(home) ? home.replace(/\/+$/, '') : `${origin}/blog`;
+      const html = await memo(`oss:blogpage:${blogPage}`, 180 * 60, () => opts.readText!(blogPage).catch(() => null));
+      const feeds = [
+        ...(html ? alternateFeedUrls(html, blogPage) : []),
+        ...blogFeedUrls(home),
+        ...blogFeedUrls(origin),
+      ].filter((url, i, all) => all.indexOf(url) === i);
+      let usedFeed = false;
+      for (const feed of feeds.slice(0, 8)) {
+        if (overBudget()) break;
+        const xml = await memo(`oss:feed:${feed}`, 180 * 60, () => opts.readText!(feed).catch(() => null));
+        if (!xml || !/<item\b|<entry\b/i.test(xml)) continue;
+        const items = linesFromBlogFeed(xml, year, 'changelog').filter((item) => !alreadyHave(item));
+        if (items.length) {
+          found.push(...items);
+          ran.push(`oss-blog:${new URL(home).hostname}:${items.length}`);
+        }
+        usedFeed = true;
+        break;
+      }
+      if (!usedFeed && html) {
+        const items = linesFromBlogHtml(html, year, blogPage).filter((item) => !alreadyHave(item));
+        if (items.length) {
+          found.push(...items);
+          ran.push(`oss-blog-html:${new URL(home).hostname}:${items.length}`);
+        }
+      }
+    }
+  };
+
+  const earlyHomes = [
+    ...orgRepos.map((repo) => publicUrl(repo.homepage)).filter((url): url is string => Boolean(url)),
+    ...(opts.sites || []).map((url) => publicUrl(url)).filter((url): url is string => Boolean(url)),
+  ].filter((url, i, all) => all.indexOf(url) === i);
+  await harvestBlogs(earlyHomes.slice(0, 6));
 
   let bio = opts.bio || '';
   const products = [opts.affiliation?.product, opts.affiliation?.company].filter((value): value is string => Boolean(value));
@@ -800,21 +981,12 @@ export async function harvestOss(opts: {
     .slice(0, 8);
   await harvestRepos([...leftover, ...ownedLeft].slice(0, 8), 'oss-rel');
 
-  const homes = [...new Set(orgRepos.map((repo) => publicUrl(repo.homepage)).filter((url): url is string => Boolean(url)))].slice(0, 6);
-  if (opts.readText && !overBudget()) {
-    for (const home of homes) {
-      if (overBudget()) break;
-      for (const feed of blogFeedUrls(home).slice(0, 4)) {
-        const xml = await memo(`oss:feed:${feed}`, 180 * 60, () => opts.readText!(feed).catch(() => null));
-        if (!xml || !/<item\b|<entry\b/i.test(xml)) continue;
-        const items = linesFromBlogFeed(xml, year, 'changelog');
-        if (items.length) {
-          found.push(...items);
-          ran.push(`oss-blog:${new URL(home).hostname}`);
-          break;
-        }
-      }
-    }
+  if (!ran.some((tag) => /^oss-blog/.test(tag))) {
+    const lateHomes = [
+      ...orgRepos.map((repo) => publicUrl(repo.homepage)).filter((url): url is string => Boolean(url)),
+      ...earlyHomes,
+    ].filter((url, i, all) => all.indexOf(url) === i);
+    await harvestBlogs(lateHomes.slice(0, 6));
   }
 
   ran.push(`oss-lines:${found.length}`);

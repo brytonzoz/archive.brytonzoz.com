@@ -402,6 +402,94 @@ test('bio-mentioned org repos skip contributor stats', async () => {
   assert.equal(calls.some((path) => path.includes('/stats/contributors')), false);
 });
 
+test('prefixed tags still parse product-prefixed titles', () => {
+  assert.deepEqual(oss.parseSemver('Bun v1.4.3'), { major: 1, minor: 4, patch: 3 });
+  assert.deepEqual(oss.parseSemver('Bun 1.4'), { major: 1, minor: 4, patch: 0 });
+});
+
+test('major/minor without notes still become version lines; singles keep the version', () => {
+  const lines = oss.linesFromOssRepo(
+    { owner: 'oven-sh', name: 'bun', homepage: 'https://bun.com', html_url: 'https://github.com/oven-sh/bun', stargazers_count: 96000 },
+    [
+      { tag_name: 'bun-v1.4.3', published_at: '2026-10-10T12:00:00Z', body: '', html_url: 'https://github.com/oven-sh/bun/releases/tag/bun-v1.4.3' },
+      { tag_name: 'bun-v1.4.2', published_at: '2026-09-05T12:00:00Z', body: '', html_url: 'https://github.com/oven-sh/bun/releases/tag/bun-v1.4.2' },
+      { tag_name: 'bun-v1.4.1', published_at: '2026-09-04T12:00:00Z', body: '', html_url: 'https://github.com/oven-sh/bun/releases/tag/bun-v1.4.1' },
+      { tag_name: 'bun-v1.4.0', published_at: '2026-08-20T12:00:00Z', body: '', html_url: 'https://github.com/oven-sh/bun/releases/tag/bun-v1.4.0' },
+      { tag_name: 'bun-v1.3.14', published_at: '2026-05-13T12:00:00Z', body: '', html_url: 'https://github.com/oven-sh/bun/releases/tag/bun-v1.3.14' },
+      { tag_name: 'bun-v1.3.13', published_at: '2026-04-20T12:00:00Z', body: '', html_url: 'https://github.com/oven-sh/bun/releases/tag/bun-v1.3.13' },
+      { tag_name: 'bun-v1.3.12', published_at: '2026-04-09T12:00:00Z', body: '', html_url: 'https://github.com/oven-sh/bun/releases/tag/bun-v1.3.12' },
+      { tag_name: 'bun-v1.3.11', published_at: '2026-03-18T12:00:00Z', body: '', html_url: 'https://github.com/oven-sh/bun/releases/tag/bun-v1.3.11' },
+      { tag_name: 'bun-v1.3.10', published_at: '2026-02-26T12:00:00Z', body: '', html_url: 'https://github.com/oven-sh/bun/releases/tag/bun-v1.3.10' },
+      { tag_name: 'bun-v1.3.9', published_at: '2026-02-08T12:00:00Z', body: '', html_url: 'https://github.com/oven-sh/bun/releases/tag/bun-v1.3.9' },
+      { tag_name: 'bun-v1.3.8', published_at: '2026-01-29T12:00:00Z', body: '', html_url: 'https://github.com/oven-sh/bun/releases/tag/bun-v1.3.8' },
+      { tag_name: 'bun-v1.3.7', published_at: '2026-01-27T12:00:00Z', body: '', html_url: 'https://github.com/oven-sh/bun/releases/tag/bun-v1.3.7' },
+      { tag_name: 'bun-v1.3.6', published_at: '2026-01-13T12:00:00Z', body: '', html_url: 'https://github.com/oven-sh/bun/releases/tag/bun-v1.3.6' },
+    ],
+    [],
+    2026,
+    'company',
+  );
+  const names = lines.map((item) => item.name);
+  assert.ok(names.some((name) => /bun 1\.4$/i.test(name)), JSON.stringify(names));
+  assert.ok(names.some((name) => /bun 1\.3\.14/i.test(name)), JSON.stringify(names));
+  assert.ok(names.some((name) => /bun 1\.3\.11/i.test(name)), JSON.stringify(names));
+  assert.ok(names.some((name) => /bun 1\.4\.3/i.test(name)), JSON.stringify(names));
+  assert.ok(names.some((name) => /RELEASES IN JAN/i.test(name)), JSON.stringify(names));
+  assert.ok(names.some((name) => /RELEASES IN SEP/i.test(name)), JSON.stringify(names));
+  const owner = { name: 'Jarred Sumner', github: 'Jarred-Sumner', orgs: ['oven-sh'] };
+  const printed = ai.finish(lines, 'Bun 1.4 rewrote the runtime in Rust.', 1, undefined, [], {
+    who: 'Jarred Sumner',
+    handle: 'jarredsumner',
+    year: 2026,
+    owner,
+  });
+  const out = printed.items.map((item) => item.name);
+  assert.ok(out.some((name) => /BUN 1\.4$/.test(name)), JSON.stringify(out));
+  assert.ok(out.some((name) => /BUN 1\.3\.14/.test(name)), JSON.stringify(out));
+  assert.ok(out.some((name) => /BUN 1\.4\.3/.test(name)), JSON.stringify(out));
+  assert.equal(out.filter((name) => name === 'BUN').length, 0, JSON.stringify(out));
+  assert.ok(out.length >= 8, JSON.stringify(out));
+});
+
+test('project blog alternate feed is preferred over /blog/rss.xml 404s', async () => {
+  const fetched = [];
+  const get = async (path) => {
+    if (path.startsWith('/users/Jarred-Sumner/repos')) return [];
+    if (path.startsWith('/users/Jarred-Sumner/orgs')) return [];
+    if (path.startsWith('/users/Jarred-Sumner/events')) return [{ type: 'PushEvent', repo: { name: 'oven-sh/bun' } }];
+    if (path === '/repos/oven-sh/bun') {
+      return { name: 'bun', html_url: 'https://github.com/oven-sh/bun', homepage: 'https://bun.com', stargazers_count: 96000, fork: false };
+    }
+    if (path.includes('/oven-sh/bun/releases')) {
+      return [{ tag_name: 'bun-v1.4.0', published_at: '2026-08-20T12:00:00Z', body: '', html_url: 'https://github.com/oven-sh/bun/releases/tag/bun-v1.4.0' }];
+    }
+    return [];
+  };
+  const { found, ran } = await oss.harvestOss({
+    login: 'Jarred-Sumner',
+    year: 2026,
+    get,
+    readText: async (url) => {
+      fetched.push(url);
+      if (/\/blog\/?$/i.test(url) && !/rss|feed|atom/i.test(url)) {
+        return '<link rel="alternate" type="application/rss+xml" href="/rss.xml">';
+      }
+      if (url === 'https://bun.com/rss.xml') {
+        return `<?xml version="1.0"?><rss><channel>
+          <item><title>Rewriting Bun in Rust</title><link>https://bun.com/blog/rewriting-bun-in-rust</link><pubDate>Wed, 08 Jul 2026 16:00:00 GMT</pubDate></item>
+          <item><title>Bun 1.4</title><link>https://bun.com/blog/bun-v1.4</link><pubDate>Thu, 20 Aug 2026 00:53:44 GMT</pubDate></item>
+        </channel></rss>`;
+      }
+      return null;
+    },
+  });
+  assert.ok(fetched.includes('https://bun.com/rss.xml'), JSON.stringify(fetched));
+  assert.ok(found.some((item) => /rewriting bun in rust/i.test(item.name)), JSON.stringify(found.map((item) => item.name)));
+  assert.ok(found.some((item) => /bun 1\.4/i.test(item.name)), JSON.stringify(found.map((item) => item.name)));
+  assert.equal(found.filter((item) => /bun 1\.4/i.test(item.name)).length, 1, JSON.stringify(found.map((item) => item.name)));
+  assert.ok(ran.some((tag) => /oss-blog:bun\.com/.test(tag)), JSON.stringify(ran));
+});
+
 test('live prints keep the writer note; empty CI notes use the sentence fallback', () => {
   const items = [
     {

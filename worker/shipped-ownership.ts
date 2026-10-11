@@ -154,7 +154,7 @@ export function ownershipEvidence(
 }
 
 export function ownedByBuilder(
-  item: { name?: string; description?: string; link?: string | null; source?: string },
+  item: { name?: string; description?: string; link?: string | null; source?: string; kind?: string },
   owner?: OwnerContext | null,
 ): boolean {
   return ownershipEvidence(item, owner) !== 'none';
@@ -162,10 +162,11 @@ export function ownedByBuilder(
 
 /** Undated crumbs need real ownership. Named/portfolio site crumbs also need a description. */
 export function undatedPassesGate(
-  item: { name?: string; description?: string; link?: string | null; source?: string; date?: string | null },
+  item: { name?: string; description?: string; link?: string | null; source?: string; date?: string | null; kind?: string },
   owner?: OwnerContext | null,
 ): boolean {
   if (item.date) return true;
+  if (isOssHarvestItem(item)) return true;
   const kind = ownershipEvidence(item, owner);
   if (kind === 'none') return false;
   const desc = (item.description || '').replace(/\s+/g, ' ').trim();

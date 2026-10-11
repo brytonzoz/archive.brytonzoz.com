@@ -18,7 +18,7 @@ const uiSans = Inter({
 const receiptMono = Fragment_Mono({
   subsets: ['latin'],
   weight: '400',
-  display: 'block',
+  display: 'swap',
   variable: '--font-receipt',
 });
 

@@ -303,7 +303,7 @@ export function Machine({ job, display, tone, onPrinted, onTorn, tearSignal = 0,
       const inked = printed;
       timers.push(
         window.setTimeout(() => {
-          if (!cancelled) el.style.setProperty('--ink', `${inked}px`);
+          if (!cancelled) el.style.setProperty('--inked', `${inked}px`);
         }, Math.round(stepMs * 0.55)),
       );
       if (printed < height) {
@@ -315,7 +315,7 @@ export function Machine({ job, display, tone, onPrinted, onTorn, tearSignal = 0,
       motorOff();
       clip(0);
       el.style.transform = '';
-      el.style.setProperty('--ink', `${height}px`);
+      el.style.setProperty('--inked', `${height}px`);
       setPhase('hanging');
       tell(true, false);
     };
@@ -376,7 +376,7 @@ export function Machine({ job, display, tone, onPrinted, onTorn, tearSignal = 0,
       if (n % 2 === 0) pressTick();
       timers.push(
         window.setTimeout(() => {
-          el.style.setProperty('--ink', `${printed}px`);
+          el.style.setProperty('--inked', `${printed}px`);
         }, 38),
       );
       if (left > 0) {
@@ -385,7 +385,7 @@ export function Machine({ job, display, tone, onPrinted, onTorn, tearSignal = 0,
       }
       clip(0);
       el.style.transform = '';
-      el.style.setProperty('--ink', `${height}px`);
+      el.style.setProperty('--inked', `${height}px`);
       motorOff();
     };
     timers.push(window.setTimeout(step, 40));

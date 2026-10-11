@@ -1,9 +1,7 @@
 // Re-run deterministic sub-line cleaner on every stored receipt (no AI).
 //   ADMIN_PASSWORD=… node scripts/sanitize-shipped-receipts.mjs [origin] [--dry-run]
-const origin = (process.argv.find((a) => !a.startsWith('-') && a.includes('.')) || process.env.SHIPPED_ORIGIN || 'https://shipped-staging.brytonzoz.com').replace(
-  /\/+$/,
-  '',
-);
+const args = process.argv.slice(2).filter((a) => !a.startsWith('-'));
+const origin = (args[0] || process.env.SHIPPED_ORIGIN || 'https://shipped-staging.brytonzoz.com').replace(/\/+$/, '');
 const dryRun = process.argv.includes('--dry-run');
 const password = process.env.ADMIN_PASSWORD || '';
 if (!password) {

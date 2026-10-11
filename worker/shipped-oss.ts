@@ -212,6 +212,40 @@ const OSS_ORG_ALIASES: Record<string, string[]> = {
   rails: ['rails', 'rubyonrails'],
 };
 
+const OSS_FLAGSHIP_REPOS = [
+  'vite',
+  'vue',
+  'core',
+  'rolldown',
+  'vitepress',
+  'vitest',
+  'oxc',
+  'tsdown',
+  'vue-router',
+  'pinia',
+  'bun',
+  'svelte',
+  'kit',
+  'rollup',
+];
+
+function ossRepoPriority(name: string): number {
+  const key = String(name || '')
+    .toLowerCase()
+    .replace(/[^a-z0-9-]/g, '');
+  const idx = OSS_FLAGSHIP_REPOS.indexOf(key);
+  return idx >= 0 ? idx : 50;
+}
+
+/** Vite / Vue / Rolldown before docs and event crumbs so a fat canary feed does not starve sibling repos. */
+export function rankOssHarvestRepos<T extends { name: string; stargazers_count?: number }>(repos: T[]): T[] {
+  return repos.slice().sort((a, b) => {
+    const rank = ossRepoPriority(a.name) - ossRepoPriority(b.name);
+    if (rank) return rank;
+    return (b.stargazers_count ?? 0) - (a.stargazers_count ?? 0);
+  });
+}
+
 function orgMatchesProduct(org: string, raw: string): boolean {
   const slug = org.replace(/^@/, '').toLowerCase().replace(/[^a-z0-9]/g, '');
   const token = String(raw || '')
@@ -866,8 +900,12 @@ export async function harvestOss(opts: {
           return Boolean(when && when < `${year}-01-01`);
         });
       // Recent stables plus canaries can fill page 1 (and 2) without reaching January.
+      // Stop deepening a fat canary feed once we have a year's worth of stables so
+      // sibling flagships (vitest, oxc, vue-router) still get a first page.
       let releasePage = 1;
       while (!walkedBeforeYear() && releases.length >= 30 && releasePage < 4 && !overBudget()) {
+        const stablesSoFar = yearStable().length;
+        if (stablesSoFar >= 12 || (stablesSoFar >= 8 && releasePage >= 2)) break;
         releasePage += 1;
         const more = await memo(`oss:rel${releasePage}:${repo.owner}/${repo.name}`, 180 * 60, () =>
           opts
@@ -927,7 +965,8 @@ export async function harvestOss(opts: {
     }
   };
 
-  await harvestRepos(orgRepos.slice(0, 8), 'oss-rel');
+  const rankedRepos = rankOssHarvestRepos(orgRepos);
+  await harvestRepos(rankedRepos.slice(0, 16), 'oss-rel');
 
   if (leftoverPins.length && !overBudget()) {
     const loaded = await Promise.all(
@@ -1100,7 +1139,9 @@ export async function harvestOss(opts: {
   }
 
   await harvestRepos(
-    orgRepos.filter((repo) => !seenHarvest.has(`${repo.owner.toLowerCase()}/${repo.name.toLowerCase()}`)).slice(0, 8),
+    rankOssHarvestRepos(
+      orgRepos.filter((repo) => !seenHarvest.has(`${repo.owner.toLowerCase()}/${repo.name.toLowerCase()}`)),
+    ).slice(0, 8),
     'oss-rel',
   );
 
@@ -1134,7 +1175,9 @@ export async function harvestOss(opts: {
     }
   }
 
-  const leftover = orgRepos.filter((repo) => !seenHarvest.has(`${repo.owner.toLowerCase()}/${repo.name.toLowerCase()}`));
+  const leftover = rankOssHarvestRepos(
+    orgRepos.filter((repo) => !seenHarvest.has(`${repo.owner.toLowerCase()}/${repo.name.toLowerCase()}`)),
+  );
   const ownedLeft = owned
     .filter((repo) => !seenHarvest.has(`${repo.owner.toLowerCase()}/${repo.name.toLowerCase()}`))
     .sort((a, b) => (b.stargazers_count ?? 0) - (a.stargazers_count ?? 0))

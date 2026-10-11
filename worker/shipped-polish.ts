@@ -482,7 +482,8 @@ export function isJunkTitle(
   const text = tidy(title);
   if (!text) return true;
   if (text.length < 3 && !/^v\d$/i.test(text)) return true;
-  if (BYLINE.test(text) || ((text.match(/,/g) || []).length < 2 && NAME_LIST.test(text)) || ROUNDUP.test(text) || READ_THE.test(text) || INSTRUCTIONAL.test(text)) return true;
+  if (BYLINE.test(text) || ((text.match(/,/g) || []).length < 2 && NAME_LIST.test(text)) || /\band \d+ others?\b/i.test(text) || ROUNDUP.test(text) || READ_THE.test(text) || INSTRUCTIONAL.test(text)) return true;
+  if (hasMashedDuplicateTokens(text)) return true;
   if (RESEARCH_GERUND.test(text) || CUSTOMER_STORY.test(text) || CHOPPED_GATEWAY.test(text) || isAcquisitionNews(text)) return true;
   if (CTA_NAV.test(text) || CTA_TRAIL.test(text)) return true;
   if (/^(download on the|get it on|get the app|affiliates|analytics|available on|filed under|quitting)\b/i.test(text)) return true;
@@ -504,6 +505,15 @@ export function isJunkTitle(
   if (looksFragment(text) || looksMidWord(text) || looksCutOff(text)) return true;
   if ((text.replace(/[^a-zA-Z]/g, '').length < 3) && /\d/.test(text) && !/^v\d\b/i.test(text)) return true;
   return false;
+}
+
+/** Consecutive repeated tokens (`typesafe-compat typesafe-compat`) are scrape mash, not a ship. */
+export function hasMashedDuplicateTokens(title: string): boolean {
+  const tokens = tidy(title)
+    .toLowerCase()
+    .split(/[\s,/|]+/)
+    .map((token) => token.replace(/^[^a-z0-9]+|[^a-z0-9]+$/g, ''));
+  return tokens.some((token, i) => i > 0 && token.length >= 4 && token === tokens[i - 1]);
 }
 
 function normalizeVersionTokens(text: string): string {
@@ -939,7 +949,9 @@ export function cleanShipTitle(raw: unknown, max = TITLE_MAX): string {
   if (/^(released|updated|added)\s+/i.test(text)) {
     text = text.replace(/^(released|updated|added)\s+/i, '').replace(/^the\s+/i, '').trim();
   }
+  text = text.replace(/\b([\w][\w.-]{3,})\s+\1\b/gi, '$1');
   text = text.replace(/\b(\w+)\s+\1\b/gi, '$1');
+  text = text.replace(/\s+and \d+ others?\b.*$/i, '');
   text = text.replace(/,\s+a new\b.*$/i, '').trim();
   text = text.replace(/\s+in (public )?beta with\b.*$/i, '').trim();
   text = text.replace(/-+$/, '').trim();
@@ -1012,8 +1024,9 @@ export function shortenWordyTitle(title: string): string {
   while (clipped && TITLE_TRAILING_GLUE.test(clipped)) {
     clipped = clipped.split(/\s+/).slice(0, -1).join(' ').trim();
   }
+  const clippedWords = clipped.split(/\s+/).filter(Boolean);
   if (
-    clipped.split(/\s+/).filter(Boolean).length >= 2 &&
+    clippedWords.length >= 2 &&
     isProductNounPhrase(clipped) &&
     !looksCutOff(clipped) &&
     !isJunkTitle(clipped) &&
@@ -1022,7 +1035,17 @@ export function shortenWordyTitle(title: string): string {
   ) {
     return clipped;
   }
-  return text;
+  if (
+    clippedWords.length >= 3 &&
+    clippedWords.length < 8 &&
+    !looksCutOff(clipped) &&
+    !looksMidWord(clipped) &&
+    !isJunkTitle(clipped) &&
+    !TITLE_TRAILING_GLUE.test(clipped)
+  ) {
+    return clipped;
+  }
+  return '';
 }
 
 /** levels.io / indie journal ships: first-person launches, not blog essays.
@@ -1237,6 +1260,7 @@ export function titleSanityOk(title: string): boolean {
   if (looksLikePrintedFirstPerson(text) || looksLikeEssayTitle(text) || looksLikeScopedPackage(text) || looksLikeMonthlyRoundup(text)) {
     return false;
   }
+  if (/\band \d+ others?\b/i.test(text) || hasMashedDuplicateTokens(text)) return false;
   const words = text.split(/\s+/).filter(Boolean);
   if (words.length >= 8 && !/\d+\.\d+/.test(text) && !/·\s*\d+\s+(updates?|releases?)/i.test(text)) return false;
   if (SENTENCE_VERB.test(text) && !/\d+\.\d+/.test(text)) return false;
@@ -1727,7 +1751,8 @@ export function polishCandidates<T extends Polishable>(items: T[], opts: PolishO
         !isNeverShipKind(fallback) &&
         !isDocsOrReferenceTitle(fallback) &&
         !isBlogEssayTitle(fallback) &&
-        !isNotAShipTitle(fallback);
+        !isNotAShipTitle(fallback) &&
+        titleSanityOk(fallback);
       if (keepCard) name = fallback;
     }
     if (name) name = reconcileTitleWithHref(name, item.link);
@@ -1874,7 +1899,13 @@ export function polishCandidates<T extends Polishable>(items: T[], opts: PolishO
   }
   const rolled = rollupCeoLeadCrumbs(capped, opts.affiliation);
   if (rolled.length < capped.length) drop({ name: `${capped.length - rolled.length} ceo-lead crumbs` }, 'ceo-rollup');
-  return rolled.sort((a, b) => (a.date ?? '9999').localeCompare(b.date ?? '9999'));
+  const sane = rolled.filter((item) => {
+    if (flagshipLaunchName(item) || /·\s*\d+\s+(updates?|releases?)\s+in\s+/i.test(item.name)) return true;
+    if (titleSanityOk(item.name)) return true;
+    drop(item, 'title-sanity');
+    return false;
+  });
+  return sane.sort((a, b) => (a.date ?? '9999').localeCompare(b.date ?? '9999'));
 }
 
 export function isOpenAiCompanyWide(name: string, link?: string | null): boolean {

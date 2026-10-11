@@ -30,6 +30,13 @@ test('bylines, docs nav, week-of roundups, and articles about the person are jun
   assert.equal(polish.isJunkTitle('S JACK', { who: 'Jack Friks' }), true);
   assert.equal(polish.isJunkTitle('THE GUY WHO MADE POST BRIDGE'), true);
   assert.equal(polish.isJunkTitle('MELKEY MOKSYAKOV, ESTEBAN SUÁREZ'), true);
+  assert.equal(polish.isJunkTitle('KEVIN DAWKINS, JERILYN ZHENG, AND 1 OTHER'), true);
+  assert.equal(polish.isJunkTitle('API TYPESAFE-COMPAT TYPESAFE-COMPAT DECISIONS API'), true);
+  assert.equal(polish.hasMashedDuplicateTokens('API TYPESAFE-COMPAT TYPESAFE-COMPAT DECISIONS API'), true);
+  assert.equal(polish.hasMashedDuplicateTokens('GPT-6 Sol and GPT-6 Luna'), false);
+  assert.equal(polish.titleSanityOk('Protect production deployments for free on every plan'), false);
+  assert.equal(polish.titleSanityOk('Agents can now buy domains with the Vercel CLI'), false);
+  assert.equal(polish.titleSanityOk('Kevin Dawkins, Jerilyn Zheng, and 1 other'), false);
   assert.equal(polish.isJunkTitle('Cursor 2.0'), false);
 });
 
@@ -1298,4 +1305,51 @@ test('cheap filters strip markup, drop prereleases and other years, and dedupe U
   );
   assert.ok(names.includes('Minor Changes'), JSON.stringify(names));
   assert.equal(cheap.find((item) => item.name === 'Minor Changes')?.description, 'Minor Changes - 17ee736');
+});
+
+test('print-time polish drops 8+ word changelog sentences, person lists, and mashed duplicates', () => {
+  const gated = polish.gateReceiptItems(
+    [
+      found({
+        name: 'Protect production deployments for free on every plan',
+        date: '2026-09-01',
+        link: 'https://vercel.com/changelog/protect-production-deployments-for-free-on-every-plan',
+      }),
+      found({
+        name: 'Secure compute and static IP builds start 64% faster',
+        date: '2026-09-08',
+        link: 'https://vercel.com/changelog/secure-compute-static-ip',
+      }),
+      found({
+        name: 'Kevin Dawkins, Jerilyn Zheng, and 1 other',
+        date: '2026-09-12',
+        link: 'https://vercel.com/blog/authors',
+      }),
+      found({
+        name: 'API typesafe-compat typesafe-compat Decisions API',
+        date: '2026-08-02',
+        link: 'https://vercel.com/changelog/typesafe-compat',
+      }),
+      found({
+        name: 'Vercel Agent',
+        date: '2026-07-01',
+        link: 'https://vercel.com/changelog/vercel-agent',
+      }),
+      found({
+        name: 'Chat SDK',
+        date: '2026-06-01',
+        link: 'https://vercel.com/changelog/chat-sdk',
+      }),
+    ],
+    { year: 2026, who: 'Guillermo Rauch' },
+  );
+  const names = gated.map((item) => item.name);
+  assert.equal(
+    names.some((name) => name.trim().split(/\s+/).filter(Boolean).length >= 8),
+    false,
+    JSON.stringify(names),
+  );
+  assert.equal(names.some((name) => /dawkins|and 1 other|typesafe-compat typesafe-compat/i.test(name)), false, JSON.stringify(names));
+  assert.ok(names.some((name) => /vercel agent/i.test(name)), JSON.stringify(names));
+  assert.ok(names.some((name) => /chat sdk/i.test(name)), JSON.stringify(names));
 });

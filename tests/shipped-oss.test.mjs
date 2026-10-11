@@ -784,3 +784,79 @@ test('a leftover canary-only pin still prints after a star-heavy founder repo', 
   assert.ok(names.some((name) => /nub/i.test(name)), JSON.stringify(names));
   assert.ok(ran.some((tag) => /oss-pin:nubjs\/nub/.test(tag)), JSON.stringify(ran));
 });
+
+test('flagship OSS repos harvest before docs crumbs so sibling products still get a page', async () => {
+  const ranked = oss.rankOssHarvestRepos([
+    { name: 'docs', stargazers_count: 90000 },
+    { name: 'rfcs', stargazers_count: 80000 },
+    { name: 'vitest', stargazers_count: 12000 },
+    { name: 'oxc', stargazers_count: 14000 },
+    { name: 'vite', stargazers_count: 70000 },
+    { name: 'core', stargazers_count: 48000 },
+  ]);
+  assert.deepEqual(
+    ranked.slice(0, 4).map((repo) => repo.name),
+    ['vite', 'core', 'vitest', 'oxc'],
+  );
+
+  const fetched = [];
+  const canaries = Array.from({ length: 40 }, (_, i) => ({
+    tag_name: `vite@8.3.0-beta.${i + 1}`,
+    published_at: `2026-10-01T${String(10 + (i % 10)).padStart(2, '0')}:00:00Z`,
+    prerelease: true,
+    body: 'canary',
+  }));
+  const get = async (path) => {
+    fetched.push(path);
+    if (path.startsWith('/users/yyx990803/repos')) return [];
+    if (path.startsWith('/users/yyx990803/orgs')) return [];
+    if (path.startsWith('/users/yyx990803/events')) {
+      return [
+        { type: 'PushEvent', repo: { name: 'vitejs/docs' } },
+        { type: 'PushEvent', repo: { name: 'vitejs/vite' } },
+        { type: 'PushEvent', repo: { name: 'vitejs/vitest' } },
+        { type: 'PushEvent', repo: { name: 'oxc-project/oxc' } },
+      ];
+    }
+    if (path === '/repos/vitejs/docs') {
+      return { name: 'docs', html_url: 'https://github.com/vitejs/docs', stargazers_count: 90000, fork: false, pushed_at: '2026-10-01T00:00:00Z' };
+    }
+    if (path === '/repos/vitejs/vite') {
+      return { name: 'vite', html_url: 'https://github.com/vitejs/vite', homepage: 'https://vite.dev', stargazers_count: 70000, fork: false, pushed_at: '2026-10-01T00:00:00Z' };
+    }
+    if (path === '/repos/vitejs/vitest') {
+      return { name: 'vitest', html_url: 'https://github.com/vitest-dev/vitest', homepage: 'https://vitest.dev', stargazers_count: 12000, fork: false, pushed_at: '2026-10-01T00:00:00Z' };
+    }
+    if (path === '/repos/oxc-project/oxc') {
+      return { name: 'oxc', html_url: 'https://github.com/oxc-project/oxc', homepage: 'https://oxc.rs', stargazers_count: 14000, fork: false, pushed_at: '2026-10-01T00:00:00Z' };
+    }
+    if (path.startsWith('/orgs/vitejs/repos')) {
+      return [
+        { name: 'docs', html_url: 'https://github.com/vitejs/docs', stargazers_count: 90000, pushed_at: '2026-10-01T00:00:00Z' },
+        { name: 'vite', html_url: 'https://github.com/vitejs/vite', homepage: 'https://vite.dev', stargazers_count: 70000, pushed_at: '2026-10-01T00:00:00Z' },
+        { name: 'vitest', html_url: 'https://github.com/vitejs/vitest', homepage: 'https://vitest.dev', stargazers_count: 12000, pushed_at: '2026-10-01T00:00:00Z' },
+      ];
+    }
+    if (path.includes('/vitejs/vite/releases')) return canaries;
+    if (path.includes('/vitejs/vitest/releases')) {
+      return [{ tag_name: 'v3.2.0', name: 'Vitest 3.2', published_at: '2026-06-02T12:00:00Z', body: 'Vitest 3.2', html_url: 'https://github.com/vitest-dev/vitest/releases/tag/v3.2.0' }];
+    }
+    if (path.includes('/oxc-project/oxc/releases')) {
+      return [{ tag_name: 'oxc_v0.90.0', name: 'Oxc 0.90', published_at: '2026-05-02T12:00:00Z', body: 'Oxc 0.90', html_url: 'https://github.com/oxc-project/oxc/releases/tag/oxc_v0.90.0' }];
+    }
+    return [];
+  };
+  const { found, ran } = await oss.harvestOss({
+    login: 'yyx990803',
+    year: 2026,
+    get,
+    bio: 'Creator of Vue and Vite.',
+    affiliation: { company: 'VoidZero', role: 'founder', product: 'Vite' },
+    orgs: ['vitejs', 'oxc-project'],
+  });
+  const names = found.map((item) => item.name);
+  assert.ok(fetched.some((path) => /\/vitejs\/vitest\/releases/.test(path)), JSON.stringify(fetched));
+  assert.ok(fetched.some((path) => /\/oxc-project\/oxc\/releases/.test(path)), JSON.stringify(fetched));
+  assert.ok(names.some((name) => /vitest/i.test(name)), JSON.stringify({ names, ran }));
+  assert.ok(names.some((name) => /oxc/i.test(name)), JSON.stringify({ names, ran }));
+});

@@ -1826,7 +1826,7 @@ export async function gather(
     gatherFresh(subject, resolved.profile, env, year, meter, tinyfish, resolved.notes, mode, opts?.onPartial, opts?.affiliation);
   if (opts?.rebuild && !opts.onPartial) return load();
   if (opts?.rebuild) return load();
-  const key = mode === 'full' ? `gather:full:v36:${year}:${resolved.cacheKey}` : `gather:v45:${year}:${resolved.cacheKey}`;
+  const key = mode === 'full' ? `gather:full:v36:${year}:${resolved.cacheKey}` : `gather:v46:${year}:${resolved.cacheKey}`;
   return cached(
     key,
     1440 * MIN,

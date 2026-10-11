@@ -8,6 +8,8 @@ on:
     paths:
       - .github/workflows/shipped-reprint.yml
       - scripts/reprint-shipped.mjs
+      - scripts/sanitize-shipped-receipts.mjs
+      - scripts/scan-shipped-junk.mjs
       - worker/shipped.ts
       - worker/shipped-sources.ts
       - worker/shipped-source-cache.ts
@@ -51,6 +53,37 @@ concurrency:
   cancel-in-progress: false
 
 jobs:
+  sanitize-sublines:
+    name: Sanitize stored receipt sub-lines
+    if: github.event_name == 'push' && contains(github.event.head_commit.message, '[shipped-sanitize]')
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v5
+      - uses: actions/setup-node@v5
+        with:
+          node-version: 22
+          cache: npm
+      - run: npm ci
+      - name: Wait for staging Worker
+        run: sleep 200
+      - name: Sanitize all receipts on staging
+        env:
+          ADMIN_PASSWORD: ${{ secrets.ADMIN_PASSWORD }}
+          SHIPPED_ORIGIN: https://shipped-staging.brytonzoz.com
+        run: |
+          if [ -z "$ADMIN_PASSWORD" ]; then
+            echo "::error::ADMIN_PASSWORD is required."
+            exit 1
+          fi
+          node --no-warnings scripts/sanitize-shipped-receipts.mjs
+          node --experimental-transform-types --no-warnings scripts/scan-shipped-junk.mjs
+          echo "sanitize_sha=${GITHUB_SHA}" >> "$GITHUB_ENV"
+      - name: Summary
+        run: |
+          echo "### Sanitize complete" >> "$GITHUB_STEP_SUMMARY"
+          echo "SHA: \`${GITHUB_SHA}\`" >> "$GITHUB_STEP_SUMMARY"
+
   reprint:
     name: Reprint receipts (no xAI)
     if: github.event_name == 'workflow_dispatch' || contains(github.event.head_commit.message, '[shipped-reprint')

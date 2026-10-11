@@ -2,7 +2,7 @@ import assert from 'node:assert/strict';
 import { test } from 'node:test';
 import fs from 'node:fs';
 import { SHIPPED_STATUSES, shippedCounts, toItems, yearGroups } from '../lib/shipped.ts';
-import { isGithubLogin, itemDate, itemsShipped, readQuery, receiptPageTitle, shareText, shareTweet, shippedYear, subjectKey, subjectKicker, subjectLabel, xHandle } from '../lib/shipped-year.ts';
+import { isGithubLogin, itemDate, itemsShipped, readQuery, receiptPageTitle, shareText, shareTweet, shippedYear, subjectFromLoginKey, subjectKey, subjectKicker, subjectLabel, xHandle } from '../lib/shipped-year.ts';
 
 const read = (file) => JSON.parse(fs.readFileSync(new URL(file, import.meta.url), 'utf8'));
 const DATA = read('../data/shipped/businesses.json');
@@ -93,6 +93,9 @@ test('subjects key the 7-day cache and takedowns whatever the case', () => {
   assert.notEqual(subjectKey({ kind: 'github', id: 'rauchg' }), subjectKey({ kind: 'x', id: 'rauchg' }));
   assert.equal(subjectLabel({ kind: 'x', id: 'levelsio', display: 'Pieter' }), '@levelsio');
   assert.equal(subjectLabel({ kind: 'domain', id: 'mopkin.app', display: 'mopkin.app' }), 'mopkin.app');
+  assert.deepEqual(subjectFromLoginKey('x:jarredsumner'), { kind: 'x', id: 'jarredsumner' });
+  assert.deepEqual(subjectFromLoginKey('github:Rich-Harris'), { kind: 'github', id: 'Rich-Harris' });
+  assert.equal(subjectFromLoginKey('#26'), null);
 });
 
 test('item dates and the share text', () => {

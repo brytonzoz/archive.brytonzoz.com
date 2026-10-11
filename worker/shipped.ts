@@ -143,6 +143,7 @@ import {
   receiptPageTitle,
   shareText,
   shippedYear,
+  subjectFromLoginKey,
   subjectKey,
   subjectLabel,
   type Candidate,
@@ -2133,8 +2134,21 @@ async function dropListedCache(env: ShippedEnv, id?: number) {
   await Promise.all([...origins].flatMap((origin) => paths.map((path) => cache.delete(new Request(new URL(path, origin))).catch(() => false))));
 }
 
-function subjectFromReceipt(data: YearReceipt): Subject | null {
+function subjectFromReceipt(data: YearReceipt, loginKey?: string, login?: string | null): Subject | null {
   const subject = data.subject;
+  const broken = !subject || /^#\d+$/.test(String(subject.display || subject.id || ''));
+  if (broken && loginKey) {
+    const recovered = subjectFromLoginKey(loginKey);
+    if (recovered) {
+      const label = (login && !/^#\d+$/.test(login) ? login : recovered.id).replace(/^@/, '');
+      return {
+        kind: recovered.kind,
+        id: recovered.id,
+        display: prettyPersonName(label) || label,
+        x: recovered.kind === 'x' ? recovered.id : undefined,
+      };
+    }
+  }
   if (!subject || (subject.kind !== 'github' && subject.kind !== 'x' && subject.kind !== 'domain' && subject.kind !== 'name')) return null;
   if (typeof subject.id !== 'string' || !subject.id) return null;
   return { kind: subject.kind, id: subject.id, display: typeof subject.display === 'string' && subject.display ? subject.display : subject.id, x: subject.x };
@@ -2306,9 +2320,9 @@ async function reprintReceipt(
   affiliationHint?: Partial<import('./shipped-affiliation').Affiliation>,
 ): Promise<Response> {
   const row = await db
-    .prepare('SELECT id, data, listed, hidden, login_key, mode FROM shipped_receipts WHERE id = ?')
+    .prepare('SELECT id, data, listed, hidden, login_key, login, mode FROM shipped_receipts WHERE id = ?')
     .bind(id)
-    .first<{ id: number; data: string; listed: number; hidden: number; login_key: string; mode: string }>();
+    .first<{ id: number; data: string; listed: number; hidden: number; login_key: string; login: string | null; mode: string }>();
   if (!row) return json({ error: 'not-found' }, 404);
   let current: YearReceipt;
   try {
@@ -2316,7 +2330,7 @@ async function reprintReceipt(
   } catch {
     return json({ error: 'bad-receipt' }, 400);
   }
-  const subject = subjectFromReceipt(current);
+  const subject = subjectFromReceipt(current, row.login_key, row.login);
   if (!subject) return json({ error: 'bad-receipt' }, 400);
   const year = current.year || yearOf(env);
   const state = await generatorState(env, db);
@@ -2517,7 +2531,8 @@ async function printFreshSubject(env: ShippedEnv, db: D1Database, raw: string): 
     };
     const day = today();
     const replaces = await db.prepare('SELECT 1 AS x FROM shipped_receipts WHERE login_key = ? AND day = ? AND mode = ?').bind(key, day, mode).first();
-    const inserted = await db
+    const now = Date.now();
+    let inserted = await db
       .prepare(
         `INSERT INTO shipped_receipts (login, login_key, day, mode, data, demo, model, input_tokens, output_tokens, searches, cost_micros, listed, created_at)
          VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
@@ -2526,8 +2541,17 @@ async function printFreshSubject(env: ShippedEnv, db: D1Database, raw: string): 
            cost_micros = excluded.cost_micros, listed = excluded.listed, created_at = excluded.created_at
          WHERE shipped_receipts.hidden != 1 RETURNING id`,
       )
-      .bind(subjectLabel(subject), key, day, mode, JSON.stringify(receipt), state.demo ? 1 : 0, model, usage.input, usage.output, usage.searches, usage.cost, 1, Date.now())
+      .bind(subjectLabel(subject), key, day, mode, JSON.stringify(receipt), state.demo ? 1 : 0, model, usage.input, usage.output, usage.searches, usage.cost, 1, now)
       .first<{ id: number }>();
+    if (!inserted) {
+      inserted = await db
+        .prepare(
+          `UPDATE shipped_receipts SET login = ?, data = ?, demo = ?, model = ?, input_tokens = ?, output_tokens = ?, searches = ?, cost_micros = ?, listed = 1, hidden = 0, created_at = ?
+           WHERE login_key = ? AND day = ? AND mode = ? AND hidden = 1 RETURNING id`,
+        )
+        .bind(subjectLabel(subject), JSON.stringify(receipt), state.demo ? 1 : 0, model, usage.input, usage.output, usage.searches, usage.cost, now, key, day, mode)
+        .first<{ id: number }>();
+    }
     if (!inserted) return json({ error: 'taken-down' }, 410);
     await db.prepare('UPDATE shipped_receipts SET hidden = 0 WHERE id = ? AND hidden = 2').bind(inserted.id).run();
     if (!replaces) await bump(db, 'printed');

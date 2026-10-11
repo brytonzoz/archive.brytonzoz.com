@@ -282,3 +282,15 @@ export const isDomain = (value: string) => DOMAIN.test(value);
 
 /** Cache and takedown key: the same subject maps to the same key whatever case was typed. */
 export const subjectKey = (subject: Pick<Subject, 'kind' | 'id'>) => `${subject.kind}:${subject.id.toLowerCase()}`;
+
+/** Reverse a stored login_key (`x:jarredsumner`) when a receipt's subject display got replaced with `#26`. */
+export function subjectFromLoginKey(key: string): Pick<Subject, 'kind' | 'id'> | null {
+  const match = String(key || '')
+    .trim()
+    .match(/^(github|x|domain|name):(.+)$/i);
+  if (!match?.[2]) return null;
+  const kind = match[1]!.toLowerCase() as Subject['kind'];
+  const id = match[2].trim();
+  if (!id) return null;
+  return { kind, id };
+}

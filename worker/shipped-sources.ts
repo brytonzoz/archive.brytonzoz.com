@@ -61,6 +61,20 @@ import {
   withMetrics,
   type SourcedStat,
 } from './shipped-research';
+import {
+  cacheGet,
+  cachePut,
+  githubEtagCacheKey,
+  githubRequestHeaders,
+  isFreshSourceHarvest,
+  preferSourceHarvest,
+  readSourceHarvest,
+  SOURCE_CACHE_TTL_SEC,
+  sourceHarvestKey,
+  WARM_SOURCE_MS,
+  writeSourceHarvest,
+  type SourceCacheStore,
+} from './shipped-source-cache';
 
 export interface SourceEnv {
   GITHUB_TOKEN?: string;
@@ -85,6 +99,7 @@ export interface SourceEnv {
   OPENAI_API_KEY?: string;
   OPENAI_API_BASE?: string;
   companyStore?: import('./shipped-company-store').CompanyStore;
+  sourceCache?: SourceCacheStore;
 }
 
 export type DateConfidence = 'exact' | 'year' | 'inferred' | 'unknown';
@@ -228,6 +243,27 @@ export async function raceTimeout<T>(work: Promise<T>, ms: number, fallback: T):
   }
 }
 
+async function harvestOrCache(
+  env: SourceEnv,
+  key: string,
+  liveP: Promise<Found[]>,
+  coldMs: number,
+): Promise<{ found: Found[]; from: 'live' | 'cache' | 'merge' }> {
+  const cached = await readSourceHarvest(env.sourceCache, key);
+  const wait = isFreshSourceHarvest(cached) ? WARM_SOURCE_MS : coldMs;
+  const live = await raceTimeout(liveP.catch(() => [] as Found[]), wait, null as Found[] | null);
+  const picked = preferSourceHarvest(live, cached?.found);
+  if (picked.items.length && (picked.from === 'live' || picked.from === 'merge' || !cached?.found.length)) {
+    await writeSourceHarvest(env.sourceCache, key, {
+      at: picked.from === 'live' ? Date.now() : cached?.at || Date.now(),
+      found: picked.items,
+      ran: cached?.ran,
+      orgs: cached?.orgs,
+    });
+  }
+  return { found: picked.items, from: picked.from };
+}
+
 export class SourceError extends Error {
   constructor(public code: string) {
     super(code);
@@ -349,13 +385,10 @@ async function githubApi<T>(path: string, env: SourceEnv): Promise<T> {
   const auth = githubAuth(env);
   if (!auth) throw new SourceError('rate-limited');
   const quota = quotas[auth];
+  const etagKey = githubEtagCacheKey(auth, path);
+  const prior = await cacheGet<{ etag: string; body: T }>(etagKey);
   const response = await fetch(`https://api.github.com${path}`, {
-    headers: {
-      'user-agent': UA,
-      accept: 'application/vnd.github+json',
-      'x-github-api-version': '2022-11-28',
-      ...(auth === 'token' ? { authorization: `Bearer ${env.GITHUB_TOKEN}` } : {}),
-    },
+    headers: githubRequestHeaders(auth, env.GITHUB_TOKEN, prior?.etag),
     signal: AbortSignal.timeout(TIMEOUT),
   });
   const remaining = response.headers.get('x-ratelimit-remaining');
@@ -367,6 +400,7 @@ async function githubApi<T>(path: string, env: SourceEnv): Promise<T> {
     console.warn('shipped: GITHUB_TOKEN was rejected; using the anonymous API and public pages');
     return githubApi<T>(path, env);
   }
+  if (response.status === 304 && prior && prior.body !== undefined) return prior.body;
   if (response.status === 404) throw new SourceError('not-found');
   if (response.status === 403 || response.status === 429) {
     quota.remaining = 0;
@@ -375,7 +409,10 @@ async function githubApi<T>(path: string, env: SourceEnv): Promise<T> {
     throw new SourceError('rate-limited');
   }
   if (!response.ok) throw new SourceError(`http-${response.status}`);
-  return (await response.json()) as T;
+  const body = (await response.json()) as T;
+  const etag = response.headers.get('etag');
+  if (etag) await cachePut(etagKey, { etag, body }, SOURCE_CACHE_TTL_SEC);
+  return body;
 }
 
 /** A github.com page read directly: its text, or null when GitHub says it doesn't exist. Throws when unsure. */
@@ -1828,7 +1865,7 @@ export async function gather(
     gatherFresh(subject, resolved.profile, env, year, meter, tinyfish, resolved.notes, mode, opts?.onPartial, opts?.affiliation);
   if (opts?.rebuild && !opts.onPartial) return load();
   if (opts?.rebuild) return load();
-  const key = mode === 'full' ? `gather:full:v37:${year}:${resolved.cacheKey}` : `gather:v47:${year}:${resolved.cacheKey}`;
+  const key = mode === 'full' ? `gather:full:v38:${year}:${resolved.cacheKey}` : `gather:v48:${year}:${resolved.cacheKey}`;
   return cached(
     key,
     1440 * MIN,
@@ -2117,14 +2154,47 @@ async function gatherFresh(
           }).catch(() => ({ found: [] as Found[], ran: [] as string[], orgs: [] as string[] }));
         })()
       : Promise.resolve({ found: [] as Found[], ran: [] as string[], orgs: [] as string[] });
-  const ossP = raceTimeout(ossHarvestP, OSS_TIMEOUT_MS, { found: [] as Found[], ran: [] as string[], orgs: [] as string[] });
-  const ownP = raceTimeout(
+  const ossSubject = profile.github || profile.x || subject.id;
+  const ossCacheKey = sourceHarvestKey('oss', year, ossSubject);
+  const ossCachedP = readSourceHarvest(env.sourceCache, ossCacheKey);
+  const ownCacheKey = sourceHarvestKey('own', year, ossSubject);
+  const ossP = (async () => {
+    const cached = await ossCachedP;
+    const wait = isFreshSourceHarvest(cached) ? WARM_SOURCE_MS : OSS_TIMEOUT_MS;
+    const live = await raceTimeout(
+      ossHarvestP,
+      wait,
+      null as { found: Found[]; ran: string[]; orgs: string[] } | null,
+    );
+    const picked = preferSourceHarvest(live?.found, cached?.found);
+    const result = {
+      found: picked.items,
+      ran: [...(live?.ran || cached?.ran || []), `oss-${picked.from}`],
+      orgs: live?.orgs?.length ? live.orgs : cached?.orgs || [],
+    };
+    if (result.found.length && (picked.from === 'live' || picked.from === 'merge' || !cached?.found.length)) {
+      await writeSourceHarvest(env.sourceCache, ossCacheKey, {
+        at: picked.from === 'live' ? Date.now() : cached?.at || Date.now(),
+        found: result.found,
+        ran: result.ran,
+        orgs: result.orgs,
+      });
+    }
+    return result;
+  })();
+  const ownP = harvestOrCache(
+    env,
+    ownCacheKey,
     harvestOwnProductSites(ownProducts, year, [profile.site, ...sitesOf(profile)]).catch(() => []),
     OSS_TIMEOUT_MS,
-    [],
-  );
+  ).then((row) => row.found);
   const [results, site, extraSites, searched, storeHarvest, githubOverview] = await Promise.all([
-    Promise.allSettled(SOURCES.filter((source) => source.enabled(ctx)).map(async (source) => ({ id: source.id, found: await raceTimeout(source.run(ctx), SOURCE_TIMEOUT_MS, []) }))),
+    Promise.allSettled(
+      SOURCES.filter((source) => source.enabled(ctx)).map(async (source) => {
+        const cached = await harvestOrCache(env, sourceHarvestKey(source.id, year, ossSubject), source.run(ctx), SOURCE_TIMEOUT_MS);
+        return { id: source.id, found: cached.found, from: cached.from };
+      }),
+    ),
     homepage ? raceTimeout(readSite(homepage, HOME_TIMEOUT_MS).catch(() => null), HOME_TIMEOUT_MS, null) : Promise.resolve(null),
     Promise.all(extraHomes.map((url) => raceTimeout(readSite(url).catch(() => null), SOURCE_TIMEOUT_MS, null))),
     Promise.all(
@@ -2229,12 +2299,33 @@ async function gatherFresh(
   found.push(...itemsFromWebEvidence({ profile, site, pages: [], web, year }));
 
   const projectPages = [site, ...ownPages].filter((page): page is SiteInfo => Boolean(page));
+  const journalLive: Found[] = [];
   for (const page of projectPages) {
     const text = `${page.title}\n${page.description}\n${page.text}`;
     found.push(...itemsFromProjectList({ text, url: page.url, year }));
-    found.push(...itemsFromDatedJournal({ text, url: page.url, year }));
+    const journal = itemsFromDatedJournal({ text, url: page.url, year });
+    journalLive.push(...journal);
+    found.push(...journal);
     found.push(...itemsFromPersonalFeed({ text: page.embedded && /<item\b|<entry\b/i.test(page.embedded) ? page.embedded : text, url: page.url, year }));
     found.push(...itemsFromEmbeddedPortfolio({ html: page.embedded || text, url: page.url, year }));
+  }
+  {
+    const journalKey = sourceHarvestKey('journal', year, ossSubject);
+    const journalCached = await readSourceHarvest(env.sourceCache, journalKey);
+    const journal = preferSourceHarvest(journalLive, journalCached?.found);
+    if (journal.from !== 'live') {
+      const extra = journal.items.filter((item) => !found.some((row) => row.link && item.link && row.link === item.link));
+      if (extra.length) {
+        found.push(...extra);
+        ran.push(`journal-${journal.from}:${extra.length}`);
+      }
+    }
+    if (journal.items.length) {
+      await writeSourceHarvest(env.sourceCache, journalKey, {
+        at: journal.from === 'live' ? Date.now() : journalCached?.at || Date.now(),
+        found: journal.items,
+      });
+    }
   }
   if (storeHarvest.found.length) {
     found.push(...storeHarvest.found);
@@ -2291,6 +2382,8 @@ async function gatherFresh(
   };
   emitPartial(found, 'partial:first-wave');
   {
+    const cachedOss = await ossCachedP;
+    if (cachedOss?.found.length) emitPartial([...found, ...cachedOss.found], 'partial:oss-cache');
     const [ossHarvest, ownHarvest] = await Promise.all([ossP, ownP]);
     mergeSlowHarvest(ossHarvest, ownHarvest);
     emitPartial(found, 'partial:oss');

@@ -69,6 +69,7 @@ import {
 } from './shipped-sources';
 import { prettyPersonName } from './shipped-identity';
 import { makeCompanyStore, parseOffworkerCache, putOffworkerCache } from './shipped-company-store';
+import { makeSourceCache } from './shipped-source-cache';
 import { TINYFISH_DAILY, type TinyfishKind, type TinyfishMeter } from './shipped-tinyfish';
 import { checkFetchUrl, finalUrl } from './shipped-fetch';
 import {
@@ -287,6 +288,8 @@ const SCHEMA = [
     r2_key TEXT, fetched_at INTEGER NOT NULL, rev TEXT, PRIMARY KEY (slug, year))`,
   `CREATE TABLE IF NOT EXISTS shipped_company_queue (
     slug TEXT PRIMARY KEY, company TEXT NOT NULL, product TEXT, site TEXT, queued_at INTEGER NOT NULL)`,
+  `CREATE TABLE IF NOT EXISTS shipped_source_cache (
+    cache_key TEXT PRIMARY KEY, data TEXT NOT NULL, n INTEGER NOT NULL DEFAULT 0, updated_at INTEGER NOT NULL)`,
 ];
 // Columns added after the tables first shipped; "duplicate column" means it's already there.
 const COLUMNS = [
@@ -372,6 +375,7 @@ function sourceNames(env: ShippedEnv): string[] {
 function gatherEnv(env: ShippedEnv, db: D1Database | null, extra: Partial<SourceEnv> = {}): SourceEnv {
   return Object.assign(Object.create(env) as ShippedEnv, {
     companyStore: db ? makeCompanyStore(env, db) : undefined,
+    sourceCache: db ? makeSourceCache(db) : undefined,
     ...extra,
   });
 }

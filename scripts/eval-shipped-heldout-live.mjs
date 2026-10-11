@@ -164,14 +164,53 @@ async function printOne(query) {
     inputTokens: printed.inputTokens ?? loaded.input_tokens ?? loaded.inputTokens ?? null,
     outputTokens: printed.outputTokens ?? loaded.output_tokens ?? loaded.outputTokens ?? null,
     ms: Date.now() - started,
+    missingRequired: requiredMiss(query, titles, items.length),
     ok:
       !junk.length &&
       !echoNote(note, items) &&
       items.length >= ossFloor(query) &&
       !droppedToZero(query, items.length) &&
       !employerSpill(query, titles).length &&
+      !requiredMiss(query, titles, items.length) &&
       (wall == null || wall === items.length),
   };
+}
+
+function requiredMiss(query, titles, count) {
+  const who = String(query || '')
+    .replace(/^@/, '')
+    .toLowerCase();
+  const blob = (titles || []).join(' ');
+  if (/^(yyx990803|youyuxi)$/.test(who) && Number(count || 0) < 15) return 'evan<15';
+  if (/^levelsio$/.test(who) && !/hotelist/i.test(blob)) return 'no-hotelist';
+  if (/^(colinhacks|colin)$/.test(who) && !/\bnub\b/i.test(blob)) return 'no-nub';
+  if (/^(tibo|tibo_maker)$/.test(who) && Number(count || 0) < 35) return 'tibo<35';
+  return null;
+}
+
+function stableCounts(a, b) {
+  const max = Math.max(Number(a || 0), Number(b || 0), 1);
+  return Math.abs(Number(a || 0) - Number(b || 0)) / max <= 0.1;
+}
+
+async function runPass(label) {
+  const rows = [];
+  for (const query of QUERIES) {
+    try {
+      const row = await printOne(query);
+      rows.push({ ...row, pass: label });
+      console.log(JSON.stringify({ pass: label, ...row }, null, 2));
+    } catch (error) {
+      rows.push({
+        query,
+        pass: label,
+        ok: false,
+        error: error instanceof Error ? error.message : String(error),
+      });
+      console.error(label, query, error);
+    }
+  }
+  return rows;
 }
 
 if (!password) {
@@ -179,42 +218,71 @@ if (!password) {
   process.exit(2);
 }
 
-const rows = [];
-for (const query of QUERIES) {
+const twice = process.env.SHIPPED_HELD_OUT_TWICE !== '0';
+const extras = (process.env.SHIPPED_HELD_OUT_EXTRAS || 'colinhacks,tibo_maker')
+  .split(',')
+  .map((value) => value.trim())
+  .filter(Boolean);
+
+const pass1 = await runPass(1);
+const pass2 = twice ? await runPass(2) : [];
+const extraRows = [];
+for (const query of extras) {
   try {
     const row = await printOne(query);
-    rows.push(row);
-    console.log(JSON.stringify(row, null, 2));
+    extraRows.push(row);
+    console.log(JSON.stringify({ extra: true, ...row }, null, 2));
   } catch (error) {
-    rows.push({ query, ok: false, error: error instanceof Error ? error.message : String(error) });
-    console.error(query, error);
+    extraRows.push({ query, ok: false, error: error instanceof Error ? error.message : String(error) });
+    console.error('extra', query, error);
   }
 }
+
+const byQuery = new Map(pass1.map((row) => [row.query, { a: row, b: pass2.find((other) => other.query === row.query) }]));
+const stability = [...byQuery.entries()].map(([query, pair]) => {
+  const ok = !twice || (pair.b && stableCounts(pair.a.count, pair.b.count));
+  return {
+    query,
+    a: pair.a.count ?? null,
+    b: pair.b?.count ?? null,
+    ok,
+    drift: pair.b ? `${pair.a.count}→${pair.b.count}` : 'single-pass',
+  };
+});
+
+const summarize = (row) => ({
+  query: row.query,
+  id: row.id,
+  count: row.count,
+  wallCount: row.wallCount,
+  pass: row.pass,
+  note: row.note,
+  echoNote: row.echoNote,
+  junk: row.junk,
+  emptyVerified: row.emptyVerified,
+  droppedToZero: row.droppedToZero,
+  employerSpill: row.employerSpill,
+  missingRequired: row.missingRequired,
+  floor: row.floor,
+  costMicros: row.costMicros,
+  inputTokens: row.inputTokens,
+  outputTokens: row.outputTokens,
+  ms: row.ms,
+  ok: row.ok,
+  error: row.error,
+  titles: row.titles,
+});
 
 const summary = {
   origin,
   xai: 'off',
   sha: process.env.GITHUB_SHA || null,
-  rows: rows.map((row) => ({
-    query: row.query,
-    id: row.id,
-    count: row.count,
-    wallCount: row.wallCount,
-    note: row.note,
-    echoNote: row.echoNote,
-    junk: row.junk,
-    emptyVerified: row.emptyVerified,
-    droppedToZero: row.droppedToZero,
-    employerSpill: row.employerSpill,
-    floor: row.floor,
-    costMicros: row.costMicros,
-    inputTokens: row.inputTokens,
-    outputTokens: row.outputTokens,
-    ms: row.ms,
-    ok: row.ok,
-    error: row.error,
-    titles: row.titles,
-  })),
+  twice,
+  stability,
+  pass1: pass1.map(summarize),
+  pass2: pass2.map(summarize),
+  extras: extraRows.map(summarize),
+  rows: [...pass1, ...pass2, ...extraRows].map(summarize),
 };
 console.log('\n--- held-out live ---\n');
 console.log(JSON.stringify(summary, null, 2));
@@ -222,5 +290,6 @@ const reportPath = process.env.SHIPPED_REPORT;
 if (reportPath) {
   await import('node:fs/promises').then((fs) => fs.writeFile(reportPath, JSON.stringify(summary, null, 2)));
 }
-const failed = rows.filter((row) => !row.ok);
-process.exit(failed.length ? 1 : 0);
+const failed = [...pass1, ...pass2, ...extraRows].filter((row) => !row.ok);
+const unstable = stability.filter((row) => !row.ok);
+process.exit(failed.length || unstable.length ? 1 : 0);

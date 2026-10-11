@@ -256,6 +256,17 @@ test('admin gather waits for the OSS harvest budget', () => {
   assert.ok(gather > oss, `ADMIN_GATHER_MS ${gather} should exceed OSS_TIMEOUT_MS ${oss}`);
 });
 
+test('source harvests persist and GitHub calls are conditional', () => {
+  const worker = fs.readFileSync(new URL('../worker/shipped.ts', import.meta.url), 'utf8');
+  const sources = fs.readFileSync(new URL('../worker/shipped-sources.ts', import.meta.url), 'utf8');
+  assert.match(worker, /CREATE TABLE IF NOT EXISTS shipped_source_cache/);
+  assert.match(worker, /sourceCache: db \? makeSourceCache\(db\)/);
+  assert.match(sources, /if-none-match|githubRequestHeaders/);
+  assert.match(sources, /response\.status === 304/);
+  assert.match(sources, /preferSourceHarvest/);
+  assert.match(sources, /oss-cache/);
+});
+
 test('pile and receipt cache keys share the listed hash so wall busts match', () => {
   const worker = fs.readFileSync(new URL('../worker/shipped.ts', import.meta.url), 'utf8');
   assert.match(worker, /export function listedCacheRequest/);

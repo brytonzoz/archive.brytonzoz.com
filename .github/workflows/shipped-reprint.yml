@@ -10,6 +10,7 @@ on:
       - scripts/reprint-shipped.mjs
       - worker/shipped.ts
       - worker/shipped-sources.ts
+      - worker/shipped-source-cache.ts
       - worker/shipped-affiliation.ts
       - worker/shipped-company-seeds.ts
       - worker/shipped-polish.ts
@@ -127,6 +128,7 @@ jobs:
           SHIPPED_ORIGIN: ${{ github.event_name == 'workflow_dispatch' && inputs.origin || 'https://shipped-staging.brytonzoz.com' }}
           SHIPPED_XAI_OFF: '1'
           SHIPPED_REPORT: shipped-heldout-report.json
+          SHIPPED_HELD_OUT_TWICE: '1'
           GITHUB_SHA: ${{ github.sha }}
         run: |
           if [ -z "$ADMIN_PASSWORD" ]; then

@@ -105,3 +105,9 @@ CREATE TABLE IF NOT EXISTS shipped_company_queue (
   site TEXT,
   queued_at INTEGER NOT NULL
 );
+CREATE TABLE IF NOT EXISTS shipped_source_cache (
+  cache_key TEXT PRIMARY KEY,
+  data TEXT NOT NULL,
+  n INTEGER NOT NULL DEFAULT 0,
+  updated_at INTEGER NOT NULL
+);

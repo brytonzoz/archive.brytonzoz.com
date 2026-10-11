@@ -941,6 +941,8 @@ test('prereleases, starters, and Gateway model listings are not ships', () => {
   assert.equal(polish.cleanShipTitle('REMOTE CONTROL IS ON BY DEFAULT FOR EVERYONE EXCEPT'), '');
   assert.equal(polish.looksCutOff('PARTNER SITES, STARTING WITH AIRTABLE, GI'), true);
   assert.equal(polish.isBlogEssayTitle('BEST AI HEADSHOT GENERATORS 2026'), true);
+  assert.equal(polish.looksLikeEssayTitle('The Best AI Headshot Generators 2026'), true);
+  assert.equal(polish.isBlogEssayTitle('The Best AI Headshot Generators 2026'), true);
   assert.equal(polish.looksCutOff('BROWSER EXTENSIONS, SITE TOOLS, AND CLOUD SIGN-IN'), false);
   assert.equal(polish.isJunkTitle('BROWSER EXTENSIONS, SITE TOOLS, AND CLOUD SIGN-IN'), false);
   assert.match(polish.cleanShipTitle('BROWSER EXTENSIONS, SITE TOOLS, AND CLOUD SIGN-IN'), /sign-in/i);
@@ -1169,6 +1171,8 @@ test('cheap filters strip markup, drop prereleases and other years, and dedupe U
       found({ name: 'Hotel in Leiden', date: '2026-08-01', link: 'https://x.com/levelsio/status/2', source: 'x', kind: 'post' }),
       found({ name: 'We launched AI Gateway', date: '2026-04-01', link: 'https://vercel.com/changelog/ai-gateway' }),
       found({ name: 'Lisbon hotel thread', date: '2026-08-02', link: 'https://x.com/levelsio/status/3', source: 'web' }),
+      found({ name: 'BEST AI HEADSHOT GENERATORS 2026', date: '2026-01-08', link: 'https://dannypostma.com/best-ai-headshot-generators-2026' }),
+      found({ name: 'The Best AI Headshot Generators 2026', date: '2026-01-09', link: 'https://dannypostma.com/guides/headshots' }),
     ],
     2026,
   );
@@ -1176,7 +1180,11 @@ test('cheap filters strip markup, drop prereleases and other years, and dedupe U
   assert.ok(names.includes('Composer 2'), JSON.stringify(names));
   assert.ok(names.includes('We launched AI Gateway'), JSON.stringify(names));
   assert.equal(names.filter((name) => /composer/i.test(name)).length, 1);
-  assert.equal(names.some((name) => /canary|old ship|coding almost solely|@dub\/|what.?s new in svelte|hotel in leiden|lisbon hotel/i.test(name)), false, JSON.stringify(names));
+  assert.equal(
+    names.some((name) => /canary|old ship|coding almost solely|@dub\/|what.?s new in svelte|hotel in leiden|lisbon hotel|headshot generators/i.test(name)),
+    false,
+    JSON.stringify(names),
+  );
   assert.ok(names.includes('Minor Changes'), JSON.stringify(names));
   assert.equal(cheap.find((item) => item.name === 'Minor Changes')?.description, 'Minor Changes - 17ee736');
 });

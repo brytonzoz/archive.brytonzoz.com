@@ -27,6 +27,7 @@ import {
   harvestLooksLikeOssTape,
   harvestShouldWin,
   packCandidates,
+  unionHarvestWin,
   parseCurationJson,
 } from './shipped-curate';
 
@@ -1682,7 +1683,8 @@ export async function assembleReceipt(
             owner: ownerFromProfile(gathered.profile, affiliation),
             apiDown: false,
           };
-          const sealed = finish(harvested, curated.note, seed, undefined, formatStats(harvested, gathered.stats ?? []), noteCtx);
+          const tape = unionHarvestWin(harvested, curated.items);
+          const sealed = finish(tape, curated.note, seed, undefined, formatStats(tape, gathered.stats ?? []), noteCtx);
           return {
             ...sealed,
             model: curated.model,

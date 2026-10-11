@@ -199,6 +199,23 @@ test('harvest wins when Claude keeps a highlight reel of a fat company tape', ()
     { name: 'Vite 8' },
     { name: 'Vue 3.5.27' },
   ]), false);
+  const restored = curate.unionHarvestWin(
+    [
+      { name: 'NEXT.JS 16.4', link: 'https://vercel.com/changelog/next-16-4' },
+      { name: 'V0 PLATFORM API', link: 'https://vercel.com/changelog/v0-platform-api' },
+    ],
+    [
+      { name: 'AI GATEWAY', link: 'https://vercel.com/changelog/ai-gateway' },
+      { name: 'VERCEL AGENT', link: 'https://vercel.com/changelog/vercel-agent' },
+      { name: 'v0', link: 'https://vercel.com/blog/introducing-the-new-v0' },
+      { name: 'NEXT.JS 16.4', link: 'https://vercel.com/changelog/next-16-4' },
+    ],
+  );
+  const restoredNames = restored.map((item) => item.name);
+  assert.ok(restoredNames.some((name) => /ai gateway/i.test(name)), JSON.stringify(restoredNames));
+  assert.ok(restoredNames.some((name) => /vercel agent/i.test(name)), JSON.stringify(restoredNames));
+  assert.equal(restoredNames.filter((name) => /v0/i.test(name)).length, 1, JSON.stringify(restoredNames));
+  assert.equal(restoredNames.filter((name) => /next\.js 16\.4/i.test(name)).length, 1, JSON.stringify(restoredNames));
 });
 
 test('rollup keeps an existing monthly RELEASES IN label', () => {
@@ -228,4 +245,51 @@ test('rollup keeps an existing monthly RELEASES IN label', () => {
     tape.items.map((item) => item.name),
     ['BUN · 3 RELEASES IN JAN'],
   );
+});
+
+test('applyCuration drops listicle raw titles even when Claude renames them', () => {
+  const packed = [
+    {
+      id: 'c0',
+      raw_title: 'BEST AI HEADSHOT GENERATORS 2026',
+      short_desc: '',
+      source_host: 'dannypostma.com',
+      date: '2026-01-08',
+      kind: 'web',
+      found: found({
+        name: 'BEST AI HEADSHOT GENERATORS 2026',
+        date: '2026-01-08',
+        link: 'https://dannypostma.com/best-ai-headshot-generators-2026',
+        source: 'site',
+      }),
+    },
+    {
+      id: 'c1',
+      raw_title: 'AgentBar',
+      short_desc: 'I made a launch bar',
+      source_host: 'github.com',
+      date: '2026-08-13',
+      kind: 'repo',
+      found: found({
+        name: 'AgentBar',
+        date: '2026-08-13',
+        link: 'https://github.com/dannypostma/agentbar',
+        source: 'github',
+      }),
+    },
+  ];
+  const tape = curate.applyCuration(
+    {
+      items: [
+        { id: 'c0', title: 'Headshot Tools', group: null, owned: true, significance: 2 },
+        { id: 'c1', title: 'AgentBar', group: null, owned: true, significance: 2 },
+      ],
+      notes: ['AgentBar is the one with a date on it.'],
+    },
+    packed,
+  );
+  assert.ok(tape);
+  const names = tape.items.map((item) => item.name);
+  assert.equal(names.some((name) => /headshot/i.test(name)), false, JSON.stringify(names));
+  assert.ok(names.some((name) => /agentbar/i.test(name)), JSON.stringify(names));
 });

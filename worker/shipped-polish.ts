@@ -368,7 +368,7 @@ export function isBlogEssayTitle(title: string): boolean {
   if (/^[A-Za-z][\w.-]*\s+is an?\s+(applied research|engineering|product|research) team\b/i.test(text)) return true;
   if (/^both are available\b|^available today on\b/i.test(text)) return true;
   if (/^(latest|top|best)\s+(articles?|posts?|stories|news)\b/i.test(text)) return true;
-  if (/^best\b/i.test(text) && /\b(20\d{2}|generators?|tools?|apps?)\b/i.test(text) && text.split(/\s+/).length >= 4) {
+  if (/\bbest\b/i.test(text) && /\b(20\d{2}|generators?|tools?|apps?)\b/i.test(text) && text.split(/\s+/).length >= 4) {
     return true;
   }
   if (/\barticles? about\b/i.test(text)) return true;
@@ -1122,7 +1122,7 @@ export function looksLikeEssayTitle(title: string): boolean {
   if (!text) return false;
   const words = text.split(/\s+/).filter(Boolean);
   if (ESSAY_OPENER.test(text)) return true;
-  if (/^best\b/i.test(text) && /\b(20\d{2}|generators?|tools?|apps?)\b/i.test(text) && words.length >= 4) return true;
+  if (/\bbest\b/i.test(text) && /\b(20\d{2}|generators?|tools?|apps?)\b/i.test(text) && words.length >= 4) return true;
   if (words.length >= 12) return true;
   if (words.length >= 8 && ESSAY_MIDDLE.test(text)) return true;
   if (words.length >= 8 && !/\d+\.\d+/.test(text) && /\b(is|are|was|were|makes|broke|will|can't|could|should|has|have|had|lies|killed)\b/i.test(text)) {
@@ -1878,7 +1878,14 @@ export function cheapHardFilter<T extends Polishable>(items: T[], year: number):
     if (!name || name === 'YOUR POTENTIAL') continue;
     if (!cheapYearOk(item, year)) continue;
     if (isPrereleaseShip(name) || isPrereleaseShip(item.name)) continue;
-    if (looksLikeEssayTitle(name) || looksLikeScopedPackage(name) || looksLikeMonthlyRoundup(name)) continue;
+    if (
+      looksLikeEssayTitle(name) ||
+      isBlogEssayTitle(name) ||
+      looksLikeScopedPackage(name) ||
+      looksLikeMonthlyRoundup(name)
+    ) {
+      continue;
+    }
     if (looksLikeSocialPost(item)) continue;
     const link = String(item.link || '').trim();
     if (!link) continue;

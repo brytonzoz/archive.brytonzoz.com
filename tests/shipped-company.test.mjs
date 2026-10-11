@@ -865,6 +865,48 @@ test('off-worker cache is preferred and scoped on read', async () => {
   assert.equal(miss.cacheHit, false);
   assert.equal(miss.found.length, 0);
   assert.ok(miss.ran.includes('company-store-miss'));
+
+  const vercelStore = {
+    async get() {
+      return {
+        fetchedAt: Date.now(),
+        slug: 'vercel',
+        year: 2026,
+        found: [
+          {
+            name: 'Kimi K2.5 now available on AI Gateway',
+            description: '',
+            date: '2026-09-12',
+            link: 'https://vercel.com/changelog/kimi-k2-5-available-on-ai-gateway',
+            source: 'changelog',
+            status: 'LAUNCHED',
+            score: 6,
+            thisYear: true,
+          },
+          {
+            name: 'Vercel Agent',
+            description: '',
+            date: '2026-09-30',
+            link: 'https://vercel.com/changelog/vercel-agent',
+            source: 'changelog',
+            status: 'LAUNCHED',
+            score: 9,
+            thisYear: true,
+          },
+        ],
+        ran: ['gha'],
+      };
+    },
+    async queue() {
+      return false;
+    },
+  };
+  const rauch = { ...affiliation.emptyAffiliation(), company: 'Vercel', role: 'ceo', typedCompany: true };
+  const vercel = await company.harvestCompany({ affiliation: rauch, year: 2026, env: {}, store: vercelStore });
+  const vercelNames = vercel.found.map((item) => item.name);
+  assert.ok(vercelNames.some((name) => /new models on ai gateway/i.test(name)), JSON.stringify(vercelNames));
+  assert.ok(vercelNames.some((name) => /vercel agent/i.test(name)), JSON.stringify(vercelNames));
+  assert.equal(vercelNames.filter((name) => /kimi/i.test(name)).length, 0, JSON.stringify(vercelNames));
 });
 
 test('seed list includes OpenAI Codex plus the companies Bryton will look up', () => {

@@ -980,7 +980,7 @@ export async function harvestCompany(opts: {
       // treat zero ships as a hit or a CEO tape collapses to nothing.
       if (scoped.length) {
         return {
-          found: withVia(scoped, via),
+          found: compactCompanyFound(withVia(scoped, via)),
           spend: emptyXaiSpend(),
           ran: ['company-offworker', ...off.ran.slice(0, 8)],
           cacheHit: true,

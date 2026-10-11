@@ -3,6 +3,7 @@
 // only when this JSON cannot be parsed or validated.
 import type { Affiliation } from './shipped-affiliation';
 import type { Found } from './shipped-sources';
+import { flagshipLaunchName } from './shipped-flagship';
 import {
   CHEAP_CANDIDATE_CAP,
   RECEIPT_LINE_CAP,
@@ -10,6 +11,8 @@ import {
   cheapHardFilter,
   cleanDescription,
   cleanStatus,
+  isBlogEssayTitle,
+  looksLikeEssayTitle,
   spokenShipName,
   stripMarkup,
   titleSanityOk,
@@ -248,6 +251,7 @@ export function applyCuration(
     if (row.owned !== true && row.owned !== 'true') continue;
     const candidate = byId.get(row.id)!;
     if (seen.has(row.id)) continue;
+    if (looksLikeEssayTitle(candidate.raw_title) || isBlogEssayTitle(candidate.raw_title)) continue;
     const title = cleanTitle(row.title, candidate.raw_title);
     if (!title) continue;
     const significance = Math.max(0, Math.min(3, Math.round(asInt(row.significance, 1))));
@@ -316,6 +320,42 @@ export function harvestShouldWin(
     return curatedCount < floor;
   }
   return false;
+}
+
+const looseName = (text: string) => String(text || '').toLowerCase().replace(/[^a-z0-9]/g, '');
+
+const HARVEST_WIN_NEEDLE = /\b(ai gateway|vercel agent|new models on ai gateway)\b/i;
+
+function harvestWinKey(item: { name?: string; link?: string | null }): string {
+  const flag = flagshipLaunchName(item);
+  const fromFlag = looseName(flag || '');
+  if (fromFlag.length >= 2) return fromFlag;
+  return looseName(item.name || '');
+}
+
+function harvestAlreadyHas<T extends { name?: string; link?: string | null }>(tape: T[], item: T): boolean {
+  const key = harvestWinKey(item);
+  if (!key || key.length < 2) return false;
+  return tape.some((row) => {
+    const rowKey = harvestWinKey(row);
+    const rowName = looseName(row.name || '');
+    if (rowKey && (rowKey === key || rowKey.includes(key) || key.includes(rowKey))) return true;
+    return Boolean(rowName && (rowName === key || rowName.includes(key) || (key.length >= 6 && key.includes(rowName))));
+  });
+}
+
+/** Restore Claude's named flagships onto a harvest-win tape that lost them in compact/rollup. */
+export function unionHarvestWin<T extends { name?: string; link?: string | null }>(harvested: T[], curated: T[]): T[] {
+  const extra: T[] = [];
+  for (const item of curated || []) {
+    const name = String(item.name || '');
+    if (!name) continue;
+    const flagship = flagshipLaunchName(item);
+    if (!flagship && !HARVEST_WIN_NEEDLE.test(name)) continue;
+    if (harvestAlreadyHas(harvested, item) || harvestAlreadyHas(extra, item)) continue;
+    extra.push(item);
+  }
+  return extra.length ? [...extra, ...harvested] : harvested;
 }
 
 export function customerFromProfile(

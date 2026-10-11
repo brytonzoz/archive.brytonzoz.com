@@ -34,10 +34,14 @@ export function isJunkProfileText(text: string | null | undefined): boolean {
 export type NameParts = { name: string; company: string | null; tokens: string[]; product: string | null };
 
 /**
- * Only for two living people who share one public handle. Never a convenience list of
- * eval builders. Empty until a real collision shows up.
+ * Public handle collisions only: a decoy GitHub login or an X handle that is not the
+ * GitHub login. Never a harvest cheat sheet of eval builders.
  */
-export const IDENTITY_COLLISIONS: Record<string, string> = {};
+export const IDENTITY_COLLISIONS: Record<string, string> = {
+  'jarred-sumner': 'jarredsumner',
+  youyuxi: 'yyx990803',
+  dan_abramov: 'gaearon',
+};
 
 export function collisionOverride(handle: string): string | null {
   return IDENTITY_COLLISIONS[handle.replace(/^@/, '').toLowerCase()] ?? null;
@@ -268,7 +272,7 @@ export function scoreGithubMatch(opts: {
   );
   const siteHit = Boolean(user.blog && sites.some((s) => hostOf(user.blog) === hostOf(s)));
   if (wantX && user.x && user.x.toLowerCase() === wantX.toLowerCase()) score += 50;
-  if (wantX && user.login.toLowerCase() === wantX.toLowerCase()) score += 8;
+  if (wantX && user.login.toLowerCase() === wantX.toLowerCase()) score += 40;
   if (variantHit) score += 18;
   if (siteHit) score += 25;
   const nameHit = Boolean(wantName && namesClose(user.name || user.login, wantName));

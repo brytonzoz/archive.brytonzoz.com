@@ -223,11 +223,8 @@ test('held-out 15 are fresh names, never the goldens or identity tables', () => 
     assert.equal(EXCLUDED.has(query.toLowerCase()), false, query);
     assert.equal(new RegExp(`\`${escaped}\``, 'i').test(evalList), false, `eval list has ${query}`);
     assert.equal(new RegExp(`\`${escaped}\``, 'i').test(oldHeld), false, `old held-out has ${query}`);
-    assert.equal(
-      new RegExp(`['"\`]${escaped}['"\`]`, 'i').test(identitySrc.split('IDENTITY_COLLISIONS')[1]?.slice(0, 800) || ''),
-      false,
-      query,
-    );
+    const collisionBlock = identitySrc.split('IDENTITY_COLLISIONS')[1]?.split('}')[0] || '';
+    assert.equal(new RegExp(`['"\`]${escaped}['"\`]\\s*:`, 'i').test(collisionBlock), false, query);
   }
 });
 

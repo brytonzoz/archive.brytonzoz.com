@@ -1433,7 +1433,7 @@ async function githubRepoOwners(product: string, env: SourceEnv): Promise<string
 
 /** Expand a typed subject to GitHub, X, sites, PH/npm usernames. Cached 24h. */
 export async function resolveIdentity(subject: Subject, env: SourceEnv, tinyfish: TinyfishAccess = null): Promise<ResolvedIdentity> {
-  return cached(`id:v7:${subject.kind}:${subject.id.toLowerCase()}:${loose(subject.display)}:${subject.x || ''}`, 1440 * MIN, () => resolveIdentityFresh(subject, env, tinyfish));
+  return cached(`id:v8:${subject.kind}:${subject.id.toLowerCase()}:${loose(subject.display)}:${subject.x || ''}`, 1440 * MIN, () => resolveIdentityFresh(subject, env, tinyfish));
 }
 
 async function resolveProductMaker(
@@ -1507,7 +1507,7 @@ export async function resolveIdentityFresh(subject: Subject, env: SourceEnv, tin
   const collided = collisionOverride(subject.id);
   if (collided) {
     notes.push(`collision:${subject.id}->${collided}`);
-    if (isGithubLogin(collided)) profile.github ||= collided;
+    if (isGithubLogin(collided)) profile.github = collided;
     if (isXHandle(collided)) profile.x ||= collided;
   }
 
@@ -1588,7 +1588,7 @@ export async function resolveIdentityFresh(subject: Subject, env: SourceEnv, tin
     const fromSearch = await bestGithubFor({ ...matchOpts, logins: searched }, env, tinyfish);
     if (fromSearch && (!matched || fromSearch.score > matched.score)) matched = fromSearch;
   }
-  if (matched) {
+  if (matched && !(collided && isGithubLogin(collided) && matched.user.login.toLowerCase() !== collided.toLowerCase())) {
     notes.push(`github:${matched.user.login} repos=${matched.user.repos} score=${matched.score}`);
     profile.github = matched.user.login;
     profile.name ||= matched.user.name;
@@ -1602,8 +1602,13 @@ export async function resolveIdentityFresh(subject: Subject, env: SourceEnv, tin
       profile.sites = mergeSites(profile.sites, [matched.user.blog]);
     }
   } else if (profile.github) {
+    if (collided && isGithubLogin(collided) && matched && matched.user.login.toLowerCase() !== collided.toLowerCase()) {
+      notes.push(`collision-pin:${matched.user.login}->${collided} score=${matched.score}`);
+      profile.github = collided;
+    }
     const user = await githubUser(profile.github, env, tinyfish).catch(() => null);
     if (user) {
+      notes.push(`github:${user.login} repos=${user.repos} score=pin`);
       profile.name ||= user.name;
       profile.bio ||= user.bio;
       profile.site ||= user.blog;

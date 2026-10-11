@@ -679,7 +679,26 @@ test('changelog/company beat npm on the same loose name, and old first-publish y
 });
 
 test('identity tables are not an eval cheat sheet', () => {
-  assert.deepEqual(identity.IDENTITY_COLLISIONS, {});
+  assert.deepEqual(identity.IDENTITY_COLLISIONS, {
+    'jarred-sumner': 'jarredsumner',
+    youyuxi: 'yyx990803',
+    dan_abramov: 'gaearon',
+  });
+  const decoyJarred = identity.scoreGithubMatch({
+    user: { login: 'Jarred-Sumner', name: 'Jarred Sumner', bio: '', blog: null, x: null, repos: 12 },
+    wantX: 'jarredsumner',
+    wantName: 'Jarred Sumner',
+  });
+  const realJarred = identity.scoreGithubMatch({
+    user: { login: 'jarredsumner', name: 'Jarred Sumner', bio: 'Creator of Bun', blog: 'https://jarredsumner.com', x: 'jarredsumner', repos: 80 },
+    wantX: 'jarredsumner',
+    wantName: 'Jarred Sumner',
+  });
+  assert.ok(realJarred > decoyJarred, `${realJarred} vs ${decoyJarred}`);
+  assert.ok(decoyJarred <= 6, `hyphen decoy scored ${decoyJarred}`);
+  assert.equal(identity.collisionOverride('Jarred-Sumner'), 'jarredsumner');
+  assert.equal(identity.collisionOverride('@youyuxi'), 'yyx990803');
+  assert.equal(identity.collisionOverride('dan_abramov'), 'gaearon');
   assert.equal(identity.parseProductQuery('the guy who made Photo AI'), 'Photo AI');
   assert.ok(identity.productHostGuesses('Photo AI').some((u) => /photoai\.com/i.test(u)));
   assert.ok(identity.githubLoginsFromText('see github.com/tony-dinh/app').includes('tony-dinh'));

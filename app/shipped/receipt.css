@@ -55,6 +55,7 @@
   gap: 16px;
   width: min(29rem, 100%);
   max-width: 100%;
+  min-width: 0;
   margin: 0 auto;
 }
 
@@ -1081,6 +1082,16 @@
 
 .shipped-desk-pins {
   display: none;
+}
+
+.shipped-stage,
+.shipped-counter,
+.shipped-printer,
+.shipped-printer-body,
+.shipped-ticket,
+.shipped-board {
+  max-width: 100%;
+  min-width: 0;
 }
 
 .shipped-stage.is-focus {

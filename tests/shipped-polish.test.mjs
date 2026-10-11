@@ -243,6 +243,10 @@ test('source lines are via Brand · host with no sitemap metadata', () => {
   );
   assert.equal(polish.cleanDescription('Patch Changes - Updated dependencies'), '');
   assert.equal(polish.cleanDescription('- Fixed the empty tweet state on the profile'), 'Fixed the empty tweet state on the profile');
+  assert.equal(
+    polish.cleanDescription("What's Changed chore: Migrate suspense related tests to e2e"),
+    'Migrate suspense related tests to e2e',
+  );
   assert.ok((polish.cleanDescription('- Fixed the empty tweet state on the profile') || '').length <= 60);
   assert.equal(polish.cleanDescription('Updated dependencies'), '');
   assert.equal(polish.isUpdatedDependenciesOnly({ name: 'Updated dependencies', description: '' }), true);

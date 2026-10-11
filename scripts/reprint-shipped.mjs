@@ -29,6 +29,7 @@
 // After 04668b7: 60-char wrap, date-or-drop changelog, OpenAI /index, no bare notes, drop Ship or Die for Jack.
 // After note/self-name pass: word-number counts, bio/thin-tape notes, LEGAL/TRUELL20.
 // After f063801: reprint #6, #7, #13, #16–#22 on the leftover-nav / weak-note gate.
+// After cf08766: changelog blurbs + pre-2026 journal titles; reprint wall slips 7,28,62,66,69,417.
 // Optional SHIPPED_PRINT_SUBJECTS=handle,handle prints two fresh names via admin print-subject.
 //
 //   ADMIN_PASSWORD=… node scripts/reprint-shipped.mjs [origin]

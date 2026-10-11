@@ -1352,7 +1352,8 @@ export function cleanDescription(value: unknown): string {
     .trim();
   text = text.replace(DESC_VERSION_HEADER, '').trim();
   text = text.replace(/^(?:patch|minor|major)\s+changes\b[:\s-]*/i, '').trim();
-  text = text.replace(/^(?:features|fixes|changelog|release notes|what's new)\b[:\s-]*/i, '').trim();
+  text = text.replace(/^(?:what's changed|what changed|what's new|features|fixes|changelog|release notes)\b[:\s-]*/i, '').trim();
+  text = text.replace(/^(?:chore|feat|fix|docs|refactor):\s*/i, '').trim();
   text = text.replace(/^\s*[-*+]\s+/g, '').replace(/\(#[0-9a-f]+\)/gi, '').replace(/#\d+\b/g, '').trim();
   if (!text || DESC_UPDATED_DEPS.test(text) || DESC_CHANGELOG_LABEL.test(text) || /^[0-9a-f]{7,40}$/i.test(text)) return '';
   if (

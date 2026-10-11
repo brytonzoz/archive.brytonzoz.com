@@ -179,7 +179,7 @@ export function WallFocus({ receipt, crumpled, reduced, onClose, onCrumple, onUn
       return;
     }
     const start = performance.now();
-    const dur = 520;
+    const dur = 680;
     const tick = (now: number) => {
       if (crumple.current !== engine) return;
       const t = Math.min(1, (now - start) / dur);

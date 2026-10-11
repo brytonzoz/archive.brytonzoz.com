@@ -128,7 +128,17 @@ export function ReceiptWall({ page = false }: { page?: boolean }) {
         {visible.map((card) => {
           const receipt = byId.get(card.id);
           if (!receipt) return null;
-          return <WallPin key={card.id} card={card} receipt={receipt} crumpled={crumpled.has(card.id)} reduced={reduced} onOpen={() => setFocus(card.id)} />;
+          return (
+            <WallPin
+              key={card.id}
+              card={card}
+              receipt={receipt}
+              crumpled={crumpled.has(card.id)}
+              reduced={reduced}
+              parallax={reduced ? 0 : ((card.id % 5) - 2) * view.top * 0.028}
+              onOpen={() => setFocus(card.id)}
+            />
+          );
         })}
       </div>
       {focused ? (
@@ -170,12 +180,14 @@ function WallPin({
   receipt,
   crumpled,
   reduced,
+  parallax,
   onOpen,
 }: {
   card: WallCard;
   receipt: PileReceipt;
   crumpled: boolean;
   reduced: boolean;
+  parallax: number;
   onOpen: () => void;
 }) {
   const rotate = reduced ? 0 : card.rotate;
@@ -188,14 +200,14 @@ function WallPin({
       style={{
         width: card.w,
         height: card.h,
-        transform: `translate3d(${card.x}px, ${card.y}px, 0) rotate(${rotate}deg)`,
+        transform: `translate3d(${card.x}px, ${card.y + parallax}px, 0) rotate(${rotate}deg)`,
       }}
       aria-label={`${receipt.who}, ${receipt.potential ? 'potential' : `${receipt.count} shipped`}${crumpled ? ', crumpled for you' : ''}`}
       onPointerDown={press}
       onClick={onOpen}
     >
       {card.kind === 'pin' ? (
-        <span className="shipped-wall-tack" style={{ left: `${card.pinX * 100}%` }} aria-hidden="true" />
+        <span className={`shipped-wall-tack is-${card.pinColor}`} style={{ left: `${card.pinX * 100}%` }} aria-hidden="true" />
       ) : (
         <span className="shipped-wall-tape" aria-hidden="true" />
       )}

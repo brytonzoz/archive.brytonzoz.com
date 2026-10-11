@@ -126,6 +126,7 @@ test('after a print the stage auto-tears; sponsors stay collapsed; Turnstile has
   const feel = fs.readFileSync(new URL('../components/shipped/feel.ts', import.meta.url), 'utf8');
   assert.match(feel, /pressPrint/);
   assert.match(feel, /pressTear/);
+  assert.match(feel, /pressTick/);
 
   const css = fs.readFileSync(new URL('../app/shipped/receipt.css', import.meta.url), 'utf8');
   assert.match(css, /\.shipped-board-panel \{[\s\S]*max-height: 0;/);
@@ -153,6 +154,11 @@ test('after a print the stage auto-tears; sponsors stay collapsed; Turnstile has
   assert.match(machine, /stepMs/);
   assert.match(machine, /pressPrint/);
   assert.match(machine, /pressTear/);
+  assert.match(machine, /pressTick/);
+  assert.match(machine, /--burn/);
+
+  const stagePrinted = fs.readFileSync(new URL('../components/shipped/ShippedStage.tsx', import.meta.url), 'utf8');
+  assert.match(stagePrinted, /720/);
 });
 
 test('shared receipt pages are the hero; DATE/RECEIPT pairs do not collide; checkout returns to the same receipt', () => {

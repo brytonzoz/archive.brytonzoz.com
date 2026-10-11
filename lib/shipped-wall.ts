@@ -52,11 +52,13 @@ export function setCrumpled(id: number, crumpled: boolean): number[] {
 }
 
 export type WallPinKind = 'pin' | 'tape';
+export type WallPinColor = 'red' | 'brass' | 'steel' | 'jade';
 
 export type WallPinStyle = {
   rotate: number;
   kind: WallPinKind;
   pinX: number;
+  pinColor: WallPinColor;
 };
 
 /** One seed per receipt: the same id always hangs at the same angle with the same fastener. */
@@ -64,10 +66,13 @@ export function wallPinStyle(id: number): WallPinStyle {
   const random = prng(`wall-pin:${id}`);
   const a = random();
   const b = random();
+  const c = random();
+  const colors: WallPinColor[] = ['red', 'brass', 'steel', 'jade'];
   return {
     rotate: Math.round((a * 6.4 - 3.2) * 10) / 10,
     kind: b > 0.42 ? 'pin' : 'tape',
     pinX: 0.28 + random() * 0.44,
+    pinColor: colors[Math.floor(c * colors.length)],
   };
 }
 
@@ -80,6 +85,7 @@ export type WallCard = {
   rotate: number;
   kind: WallPinKind;
   pinX: number;
+  pinColor: WallPinColor;
 };
 
 export function estimateWallCardHeight(itemCount: number, crumpled: boolean, width: number): number {
@@ -111,7 +117,7 @@ export function layoutWall<T extends { id: number; items: { name: string }[] }>(
     const x = gap + col * (w + gap);
     const y = tops[col];
     tops[col] = y + h + gap;
-    return { id: receipt.id, x, y, w, h, rotate: style.rotate, kind: style.kind, pinX: style.pinX };
+    return { id: receipt.id, x, y, w, h, rotate: style.rotate, kind: style.kind, pinX: style.pinX, pinColor: style.pinColor };
   });
   return { cards, height: Math.max(gap, ...tops) };
 }

@@ -20,3 +20,5 @@ export const press = () => tap(8);
 export const pressPrint = () => tap(14);
 /** TEAR: two pulses, like fibres giving way. */
 export const pressTear = () => tap([10, 18, 22]);
+/** One printed line: a near-imperceptible tick, same frame as the head. */
+export const pressTick = () => tap(4);

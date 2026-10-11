@@ -93,7 +93,15 @@ function Slot({ slot, origin, hero }: { slot: SponsorSlot; origin: string | null
       </span>
       {slot.logo ? (
         // eslint-disable-next-line @next/next/no-img-element
-        <img src={slot.logo} alt="" loading="lazy" className={`shipped-logo w-auto ${hero ? 'max-h-10' : 'max-h-6'} max-w-full`} />
+        <img
+          src={slot.logo}
+          alt=""
+          loading="lazy"
+          className={`shipped-logo w-auto ${hero ? 'max-h-10' : 'max-h-6'} max-w-full`}
+          onError={(event) => {
+            event.currentTarget.hidden = true;
+          }}
+        />
       ) : null}
       <span className={`block break-words font-semibold leading-tight ${hero ? 'text-[14px]' : 'text-[10.5px]'}`}>{slot.name}</span>
       <span className={`block break-words leading-snug opacity-75 ${hero ? 'text-[11.5px]' : 'text-[9.5px]'}`}>{slot.cta}</span>
@@ -129,14 +137,25 @@ function ItemRow({ item, compact }: { item: ViewItem; compact?: boolean }) {
     <li className="shipped-year-item">
       {item.logo ? (
         // eslint-disable-next-line @next/next/no-img-element
-        <img src={item.logo.src} width={item.logo.width} height={item.logo.height} alt="" loading="lazy" decoding="async" className="shipped-item-logo shipped-logo mb-1" />
+        <img
+          src={item.logo.src}
+          width={item.logo.width}
+          height={item.logo.height}
+          alt=""
+          loading="lazy"
+          decoding="async"
+          className="shipped-item-logo shipped-logo mb-1"
+          onError={(event) => {
+            event.currentTarget.hidden = true;
+          }}
+        />
       ) : null}
       <div className="shipped-lead">
         <h3 className="shipped-item-name min-w-0 font-semibold leading-snug">
           <ItemName item={item} />
         </h3>
         <span className="shipped-lead-fill" aria-hidden="true" />
-        <p className="shrink-0 text-[12px] font-semibold">
+        <p className="shrink-0 text-[12px] font-semibold tabular-nums">
           <span className="sr-only">Status: </span>
           {item.status}
         </p>

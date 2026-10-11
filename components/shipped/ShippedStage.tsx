@@ -501,7 +501,7 @@ export function ShippedStage({ opening, title }: { opening: Opening; title: Reac
             setPaper('hanging');
             // Visitor receipts open full-screen on their own. TEAR stays as an optional gesture.
             if (currentRef.current) {
-              window.setTimeout(() => setTearSignal((n) => n + 1), 120);
+              window.setTimeout(() => setTearSignal((n) => n + 1), 720);
             }
           }}
           onTorn={() => setPaper('torn')}

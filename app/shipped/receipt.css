@@ -655,9 +655,20 @@
   position: absolute;
   inset: 0;
   pointer-events: none;
-  opacity: 0.14;
+  opacity: 0.16;
   mix-blend-mode: multiply;
   background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='80' height='80'%3E%3Cfilter id='i'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='1.1' numOctaves='2' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23i)' opacity='.55'/%3E%3C/svg%3E");
+}
+
+.shipped-paper::before {
+  content: '';
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  background:
+    linear-gradient(180deg, rgba(255, 255, 255, 0.38), transparent 14px),
+    linear-gradient(0deg, rgba(80, 50, 20, 0.08), transparent 22px),
+    linear-gradient(90deg, rgba(62, 44, 22, 0.1), transparent 8%, transparent 92%, rgba(62, 44, 22, 0.12));
 }
 
 .shipped-ticket.is-slip .shipped-paper {
@@ -677,6 +688,8 @@
   line-height: 1.5;
   letter-spacing: 0.01em;
   -webkit-font-smoothing: none;
+  font-variant-numeric: tabular-nums lining-nums;
+  font-feature-settings: 'tnum' 1, 'lnum' 1;
 }
 
 /* Every band is normal document flow. Absolute children must not stack on the header. */
@@ -727,7 +740,8 @@
   flex: 0 1 auto;
   min-width: 0;
   text-align: right;
-  font-variant-numeric: tabular-nums;
+  font-variant-numeric: tabular-nums lining-nums;
+  font-feature-settings: 'tnum' 1, 'lnum' 1;
 }
 
 .shipped-lead-fill {
@@ -872,10 +886,18 @@
   flex: none;
 }
 
-/* 1-bit logos stay crisp, like thermal print. */
-.shipped-logo {
+/* 1-bit logos stay crisp, like thermal print. Color favicons get knocked to ink. */
+.shipped-logo,
+.shipped-item-logo {
   image-rendering: pixelated;
   height: auto;
+  filter: grayscale(1) contrast(2.6) brightness(0.68);
+  mix-blend-mode: multiply;
+}
+
+.shipped-logo[hidden],
+.shipped-item-logo[hidden] {
+  display: none;
 }
 
 .shipped-item-logo {
@@ -1088,6 +1110,38 @@ html.shipped-focus .shipped-board {
 
   .shipped-ticker-pin {
     order: 0;
+  }
+}
+
+@media (min-width: 1440px) {
+  .shipped-page {
+    padding-top: 40px;
+    background-image:
+      radial-gradient(ellipse 58% 36% at 50% 8%, rgba(255, 214, 160, 0.22), transparent 62%),
+      radial-gradient(ellipse 90% 55% at 50% 100%, rgba(0, 0, 0, 0.72), transparent 58%),
+      linear-gradient(180deg, #1c1814 0%, #120f0c 42%, #0c0a08 100%),
+      url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='180' height='180'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='.72' numOctaves='3' stitchTiles='stitch'/%3E%3CfeColorMatrix values='0 0 0 0 .62 0 0 0 0 .52 0 0 0 0 .4 0 0 0 .11 0'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)'/%3E%3C/svg%3E");
+  }
+
+  .shipped-stack {
+    width: min(44rem, 100%);
+  }
+
+  .shipped-board,
+  .shipped-stage {
+    width: min(34rem, 100%);
+  }
+
+  .shipped-printer {
+    width: min(32rem, 100%);
+  }
+
+  .shipped-printer-body {
+    box-shadow:
+      inset 0 1px 0 rgba(255, 255, 255, 0.16),
+      inset 0 -1px 0 rgba(0, 0, 0, 0.75),
+      0 2px 2px rgba(0, 0, 0, 0.45),
+      0 36px 64px -16px rgba(0, 0, 0, 0.82);
   }
 }
 
@@ -1540,8 +1594,18 @@ button.shipped-lcd-text {
   display: none;
 }
 
-.shipped-printer.is-focus .shipped-pull {
-  transform: none !important;
+.shipped-printer.is-focus .shipped-ticket,
+.shipped-printer.is-hero .shipped-ticket {
+  transform: perspective(1200px) rotateX(1.8deg);
+  transform-origin: 50% 6%;
+}
+
+.shipped-printer.is-focus .shipped-paper,
+.shipped-printer.is-hero .shipped-paper {
+  box-shadow:
+    inset 0 1px 0 rgba(255, 255, 255, 0.62),
+    inset 0 -22px 28px rgba(80, 50, 20, 0.07),
+    0 18px 36px rgba(0, 0, 0, 0.28);
 }
 
 .shipped-stub {
@@ -1571,8 +1635,65 @@ button.shipped-lcd-text {
 /* Before the print starts (and before JS) the paper is still on the roll: hide from the bottom so the header is what emerges. */
 .is-printing .shipped-feed,
 .is-feeding .shipped-feed {
+  --burn: 0px;
   clip-path: inset(0 0 100% 0);
   -webkit-clip-path: inset(0 0 100% 0);
+}
+
+.is-printing .shipped-ink {
+  -webkit-mask-image: linear-gradient(
+    180deg,
+    #000 0,
+    #000 calc(var(--burn, 0px) - 22px),
+    rgba(0, 0, 0, 0.38) var(--burn, 0px),
+    transparent calc(var(--burn, 0px) + 10px)
+  );
+  mask-image: linear-gradient(
+    180deg,
+    #000 0,
+    #000 calc(var(--burn, 0px) - 22px),
+    rgba(0, 0, 0, 0.38) var(--burn, 0px),
+    transparent calc(var(--burn, 0px) + 10px)
+  );
+}
+
+.is-printing .shipped-feed::after {
+  content: '';
+  position: absolute;
+  left: 7%;
+  right: 7%;
+  top: var(--burn, 0px);
+  height: 2px;
+  background: linear-gradient(90deg, transparent, rgba(40, 28, 16, 0.4), transparent);
+  pointer-events: none;
+}
+
+.is-printing .shipped-ticket,
+.is-hanging .shipped-ticket {
+  transform: perspective(640px) rotateX(5.5deg);
+  transform-origin: 50% 0;
+}
+
+.is-printing .shipped-ticket::after,
+.is-hanging .shipped-ticket::after {
+  content: '';
+  position: absolute;
+  left: 5%;
+  right: 5%;
+  bottom: -7px;
+  height: 14px;
+  border-radius: 50%;
+  background: rgba(0, 0, 0, 0.2);
+  filter: blur(5px);
+  pointer-events: none;
+}
+
+.is-printing .shipped-paper,
+.is-hanging .shipped-paper {
+  box-shadow:
+    inset 0 1px 0 rgba(255, 255, 255, 0.62),
+    inset 0 -18px 22px rgba(80, 50, 20, 0.1),
+    0 12px 20px rgba(0, 0, 0, 0.24);
 }
 
 .shipped-pull {
@@ -2256,6 +2377,24 @@ button.shipped-lcd-text {
     clip-path: none;
     -webkit-clip-path: none;
   }
+
+  .is-printing .shipped-ticket,
+  .is-hanging .shipped-ticket,
+  .shipped-printer.is-focus .shipped-ticket,
+  .shipped-printer.is-hero .shipped-ticket {
+    transform: none;
+  }
+
+  .is-printing .shipped-ink {
+    -webkit-mask-image: none;
+    mask-image: none;
+  }
+
+  .is-printing .shipped-feed::after,
+  .is-printing .shipped-ticket::after,
+  .is-hanging .shipped-ticket::after {
+    display: none;
+  }
 }
 
 @media (hover: hover) and (pointer: fine) {
@@ -2497,6 +2636,18 @@ button.shipped-lcd-text {
   z-index: 2;
 }
 
+.shipped-wall-tack.is-brass {
+  background: radial-gradient(circle at 35% 30%, #ffe7a8, #c48a22 62%, #6e4810);
+}
+
+.shipped-wall-tack.is-steel {
+  background: radial-gradient(circle at 35% 30%, #f2f4f6, #8a929a 62%, #3d4248);
+}
+
+.shipped-wall-tack.is-jade {
+  background: radial-gradient(circle at 35% 30%, #b8e8c8, #2f8a58 62%, #145232);
+}
+
 .shipped-wall-tack::after {
   content: '';
   position: absolute;
@@ -2574,6 +2725,18 @@ html.shipped-wall-focus-open .shipped-wall-board {
   touch-action: none;
   cursor: grab;
   will-change: transform;
+  animation: shipped-wall-lift 420ms var(--ease-out) both;
+}
+
+@keyframes shipped-wall-lift {
+  from {
+    opacity: 0.55;
+    transform: translate3d(0, 28px, 0) scale(0.95);
+  }
+  to {
+    opacity: 1;
+    transform: none;
+  }
 }
 
 .shipped-wall-focus-paper:active {
@@ -2617,5 +2780,6 @@ html.shipped-wall-focus-open .shipped-wall-board {
   .shipped-wall-pin,
   .shipped-wall-focus-paper {
     transition: none;
+    animation: none;
   }
 }

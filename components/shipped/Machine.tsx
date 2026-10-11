@@ -8,7 +8,7 @@
 // counter, and the stub left in the slot is the other half of the tear. A torn receipt tilts toward a mouse.
 // prefers-reduced-motion: the receipt is already printed and torn, nothing moves.
 import React, { useCallback, useEffect, useRef, useState } from 'react';
-import { press, pressPrint, pressTear } from './feel';
+import { press, pressPrint, pressTear, pressTick } from './feel';
 import { Ticket } from './paper';
 import { rubber, spring, springStep, stubClip, tornEdge, type SpringConfig } from './physics';
 import { click, motorOff, motorOn, rip, tick, useSound } from './sound';
@@ -71,8 +71,13 @@ const REST_Y = 30;
 const STUB = 14;
 const GRIP = 112;
 const SETTLE = spring(0.38, 0.32);
+const FLY = spring(0.52, 0.3);
 const SNAP_BACK = spring(0.32, 0.08);
 const TILT = spring(0.35, 0);
+
+function isVisitorPrint(job: Job): boolean {
+  return job.kind === 'print' && !job.slip && job.key !== 'house';
+}
 
 
 function reducedMotion() {
@@ -170,10 +175,17 @@ export function Machine({ job, display, tone, onPrinted, onTorn, tearSignal = 0,
     (velocity: Vec) => {
       if (phaseRef.current !== 'hanging') return;
       rip();
+      pressTear();
       setHint(false);
       setPhase('tearing');
+      const lift = isVisitorPrint(shown);
       const direction = velocity.x === 0 ? (Math.random() < 0.5 ? -1 : 1) : Math.sign(velocity.x);
-      const rest = { x: direction * (2 + Math.random() * 6), y: REST_Y, r: direction * (0.5 + Math.random() * 0.9) * swing() };
+      const rest = lift
+        ? { x: 0, y: 0, r: 0 }
+        : { x: direction * (2 + Math.random() * 6), y: REST_Y, r: direction * (0.5 + Math.random() * 0.9) * swing() };
+      const throwV = lift
+        ? { x: velocity.x * 0.4, y: Math.min(velocity.y, -380), r: direction * 8 }
+        : velocity;
       const key = shown.key;
       if (reducedMotion()) {
         pos.current = rest;
@@ -182,12 +194,12 @@ export function Machine({ job, display, tone, onPrinted, onTorn, tearSignal = 0,
         callbacks.current.onTorn?.(key);
         return;
       }
-      settle(rest, velocity, SETTLE, () => {
+      settle(rest, throwV, lift ? FLY : SETTLE, () => {
         setPhase('torn');
         callbacks.current.onTorn?.(key);
       });
     },
-    [settle, swing, shown.key],
+    [settle, swing, shown],
   );
 
   // Print: shove the paper out from under the head, then let it hang.
@@ -234,26 +246,34 @@ export function Machine({ job, display, tone, onPrinted, onTorn, tearSignal = 0,
         cancelled = true;
       };
     }
-    const line = 20;
-    const stepMs = shown.slip ? 32 : shown.fast ? 42 : 82;
+    const line = 18;
+    const stepMs = shown.slip ? 32 : shown.fast ? 42 : 88;
     let printed = 0;
+    let n = 0;
     shiver = body.current?.animate(
-      [{ transform: 'translateY(0)' }, { transform: 'translateY(0.7px)' }, { transform: 'translateY(-0.3px)' }, { transform: 'translateY(0)' }],
-      { duration: 110, iterations: Infinity },
+      [{ transform: 'translateY(0)' }, { transform: 'translateY(0.8px)' }, { transform: 'translateY(-0.4px)' }, { transform: 'translateY(0)' }],
+      { duration: 90, iterations: Infinity },
     );
     motorOn();
     const feedLine = () => {
       if (cancelled) return;
       printed = Math.min(height, printed + line);
+      n += 1;
+      const jitter = n % 2 ? 0.55 : -0.4;
       clip(height - printed);
+      el.style.transform = `translate3d(${jitter.toFixed(2)}px, 0, 0)`;
+      el.style.setProperty('--burn', `${printed}px`);
       tick();
+      if (n % 2 === 0) pressTick();
       if (printed < height) {
-        timers.push(window.setTimeout(feedLine, stepMs));
+        const hold = n % 7 === 0 ? stepMs * 2.1 : stepMs;
+        timers.push(window.setTimeout(feedLine, hold));
         return;
       }
       shiver?.cancel();
       motorOff();
       clip(0);
+      el.style.transform = '';
       setPhase('hanging');
       tell(true, false);
     };
@@ -293,18 +313,24 @@ export function Machine({ job, display, tone, onPrinted, onTorn, tearSignal = 0,
       el.style.setProperty(webkitClipPath, value);
     };
     let left = hidden;
+    let n = 0;
     clip(left);
     motorOn();
     const timers: number[] = [];
     const step = () => {
-      left = Math.max(0, left - 20);
+      left = Math.max(0, left - 18);
+      n += 1;
       clip(left);
+      el.style.setProperty('--burn', `${height - left}px`);
+      el.style.transform = `translate3d(${n % 2 ? 0.4 : -0.35}px, 0, 0)`;
       tick();
+      if (n % 2 === 0) pressTick();
       if (left > 0) {
         timers.push(window.setTimeout(step, 70));
         return;
       }
       clip(0);
+      el.style.transform = '';
       motorOff();
     };
     timers.push(window.setTimeout(step, 40));
@@ -526,10 +552,7 @@ export function Machine({ job, display, tone, onPrinted, onTorn, tearSignal = 0,
         className="shipped-key is-tear"
         disabled={phase !== 'hanging'}
         aria-disabled={phase !== 'hanging'}
-        onPointerDown={() => {
-          if (phase !== 'hanging') return;
-          pressTear();
-        }}
+        onPointerDown={press}
         onClick={() => {
           if (phase !== 'hanging') return;
           click();

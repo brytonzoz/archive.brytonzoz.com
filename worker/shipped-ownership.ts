@@ -125,7 +125,7 @@ function githubOrgOwned(url: string | null | undefined, owner: OwnerContext | nu
 }
 
 export function isOssHarvestItem(item: { kind?: string } | null | undefined): boolean {
-  return /^(oss-release|oss-launch|oss-blog)$/.test(item?.kind || '');
+  return /^(oss-release|oss-launch|oss-blog|oss-pin)$/.test(item?.kind || '');
 }
 
 /** Why this line may appear on the person's receipt. `none` means drop it. */

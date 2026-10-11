@@ -922,6 +922,12 @@ export async function harvestOss(opts: {
     }
   };
 
+  orgRepos.sort((a, b) => {
+    const ownA = isOwnProductRepo(a) ? 0 : 1;
+    const ownB = isOwnProductRepo(b) ? 0 : 1;
+    if (ownA !== ownB) return ownA - ownB;
+    return (a.stargazers_count ?? 0) - (b.stargazers_count ?? 0);
+  });
   await harvestRepos(orgRepos.slice(0, 8), 'oss-rel');
 
   const alreadyHave = (item: OssFound): boolean =>

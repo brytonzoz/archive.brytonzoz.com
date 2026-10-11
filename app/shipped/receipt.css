@@ -2310,6 +2310,7 @@ button.shipped-lcd-text {
 .shipped-wall {
   width: 100%;
   max-width: 100%;
+  padding: 0 8px 12px;
   color: var(--cream);
 }
 

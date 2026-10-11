@@ -35,7 +35,7 @@
 // Tables are created (and new columns added) on first use; see SCHEMA below.
 import { CURATION_RESERVE_MICROS, DEFAULT_MODEL, PrintError, assembleReceipt, demoReceipt, finish, harvestItems, maxSearches, promptFor, worstCaseMicros, type AiEnv, type DraftItem } from './shipped-ai';
 import { harvestLooksLikeCommentaryTape } from './shipped-curate';
-import { cheapHardFilter, titleSanityOk } from './shipped-polish';
+import { cheapHardFilter, isBlogEssayTitle, looksLikeEssayTitle, titleSanityOk } from './shipped-polish';
 import { ICON_HASH, bytesDataUri, iconDataUri, iconKey, reencodeLogo, storeIcon } from './shipped-icons';
 import { houseMark } from './shipped-marks';
 import { yearCardPng, yearRolloPdf, yearRolloPng, yearTallPng, type LogoResolver } from './shipped-og';
@@ -2236,7 +2236,9 @@ function tapeLooksBroken(items: { name?: string | null }[] | undefined): boolean
         /:\s*$/.test(name) ||
         /^what[’']s new in\b/i.test(name) ||
         /^(i|i'm|i've|we|we've|it's)\b/i.test(name) ||
-        name.trim().split(/\s+/).filter(Boolean).length >= 12,
+        name.trim().split(/\s+/).filter(Boolean).length >= 12 ||
+        looksLikeEssayTitle(name) ||
+        isBlogEssayTitle(name),
     )
   ) {
     return true;

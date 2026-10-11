@@ -308,9 +308,13 @@ export function harvestShouldWin(
   const openaiLead = /^lead$/i.test(role || '') && /^openai$/i.test(brand);
   if (flagshipCeo || openaiLead) {
     if (harvestedCount < 12) return false;
-    // Vercel: Claude's 11-line reel has the flagships but sits under the Rauch floor of 30.
-    // Compact now keeps New models on AI Gateway, so restoring harvest keeps the needle.
-    const floor = /^cursor$/i.test(brand) ? 40 : /^vercel$/i.test(brand) ? 30 : 35;
+    // A 193-line npm dump is worse than Claude's short reel. A compact 25–80
+    // company tape can restore the Rauch floor; unionHarvestWin puts Gateway back on it.
+    if (/^vercel$/i.test(brand)) {
+      if (harvestedCount < 25 || harvestedCount > 80) return false;
+      return curatedCount < 30;
+    }
+    const floor = /^cursor$/i.test(brand) ? 40 : 35;
     return curatedCount < floor;
   }
   // OSS maintainers: restore the release tape when Claude keeps a highlight reel.

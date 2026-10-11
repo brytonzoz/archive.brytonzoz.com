@@ -2131,6 +2131,9 @@ button.shipped-lcd-text {
 
 .shipped-turnstile.is-on,
 .shipped-turnstile.is-challenge {
+  position: relative;
+  left: auto;
+  bottom: auto;
   z-index: 6;
   width: min(19rem, 100%);
   height: auto;

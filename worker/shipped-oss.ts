@@ -680,13 +680,19 @@ export async function harvestOss(opts: {
     targets.push(repo);
   }
   const ranked = [
-    ...targets.filter((repo) => pinned.has(`${repo.owner.toLowerCase()}/${repo.name.toLowerCase()}`)),
+    ...targets.filter((repo) => pinned.has(`${repo.owner.toLowerCase()}/${repo.name.toLowerCase()}`)).slice(0, 8),
     ...targets
       .filter((repo) => !pinned.has(`${repo.owner.toLowerCase()}/${repo.name.toLowerCase()}`))
-      .sort((a, b) => (b.stargazers_count ?? 0) - (a.stargazers_count ?? 0)),
-  ].slice(0, 24);
+      .sort((a, b) => (b.stargazers_count ?? 0) - (a.stargazers_count ?? 0))
+      .slice(0, 8),
+  ];
 
+  const started = Date.now();
   for (const repo of ranked) {
+    if (Date.now() - started > 28_000) {
+      ran.push('oss-budget');
+      break;
+    }
     const source: OssFound['source'] = repo.owner.toLowerCase() === login.toLowerCase() ? 'github' : 'company';
     const releases = await memo(`oss:rel:${repo.owner}/${repo.name}`, 180 * 60, () =>
       opts

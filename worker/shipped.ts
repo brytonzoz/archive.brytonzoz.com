@@ -2234,9 +2234,9 @@ async function loadStoredNotes(db: D1Database, exceptId?: number): Promise<strin
   return notes;
 }
 
-// Fast sources and OSS are each time-boxed to ~6s. Admin still waits for the
-// full first wave so reprints are not empty stubs.
-export const ADMIN_GATHER_MS = 20_000;
+// Fast sources stay at ~6s. OSS and admin wait for the full first wave so
+// Vite siblings and leftover pins are not empty stubs.
+export const ADMIN_GATHER_MS = 40_000;
 export const ADMIN_CURATE_MS = 14_000;
 
 function stubGathered(subject: Subject): Gathered {

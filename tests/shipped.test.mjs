@@ -252,7 +252,7 @@ test('admin gather waits for the OSS harvest budget', () => {
   const sources = fs.readFileSync(new URL('../worker/shipped-sources.ts', import.meta.url), 'utf8');
   const gather = Number((worker.match(/ADMIN_GATHER_MS = ([\d_]+)/)?.[1] || '0').replace(/_/g, ''));
   const oss = Number((sources.match(/OSS_TIMEOUT_MS = ([\d_]+)/)?.[1] || '0').replace(/_/g, ''));
-  assert.ok(oss >= 6_000 && oss <= 8_000, `OSS_TIMEOUT_MS ${oss}`);
+  assert.ok(oss >= 28_000, `OSS_TIMEOUT_MS ${oss}`);
   assert.ok(gather > oss, `ADMIN_GATHER_MS ${gather} should exceed OSS_TIMEOUT_MS ${oss}`);
 });
 

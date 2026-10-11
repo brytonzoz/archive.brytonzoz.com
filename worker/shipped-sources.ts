@@ -209,7 +209,7 @@ export interface SourceProvider {
 
 const UA = 'brytonzoz.com-shipped (+https://shipped.brytonzoz.com/)';
 export const SOURCE_TIMEOUT_MS = 6000;
-export const OSS_TIMEOUT_MS = 6000;
+export const OSS_TIMEOUT_MS = 28_000;
 /** Own homepage / journal — slightly longer than third-party sources so hotelist.com lands. */
 export const HOME_TIMEOUT_MS = 8000;
 const TIMEOUT = SOURCE_TIMEOUT_MS;

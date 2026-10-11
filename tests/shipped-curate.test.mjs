@@ -210,7 +210,7 @@ test('harvest wins when Claude keeps a highlight reel of a fat company tape', ()
   ];
   assert.equal(curate.harvestLooksLikeOssTape(bunPlusEssays), true);
   assert.equal(curate.harvestLooksLikeCommentaryTape(bunPlusEssays), false);
-  assert.ok(sources.OSS_TIMEOUT_MS >= 6_000 && sources.OSS_TIMEOUT_MS <= 8_000);
+  assert.ok(sources.OSS_TIMEOUT_MS >= 28_000);
   assert.equal(curate.harvestLooksLikeCommentaryTape([
     { name: "Brazil's CPF catch-22 makes booking hotels impossible" },
     { name: 'Tech insiders avoid touchscreens and smart homes because' },
@@ -361,6 +361,27 @@ test('harvest wins when Claude keeps a highlight reel of a fat company tape', ()
   assert.ok(openaiWin.some((item) => /gpt-5\.3-codex/i.test(item.name)), JSON.stringify(openaiWin.slice(-8)));
   assert.equal(openaiWin.some((item) => /oracle turns days/i.test(item.name)), false);
   assert.equal(curate.harvestShouldWin(openaiWin.length, 33, 'lead', 'OpenAI'), true);
+  const tiboTape = [
+    { name: 'CODEX APP', source: 'changelog', link: 'https://openai.com/codex' },
+    { name: 'CODEX CLI', source: 'changelog', link: 'https://developers.openai.com/codex/cli' },
+    { name: 'CODEX CLOUD', source: 'changelog', link: 'https://developers.openai.com/codex/cloud' },
+    ...Array.from({ length: 31 }, (_, i) => ({
+      name: `CODEX APP · UPDATE ${i + 1}`,
+      source: 'changelog',
+      link: `https://developers.openai.com/codex/changelog#u${i + 1}`,
+    })),
+  ];
+  const tiboFound = [
+    ...tiboTape,
+    { name: 'Codex worktrees', source: 'changelog', link: 'https://developers.openai.com/codex/worktrees' },
+    { name: 'Codex sandbox', source: 'changelog', link: 'https://developers.openai.com/codex/sandbox' },
+    { name: 'GPT-5.3-Codex', source: 'changelog', link: 'https://developers.openai.com/codex/gpt-5-3' },
+  ];
+  const tiboWin = curate.harvestWinSource(tiboTape, tiboFound, 'lead', 'OpenAI');
+  assert.ok(tiboWin.length >= 35, JSON.stringify(tiboWin.map((item) => item.name).slice(-8)));
+  assert.ok(tiboWin.some((item) => /worktrees/i.test(item.name)), JSON.stringify(tiboWin.slice(-8)));
+  assert.ok(tiboWin.some((item) => /sandbox/i.test(item.name)), JSON.stringify(tiboWin.slice(-8)));
+  assert.equal(curate.harvestShouldWin(tiboWin.length, 34, 'lead', 'OpenAI'), true);
   const bunWin = curate.harvestWinSource(bunPlusEssays, bunPlusEssays, null, null);
   assert.ok(bunWin.every((item) => !/cpf catch-22|mind virus|stripe dispute/i.test(item.name)), JSON.stringify(bunWin));
   assert.ok(bunWin.length >= 8, JSON.stringify(bunWin));

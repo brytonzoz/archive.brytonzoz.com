@@ -391,10 +391,26 @@ function companyHarvestWinKind(role?: string | null, company?: string | null): C
 
 function companyHarvestFloor(kind: CompanyWinKind, floor?: number): number {
   if (Number.isFinite(floor) && (floor as number) > 0) return floor as number;
-  if (kind === 'openai') return 35;
-  if (kind === 'cursor-ceo') return 40;
-  if (kind === 'vercel-ceo') return 40;
+  // Aim above the live golden so finish() can drop a leftover line.
+  if (kind === 'openai' || kind === 'cursor-ceo' || kind === 'vercel-ceo') return 40;
   return 30;
+}
+
+/** Expand duplicate check — exact name or same link, not flagship-substring greed. */
+function harvestExpandHas<T extends { name?: string; link?: string | null }>(tape: T[], item: T): boolean {
+  const key = looseName(item.name || '');
+  const link = String(item.link || '').replace(/#.*$/, '');
+  if (!key && !link) return false;
+  return tape.some((row) => {
+    const rowLink = String(row.link || '').replace(/#.*$/, '');
+    if (link && rowLink && link === rowLink) return true;
+    const rowKey = looseName(row.name || '');
+    if (!key || !rowKey) return false;
+    if (rowKey === key) return true;
+    const shorter = rowKey.length <= key.length ? rowKey : key;
+    const longer = rowKey.length <= key.length ? key : rowKey;
+    return shorter.length >= 6 && longer.startsWith(shorter) && /^[0-9.]+$/.test(longer.slice(shorter.length));
+  });
 }
 
 function companyHarvestCardOk(item: { link?: string | null; source?: string }, kind: CompanyWinKind): boolean {
@@ -449,7 +465,7 @@ export function expandCompanyHarvestWin<T extends { name?: string; link?: string
     if (words.length < 1) continue;
     if (words.length >= 8 && !/\d+\.\d+/.test(short) && !/·\s*\d+\s+(updates?|releases?)/i.test(short)) continue;
     if (!titleSanityOk(short)) continue;
-    if (harvestAlreadyHas(harvested, item) || harvestAlreadyHas(extra, { ...item, name: short })) continue;
+    if (harvestExpandHas(harvested, { ...item, name: short }) || harvestExpandHas(extra, { ...item, name: short })) continue;
     extra.push({ ...item, name: short });
   }
   return extra.length ? [...harvested, ...extra] : harvested;

@@ -8,6 +8,9 @@ import { pinnedReposFromHtml } from './shipped-products';
 import { journalShipName, looksLikePersonalShip } from './shipped-research';
 import { looksLikeProductReadme } from './shipped-repos';
 
+/** Admin reprints wait this long so Vite siblings and leftover pins (Nub) are not empty. */
+export const OSS_HARVEST_MS = 28_000;
+
 export type OssRelease = {
   name?: string;
   tag_name?: string;
@@ -770,7 +773,7 @@ export async function harvestOss(opts: {
   ran.push(`oss-orgs:${orgs.slice(0, 8).join(',') || 'none'}`);
 
   const started = Date.now();
-  const overBudget = () => Date.now() - started > 6_000;
+  const overBudget = () => Date.now() - started > OSS_HARVEST_MS;
   const orgRepos: OssRepo[] = [];
   const takeRepo = (repo: OssRepo | null | undefined) => {
     if (!repo) return;
@@ -1018,7 +1021,7 @@ export async function harvestOss(opts: {
   const pinName = (pin: { name: string }) => pin.name.toLowerCase().replace(/[^a-z0-9-]/g, '');
   const flagshipPins = leftoverPins.filter((pin) => OSS_FLAGSHIP_REPOS.includes(pinName(pin)));
   const laterPins = leftoverPins.filter((pin) => !OSS_FLAGSHIP_REPOS.includes(pinName(pin)));
-  // Flagship leftover pins (Nub) before a fat founder tape spends the 6s budget.
+  // Flagship leftover pins (Nub) before a fat founder tape spends the harvest budget.
   // Personal leftover pins (notes) stay after so Vite / Vitest are not starved.
   await loadPins(flagshipPins);
   const rankedRepos = rankOssHarvestRepos(orgRepos);

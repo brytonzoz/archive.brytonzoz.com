@@ -5,7 +5,7 @@ import { affiliationFromBio } from './shipped-affiliation';
 import { githubReposFromText, productHostGuesses } from './shipped-identity';
 import { isBlogEssayTitle, isPrereleaseShip, looksLikeEssayTitle } from './shipped-polish';
 import { pinnedReposFromHtml } from './shipped-products';
-import { looksLikePersonalShip } from './shipped-research';
+import { journalShipName, looksLikePersonalShip } from './shipped-research';
 import { looksLikeProductReadme } from './shipped-repos';
 
 export type OssRelease = {
@@ -514,9 +514,11 @@ export function linesFromBlogFeed(xml: string, year: number, source: OssFound['s
       if (looksLikeEssayTitle(item.name) || isBlogEssayTitle(item.name)) return false;
       return item.name.trim().split(/\s+/).filter(Boolean).length <= 5;
     })
-    .map((item) =>
-      asFound({
-        name: item.name,
+    .map((item) => {
+      const personal = looksLikePersonalShip(item.name) || looksLikePersonalShip(`${item.name} ${item.description || ''}`);
+      const name = personal ? journalShipName(item.name) || item.name : item.name;
+      return asFound({
+        name,
         description: item.description,
         date: item.date,
         link: item.link,
@@ -524,9 +526,9 @@ export function linesFromBlogFeed(xml: string, year: number, source: OssFound['s
         source,
         status: item.status === 'LIVE' ? 'LIVE' : 'SHIPPED',
         score: 6,
-        kind: 'oss-blog',
-      }),
-    );
+        kind: personal ? 'journal-ship' : 'oss-blog',
+      });
+    });
 }
 
 const MONTH_NAME: Record<string, string> = {

@@ -106,6 +106,9 @@ test('printed titles stay noun phrases at 48 characters', () => {
     'DEPLOY CURSOR ORIGIN APPS TO PRODUCTION AND OTHER SURFACES',
     'ALWAYS-ON TRACING FOR SERVERLESS FUNCTIONS AND OTHER SERVICES',
     'MICROFRONTENDS PREVIEWS NOW LINK TO THE DEPLOYMENT AND OTHER SURFACES',
+    'PROTECT PRODUCTION DEPLOYMENTS FOR FREE ON EVERY PLAN',
+    'SECURE COMPUTE AND STATIC IP BUILDS START 64% FASTER',
+    'AGENTS CAN NOW BUY DOMAINS WITH THE VERCEL CLI',
   ]) {
     const next = polish.cleanShipTitle(raw) || polish.shortenWordyTitle(raw);
     assert.ok(next.split(/\s+/).filter(Boolean).length < 8, `${raw} -> ${next}`);

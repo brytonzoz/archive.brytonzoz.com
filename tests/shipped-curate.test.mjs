@@ -259,6 +259,41 @@ test('harvest wins when Claude keeps a highlight reel of a fat company tape', ()
   assert.ok(expanded.some((item) => /sandbox routing/i.test(item.name)), JSON.stringify(expanded));
   assert.ok(expanded.some((item) => /persistent memory/i.test(item.name)), JSON.stringify(expanded));
   assert.equal(expanded.some((item) => /what.?s new in svelte/i.test(item.name)), false, JSON.stringify(expanded));
+  const wordyWin = curate.expandCeoHarvestWin(
+    [{ name: 'NEXT.JS 16.4', link: 'https://vercel.com/changelog/next-16-4', source: 'changelog' }],
+    [
+      {
+        name: 'Protect production deployments for free on every plan',
+        link: 'https://vercel.com/changelog/protect-production',
+        source: 'changelog',
+      },
+      {
+        name: 'Agents can now buy domains with the Vercel CLI',
+        link: 'https://vercel.com/changelog/agents-buy-domains',
+        source: 'changelog',
+      },
+    ],
+    'ceo',
+    'Vercel',
+    30,
+  );
+  assert.ok(
+    wordyWin.every((item) => item.name.trim().split(/\s+/).length < 8 || /\d+\.\d+/.test(item.name)),
+    JSON.stringify(wordyWin.map((item) => item.name)),
+  );
+  const journalBack = curate.unionJournalShips(
+    [{ name: 'INFINITESLOP.AI', link: 'https://github.com/levelsio/infiniteslop', kind: 'oss-release' }],
+    [
+      { name: 'hotelist.com', link: 'https://levels.io/#hotelist-com', source: 'site', kind: 'journal-ship' },
+      { name: 'nomads.com free', link: 'https://levels.io/#nomads-com', source: 'site' },
+      { name: 'Photo AI feature', link: 'https://levels.io/#photo-ai-feature', source: 'site' },
+      { name: 'Luxury hotels are mathematically bad value', link: 'https://levels.io/luxury-hotels', source: 'site' },
+    ],
+  );
+  assert.ok(journalBack.some((item) => /hotelist/i.test(item.name)), JSON.stringify(journalBack));
+  assert.ok(journalBack.some((item) => /nomads/i.test(item.name)), JSON.stringify(journalBack));
+  assert.ok(journalBack.some((item) => /photo ai/i.test(item.name)), JSON.stringify(journalBack));
+  assert.equal(journalBack.some((item) => /luxury hotels/i.test(item.name)), false, JSON.stringify(journalBack));
   const essayRss = [
     { name: 'Luxury hotels are mathematically bad value', kind: 'oss-blog', link: 'https://levels.io/luxury-hotels' },
     { name: "I've been coding almost solely on my VPS", kind: 'oss-blog', link: 'https://levels.io/vps' },

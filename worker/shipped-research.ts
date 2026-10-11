@@ -271,6 +271,7 @@ export function itemsFromDatedJournal(opts: { text: string; url: string; year: n
       status: 'LAUNCHED',
       score: 7,
       thisYear: true,
+      kind: 'journal-ship',
     });
   };
 
@@ -343,6 +344,7 @@ export function itemsFromPersonalFeed(opts: { text: string; url: string; year: n
       status: 'LAUNCHED',
       score: 7.5,
       thisYear: true,
+      kind: 'journal-ship',
     });
   };
   const preferProduct = (named: string, product?: { name: string; url: string } | null) => {

@@ -866,6 +866,14 @@ test('prereleases, starters, and Gateway model listings are not ships', () => {
   assert.match(polish.cleanShipTitle('GPT-6.1 SOL PRODUCT SEP 29, 2026'), /gpt-6\.1 sol/i);
   assert.match(polish.cleanShipTitle('ChatGPT Voice and multi-folder projects 26.715'), /chatgpt voice and multi-folder projects/i);
   assert.match(polish.cleanShipTitle('Agents can now buy domains with the Vercel CLI'), /agents can now buy domains/i);
+  assert.ok(polish.shortenWordyTitle('Agents can now buy domains with the Vercel CLI').split(/\s+/).length < 8);
+  assert.match(polish.shortenWordyTitle('Agents can now buy domains with the Vercel CLI'), /agents can now buy domains/i);
+  assert.ok(polish.shortenWordyTitle('Protect production deployments for free on every plan').split(/\s+/).length < 8);
+  assert.ok(polish.shortenWordyTitle('Secure compute and static IP builds start 64% faster').split(/\s+/).length < 8);
+  assert.equal(polish.isJournalShip({ name: 'hotelist.com', source: 'site', link: 'https://levels.io/#hotelist-com' }), true);
+  assert.equal(polish.isJournalShip({ name: 'nomads.com free', source: 'site', link: 'https://levels.io/#nomads-com' }), true);
+  assert.equal(polish.isJournalShip({ name: 'Photo AI feature', source: 'site', link: 'https://levels.io/#photo-ai-feature' }), true);
+  assert.equal(polish.isJournalShip({ name: 'Luxury hotels are mathematically bad value', source: 'site', link: 'https://levels.io/luxury-hotels' }), false);
   assert.match(polish.cleanShipTitle('Use Codex with Amazon Bedrock'), /codex with amazon bedrock|use codex with amazon bedrock/i);
   assert.match(polish.cleanShipTitle('Build and install plugins in Codex'), /plugins in codex|build and install plugins/i);
   assert.match(polish.cleanShipTitle('Share an app window'), /share an app window/i);

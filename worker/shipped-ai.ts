@@ -30,6 +30,7 @@ import {
   ossWinTape,
   packCandidates,
   unionHarvestWin,
+  unionJournalShips,
   parseCurationJson,
 } from './shipped-curate';
 
@@ -1690,7 +1691,7 @@ export async function assembleReceipt(
             owner: ownerFromProfile(gathered.profile, affiliation),
             apiDown: false,
           };
-          const tape = unionHarvestWin(winSource, curated.items);
+          const tape = unionJournalShips(unionHarvestWin(winSource, curated.items), harvested);
           const sealed = finish(tape, curated.note, seed, undefined, formatStats(tape, gathered.stats ?? []), noteCtx);
           return {
             ...sealed,
@@ -1702,7 +1703,21 @@ export async function assembleReceipt(
             noteCandidates: curated.noteCandidates,
           };
         }
-        return curated;
+        const withJournal = unionJournalShips(curated.items, harvested);
+        if (withJournal.length === curated.items.length) return curated;
+        const sealed = finish(withJournal, curated.note, seed, undefined, formatStats(withJournal, gathered.stats ?? []), {
+          role: affiliation?.role,
+          company: affiliation?.company,
+          who: gathered.profile.name,
+          handle: gathered.profile.x,
+          bio: gathered.profile.bio,
+          usedNotes,
+          year,
+          affiliation,
+          owner: ownerFromProfile(gathered.profile, affiliation),
+          apiDown: false,
+        });
+        return { ...curated, ...sealed };
       }
     } catch (error) {
       if (error instanceof PrintError && error.code === 'out-of-credit') throw error;

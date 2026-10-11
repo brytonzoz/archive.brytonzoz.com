@@ -221,6 +221,7 @@ function fromJournal(row: {
   status?: string;
   score: number;
   thisYear?: boolean;
+  kind?: string;
 }): ChangelogFound {
   const status =
     row.status === 'RELEASED' || row.status === 'SHIPPED' || row.status === 'LIVE' || row.status === 'LAUNCHED'
@@ -237,6 +238,7 @@ function fromJournal(row: {
     status,
     score: row.score,
     thisYear: row.thisYear !== false,
+    kind: row.kind || 'journal-ship',
   };
 }
 

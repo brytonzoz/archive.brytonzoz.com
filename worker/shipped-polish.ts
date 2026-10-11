@@ -237,7 +237,7 @@ export function endsWithCutOffWord(text: string): boolean {
     words.length >= 3 &&
     last.length >= 8 &&
     !/\d/.test(last) &&
-    !/(tion|sion|ment|ness|ship|ware|work|ings|able|ible|ical|ular|ers?|ors?|ies|ous|ive|est|ing|ted|als?|ects|ity|ance|ence|ator|ency|graphy|shots)$/i.test(
+    !/(tion|sion|ments?|ness|ship|ware|work|ings|able|ible|ical|ular|ers?|ors?|ies|ous|ive|est|ing|ted|als?|ects|ity|ance|ence|ator|ency|graphy|shots)$/i.test(
       last,
     )
   ) {
@@ -1012,26 +1012,39 @@ export function shortenWordyTitle(title: string): string {
     .trim();
   if (!text) return '';
   if (/\d+\.\d+/.test(text) || /·\s*\d+\s+(updates?|releases?)/i.test(text)) return text;
-  if (isMinorPlatformChange(text) || isMinorPlatformChange(title)) return stripMarkup(title);
-  const words = text.split(/\s+/).filter(Boolean);
-  if (words.length < 8) return text;
+  const originalWords = text.split(/\s+/).filter(Boolean);
+  if (originalWords.length >= 8) {
+    const stripped = text
+      .replace(/\s+for free(?:\s+on every plan)?$/i, '')
+      .replace(/\s+on every plan$/i, '')
+      .replace(/\s+starts?\s+\d+%\s+faster$/i, '')
+      .replace(/\s+\d+%\s+faster$/i, '')
+      .replace(/\s+with the\s+.+$/i, '')
+      .trim();
+    const next = stripped.split(/\s+/).filter(Boolean);
+    if (stripped && next.length >= 2 && next.length < 8 && !looksCutOff(stripped)) {
+      return stripped;
+    }
+  }
+  if (originalWords.length < 8) return text;
+  if (isMinorPlatformChange(text) || isMinorPlatformChange(title)) return text;
   const phrase = nounPhraseFromSentence(text);
   const phraseWords = phrase ? phrase.split(/\s+/).filter(Boolean) : [];
   if (phrase && phraseWords.length >= 2 && phraseWords.length < 8 && isProductNounPhrase(phrase) && !looksCutOff(phrase) && !isJunkTitle(phrase)) {
     return phrase;
   }
-  let clipped = words.slice(0, 5).join(' ');
+  let clipped = originalWords.slice(0, 5).join(' ');
   while (clipped && TITLE_TRAILING_GLUE.test(clipped)) {
     clipped = clipped.split(/\s+/).slice(0, -1).join(' ').trim();
   }
   const clippedWords = clipped.split(/\s+/).filter(Boolean);
+  const canNow = /\bcan now\b/i.test(clipped);
   if (
     clippedWords.length >= 2 &&
-    isProductNounPhrase(clipped) &&
     !looksCutOff(clipped) &&
     !isJunkTitle(clipped) &&
     !SENTENCE_VERB.test(clipped) &&
-    !/\bnow\b/i.test(clipped)
+    (canNow || (isProductNounPhrase(clipped) && !/\bnow\b/i.test(clipped)))
   ) {
     return clipped;
   }
@@ -1050,9 +1063,26 @@ export function shortenWordyTitle(title: string): string {
 
 /** levels.io / indie journal ships: first-person launches, not blog essays.
  *  "Announced 2026" / "I made this." on the description is not enough — tweet
- *  dumps get those prefixes from the journal scraper. */
-export function isJournalShip(item: { name?: string; description?: string | null; source?: string }): boolean {
-  return looksLikePersonalShip(String(item.name || ''));
+ *  dumps get those prefixes from the journal scraper. After rewrite the name
+ *  is the product (hotelist.com); keep those via kind, host, or ship-list href. */
+export function isJournalShip(item: {
+  name?: string;
+  description?: string | null;
+  source?: string;
+  kind?: string;
+  link?: string | null;
+}): boolean {
+  if (String(item.kind || '') === 'journal-ship') return true;
+  const name = String(item.name || '').trim();
+  if (looksLikePersonalShip(name)) return true;
+  if (!name || looksLikeEssayTitle(name) || isBlogEssayTitle(name) || looksLikeMonthlyRoundup(name)) return false;
+  if (item.source && item.source !== 'site') return false;
+  const words = name.split(/\s+/).filter(Boolean);
+  const hostish = /^[a-z0-9-]+(?:\.[a-z0-9-]+)*\.(com|io|ai|app|dev|co)$/i.test(name);
+  const shortProduct = words.length <= 4 && /\b(feature|features|free|milestone)$/i.test(name);
+  if (!hostish && !shortProduct) return false;
+  const link = String(item.link || '');
+  return Boolean(link && (isShipListHref(link) || /#/.test(link)));
 }
 
 /** Product / feature / model noun phrase. Sentence fragments and dangling preps fail. */

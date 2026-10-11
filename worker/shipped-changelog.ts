@@ -13,6 +13,7 @@ export type ChangelogFound = {
   status: 'LAUNCHED' | 'SHIPPED' | 'RELEASED' | 'LIVE';
   score: number;
   thisYear: boolean;
+  kind?: string;
 };
 
 export const COMPANY_PATHS = [

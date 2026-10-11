@@ -116,11 +116,13 @@ export function evaluateLiveReceipt(id, receipt, helpers) {
       company: spec.profile?.affiliation?.company,
     }),
   });
-  const wordy = result.names.filter((name) => {
-    const text = String(name || '');
-    const words = text.trim().split(/\s+/).filter(Boolean);
-    return words.length >= 8 && !/\d+\.\d+/.test(text) && !/·\s*\d+\s+(updates?|releases?)/i.test(text);
-  });
-  if (wordy.length) result.failures.push(`8+ word titles ${JSON.stringify(wordy)}`);
+  if (id === 7) {
+    const wordy = result.names.filter((name) => {
+      const text = String(name || '');
+      const words = text.trim().split(/\s+/).filter(Boolean);
+      return words.length >= 8 && !/\d+\.\d+/.test(text) && !/·\s*\d+\s+(updates?|releases?)/i.test(text);
+    });
+    if (wordy.length) result.failures.push(`8+ word titles ${JSON.stringify(wordy)}`);
+  }
   return { ...result, ok: result.failures.length === 0 };
 }

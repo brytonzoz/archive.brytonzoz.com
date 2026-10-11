@@ -50,6 +50,7 @@ function ossFloor(query) {
 }
 
 // 0936709 held-out counts. Fail any builder who had real ships then and now prints 0.
+// Retrigger: reprint + held-out must run on the journal-union / title-clip head.
 const BASELINE_0936709 = {
   steventey: 0,
   shadcn: 4,

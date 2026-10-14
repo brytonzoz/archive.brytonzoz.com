@@ -86,7 +86,7 @@ function PrintedReceiptLive() {
     <>
       <OrderNotice />
       <ShippedStage key={stageKey} opening={opening} title="Print your Shipped receipt" />
-      <p className="pb-8 text-center text-[11px] text-[#f3ead8]/45">
+      <p className="shipped-footer">
         <a href="/terms/" className="underline underline-offset-4">
           Terms &amp; privacy
         </a>

@@ -22,32 +22,48 @@ function loadTurnstile(): Promise<TurnstileApi> {
     if (window.turnstile) return resolve(window.turnstile);
     const existing = document.querySelector<HTMLScriptElement>('script[src*="challenges.cloudflare.com/turnstile"]');
     const tag = existing ?? document.createElement('script');
+    const start = Date.now();
+    let settled = false;
+    let polling: number | undefined;
+    const cleanup = () => {
+      window.clearTimeout(polling);
+      tag.onload = null;
+      tag.onerror = null;
+    };
+    const fail = () => {
+      if (settled) return;
+      settled = true;
+      cleanup();
+      // A failed script element will not download again when it is reused.
+      tag.remove();
+      script = null;
+      reject(new Error('turnstile'));
+    };
+    const wait = () => {
+      if (settled) return;
+      window.clearTimeout(polling);
+      if (window.turnstile) {
+        settled = true;
+        cleanup();
+        return resolve(window.turnstile);
+      }
+      if (Date.now() - start > 8_000) return fail();
+      polling = window.setTimeout(wait, 40);
+    };
+    tag.onload = wait;
+    tag.onerror = fail;
     if (!existing) {
       tag.src = 'https://challenges.cloudflare.com/turnstile/v0/api.js?render=explicit';
       tag.async = true;
       tag.defer = true;
       document.head.appendChild(tag);
     }
-    const start = Date.now();
-    const wait = () => {
-      if (window.turnstile) return resolve(window.turnstile);
-      if (Date.now() - start > 8_000) {
-        script = null;
-        return reject(new Error('turnstile'));
-      }
-      window.setTimeout(wait, 40);
-    };
-    tag.onload = wait;
-    tag.onerror = () => {
-      script = null;
-      reject(new Error('turnstile'));
-    };
     wait();
   });
   return script;
 }
 
-if (typeof document !== 'undefined') void loadTurnstile();
+if (typeof document !== 'undefined') void loadTurnstile().catch(() => undefined);
 
 export type TurnstileHandle = { reset: () => void; execute: () => Promise<string | null>; warm: () => void };
 
@@ -60,6 +76,7 @@ type TurnstileProps = {
 };
 
 const EXECUTE_MS = 4_000;
+const VERIFY_DEADLINE_MS = 20_000;
 
 export const Turnstile = forwardRef<TurnstileHandle, TurnstileProps>(function Turnstile(
   { siteKey, onToken, theme = 'light', appearance = 'execute' },
@@ -72,6 +89,7 @@ export const Turnstile = forwardRef<TurnstileHandle, TurnstileProps>(function Tu
   const spent = useRef(false);
   const minting = useRef(false);
   const waiters = useRef<((value: string | null) => void)[]>([]);
+  const cancelExecution = useRef<(() => void) | null>(null);
   const callback = useRef(onToken);
   callback.current = onToken;
   const [challenge, setChallenge] = useState(appearance === 'always');
@@ -120,25 +138,49 @@ export const Turnstile = forwardRef<TurnstileHandle, TurnstileProps>(function Tu
 
   useImperativeHandle(ref, () => ({
     reset: () => {
+      cancelExecution.current?.();
       minting.current = false;
       resetWidget(true);
     },
     warm: () => {
       setFailed(false);
-      void loadTurnstile();
+      void loadTurnstile().catch(() => {
+        setChallenge(true);
+        setFailed(true);
+      });
     },
     execute: () => {
+      cancelExecution.current?.();
       // Always mint a new token. A leftover or spent one is what made PRINT 400.
       minting.current = true;
       token.current = null;
       spent.current = false;
       setFailed(false);
       return new Promise((resolve) => {
-        waiters.current.push(resolve);
+        let finished = false;
+        let polling: number | undefined;
+        const finish = (value: string | null) => {
+          if (finished) return;
+          finished = true;
+          window.clearTimeout(deadline);
+          window.clearTimeout(polling);
+          waiters.current = waiters.current.filter((waiter) => waiter !== finish);
+          if (cancelExecution.current === cancel) cancelExecution.current = null;
+          resolve(value);
+        };
+        const cancel = () => finish(null);
+        cancelExecution.current = cancel;
+        const deadline = window.setTimeout(() => {
+          minting.current = false;
+          setFailed(true);
+          finish(null);
+        }, VERIFY_DEADLINE_MS);
+        waiters.current.push(finish);
         const start = Date.now();
         let kicked = false;
         let managed = visible;
         const run = () => {
+          if (finished) return;
           if (token.current) {
             minting.current = false;
             resolveWaiters(token.current);
@@ -157,13 +199,15 @@ export const Turnstile = forwardRef<TurnstileHandle, TurnstileProps>(function Tu
               showManaged();
             }
           }
-          if (!token.current) window.setTimeout(run, 50);
+          if (!token.current) polling = window.setTimeout(run, 50);
         };
         // reset() must settle before execute() or Cloudflare answers 400.
-        window.setTimeout(run, 80);
+        polling = window.setTimeout(run, 80);
       });
     },
   }));
+
+  useEffect(() => () => cancelExecution.current?.(), []);
 
   useEffect(() => {
     const el = box.current;
@@ -201,6 +245,7 @@ export const Turnstile = forwardRef<TurnstileHandle, TurnstileProps>(function Tu
         });
       })
       .catch(() => {
+        if (cancelled) return;
         setChallenge(true);
         setFailed(true);
         if (!minting.current) emit(null);

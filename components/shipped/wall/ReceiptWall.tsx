@@ -9,8 +9,10 @@ import { press } from '../feel';
 import { useShippedState } from '../state';
 import { WallFocus } from './WallFocus';
 import { WallSlip } from './WallSlip';
+import styles from './ReceiptWall.module.css';
 
 const PAGE = 24;
+const PREVIEW_COUNT = 6;
 const BUFFER = 720;
 const RETRIES = 3;
 const FETCH_MS = 4_000;
@@ -33,9 +35,9 @@ function asReceipt(row: Partial<PileReceipt> & { id: number; who?: string }): Pi
   };
 }
 
-async function fetchPile(before?: number | null): Promise<PileResponse> {
+async function fetchPile(before?: number | null, limit = PAGE): Promise<PileResponse> {
   const url = new URL('/api/shipped/pile', window.location.origin);
-  url.searchParams.set('limit', String(PAGE));
+  url.searchParams.set('limit', String(limit));
   if (before) url.searchParams.set('before', String(before));
   const response = await fetch(url, { cache: 'no-store', signal: AbortSignal.timeout(FETCH_MS) });
   if (!response.ok) throw new Error('pile');
@@ -44,7 +46,7 @@ async function fetchPile(before?: number | null): Promise<PileResponse> {
   return { ...page, receipts, next: page.next ?? null, total: page.total ?? receipts.length };
 }
 
-class WallCatch extends Component<{ children: React.ReactNode }, { failed: boolean }> {
+class WallCatch extends Component<{ children: React.ReactNode; page: boolean }, { failed: boolean }> {
   state = { failed: false };
   static getDerivedStateFromError() {
     return { failed: true };
@@ -52,11 +54,12 @@ class WallCatch extends Component<{ children: React.ReactNode }, { failed: boole
   render() {
     if (this.state.failed) {
       return (
-        <section className="shipped-wall" data-wall="" aria-label="The wall">
-          <header className="shipped-wall-head">
-            <h2>The wall</h2>
-            <p>Reload to pin again</p>
-          </header>
+        <section className={styles.preview} data-wall="" aria-label="Recent receipts">
+          <h2 className={styles.heading}>{this.props.page ? 'The receipt wall' : 'Fresh off the printer'}</h2>
+          <div className={styles.empty}>
+            <p>Receipts couldn’t load. Please try again.</p>
+            <button type="button" className={styles.retry} onClick={() => window.location.reload()}>Reload receipts</button>
+          </div>
         </section>
       );
     }
@@ -66,9 +69,86 @@ class WallCatch extends Component<{ children: React.ReactNode }, { failed: boole
 
 export function ReceiptWall({ page = false }: { page?: boolean }) {
   return (
-    <WallCatch>
-      <ReceiptWallBoard page={page} />
+    <WallCatch page={page}>
+      {page ? <ReceiptWallBoard page /> : <ReceiptWallPreview />}
     </WallCatch>
+  );
+}
+
+function ReceiptWallPreview() {
+  const state = useShippedState();
+  const [receipts, setReceipts] = useState<PileReceipt[]>([]);
+  const [ready, setReady] = useState(false);
+  const [failed, setFailed] = useState(false);
+  const [attempt, setAttempt] = useState(0);
+
+  useEffect(() => {
+    let live = true;
+    setReady(false);
+    setFailed(false);
+    fetchPile(null, PREVIEW_COUNT)
+      .then((response) => {
+        if (live) setReceipts(response.receipts.slice(0, PREVIEW_COUNT));
+      })
+      .catch(() => {
+        if (live) setFailed(true);
+      })
+      .finally(() => {
+        if (live) setReady(true);
+      });
+    return () => { live = false; };
+  }, [attempt]);
+
+  const recent = receipts.length
+    ? receipts
+    : ready
+      ? (state?.recent ?? []).slice(0, PREVIEW_COUNT).flatMap((row) => asReceipt({ ...row, items: [] }) ?? [])
+      : [];
+
+  return (
+    <section className={styles.preview} data-wall="" aria-labelledby="recent-receipts-heading">
+      <header className={styles.header}>
+        <div>
+          <p className={styles.eyebrow}>The receipt wall</p>
+          <h2 id="recent-receipts-heading" className={styles.heading}>Fresh off the printer</h2>
+          <p className={styles.intro}>A few things people have put into the world.</p>
+        </div>
+        <a href="/wall/" className={styles.viewAll}>View all receipts <span aria-hidden="true">→</span></a>
+      </header>
+      {recent.length ? (
+        <ul className={styles.grid}>
+          {recent.map((receipt) => (
+            <li key={receipt.id}>
+              <a href={`/r/${receipt.id}/`} className={styles.card}>
+                <div className={styles.cardTop}>
+                  <span>Receipt #{receipt.id}</span>
+                  <span aria-hidden="true">→</span>
+                </div>
+                <h3 className={styles.person}>{receipt.who}</h3>
+                <p className={styles.count}>{receipt.potential ? 'Potential to ship' : `${receipt.count} ${receipt.count === 1 ? 'thing' : 'things'} shipped`}</p>
+                <div className={styles.items}>
+                  {receipt.items.length ? (
+                    <ul>
+                      {receipt.items.slice(0, 2).map((item, index) => <li key={`${item.name}-${index}`}>{item.name}</li>)}
+                    </ul>
+                  ) : <p>Open to see the full receipt.</p>}
+                </div>
+                <span className={styles.open}>Open receipt <span aria-hidden="true">→</span></span>
+              </a>
+            </li>
+          ))}
+        </ul>
+      ) : !ready ? (
+        <div className={styles.empty} role="status"><p>Loading recent receipts…</p></div>
+      ) : (
+        <div className={styles.empty} role="status">
+          <p>{failed ? 'Recent receipts couldn’t load.' : 'The wall is waiting for its first receipt.'}</p>
+          {failed ? (
+            <button type="button" className={styles.retry} onClick={() => setAttempt((value) => value + 1)}>Try again</button>
+          ) : <p className={styles.emptyHint}>Print yours above and add it to the wall.</p>}
+        </div>
+      )}
+    </section>
   );
 }
 
@@ -79,6 +159,7 @@ function ReceiptWallBoard({ page = false }: { page?: boolean }) {
   const [next, setNext] = useState<number | null>(null);
   const [total, setTotal] = useState(0);
   const [ready, setReady] = useState(false);
+  const [failed, setFailed] = useState(false);
   const [width, setWidth] = useState(320);
   const [view, setView] = useState({ top: 0, height: 800 });
   const [crumpled, setCrumpledIds] = useState<Set<number>>(() => new Set());
@@ -113,6 +194,7 @@ function ReceiptWallBoard({ page = false }: { page?: boolean }) {
       });
       setNext(page.next);
       setTotal(page.total);
+      setFailed(false);
       setReady(true);
     } catch {
       if (!before && tries.current < RETRIES) {
@@ -123,6 +205,7 @@ function ReceiptWallBoard({ page = false }: { page?: boolean }) {
         }, 400 * tries.current);
         return;
       }
+      setFailed(true);
       setReady(true);
     } finally {
       loading.current = false;
@@ -187,10 +270,18 @@ function ReceiptWallBoard({ page = false }: { page?: boolean }) {
     <section className={`shipped-wall${page ? ' is-page' : ''}`} data-wall="" aria-label="The wall">
       <header className="shipped-wall-head">
         <h2>The wall</h2>
-        <p>{empty ? (ready ? 'Nothing pinned yet' : 'Pinning') : `${total} pinned`}</p>
+        <p>{empty ? (ready ? (failed ? 'Temporarily unavailable' : 'Nothing pinned yet') : 'Loading receipts…') : `${total} pinned`}</p>
       </header>
-      <div ref={board} className="shipped-wall-board" style={{ height: empty ? Math.max(height, 520) : Math.max(height, 280) }}>
-        {empty ? <WallSkeleton width={width} /> : null}
+      <div ref={board} className="shipped-wall-board" style={{ height: empty && !ready ? 520 : Math.max(height, 280) }}>
+        {empty && !ready ? <WallSkeleton width={width} /> : null}
+        {empty && ready ? (
+          <div className={styles.boardEmpty} role="status">
+            <p>{failed ? 'Receipts couldn’t load right now.' : 'Be the first to pin a receipt.'}</p>
+            {failed ? (
+              <button type="button" onClick={() => { tries.current = 0; setReady(false); void load(); }}>Try again</button>
+            ) : <a href="/">Print your receipt →</a>}
+          </div>
+        ) : null}
         {visible.map((card) => {
           const receipt = byId.get(card.id);
           if (!receipt) return null;

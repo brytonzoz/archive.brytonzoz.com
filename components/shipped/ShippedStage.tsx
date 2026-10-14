@@ -1,26 +1,24 @@
 'use client';
 
-// The top of / and /r/<id>/: one receipt printer on the desk. Type a name on its LCD and press PRINT.
+// The top of / and /r/<id>/: a clear creation form beside the live receipt printer.
 // It looks the name up, lets the visitor pick if it could be more than one person, tears off whatever is
 // hanging, feeds while the sources are searched, and prints theirs. Jams and an empty roll print a slip.
 import React, { useEffect, useRef, useState } from 'react';
 import { track } from '../../lib/analytics';
 import { countdown } from '../../lib/shipped-event';
-import { readQuery, receiptNumber, type Candidate } from '../../lib/shipped-year';
+import { readQuery, receiptNumber, SITE_YEAR, type Candidate } from '../../lib/shipped-year';
 import { press } from './feel';
 import { FALLBACK_HUMAN, HumanCheck, type HumanCheckHandle } from './HumanCheck';
 import { Machine, type Job, type Tone } from './Machine';
 import { Line, Rule, Tall } from './paper';
-import { Ticker } from './Ticker';
-import { SponsorBoard } from './SponsorBoard';
-import { DeskPins } from './DeskPins';
 import { refreshShippedState, useShippedClock, useShippedState } from './state';
 import { applyPrintChunk, fetchReceipt, followReceipt, forgetTorn, isReceiptOpen, readPrintResponse, readTorn, rememberTorn, type PrintChunk } from './print-stream';
 import { SharePill, VisitorReceipt, rememberPile, type Loaded } from './visitor';
 
 const ERRORS: Record<string, string> = {
   'invalid-query': 'Type a name, an @handle, a GitHub username or a website.',
-  turnstile: 'Couldn’t check you’re human. Try again.',
+  turnstile: 'Verification didn’t finish. Please try again.',
+  'lookup-timeout': 'That search took too long. Try again, or use a GitHub username or website.',
   'slow-down': 'The print head is hot. Try again in an hour.',
   busy: 'Lots of people printing. Try again in a few seconds.',
   printing: 'That receipt is printing right now. Try again in a few seconds.',
@@ -53,6 +51,7 @@ export type Opening = { kind: 'house'; content: React.ReactNode } | { kind: 'loa
 
 type Step =
   | { name: 'idle' }
+  | { name: 'checking' }
   | { name: 'looking' }
   | { name: 'retry' }
   | { name: 'pick'; candidates: Candidate[] }
@@ -92,7 +91,7 @@ const outOfPaper = (
 );
 
 function openingJob(opening: Opening): Job {
-  if (opening.kind === 'house') return { key: 'house', kind: 'print', slip: true, label: 'How it works', content: opening.content };
+  if (opening.kind === 'house') return { key: 'house', kind: 'print', slip: true, label: 'Receipt preview', content: opening.content };
   if (opening.kind === 'loaded') {
     return {
       key: `r${opening.loaded.receipt.id}`,
@@ -137,7 +136,7 @@ function Countdown() {
   if (left === null) {
     return (
       <p className="shipped-clock is-wait" aria-hidden="true">
-        <span className="shipped-clock-k">SHUT OFF</span>
+        <span className="shipped-clock-k">Ends in</span>
         <span className="shipped-clock-v">··</span>
       </p>
     );
@@ -152,7 +151,7 @@ function Countdown() {
   }
   return (
     <p className="shipped-clock" aria-live="off">
-      <span className="shipped-clock-k">SHUT OFF</span>
+      <span className="shipped-clock-k">Ends in</span>
       <span className="shipped-clock-v">{countdown(left)}</span>
     </p>
   );
@@ -173,9 +172,13 @@ export function ShippedStage({ opening, title }: { opening: Opening; title: Reac
   const [tick, setTick] = useState(0);
   const touched = useRef(false);
   const input = useRef<HTMLInputElement>(null);
+  const picker = useRef<HTMLFieldSetElement>(null);
+  const resultTitle = useRef<HTMLHeadingElement>(null);
+  const returnToInput = useRef(false);
   const human = useRef<HumanCheckHandle>(null);
   const prints = useRef(0);
   const run = useRef(0);
+  const submitting = useRef(false);
   const printKey = useRef<string | null>(null);
   const follow = useRef<{ cancelled: boolean } | null>(null);
   const paperRef = useRef(paper);
@@ -229,11 +232,12 @@ export function ShippedStage({ opening, title }: { opening: Opening; title: Reac
   else if (step.name === 'jammed') [display, tone] = ['PAPER JAM', 'error'];
   else if (step.name === 'retry') [display, tone] = ['TRY AGAIN', 'error'];
   else if (step.name === 'pick') [display, tone] = ['WHICH ONE?', 'ready'];
+  else if (step.name === 'checking') [display, tone] = ['VERIFYING', 'busy'];
   else if (step.name === 'looking') [display, tone] = ['LOOKING UP', 'busy'];
   else if (step.name === 'feeding') [display, tone] = [searching[Math.min(tick, searching.length - 1)], 'busy'];
   else if (job.kind === 'feed') [display, tone] = ['LOADING', 'busy'];
   else if (paper === 'printing') [display, tone] = ['PRINTING', 'busy'];
-  else if (paper === 'hanging') [display, tone] = ['TEAR HERE', 'ready'];
+  else if (paper === 'hanging') [display, tone] = [house ? 'READY TO PRINT' : 'PRINTED', 'ready'];
   else if (offline) [display, tone] = ['OFFLINE', 'error'];
   else [display, tone] = ['READY', 'ready'];
 
@@ -279,24 +283,28 @@ export function ShippedStage({ opening, title }: { opening: Opening; title: Reac
   }
 
   async function print(candidate: Candidate, gen = run.current, token?: string | null) {
-    const humanToken = token ?? (await human.current?.execute()) ?? null;
-    if (run.current !== gen) return;
-    if (!humanToken) {
-      setStep({ name: 'retry' });
-      input.current?.focus();
-      return setError(ERRORS.turnstile);
-    }
-    // Invalidate the LOOKING UP timeout so a long print never flips the LCD to TRY AGAIN.
-    if (run.current === gen) ++run.current;
+    if (submitting.current && !token) return;
+    submitting.current = true;
     setError(null);
-    setTick(0);
-    setStep({ name: 'feeding' });
-    printKey.current = null;
-    if (follow.current) follow.current.cancelled = true;
-    const watching = { cancelled: false };
-    follow.current = watching;
-    clear(() => load({ key: `feed-${prints.current}`, kind: 'feed', label: `Printing ${candidate.display}’s receipt` }, null));
+    if (!token) setStep({ name: 'checking' });
     try {
+      const humanToken = token ?? (await human.current?.execute()) ?? null;
+      if (run.current !== gen) return;
+      if (!humanToken) {
+        setStep({ name: 'retry' });
+        input.current?.focus();
+        return setError(ERRORS.turnstile);
+      }
+      // Invalidate any earlier lookup before the stream starts.
+      if (run.current === gen) ++run.current;
+      setError(null);
+      setTick(0);
+      setStep({ name: 'feeding' });
+      printKey.current = null;
+      if (follow.current) follow.current.cancelled = true;
+      const watching = { cancelled: false };
+      follow.current = watching;
+      clear(() => load({ key: `feed-${prints.current}`, kind: 'feed', label: `Printing ${candidate.display}’s receipt` }, null));
       const response = await fetch('/api/shipped/print', {
         method: 'POST',
         headers: { 'content-type': 'application/json' },
@@ -349,46 +357,43 @@ export function ShippedStage({ opening, title }: { opening: Opening; title: Reac
       setStep({ name: 'jammed' });
       setError(message);
       slip('jam', 'Paper jam', <Slip title="PAPER JAM" lines={[['RECEIPT', 'VOID'], ['CHARGED', '$0.00']]} note={message} />);
+    } finally {
+      submitting.current = false;
     }
   }
 
   async function submit(event?: React.FormEvent) {
     event?.preventDefault();
+    if (submitting.current || closed || empty || offline || !state) return;
     if (!readQuery(query)) {
       setError(ERRORS['invalid-query']);
       input.current?.focus();
       return;
     }
+    submitting.current = true;
     const gen = ++run.current;
     setError(null);
-    // PRINT and Enter both land here. Take the token during this gesture, before lookup.
-    human.current?.warm();
-    const humanToken = (await human.current?.execute()) ?? null;
-    if (run.current !== gen) return;
-    if (!humanToken) {
-      setStep({ name: 'retry' });
-      setError(ERRORS.turnstile);
-      input.current?.focus();
-      return;
-    }
-    setStep({ name: 'looking' });
-    const timer = window.setTimeout(() => {
-      if (run.current !== gen) return;
-      ++run.current;
-      setStep({ name: 'retry' });
-      setError(ERRORS.turnstile);
-      input.current?.focus();
-    }, LOOKUP_MS);
+    setStep({ name: 'checking' });
     try {
+      human.current?.warm();
+      const humanToken = (await human.current?.execute()) ?? null;
+      if (run.current !== gen) return;
+      if (!humanToken) {
+        human.current?.reset();
+        setStep({ name: 'retry' });
+        setError(ERRORS.turnstile);
+        return;
+      }
+      setStep({ name: 'looking' });
       const response = await fetch('/api/shipped/lookup', {
         method: 'POST',
         headers: { 'content-type': 'application/json' },
         body: JSON.stringify({ q: query }),
+        signal: AbortSignal.timeout(LOOKUP_MS),
       });
-      const result = (await response.json().catch(() => ({}))) as { candidates?: Candidate[]; auto?: boolean; error?: string };
+      const result = (await response.json()) as { candidates?: Candidate[]; auto?: boolean; error?: string };
       if (run.current !== gen) return;
       if (!response.ok || !result.candidates?.length) throw new Error(result.error ?? 'invalid-query');
-      window.clearTimeout(timer);
       if (result.auto) {
         await print(result.candidates[0], gen, humanToken);
         return;
@@ -397,18 +402,40 @@ export function ShippedStage({ opening, title }: { opening: Opening; title: Reac
     } catch (failure) {
       if (run.current !== gen) return;
       const code = failure instanceof Error ? failure.message : '';
-      setError(ERRORS[code] ?? 'Couldn’t look that up. Try again.');
-      setStep({ name: 'idle' });
+      const timedOut = failure instanceof Error && (failure.name === 'TimeoutError' || failure.name === 'AbortError');
+      setError(timedOut ? ERRORS['lookup-timeout'] : ERRORS[code] ?? 'Couldn’t look that up. Check the name or website and try again.');
+      setStep({ name: 'retry' });
     } finally {
-      window.clearTimeout(timer);
+      submitting.current = false;
     }
   }
 
-  const busy = step.name === 'looking' || step.name === 'feeding';
+  const busy = step.name === 'checking' || step.name === 'looking' || step.name === 'feeding';
+  const unavailable = Boolean(closed || empty || offline || !state);
+  const formStatus = step.name === 'checking' ? 'Verifying your browser…'
+    : step.name === 'looking' ? 'Finding the right person…'
+    : step.name === 'feeding' ? 'Finding public launches and building your receipt. This can take a little while.'
+    : '';
 
   useEffect(() => {
     if (step.name === 'retry') input.current?.focus();
   }, [step.name]);
+
+  useEffect(() => {
+    if (step.name !== 'pick') return;
+    picker.current?.querySelector('button')?.focus({ preventScroll: true });
+    picker.current?.scrollIntoView({ block: 'nearest', behavior: window.matchMedia('(prefers-reduced-motion: reduce)').matches ? 'auto' : 'smooth' });
+  }, [step.name]);
+
+  useEffect(() => {
+    if (focus && !shared) {
+      resultTitle.current?.focus({ preventScroll: true });
+      window.scrollTo({ top: 0, behavior: 'auto' });
+    } else if (!focus && returnToInput.current) {
+      returnToInput.current = false;
+      input.current?.focus();
+    }
+  }, [focus, shared]);
 
   useEffect(() => {
     document.documentElement.classList.toggle('shipped-focus', focus);
@@ -465,6 +492,8 @@ export function ShippedStage({ opening, title }: { opening: Opening; title: Reac
   }, [opening.kind]);
 
   function printAnother() {
+    if (submitting.current) return;
+    returnToInput.current = true;
     forgetTorn();
     printKey.current = null;
     if (follow.current) follow.current.cancelled = true;
@@ -483,30 +512,75 @@ export function ShippedStage({ opening, title }: { opening: Opening; title: Reac
   }
 
   return (
-    <div className={`shipped-stage${focus ? ' is-focus' : ''}${shared ? ' is-shared' : ''}`}>
-      {shared ? (
-        <div className="shipped-hero-bar">
-          <Ticker compact />
-          <a href="/" className="shipped-print-yours">
-            Print yours
-          </a>
-        </div>
-      ) : (
-        <>
-          <DeskPins />
-          <div className="shipped-ticker-pin">
-            <Ticker />
-            <Countdown />
+    <div className={`shipped-stage shipped-workspace${focus ? ' is-focus' : ''}${shared ? ' is-shared' : ''}`}>
+      {!shared && !focus ? (
+        <section className="shipped-create" id="print" aria-labelledby="shipped-title">
+          <p className="shipped-eyebrow"><span /> A little proof of a lot of work</p>
+          <h1 id="shipped-title">Your year.<br /><span>On a receipt.</span></h1>
+          <p className="shipped-intro">The apps, launches, and things you put into the world in {SITE_YEAR}. Find them. Print them. Give yourself some credit.</p>
+          <form className="shipped-create-form" onSubmit={(event) => void submit(event)} noValidate>
+            <label htmlFor="shipped-query">Who are we printing for?</label>
+            <div className={`shipped-query-wrap${error ? ' has-error' : ''}`}>
+              <span className="shipped-query-icon" aria-hidden="true">@</span>
+              <input
+                ref={input}
+                id="shipped-query"
+                value={query}
+                onChange={(event) => {
+                  setQuery(event.target.value);
+                  if (step.name === 'pick' || step.name === 'jammed' || step.name === 'retry') setStep({ name: 'idle' });
+                  setError(null);
+                }}
+                onFocus={() => human.current?.warm()}
+                placeholder="Name, @handle, or website"
+                autoComplete="off"
+                autoCapitalize="none"
+                spellCheck={false}
+                maxLength={80}
+                enterKeyHint="go"
+                disabled={busy || unavailable}
+                aria-invalid={Boolean(error)}
+                aria-describedby={`shipped-input-help${error ? ' shipped-print-error' : ''}`}
+              />
+            </div>
+            <p id="shipped-input-help" className="shipped-input-help">A GitHub username works, too. Public work only.</p>
+            <label className="shipped-wall-choice">
+              <input type="checkbox" checked={listed} disabled={busy || unavailable} onChange={(event) => {
+                const value = event.target.checked;
+                setListed(value);
+                try { window.localStorage.setItem('shipped-wall-off', value ? '0' : '1'); } catch { /* Choice lasts for this visit. */ }
+              }} />
+              <span>Add my receipt to the public wall</span>
+            </label>
+            <button type="submit" className="shipped-create-button" disabled={busy || unavailable} aria-busy={busy} onPointerDown={press}>
+              {busy ? <><span className="shipped-busy-dot" />{step.name === 'checking' ? 'Verifying…' : step.name === 'looking' ? 'Finding your work…' : 'Printing your receipt…'}</> : <>{step.name === 'retry' || step.name === 'jammed' ? 'Try again' : closed ? 'Printing has ended' : unavailable ? 'Printer unavailable' : 'Print my receipt'}<span aria-hidden="true">→</span></>}
+            </button>
+            <p className="shipped-free-note">Free to print & share. No account needed.</p>
+            {error ? <p id="shipped-print-error" className="shipped-form-error" role="alert">{error}</p> : null}
+            {formStatus ? <p className="shipped-form-status" role="status">{formStatus}</p> : null}
+            {unavailable ? <p className="shipped-form-status" role="status">{state === undefined ? 'Connecting to the printer…' : !state ? 'The printer couldn’t connect. Reload the page to try again.' : closed ? 'This printing event has ended. You can still browse and share existing receipts.' : empty ? 'The printer is out of paper. Browse the wall while we restock.' : 'The printer is temporarily offline. Try again later, or browse the wall.'}</p> : null}
+          </form>
+          <div className="shipped-verification">
+            <HumanCheck ref={human} check={generator?.human ?? FALLBACK_HUMAN} onToken={() => undefined} theme="light" appearance="execute" />
           </div>
-          <SponsorBoard />
-        </>
+          {step.name === 'pick' ? (
+            <fieldset className="shipped-person-picker" ref={picker}>
+              <legend>Which person did you mean?</legend>
+              <p>Choose a match to print their receipt.</p>
+              {step.candidates.map((candidate) => (
+                <button key={`${candidate.kind}:${candidate.id}`} type="button" onClick={() => void print(candidate)} disabled={busy}>
+                  <span><strong>{candidate.display}</strong><small>{candidate.detail}</small></span><span aria-hidden="true">→</span>
+                </button>
+              ))}
+            </fieldset>
+          ) : null}
+          <div className="shipped-create-bottom"><a href="/wall/">Explore the receipt wall <span aria-hidden="true">→</span></a><Countdown /></div>
+        </section>
+      ) : (
+        <div className="shipped-result-heading"><h1 id="shipped-title" ref={resultTitle} tabIndex={-1}>{current ? 'Your receipt is ready.' : title}</h1><a href="/" onClick={(event) => { if (!shared) { event.preventDefault(); printAnother(); } }}>Print another <span aria-hidden="true">→</span></a></div>
       )}
-
-      <section className="shipped-counter" id="print" aria-labelledby="shipped-title">
-        <h1 id="shipped-title" className="sr-only">
-          {title}
-        </h1>
-
+      <section className="shipped-counter shipped-preview" aria-label={focus || shared ? 'Your printed receipt' : 'Receipt preview'}>
+        {!shared && !focus ? <div className="shipped-preview-caption"><span><i /> THE PUBLIC RECEIPT PRINTER</span><span>NO. {SITE_YEAR}</span></div> : null}
         <Machine
           job={job}
           display={display}
@@ -514,99 +588,21 @@ export function ShippedStage({ opening, title }: { opening: Opening; title: Reac
           tearSignal={tearSignal}
           onPrinted={() => {
             setPaper('hanging');
-            // Visitor receipts open full-screen on their own. TEAR stays as an optional gesture.
-            if (currentRef.current) {
-              window.setTimeout(() => setTearSignal((n) => n + 1), 720);
-            }
+            if (currentRef.current) window.setTimeout(() => setTearSignal((n) => n + 1), 720);
           }}
           onTorn={() => setPaper('torn')}
           paperMax={paperMax}
           focus={focus}
           hero={shared}
-          inputRef={input}
-          console={
-            empty || (offline && !busy)
-              ? undefined
-              : {
-                  query,
-                  onQuery: (value) => {
-                    setQuery(value);
-                    if (step.name === 'pick' || step.name === 'jammed' || step.name === 'retry') setStep({ name: 'idle' });
-                    if (error) setError(null);
-                  },
-                  onPrint: () => {
-                    if (step.name === 'retry') human.current?.reset();
-                    void submit();
-                  },
-                  onWarm: () => human.current?.warm(),
-                  printing: busy,
-                  retry: step.name === 'retry',
-                  listed,
-                  onListed: (value) => {
-                    setListed(value);
-                    try {
-                      window.localStorage.setItem('shipped-wall-off', value ? '0' : '1');
-                    } catch {
-                      // Private mode: the choice lasts for this page only.
-                    }
-                  },
-                  closed,
-                  invalid: Boolean(error),
-                  under: shared || focus ? null : (
-                    <HumanCheck ref={human} check={generator?.human ?? FALLBACK_HUMAN} onToken={() => undefined} theme="dark" appearance="execute" />
-                  ),
-                }
-          }
         />
-
-        {error && step.name === 'retry' ? (
-          <button
-            type="button"
-            id="shipped-print-error"
-            className="shipped-desk-error is-retry"
-            onPointerDown={press}
-            onClick={() => {
-              human.current?.reset();
-              input.current?.focus();
-              void submit();
-            }}
-          >
-            {error}
-          </button>
-        ) : error ? (
-          <p id="shipped-print-error" className="shipped-desk-error" role="alert">
-            {error}
-          </p>
-        ) : null}
-
-        {step.name === 'pick' ? (
-          <fieldset className="shipped-pick">
-            <legend className="shipped-pick-legend">Which one is you?</legend>
-            <ul>
-              {step.candidates.map((candidate) => (
-                <li key={`${candidate.kind}:${candidate.id}`}>
-                  <button type="button" className="shipped-pick-choice" onPointerDown={press} onClick={() => print(candidate)} disabled={busy}>
-                    <span className="block font-semibold">{candidate.display}</span>
-                    <span className="block opacity-60">{candidate.detail}</span>
-                  </button>
-                </li>
-              ))}
-            </ul>
-          </fieldset>
-        ) : null}
-
-        {empty ? (
-          <p className="shipped-desk-status" role="status">
-            {closed ? 'The printer is off for good. Receipts already printed still open and share.' : 'Out of paper. Receipts already printed still open and share.'}
-          </p>
-        ) : offline && !busy ? (
-          <p className="shipped-desk-status" role="status">
-            The printer is offline. Check back soon.
-          </p>
-        ) : null}
-
+        {!shared && !focus ? <p className="shipped-preview-note">Real work. Every item linked to its source.</p> : null}
         {focus && current ? <SharePill receipt={current.receipt} onPrintAnother={printAnother} /> : null}
       </section>
+      {!shared && !focus ? <div className="shipped-process" aria-label="How it works">
+        <div><span>01</span><p><strong>Find your work</strong><small>We look through public sources.</small></p></div>
+        <div><span>02</span><p><strong>Watch it print</strong><small>Your year, itemized on one receipt.</small></p></div>
+        <div><span>03</span><p><strong>Keep the proof</strong><small>Save it, share it, or get a real print.</small></p></div>
+      </div> : null}
     </div>
   );
 }

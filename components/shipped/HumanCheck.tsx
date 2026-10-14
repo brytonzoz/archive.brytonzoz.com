@@ -111,10 +111,18 @@ export const HumanCheck = forwardRef<HumanCheckHandle, Props>(function HumanChec
         }
         return turnstile.current?.execute() ?? null;
       }
-      return Promise.race([
-        new Promise<string | null>((resolve) => waiters.current.push(resolve)),
-        new Promise<string | null>((resolve) => window.setTimeout(() => resolve(null), 15_000)),
-      ]);
+      return new Promise<string | null>((resolve) => {
+        const finish = (value: string | null) => {
+          window.clearTimeout(timer);
+          waiters.current = waiters.current.filter((waiter) => waiter !== finish);
+          resolve(value);
+        };
+        const timer = window.setTimeout(() => finish(null), 15_000);
+        waiters.current.push(finish);
+        // The background puzzle may already have completed, and onToken consumers
+        // may have spent its proof. Start a fresh challenge for this execution.
+        setRound((n) => n + 1);
+      });
     },
   }));
 

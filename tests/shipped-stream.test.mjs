@@ -126,11 +126,8 @@ test('after a print the stage auto-tears; sponsors stay collapsed; Turnstile has
   assert.match(board, /spots · from/);
   assert.doesNotMatch(board, /shipped-board-marks/);
 
-  assert.match(stage, /SponsorBoard/);
-  assert.match(stage, /DeskPins/);
+  // Form placement and receipt navigation are exercised in scripts/check-shipped-ux.cjs.
   assert.match(stage, /shipped-clock-k/);
-  const home = fs.readFileSync(new URL('../app/shipped/page.tsx', import.meta.url), 'utf8');
-  assert.doesNotMatch(home, /SponsorBoard/);
 
   const feel = fs.readFileSync(new URL('../components/shipped/feel.ts', import.meta.url), 'utf8');
   assert.match(feel, /pressPrint/);
@@ -180,7 +177,6 @@ test('after a print the stage auto-tears; sponsors stay collapsed; Turnstile has
 test('shared receipt pages are the hero; DATE/RECEIPT pairs do not collide; checkout returns to the same receipt', () => {
   const stage = fs.readFileSync(new URL('../components/shipped/ShippedStage.tsx', import.meta.url), 'utf8');
   assert.match(stage, /is-shared/);
-  assert.match(stage, /Print yours/);
   assert.match(stage, /hero=\{shared\}/);
 
   const paper = fs.readFileSync(new URL('../components/shipped/paper.tsx', import.meta.url), 'utf8');
@@ -233,7 +229,6 @@ test('shared receipt pages are the hero; DATE/RECEIPT pairs do not collide; chec
   const machine = fs.readFileSync(new URL('../components/shipped/Machine.tsx', import.meta.url), 'utf8');
   assert.match(machine, /clearTearPaint/);
   assert.match(machine, /phase === 'torn' && !focus && !hero \? ' is-scroll'/);
-  assert.match(stage, /shared \|\| focus \? null/);
   assert.match(machine, /type="button"/);
   assert.match(machine, /desk\.onPrint\(\)/);
   assert.match(machine, /onWarm/);
@@ -242,7 +237,6 @@ test('shared receipt pages are the hero; DATE/RECEIPT pairs do not collide; chec
 
   assert.match(stage, /humanToken = token \?\?/);
   assert.match(stage, /human\.current\?\.warm/);
-  assert.match(stage, /is-retry/);
 
   const sound = fs.readFileSync(new URL('../components/shipped/sound.ts', import.meta.url), 'utf8');
   assert.match(sound, /allowSound/);

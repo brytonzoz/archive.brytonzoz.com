@@ -628,7 +628,7 @@ export function OrderNotice() {
   }, []);
   if (!message) return null;
   return (
-    <p className="mx-auto mb-4 max-w-md border border-dashed border-[#f3ead8]/40 p-3 text-center text-[12.5px] text-[#f3ead8]" role="status">
+    <p className="shipped-order-notice mx-auto mb-4 max-w-md border border-dashed border-[#f3ead8]/40 p-3 text-center text-[12.5px] text-[#f3ead8]" role="status">
       {message}
     </p>
   );

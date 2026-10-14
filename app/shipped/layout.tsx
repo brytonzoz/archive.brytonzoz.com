@@ -8,6 +8,7 @@ import { SHIPPED_URL } from '../../lib/shipped-year';
 import shareImages from '../../lib/share-images.json';
 import { ShippedNav } from '../../components/shipped/ShippedNav';
 import './receipt.css';
+import './workspace.css';
 
 const uiSans = Inter({
   subsets: ['latin'],
@@ -81,14 +82,14 @@ export const metadata: Metadata = {
 };
 
 export const viewport: Viewport = {
-  themeColor: '#161310',
-  colorScheme: 'dark',
+  themeColor: '#f6f4ed',
+  colorScheme: 'light',
   viewportFit: 'cover',
 };
 
 export default function ShippedLayout({ children }: { children: React.ReactNode }) {
   return (
-    <div className={`${uiSans.variable} ${receiptMono.variable} ${uiSans.className} shipped-page`}>
+    <div className={`${uiSans.variable} ${receiptMono.variable} ${uiSans.className} shipped-page shipped-refresh`}>
       <div className="shipped-stack">
         <ShippedNav />
         {children}

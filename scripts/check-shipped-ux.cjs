@@ -50,8 +50,8 @@ async function until(check, message, timeout = 15000) {
   assert.fail(message);
 }
 
-async function fixture(browser, viewport, mode = 'open') {
-  const context = await browser.newContext({ viewport, reducedMotion: 'reduce' });
+async function fixture(browser, viewport, mode = 'open', options = {}) {
+  const context = await browser.newContext({ viewport, reducedMotion: options.motion || 'reduce' });
   const requests = { lookup: [], print: [], shared: [], unexpected: [] };
   const replies = { lookup: [], print: [] };
   const errors = [];
@@ -101,13 +101,21 @@ async function fixture(browser, viewport, mode = 'open') {
   const page = await context.newPage();
   page.on('pageerror', error => errors.push(error.message));
   page.setDefaultTimeout(15000);
+  if (options.freezeClock) {
+    const now = Date.now();
+    await page.clock.install({ time: now });
+    await page.clock.pauseAt(now + 100);
+  }
   await page.goto(`${origin}/shipped/`, { waitUntil: 'domcontentloaded' });
-  const input = page.getByRole('textbox', { name: 'Who are we printing for?', exact: true });
+  const input = page.getByRole('textbox', { name: 'Name, @handle, GitHub or website', exact: true });
   await input.waitFor({ state: 'visible' });
   const form = input.locator('xpath=ancestor::form');
-  const submit = form.locator('button[type="submit"]');
-  if (mode === 'open') await until(() => submit.isEnabled(), 'Print button becomes available after state loads');
-  else await page.getByRole('status').filter({ hasText: mode === 'closed' ? /This printing event has ended/ : /printer is temporarily offline/ }).waitFor({ state: 'visible' });
+  const submit = form.getByRole('button', { name: /^(Print your receipt for free|Retry printing your receipt)$/ });
+  if (mode === 'open') await until(async () => {
+    if (options.freezeClock) await page.clock.runFor(16);
+    return submit.isEnabled();
+  }, 'Print button becomes available after state loads');
+  else await page.getByRole('status').filter({ hasText: mode === 'closed' ? /Printing has ended/ : /Temporarily offline/ }).waitFor({ state: 'visible' });
   await page.waitForFunction(() => Boolean(window.__turnstile));
   return { context, page, input, form, submit, requests, replies, errors };
 }
@@ -128,24 +136,31 @@ async function assertBusy(f) {
 async function checkJourney(browser, viewport, name) {
   const f = await fixture(browser, viewport);
   const { page, input, submit, requests } = f;
-  const heading = page.getByRole('heading', { name: 'Your year. On a receipt.', exact: true });
-  assert.ok(await heading.isVisible(), 'A visible heading explains the page');
-  const headingBox = await heading.boundingBox();
-  assert.ok(headingBox.height > 20 && headingBox.width > 100, 'Heading is readable rather than screen-reader-only');
-  assert.match(await submit.innerText(), /Print my receipt/i);
+  assert.equal(await page.getByRole('heading', { name: 'Print yours', exact: true }).count(), 1, 'Printer section has an accessible heading');
+  assert.ok(await page.locator('.shipped-lcd').isVisible(), 'The input is presented on the physical printer LCD');
+  assert.ok(await input.isEditable(), 'LCD input is ready to edit');
+  assert.ok(await page.getByRole('button', { name: /^Sound (on|off)\. Turn printer sound (on|off)$/ }).isVisible(), 'Printer sound control remains available');
+  assert.ok(await page.getByRole('button', { name: 'TEAR', exact: true }).isVisible(), 'Physical tear control remains available');
+  assert.match(await submit.innerText(), /PRINT/);
   const submitBox = await submit.boundingBox();
   assert.ok(submitBox.y + submitBox.height <= viewport.height, 'Print action is visible without scrolling');
-  const listed = page.getByRole('checkbox', { name: 'Add my receipt to the public wall', exact: true });
-  assert.ok(await listed.isChecked(), 'Public wall defaults on');
-  const preview = page.getByRole('region', { name: 'Fresh off the printer', exact: true });
-  const cards = preview.getByRole('link').filter({ hasText: /Open receipt/ });
-  await until(async () => await cards.count() === 6, 'Six recent receipts load in the preview');
+  const listed = page.getByRole('button', { name: /^(On|Off) the wall\./ });
+  assert.equal(await listed.getAttribute('aria-pressed'), 'true', 'Public wall defaults on');
+  const preview = page.getByRole('region', { name: 'The wall', exact: true });
+  const cards = preview.getByRole('button');
+  await until(async () => await cards.count() === 6, 'Six real receipt pins load on the home wall');
   for (let index = 0; index < pile.length; index++) {
-    assert.equal(await cards.nth(index).getAttribute('href'), `/r/${pile[index].id}/`, 'Preview links directly to each receipt');
-    assert.ok((await cards.nth(index).innerText()).includes(pile[index].who));
-    const box = await cards.nth(index).boundingBox();
-    assert.ok(box.x >= 0 && box.x + box.width <= viewport.width + 1, 'Receipt preview cards fit the viewport');
+    assert.equal(await preview.getByRole('button', { name: `${pile[index].who}, ${pile[index].count} shipped`, exact: true }).count(), 1);
   }
+  assert.equal(await preview.getByRole('link', { name: /Open wall/ }).getAttribute('href'), '/wall/');
+  await cards.first().click();
+  const wallDialog = page.getByRole('dialog', { name: `${pile[0].who}'s receipt`, exact: true });
+  await wallDialog.waitFor({ state: 'visible' });
+  assert.equal(await wallDialog.getByRole('link', { name: 'Open', exact: true }).getAttribute('href'), `/r/${pile[0].id}/`, 'A wall pin opens the matching receipt');
+  await noOverflow(page, `${name} wall dialog`);
+  await page.keyboard.press('Escape');
+  await wallDialog.waitFor({ state: 'hidden' });
+  await page.evaluate(() => window.scrollTo(0, 0));
   await noOverflow(page, `${name} initial`);
   await page.screenshot({ path: `/tmp/shipped-ux-${name}-initial.png`, fullPage: true });
 
@@ -159,7 +174,8 @@ async function checkJourney(browser, viewport, name) {
   assert.equal(requests.lookup.length, 0, 'Empty input never starts lookup');
 
   await input.fill('Alex River');
-  await listed.uncheck();
+  await listed.click();
+  assert.equal(await listed.getAttribute('aria-pressed'), 'false');
   await input.press('Enter');
   await assertBusy(f);
   assert.equal(requests.lookup.length, 0, 'Lookup waits for verification');
@@ -215,11 +231,56 @@ async function checkJourney(browser, viewport, name) {
   await page.getByRole('button', { name: 'Print another', exact: true }).click();
   await input.waitFor({ state: 'visible' });
   assert.equal(await input.inputValue(), '', 'Print another returns to an empty form');
-  assert.equal(await listed.isChecked(), false, 'Print another keeps the wall preference');
+  assert.equal(await listed.getAttribute('aria-pressed'), 'false', 'Print another keeps the wall preference');
   assert.deepEqual(requests.unexpected, [], 'No unmocked mutation endpoints called');
   assert.deepEqual(f.errors, [], 'No uncaught browser errors');
   await f.context.close();
-  console.log(`PASS ${name}: validation, Enter, verification lock, ambiguity, receipt, sharing, reset, layout`);
+  console.log(`PASS ${name}: physical printer controls, wall pins, validation, Enter, verification lock, ambiguity, receipt, sharing, reset, layout`);
+}
+
+async function checkOpeningAnimation(browser) {
+  const f = await fixture(browser, { width: 390, height: 844 }, 'open', { motion: 'no-preference', freezeClock: true });
+  const printingLCD = f.page.locator('.shipped-printer.is-printing .shipped-lcd input');
+  assert.ok(await printingLCD.isVisible(), 'LCD stays visible during the opening paper animation');
+  assert.ok(await printingLCD.isEditable(), 'Opening paper animation does not lock the LCD');
+  await f.input.fill('Ready while paper prints');
+  assert.equal(await f.input.inputValue(), 'Ready while paper prints');
+  const sound = f.page.getByRole('button', { name: /^Sound (on|off)\. Turn printer sound (on|off)$/ });
+  const initialSound = await sound.getAttribute('aria-pressed');
+  await sound.press('Space');
+  assert.notEqual(await sound.getAttribute('aria-pressed'), initialSound, 'Sound control toggles');
+  await sound.press('Space');
+  const tear = f.page.getByRole('button', { name: 'TEAR', exact: true });
+  assert.ok(await tear.isDisabled(), 'Paper cannot tear before it finishes printing');
+  await f.page.clock.runFor(6000);
+  assert.ok(await tear.isEnabled(), 'Tear becomes available when the slip finishes printing');
+  await tear.press('Space');
+  await f.page.clock.runFor(3000);
+  assert.ok(await f.input.isEditable(), 'Tearing the opening slip keeps the LCD editable');
+  assert.equal(await f.input.inputValue(), 'Ready while paper prints', 'Tearing preserves the typed query');
+  assert.equal(f.requests.lookup.length, 0, 'Sound and tear controls do not submit the print form');
+  assert.deepEqual(f.errors, []);
+  await f.context.close();
+  console.log('PASS opening: editable LCD while paper animates, sound toggle, tear after printing, retained query');
+}
+
+async function checkNarrowControls(browser) {
+  const f = await fixture(browser, { width: 320, height: 844 });
+  const body = f.page.locator('.shipped-printer-body');
+  const bodyBox = await body.boundingBox();
+  const keys = body.locator('.shipped-keys').getByRole('button');
+  assert.equal(await keys.count(), 4, 'Sound, wall, tear, and print keys remain available at 320px');
+  for (const key of await keys.all()) {
+    const name = await key.getAttribute('aria-label') || await key.innerText();
+    const box = await key.boundingBox();
+    assert.ok(box && box.width >= 44 && box.height >= 44, `${name}: key preserves a 44px touch target`);
+    assert.ok(box.x >= bodyBox.x - 1 && box.x + box.width <= bodyBox.x + bodyBox.width + 1, `${name}: key fits inside the printer body`);
+    assert.ok(box.x >= 0 && box.x + box.width <= 321, `${name}: key is fully inside the 320px viewport`);
+  }
+  await noOverflow(f.page, 'narrow controls');
+  assert.deepEqual(f.errors, []);
+  await f.context.close();
+  console.log('PASS narrow: all four printer keys fit the 320px viewport and printer body with 44px targets');
 }
 
 async function checkRetries(browser) {
@@ -254,12 +315,13 @@ async function checkUnavailable(browser) {
     assert.ok(await f.input.isVisible(), `${mode}: the form remains visible`);
     assert.ok(await f.input.isDisabled(), `${mode}: input is disabled`);
     assert.ok(await f.submit.isDisabled(), `${mode}: print button is disabled`);
-    assert.ok(await f.page.getByRole('checkbox', { name: 'Add my receipt to the public wall', exact: true }).isDisabled());
+    assert.equal(await f.page.locator('.shipped-lcd-status').innerText(), mode === 'closed' ? 'CLOSED' : 'OFFLINE', `${mode}: LCD shows the unavailable state`);
+    assert.ok(await f.page.getByRole('button', { name: /^(On|Off) the wall\./ }).isDisabled());
     await f.submit.dispatchEvent('click');
     await f.page.keyboard.press('Enter');
     assert.equal(f.requests.lookup.length, 0, `${mode}: unavailable state never starts lookup`);
     assert.equal(f.requests.print.length, 0, `${mode}: unavailable state never prints`);
-    assert.ok(await f.page.getByRole('link', { name: /Explore the receipt wall/ }).isVisible(), `${mode}: visitors can still browse receipts`);
+    assert.ok(await f.page.getByRole('link', { name: /Open wall/ }).isVisible(), `${mode}: visitors can still browse receipts`);
     await noOverflow(f.page, mode);
     assert.deepEqual(f.errors, []);
     await f.context.close();
@@ -299,6 +361,8 @@ async function checkLookupTimeout(browser) {
 (async () => {
   const browser = await chromium.launch({ executablePath: process.env.CHROMIUM_PATH || '/usr/bin/chromium', headless: true, args: ['--no-sandbox'] });
   try {
+    await checkOpeningAnimation(browser);
+    await checkNarrowControls(browser);
     await checkJourney(browser, { width: 1440, height: 1000 }, 'desktop');
     await checkJourney(browser, { width: 390, height: 844 }, 'mobile');
     await checkRetries(browser);

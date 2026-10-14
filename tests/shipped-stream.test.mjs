@@ -261,8 +261,8 @@ test('item titles wrap, marks do not tile, keys read in one second, counters sta
 
   const machine = fs.readFileSync(new URL('../components/shipped/Machine.tsx', import.meta.url), 'utf8');
   assert.match(machine, /SpeakerIcon/);
-  assert.match(machine, /ON WALL/);
-  assert.match(machine, /OFF WALL/);
+  assert.match(machine, /POST TO WALL/);
+  assert.match(machine, /Off the wall\. Tap to pin it/);
   assert.doesNotMatch(machine, /SND ON|SND OFF|KEEP OFF/);
 
   const ticker = fs.readFileSync(new URL('../components/shipped/Ticker.tsx', import.meta.url), 'utf8');

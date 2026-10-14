@@ -13,20 +13,20 @@ export function HouseSlip() {
         </p>
         <p className="mt-1 text-[11px] opacity-75">THE PUBLIC RECEIPT PRINTER</p>
       </header>
-      <h2 className="shipped-inverse">YOUR YEAR, ITEMIZED</h2>
+      <h2 className="shipped-inverse">HOW IT WORKS</h2>
       <div className="space-y-1 text-[12px]">
-        <Line label="APPS YOU LAUNCHED" value="✓" />
-        <Line label="PROJECTS YOU RELEASED" value="✓" />
-        <Line label="IDEAS YOU MADE REAL" value="✓" />
-        <Line label="CREDIT WHERE IT’S DUE" value="✓" />
+        <Line label="1. TYPE A NAME OR @HANDLE" value="FREE" />
+        <Line label="2. PRESS PRINT FOR YOUR YEAR" value="FREE" />
+        <Line label="3. SAVE OR SHARE YOUR RECEIPT" value="YOURS" />
+        <Line label="MAILED THERMAL PRINT (US)" value="$5" />
       </div>
       <Rule heavy />
       <p className="text-center text-[11.5px] leading-relaxed opacity-80">
-        A receipt for the things you actually shipped. Enter a name to see what’s on yours.
+        Public, professional work only. Every item links to its source. Two weeks, then the printer shuts off for good.
       </p>
       <footer className="mt-3 text-center text-[11px]">
         <Barcode value={`SHIPPED${SITE_YEAR}`} />
-        <p className="mt-1 opacity-60">YOUR WORK ADDS UP.</p>
+        <p className="mt-1 opacity-60">*** TEAR HERE ***</p>
       </footer>
     </article>
   );

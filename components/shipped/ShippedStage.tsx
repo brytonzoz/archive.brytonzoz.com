@@ -1,16 +1,19 @@
 'use client';
 
-// The top of / and /r/<id>/: a clear creation form beside the live receipt printer.
+// The top of / and /r/<id>/: operate a receipt printer on a wooden desk.
 // It looks the name up, lets the visitor pick if it could be more than one person, tears off whatever is
 // hanging, feeds while the sources are searched, and prints theirs. Jams and an empty roll print a slip.
 import React, { useEffect, useRef, useState } from 'react';
 import { track } from '../../lib/analytics';
 import { countdown } from '../../lib/shipped-event';
-import { readQuery, receiptNumber, SITE_YEAR, type Candidate } from '../../lib/shipped-year';
+import { readQuery, receiptNumber, type Candidate } from '../../lib/shipped-year';
 import { press } from './feel';
 import { FALLBACK_HUMAN, HumanCheck, type HumanCheckHandle } from './HumanCheck';
 import { Machine, type Job, type Tone } from './Machine';
 import { Line, Rule, Tall } from './paper';
+import { Ticker } from './Ticker';
+import { SponsorBoard } from './SponsorBoard';
+import { DeskPins } from './DeskPins';
 import { refreshShippedState, useShippedClock, useShippedState } from './state';
 import { applyPrintChunk, fetchReceipt, followReceipt, forgetTorn, isReceiptOpen, readPrintResponse, readTorn, rememberTorn, type PrintChunk } from './print-stream';
 import { SharePill, VisitorReceipt, rememberPile, type Loaded } from './visitor';
@@ -91,7 +94,7 @@ const outOfPaper = (
 );
 
 function openingJob(opening: Opening): Job {
-  if (opening.kind === 'house') return { key: 'house', kind: 'print', slip: true, label: 'Receipt preview', content: opening.content };
+  if (opening.kind === 'house') return { key: 'house', kind: 'print', slip: true, label: 'How it works', content: opening.content };
   if (opening.kind === 'loaded') {
     return {
       key: `r${opening.loaded.receipt.id}`,
@@ -228,7 +231,10 @@ export function ShippedStage({ opening, title }: { opening: Opening; title: Reac
 
   let display: string;
   let tone: Tone;
-  if (empty) [display, tone] = ['OUT OF PAPER', 'empty'];
+  if (closed) [display, tone] = ['CLOSED', 'empty'];
+  else if (empty) [display, tone] = ['OUT OF PAPER', 'empty'];
+  else if (offline) [display, tone] = ['OFFLINE', 'error'];
+  else if (!state) [display, tone] = [state === undefined ? 'CONNECTING' : 'OFFLINE', 'empty'];
   else if (step.name === 'jammed') [display, tone] = ['PAPER JAM', 'error'];
   else if (step.name === 'retry') [display, tone] = ['TRY AGAIN', 'error'];
   else if (step.name === 'pick') [display, tone] = ['WHICH ONE?', 'ready'];
@@ -237,8 +243,7 @@ export function ShippedStage({ opening, title }: { opening: Opening; title: Reac
   else if (step.name === 'feeding') [display, tone] = [searching[Math.min(tick, searching.length - 1)], 'busy'];
   else if (job.kind === 'feed') [display, tone] = ['LOADING', 'busy'];
   else if (paper === 'printing') [display, tone] = ['PRINTING', 'busy'];
-  else if (paper === 'hanging') [display, tone] = [house ? 'READY TO PRINT' : 'PRINTED', 'ready'];
-  else if (offline) [display, tone] = ['OFFLINE', 'error'];
+  else if (paper === 'hanging') [display, tone] = ['TEAR HERE', 'ready'];
   else [display, tone] = ['READY', 'ready'];
 
   function load(next: Job, loaded: Loaded | null) {
@@ -512,75 +517,23 @@ export function ShippedStage({ opening, title }: { opening: Opening; title: Reac
   }
 
   return (
-    <div className={`shipped-stage shipped-workspace${focus ? ' is-focus' : ''}${shared ? ' is-shared' : ''}`}>
-      {!shared && !focus ? (
-        <section className="shipped-create" id="print" aria-labelledby="shipped-title">
-          <p className="shipped-eyebrow"><span /> A little proof of a lot of work</p>
-          <h1 id="shipped-title">Your year.<br /><span>On a receipt.</span></h1>
-          <p className="shipped-intro">The apps, launches, and things you put into the world in {SITE_YEAR}. Find them. Print them. Give yourself some credit.</p>
-          <form className="shipped-create-form" onSubmit={(event) => void submit(event)} noValidate>
-            <label htmlFor="shipped-query">Who are we printing for?</label>
-            <div className={`shipped-query-wrap${error ? ' has-error' : ''}`}>
-              <span className="shipped-query-icon" aria-hidden="true">@</span>
-              <input
-                ref={input}
-                id="shipped-query"
-                value={query}
-                onChange={(event) => {
-                  setQuery(event.target.value);
-                  if (step.name === 'pick' || step.name === 'jammed' || step.name === 'retry') setStep({ name: 'idle' });
-                  setError(null);
-                }}
-                onFocus={() => human.current?.warm()}
-                placeholder="Name, @handle, or website"
-                autoComplete="off"
-                autoCapitalize="none"
-                spellCheck={false}
-                maxLength={80}
-                enterKeyHint="go"
-                disabled={busy || unavailable}
-                aria-invalid={Boolean(error)}
-                aria-describedby={`shipped-input-help${error ? ' shipped-print-error' : ''}`}
-              />
-            </div>
-            <p id="shipped-input-help" className="shipped-input-help">A GitHub username works, too. Public work only.</p>
-            <label className="shipped-wall-choice">
-              <input type="checkbox" checked={listed} disabled={busy || unavailable} onChange={(event) => {
-                const value = event.target.checked;
-                setListed(value);
-                try { window.localStorage.setItem('shipped-wall-off', value ? '0' : '1'); } catch { /* Choice lasts for this visit. */ }
-              }} />
-              <span>Add my receipt to the public wall</span>
-            </label>
-            <button type="submit" className="shipped-create-button" disabled={busy || unavailable} aria-busy={busy} onPointerDown={press}>
-              {busy ? <><span className="shipped-busy-dot" />{step.name === 'checking' ? 'Verifying…' : step.name === 'looking' ? 'Finding your work…' : 'Printing your receipt…'}</> : <>{step.name === 'retry' || step.name === 'jammed' ? 'Try again' : closed ? 'Printing has ended' : unavailable ? 'Printer unavailable' : 'Print my receipt'}<span aria-hidden="true">→</span></>}
-            </button>
-            <p className="shipped-free-note">Free to print & share. No account needed.</p>
-            {error ? <p id="shipped-print-error" className="shipped-form-error" role="alert">{error}</p> : null}
-            {formStatus ? <p className="shipped-form-status" role="status">{formStatus}</p> : null}
-            {unavailable ? <p className="shipped-form-status" role="status">{state === undefined ? 'Connecting to the printer…' : !state ? 'The printer couldn’t connect. Reload the page to try again.' : closed ? 'This printing event has ended. You can still browse and share existing receipts.' : empty ? 'The printer is out of paper. Browse the wall while we restock.' : 'The printer is temporarily offline. Try again later, or browse the wall.'}</p> : null}
-          </form>
-          <div className="shipped-verification">
-            <HumanCheck ref={human} check={generator?.human ?? FALLBACK_HUMAN} onToken={() => undefined} theme="light" appearance="execute" />
-          </div>
-          {step.name === 'pick' ? (
-            <fieldset className="shipped-person-picker" ref={picker}>
-              <legend>Which person did you mean?</legend>
-              <p>Choose a match to print their receipt.</p>
-              {step.candidates.map((candidate) => (
-                <button key={`${candidate.kind}:${candidate.id}`} type="button" onClick={() => void print(candidate)} disabled={busy}>
-                  <span><strong>{candidate.display}</strong><small>{candidate.detail}</small></span><span aria-hidden="true">→</span>
-                </button>
-              ))}
-            </fieldset>
-          ) : null}
-          <div className="shipped-create-bottom"><a href="/wall/">Explore the receipt wall <span aria-hidden="true">→</span></a><Countdown /></div>
-        </section>
+    <div className={`shipped-stage${focus ? ' is-focus' : ''}${shared ? ' is-shared' : ''}`}>
+      {shared ? (
+        <div className="shipped-hero-bar">
+          <Ticker compact />
+          <a href="/" className="shipped-print-yours">Print yours</a>
+        </div>
       ) : (
-        <div className="shipped-result-heading"><h1 id="shipped-title" ref={resultTitle} tabIndex={-1}>{current ? 'Your receipt is ready.' : title}</h1><a href="/" onClick={(event) => { if (!shared) { event.preventDefault(); printAnother(); } }}>Print another <span aria-hidden="true">→</span></a></div>
+        <>
+          <DeskPins />
+          <div className="shipped-ticker-pin"><Ticker /><Countdown /></div>
+          <SponsorBoard />
+        </>
       )}
-      <section className="shipped-counter shipped-preview" aria-label={focus || shared ? 'Your printed receipt' : 'Receipt preview'}>
-        {!shared && !focus ? <div className="shipped-preview-caption"><span><i /> THE PUBLIC RECEIPT PRINTER</span><span>NO. {SITE_YEAR}</span></div> : null}
+      <section className="shipped-counter" id="print" aria-labelledby="shipped-title">
+        <h1 id="shipped-title" className="sr-only" ref={resultTitle} tabIndex={-1}>
+          {focus && current ? 'Your receipt is ready.' : title}
+        </h1>
         <Machine
           job={job}
           display={display}
@@ -594,15 +547,51 @@ export function ShippedStage({ opening, title }: { opening: Opening; title: Reac
           paperMax={paperMax}
           focus={focus}
           hero={shared}
+          inputRef={input}
+          console={shared || focus ? undefined : {
+            query,
+            onQuery: (value) => {
+              setQuery(value);
+              if (step.name === 'pick' || step.name === 'jammed' || step.name === 'retry') setStep({ name: 'idle' });
+              setError(null);
+            },
+            onPrint: () => void submit(),
+            onWarm: () => human.current?.warm(),
+            printing: busy,
+            retry: step.name === 'retry' || step.name === 'jammed',
+            listed,
+            onListed: (value) => {
+              setListed(value);
+              try { window.localStorage.setItem('shipped-wall-off', value ? '0' : '1'); } catch { /* This visit only. */ }
+            },
+            closed: unavailable,
+            invalid: Boolean(error),
+            status: busy || unavailable || step.name === 'pick' || error ? (closed ? 'CLOSED' : display) : 'READY',
+            under: <>
+              <HumanCheck ref={human} check={generator?.human ?? FALLBACK_HUMAN} onToken={() => undefined} theme="dark" appearance="execute" />
+              {error ? <p id="shipped-print-error" className="shipped-console-message is-error" role="alert">{error}</p> : null}
+              {formStatus ? <p className="shipped-console-message" role="status">{formStatus}</p> : null}
+              {unavailable ? <p className="shipped-console-message" role="status">{state === undefined ? 'Connecting to the printer…' : !state ? 'The printer couldn’t connect. Reload to try again.' : closed ? 'Printing has ended. The wall is still open.' : empty ? 'Out of paper. Browse the wall while we restock.' : 'Temporarily offline. Try again later, or browse the wall.'}</p> : null}
+            </>,
+          }}
         />
-        {!shared && !focus ? <p className="shipped-preview-note">Real work. Every item linked to its source.</p> : null}
+        {step.name === 'pick' ? (
+          <fieldset className="shipped-pick" ref={picker}>
+            <legend className="shipped-pick-legend">Which person did you mean?</legend>
+            <ul>
+              {step.candidates.map((candidate) => (
+                <li key={`${candidate.kind}:${candidate.id}`}>
+                  <button type="button" className="shipped-pick-choice" onPointerDown={press} onClick={() => void print(candidate)} disabled={busy}>
+                    <span className="block font-semibold">{candidate.display}</span>
+                    <span className="block opacity-60">{candidate.detail}</span>
+                  </button>
+                </li>
+              ))}
+            </ul>
+          </fieldset>
+        ) : null}
         {focus && current ? <SharePill receipt={current.receipt} onPrintAnother={printAnother} /> : null}
       </section>
-      {!shared && !focus ? <div className="shipped-process" aria-label="How it works">
-        <div><span>01</span><p><strong>Find your work</strong><small>We look through public sources.</small></p></div>
-        <div><span>02</span><p><strong>Watch it print</strong><small>Your year, itemized on one receipt.</small></p></div>
-        <div><span>03</span><p><strong>Keep the proof</strong><small>Save it, share it, or get a real print.</small></p></div>
-      </div> : null}
     </div>
   );
 }

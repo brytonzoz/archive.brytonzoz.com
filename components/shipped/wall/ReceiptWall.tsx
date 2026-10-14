@@ -1,6 +1,6 @@
 'use client';
 
-// Endless masonry of listed receipts, pinned on a cork board. Tap one to lift it, drag to spin.
+// Listed receipts pinned on a cork board. Six on the homepage; endless masonry on the wall.
 // Crumple is localStorage only — the pile API is read, never written, from here.
 import React, { Component, useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import type { PileReceipt, PileResponse } from '../../../lib/shipped-pile';
@@ -54,11 +54,16 @@ class WallCatch extends Component<{ children: React.ReactNode; page: boolean }, 
   render() {
     if (this.state.failed) {
       return (
-        <section className={styles.preview} data-wall="" aria-label="Recent receipts">
-          <h2 className={styles.heading}>{this.props.page ? 'The receipt wall' : 'Fresh off the printer'}</h2>
-          <div className={styles.empty}>
-            <p>Receipts couldn’t load. Please try again.</p>
-            <button type="button" className={styles.retry} onClick={() => window.location.reload()}>Reload receipts</button>
+        <section className={`shipped-wall${this.props.page ? ' is-page' : ''}`} data-wall="" aria-label="The wall">
+          <header className="shipped-wall-head">
+            <h2>The wall</h2>
+            {!this.props.page ? <a className={styles.openWall} href="/wall/">Open wall →</a> : null}
+          </header>
+          <div className="shipped-wall-board" style={{ height: 280 }}>
+            <div className={styles.boardEmpty}>
+              <p>Receipts couldn’t load.</p>
+              <button type="button" onClick={() => window.location.reload()}>Reload receipts</button>
+            </div>
           </div>
         </section>
       );
@@ -70,85 +75,8 @@ class WallCatch extends Component<{ children: React.ReactNode; page: boolean }, 
 export function ReceiptWall({ page = false }: { page?: boolean }) {
   return (
     <WallCatch page={page}>
-      {page ? <ReceiptWallBoard page /> : <ReceiptWallPreview />}
+      <ReceiptWallBoard page={page} />
     </WallCatch>
-  );
-}
-
-function ReceiptWallPreview() {
-  const state = useShippedState();
-  const [receipts, setReceipts] = useState<PileReceipt[]>([]);
-  const [ready, setReady] = useState(false);
-  const [failed, setFailed] = useState(false);
-  const [attempt, setAttempt] = useState(0);
-
-  useEffect(() => {
-    let live = true;
-    setReady(false);
-    setFailed(false);
-    fetchPile(null, PREVIEW_COUNT)
-      .then((response) => {
-        if (live) setReceipts(response.receipts.slice(0, PREVIEW_COUNT));
-      })
-      .catch(() => {
-        if (live) setFailed(true);
-      })
-      .finally(() => {
-        if (live) setReady(true);
-      });
-    return () => { live = false; };
-  }, [attempt]);
-
-  const recent = receipts.length
-    ? receipts
-    : ready
-      ? (state?.recent ?? []).slice(0, PREVIEW_COUNT).flatMap((row) => asReceipt({ ...row, items: [] }) ?? [])
-      : [];
-
-  return (
-    <section className={styles.preview} data-wall="" aria-labelledby="recent-receipts-heading">
-      <header className={styles.header}>
-        <div>
-          <p className={styles.eyebrow}>The receipt wall</p>
-          <h2 id="recent-receipts-heading" className={styles.heading}>Fresh off the printer</h2>
-          <p className={styles.intro}>A few things people have put into the world.</p>
-        </div>
-        <a href="/wall/" className={styles.viewAll}>View all receipts <span aria-hidden="true">→</span></a>
-      </header>
-      {recent.length ? (
-        <ul className={styles.grid}>
-          {recent.map((receipt) => (
-            <li key={receipt.id}>
-              <a href={`/r/${receipt.id}/`} className={styles.card}>
-                <div className={styles.cardTop}>
-                  <span>Receipt #{receipt.id}</span>
-                  <span aria-hidden="true">→</span>
-                </div>
-                <h3 className={styles.person}>{receipt.who}</h3>
-                <p className={styles.count}>{receipt.potential ? 'Potential to ship' : `${receipt.count} ${receipt.count === 1 ? 'thing' : 'things'} shipped`}</p>
-                <div className={styles.items}>
-                  {receipt.items.length ? (
-                    <ul>
-                      {receipt.items.slice(0, 2).map((item, index) => <li key={`${item.name}-${index}`}>{item.name}</li>)}
-                    </ul>
-                  ) : <p>Open to see the full receipt.</p>}
-                </div>
-                <span className={styles.open}>Open receipt <span aria-hidden="true">→</span></span>
-              </a>
-            </li>
-          ))}
-        </ul>
-      ) : !ready ? (
-        <div className={styles.empty} role="status"><p>Loading recent receipts…</p></div>
-      ) : (
-        <div className={styles.empty} role="status">
-          <p>{failed ? 'Recent receipts couldn’t load.' : 'The wall is waiting for its first receipt.'}</p>
-          {failed ? (
-            <button type="button" className={styles.retry} onClick={() => setAttempt((value) => value + 1)}>Try again</button>
-          ) : <p className={styles.emptyHint}>Print yours above and add it to the wall.</p>}
-        </div>
-      )}
-    </section>
   );
 }
 
@@ -181,19 +109,20 @@ function ReceiptWallBoard({ page = false }: { page?: boolean }) {
     if (loading.current) return;
     loading.current = true;
     try {
-      const page = await fetchPile(before);
-      if (!before && page.receipts.length === 0 && page.next != null && tries.current < RETRIES) {
+      const response = await fetchPile(before, page ? PAGE : PREVIEW_COUNT);
+      if (page && !before && response.receipts.length === 0 && response.next != null && tries.current < RETRIES) {
         tries.current += 1;
         loading.current = false;
-        void load(page.next);
+        void load(response.next);
         return;
       }
       setReceipts((current) => {
+        if (!page) return response.receipts.slice(0, PREVIEW_COUNT);
         const seen = new Set(current.map((row) => row.id));
-        return before ? [...current, ...page.receipts.filter((row) => !seen.has(row.id))] : page.receipts;
+        return before ? [...current, ...response.receipts.filter((row) => !seen.has(row.id))] : response.receipts;
       });
-      setNext(page.next);
-      setTotal(page.total);
+      setNext(page ? response.next : null);
+      setTotal(response.total);
       setFailed(false);
       setReady(true);
     } catch {
@@ -210,7 +139,7 @@ function ReceiptWallBoard({ page = false }: { page?: boolean }) {
     } finally {
       loading.current = false;
     }
-  }, []);
+  }, [page]);
 
   useEffect(() => {
     void load();
@@ -220,10 +149,10 @@ function ReceiptWallBoard({ page = false }: { page?: boolean }) {
     if (receipts.length || !ready || !state?.recent?.length) return;
     const fallback = state.recent.flatMap((row) => asReceipt({ id: row.id, who: row.who, count: row.count, potential: row.potential, full: row.full, items: [] }) ?? []);
     if (fallback.length) {
-      setReceipts(fallback);
+      setReceipts(page ? fallback : fallback.slice(0, PREVIEW_COUNT));
       setTotal((n) => n || state.piled || fallback.length);
     }
-  }, [ready, receipts.length, state]);
+  }, [ready, receipts.length, state, page]);
 
   useEffect(() => {
     const node = board.current;
@@ -251,17 +180,18 @@ function ReceiptWallBoard({ page = false }: { page?: boolean }) {
   );
   const byId = useMemo(() => new Map(receipts.map((row) => [row.id, row])), [receipts]);
   const visible = useMemo(() => {
+    if (!page) return cards;
     const lo = view.top - BUFFER;
     const hi = view.top + view.height + BUFFER;
     const inView = cards.filter((card) => card.y + card.h >= lo && card.y <= hi);
     return inView.length ? inView : cards.slice(0, 16);
-  }, [cards, view]);
+  }, [cards, view, page]);
 
   useEffect(() => {
-    if (!receipts.length || next === null) return;
+    if (!page || !receipts.length || next === null) return;
     const last = cards[cards.length - 1];
     if (last && last.y < view.top + view.height + BUFFER * 2) void load(next);
-  }, [receipts.length, next, cards, view, load]);
+  }, [page, receipts.length, next, cards, view, load]);
 
   const focused = focus !== null ? byId.get(focus) ?? null : null;
   const empty = receipts.length === 0;
@@ -270,16 +200,19 @@ function ReceiptWallBoard({ page = false }: { page?: boolean }) {
     <section className={`shipped-wall${page ? ' is-page' : ''}`} data-wall="" aria-label="The wall">
       <header className="shipped-wall-head">
         <h2>The wall</h2>
-        <p>{empty ? (ready ? (failed ? 'Temporarily unavailable' : 'Nothing pinned yet') : 'Loading receipts…') : `${total} pinned`}</p>
+        <div className={styles.headActions}>
+          <p>{empty ? (ready ? (failed ? 'Unavailable' : 'Nothing pinned yet') : 'Loading…') : `${total} pinned`}</p>
+          {!page ? <a className={styles.openWall} href="/wall/">Open wall →</a> : null}
+        </div>
       </header>
       <div ref={board} className="shipped-wall-board" style={{ height: empty && !ready ? 520 : Math.max(height, 280) }}>
-        {empty && !ready ? <WallSkeleton width={width} /> : null}
+        {empty && !ready ? <WallSkeleton width={width} count={page ? 8 : PREVIEW_COUNT} /> : null}
         {empty && ready ? (
           <div className={styles.boardEmpty} role="status">
-            <p>{failed ? 'Receipts couldn’t load right now.' : 'Be the first to pin a receipt.'}</p>
+            <p>{failed ? 'Receipts couldn’t load right now.' : 'No receipts pinned yet.'}</p>
             {failed ? (
               <button type="button" onClick={() => { tries.current = 0; setReady(false); void load(); }}>Try again</button>
-            ) : <a href="/">Print your receipt →</a>}
+            ) : page ? <a href="/">Print your receipt →</a> : null}
           </div>
         ) : null}
         {visible.map((card) => {
@@ -292,7 +225,7 @@ function ReceiptWallBoard({ page = false }: { page?: boolean }) {
               receipt={receipt}
               crumpled={crumpled.has(card.id)}
               reduced={reduced}
-              parallax={reduced ? 0 : ((card.id % 5) - 2) * view.top * 0.028}
+              parallax={reduced ? 0 : ((card.id % 5) - 2) * (page ? view.top : Math.max(-300, Math.min(300, view.top))) * 0.028}
               onOpen={() => setFocus(card.id)}
             />
           );
@@ -312,8 +245,8 @@ function ReceiptWallBoard({ page = false }: { page?: boolean }) {
   );
 }
 
-function WallSkeleton({ width }: { width: number }) {
-  const dummies = Array.from({ length: 8 }, (_, i) => ({ id: -(i + 1), items: [{ name: '—' }, { name: '—' }, { name: '—' }] }));
+function WallSkeleton({ width, count = 8 }: { width: number; count?: number }) {
+  const dummies = Array.from({ length: count }, (_, i) => ({ id: -(i + 1), items: [{ name: '—' }, { name: '—' }, { name: '—' }] }));
   const { cards, height } = layoutWall(dummies, new Set(), width, wallColumns(width));
   return (
     <div className="shipped-wall-skel" style={{ height }} aria-hidden="true">

@@ -60,6 +60,8 @@ export type Console = {
   invalid?: boolean;
   /** Last print failed the human check; input stays, PRINT re-runs. */
   retry?: boolean;
+  /** A second LCD line keeps progress visible without replacing the typed name. */
+  status?: string;
   /** Human check sits under the keys, above the paper. */
   under?: React.ReactNode;
 };
@@ -622,7 +624,7 @@ export function Machine({ job, display, tone, onPrinted, onTorn, tearSignal = 0,
   const stubKey = ownStub ? shown.key : stubSeed;
   const stubVisible = ownStub || phase === 'feeding' || (phase === 'idle' && stubKey !== null);
   const lead = shown.kind === 'feed';
-  const showInput = Boolean(desk && !desk.closed && !desk.printing && (phase === 'idle' || phase === 'hanging' || phase === 'torn'));
+  const showInput = Boolean(desk);
   const houseSlip = shown.kind === 'print' && (shown.key === 'house' || Boolean(shown.slip));
   const status =
     phase === 'idle'
@@ -656,13 +658,15 @@ export function Machine({ job, display, tone, onPrinted, onTorn, tearSignal = 0,
       {desk ? (
         <button
           type="button"
-          className="shipped-key"
+          className="shipped-key is-wall"
           aria-pressed={desk.listed}
+          disabled={desk.closed || desk.printing}
           aria-label={desk.listed ? 'On the wall. Tap to keep this receipt off the wall' : 'Off the wall. Tap to pin it'}
           onPointerDown={press}
           onClick={() => desk.onListed(!desk.listed)}
         >
-          <span aria-hidden="true">{desk.listed ? 'ON WALL' : 'OFF WALL'}</span>
+          <span aria-hidden="true">POST TO WALL</span>
+          <strong aria-hidden="true"><i />{desk.listed ? 'ON' : 'OFF'}</strong>
         </button>
       ) : null}
       <span className="shipped-keys-space" aria-hidden="true" />
@@ -685,6 +689,8 @@ export function Machine({ job, display, tone, onPrinted, onTorn, tearSignal = 0,
           type="button"
           className="shipped-key is-print"
           disabled={desk.closed || desk.printing}
+          aria-busy={desk.printing}
+          aria-label={desk.retry ? 'Retry printing your receipt' : 'Print your receipt for free'}
           onPointerDown={() => {
             if (desk.closed || desk.printing) return;
             pressPrint();
@@ -694,7 +700,8 @@ export function Machine({ job, display, tone, onPrinted, onTorn, tearSignal = 0,
             desk.onPrint();
           }}
         >
-          PRINT
+          <span>{desk.retry ? 'RETRY' : 'PRINT'}</span>
+          <small>{desk.printing ? 'WORKING' : 'FREE'}</small>
         </button>
       ) : null}
     </div>
@@ -708,6 +715,7 @@ export function Machine({ job, display, tone, onPrinted, onTorn, tearSignal = 0,
           {showInput && desk ? (
             <>
               <span className="sr-only">Name, @handle, GitHub or website</span>
+              <span className="shipped-lcd-label" aria-hidden="true">NAME / @HANDLE / WEBSITE</span>
               <input
                 ref={inputRef}
                 id="shipped-query"
@@ -722,9 +730,11 @@ export function Machine({ job, display, tone, onPrinted, onTorn, tearSignal = 0,
                 enterKeyHint="go"
                 placeholder="TYPE A NAME"
                 aria-invalid={desk.invalid ? true : undefined}
+                aria-describedby={desk.invalid ? 'shipped-print-error' : undefined}
                 disabled={desk.closed || desk.printing}
               />
               <span className="shipped-lcd-block" aria-hidden="true" />
+              <span className="shipped-lcd-status" aria-hidden="true">{desk.status ?? (desk.printing ? display : 'READY')}</span>
             </>
           ) : desk?.retry ? (
             <button

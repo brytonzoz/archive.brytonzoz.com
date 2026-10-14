@@ -3,7 +3,6 @@ import type { Metadata } from 'next';
 import { HouseSlip } from '../../components/shipped/HouseSlip';
 import { ShippedStage } from '../../components/shipped/ShippedStage';
 import { ReceiptWall } from '../../components/shipped/wall';
-import { SponsorBoard } from '../../components/shipped/SponsorBoard';
 import { SponsorDesk } from '../../components/shipped/SponsorDesk';
 import { SHIPPED_OG_IMAGE } from '../../lib/shipped';
 import { SHIPPED_DESCRIPTION, SHIPPED_TITLE } from '../../lib/shipped-brand';
@@ -59,8 +58,7 @@ export default function ShippedPage() {
       <ShippedStage opening={{ kind: 'house', content: <HouseSlip /> }} title="Print yours" />
       <SponsorDesk />
       <ReceiptWall />
-      <aside className="shipped-support" aria-label="Support the printer"><p>Keep the paper rolling.<span>Put your project on the receipts.</span></p><SponsorBoard /></aside>
-      <p className="shipped-footer">
+      <p className="pb-8 text-center text-[11px] text-[#f3ead8]/45">
         A free public offering by{' '}
         <a href="https://brytonzoz.com/about/" target="_blank" rel="noopener noreferrer" className="underline underline-offset-4">
           Bryton Zoz

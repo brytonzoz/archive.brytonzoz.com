@@ -25,7 +25,7 @@ test('webhook signatures: valid passes; tampered, foreign, stale, or malformed o
   assert.equal(await verifySignature(payload, `t=${t},v1=${sign(payload, t)}`, '', now), false, 'no secret configured');
 });
 
-test('slot bids are whole dollars: $1 on a house ad, then +$1 up to +max($5, 10% of current)', () => {
+test('slot bids are whole dollars: $1 on an empty slot, then +$1 up to +max($5, 10% of current)', () => {
   assert.deepEqual(sponsors.bidRange(0), { min: 100, max: 100 });
   assert.equal(sponsors.slotPrice(0), 100);
   assert.deepEqual(sponsors.bidRange(100), { min: 200, max: 600 }, '$1 holder → +$1 to +$5');
@@ -33,7 +33,7 @@ test('slot bids are whole dollars: $1 on a house ad, then +$1 up to +max($5, 10%
   assert.deepEqual(sponsors.bidRange(10_000), { min: 10_100, max: 11_000 }, '$100 holder → +$10');
   assert.deepEqual(sponsors.bidRange(4_200), { min: 4_300, max: 4_700 });
   assert.equal(sponsors.isValidBid(0, 100), true);
-  assert.equal(sponsors.isValidBid(0, 200), false, 'house ads only take $1');
+  assert.equal(sponsors.isValidBid(0, 200), false, 'empty slots only take $1');
   assert.equal(sponsors.isValidBid(10_000, 10_050), false, 'whole dollars only');
   assert.equal(sponsors.isValidBid(10_000, 10_100), true);
   assert.equal(sponsors.isValidBid(10_000, 11_000), true);
@@ -50,26 +50,34 @@ test('Shipped names itself in metadata, never Bryton Zoz', async () => {
   }
 });
 
-test('there is no floor ladder: a house hero and a small slot both open at $1', () => {
+test('there is no floor ladder: a vacant hero and a small slot both open at $1', () => {
   assert.equal(sponsors.slotPrice(0), 100);
   assert.equal(sponsors.maximumBid(0), 100);
   assert.equal('DEFAULT_LADDER' in sponsors, false);
   assert.equal('parseLadder' in sponsors, false);
 });
 
-test('house-ad marks: two-letter monograms and Brandfetch/favicon URLs, never a letter circle as the only option', async () => {
+test('initial ad inventory contains ten vacant slots without business names or destinations', () => {
+  assert.strictEqual(sponsors.EMPTY_SLOTS, sponsors.HOUSE_SLOTS, 'legacy consumers receive the same vacancies');
+  assert.equal(sponsors.HOUSE_SLOTS.length, sponsors.SLOT_COUNT);
+  for (const [slot, empty] of sponsors.HOUSE_SLOTS.entries()) {
+    assert.deepEqual(empty, { slot, name: '', cta: '', url: '' });
+    assert.equal(sponsors.slotPrice(0), 100);
+    assert.equal(sponsors.maximumBid(0), 100);
+  }
+});
+
+test('vacant ad slots never expose an inferred business mark', async () => {
   const { houseMarkPath, monogram } = await import('../lib/shipped-sponsors.ts');
-  const { markUrls } = await import('../worker/shipped-marks.ts');
+  const { houseMark } = await import('../worker/shipped-marks.ts');
   assert.equal(monogram('POCKET FACTORY'), 'PF');
   assert.equal(monogram('MOPKIN'), 'MO');
   assert.equal(monogram('COVER ART'), 'CA');
   assert.equal(monogram(''), '?');
-  assert.equal(houseMarkPath(0), '/api/shipped/mark/0');
+  assert.equal(houseMarkPath(0), null);
   assert.equal(houseMarkPath(99), null);
-  const urls = markUrls('getpocketfactory.com', 'https://cdn.brandfetch.io/getpocketfactory.com/icon.png');
-  assert.equal(urls[0], 'https://cdn.brandfetch.io/getpocketfactory.com/icon.png');
-  assert.ok(urls.some((u) => u.includes('cdn.brandfetch.io') && u.includes('getpocketfactory.com')));
-  assert.ok(urls.some((u) => u.includes('google.com/s2/favicons') && u.includes('getpocketfactory.com')));
+  const response = await houseMark({ SHIPPED: { get: async () => ({ body: 'old-brand-mark', httpMetadata: { contentType: 'image/png' } }) } }, 0);
+  assert.equal(response.status, 404, 'previously cached house logos must not reappear in vacant slots');
 });
 
 test('ticker interpolation never shows more than the confirmed count', async () => {

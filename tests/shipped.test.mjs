@@ -219,7 +219,7 @@ test('share cards are a 1200×630 desk photo and a 1080×1350 download', async (
     ],
     count: 6,
     note: 'Built in public.',
-    sponsors: [{ name: 'Pocket Factory', cta: 'NFC cards', logo: null, qr: { size: 21, path: '' } }],
+    sponsors: [{ slot: 0, house: false, name: 'Pocket Factory', cta: 'NFC cards', logo: null, qr: { size: 21, path: '' } }],
     url: 'shipped.brytonzoz.com/r/14/',
     barcode: [1, 1, 1, 1],
     shipScore: 72,
@@ -235,14 +235,12 @@ test('share cards are a 1200×630 desk photo and a 1080×1350 download', async (
   assert.match(card, /MARC LOU/);
   assert.match(card, /DATARADAR/);
   assert.match(card, /shipped\.brytonzoz\.com/);
-  assert.match(card, /PAID FOR BY/);
+  assert.match(card, /ADVERTISEMENTS/);
   assert.match(card, /POCKET FACTORY/);
-  assert.match(card, /rotate\(-10/);
-  assert.match(card, /id="desk-callout"/);
+  assert.match(card, /AD SLOT 9/);
   assert.match(card, /@marclou/);
-  assert.match(card, /scale\(1\.52\)/);
-  const callout = card.slice(card.indexOf('id="desk-callout"'));
-  assert.doesNotMatch(callout, /filter="url\(#(cast|shadow|fiber)"/);
+  assert.match(port, /ADVERTISEMENTS/);
+  assert.match(port, /AD SLOT 9/);
   assert.doesNotMatch(card, /letter-spacing="0"/, 'letter-spacing at 0 doubles the last glyph in resvg');
   assert.equal(card.includes('printerLip') || /url\(#chassis\)/.test(card), false, 'card is a desk photo, not the printer template');
 });
@@ -355,7 +353,10 @@ test('the printer mouth and receipt sponsor cells do not share a class (absolute
   assert.match(machine, /shipped-aperture/);
   assert.match(machine, /webkit-clip-path|webkitClipPath|WebkitClipPath/);
   assert.equal(machine.includes('className="shipped-slot"'), false);
-  assert.match(year, /className="shipped-slot"/);
+  assert.match(year, /SponsorBlockView/);
+  const ads = fs.readFileSync(new URL('../components/shipped/ReceiptAds.tsx', import.meta.url), 'utf8');
+  assert.match(ads, /shipped-ad-slot/);
+  assert.doesNotMatch(ads, /shipped-aperture/);
   assert.match(css, /\.shipped-aperture\s*\{[^}]*position:\s*absolute/s);
   assert.match(css, /\.shipped-receipt\s*>\s*\*\s*\{[^}]*position:\s*relative/s);
   const mouth = css.match(/\.shipped-slot\s*\{[^}]+\}/g) ?? [];

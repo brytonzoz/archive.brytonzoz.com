@@ -20,7 +20,7 @@
 //   POST /api/shipped/checkout/cancel  { checkout } the wallet sheet closed unpaid
 //   POST /api/shipped/webhook/<id>     payment provider webhook (worker/shipped-pay.ts; Stripe: /webhook/stripe)
 //   GET  /api/shipped/logo/<bid>.png   a sponsor's reviewed 1-bit logo
-//   GET  /api/shipped/mark/<slot>      house-ad color mark (Brandfetch / favicon, same-origin)
+//   GET  /api/shipped/mark/<slot>      retired house-brand mark endpoint (404)
 //   GET  /q/<key>                      a printed QR code -> the slot's link (counts scans; worker/shipped-host.ts)
 //   GET  /shipped/r/<id>/              share page: the static shell with this receipt's tags and data
 //   GET  /shipped/r/<id>/og.png        the 1200×630 card for X        (?download=1 to save it)
@@ -167,7 +167,7 @@ import { shipScore } from '../lib/shipped-modules';
 import {
   BID_RULES,
   HERO_SLOT,
-  HOUSE_SLOTS,
+  EMPTY_SLOTS,
   LOGO_LIMITS,
   SLOT_COUNT,
   checkSponsorUrl,
@@ -256,7 +256,7 @@ const FAILED_FOR = 10 * MINUTE;
 /** Longest a print may hold its locks (gathering + up to three 40 s model calls). */
 const PRINT_LOCK = 3 * MINUTE;
 /** Bump when the share images change, so cached ones are redrawn. */
-const IMAGE_VERSION = 11;
+const IMAGE_VERSION = 12;
 
 const SCHEMA = [
   `CREATE TABLE IF NOT EXISTS shipped_receipts (
@@ -947,7 +947,7 @@ async function seen(request: Request, env: ShippedEnv): Promise<Response> {
   const id = Number(body?.id);
   if (!db || !Number.isSafeInteger(id) || id < 1) return json({ ok: false }, 400);
   if (await overLimit(db, request, 'seen')) return json({ ok: false }, 429);
-  // While sponsor-display is off the block shows house ads only, so no holder is credited.
+  // While sponsor-display is off the block shows empty slots only, so no holder is credited.
   if ((await switchedOff(env, db)).has('sponsor-display')) return json({ ok: true, counted: false });
   const real = await db.prepare('SELECT 1 AS x FROM shipped_receipts WHERE id = ? AND hidden = 0').bind(id).first();
   if (!real || !(await onceToday(db, request, `seen:${id}`))) return json({ ok: true, counted: false });
@@ -1180,7 +1180,6 @@ type BidRow = {
 };
 
 const bidLogoPath = (id: number) => `/api/shipped/logo/${id}.png`;
-const houseKey = (slot: number) => `h${slot}`;
 
 type SlotContext = { impressions: number; lastOutbid: number | null; holders: number; seenAtEnd: number | null; closesAt: number };
 
@@ -1189,14 +1188,14 @@ function priced(currentCents: number): { next: number; maxNext: number } {
   return { next: range.min, maxNext: range.max };
 }
 
-function houseSlot(slot: number, ctx: SlotContext): SponsorSlot {
-  const ad = HOUSE_SLOTS[slot];
+function emptySlot(slot: number, ctx: SlotContext): SponsorSlot {
+  const ad = EMPTY_SLOTS[slot];
   return {
     slot,
     name: ad.name,
     cta: ad.cta,
     url: ad.url,
-    qr: houseKey(slot),
+    qr: '',
     logo: null,
     house: true,
     cents: 0,
@@ -1212,7 +1211,7 @@ function houseSlot(slot: number, ctx: SlotContext): SponsorSlot {
 }
 
 function slotFrom(slot: number, bid: BidRow | undefined, ctx: SlotContext): SponsorSlot {
-  if (!bid) return houseSlot(slot, ctx);
+  if (!bid) return emptySlot(slot, ctx);
   return {
     slot,
     name: bid.name,
@@ -1234,7 +1233,7 @@ function slotFrom(slot: number, bid: BidRow | undefined, ctx: SlotContext): Spon
   };
 }
 
-/** Who holds each slot right now (after close: forever), at what price. With sponsor-display switched off, the house ads. */
+/** Who holds each slot right now (after close: forever), at what price. With sponsor-display switched off, empty slots. */
 async function sponsorBlock(db: D1Database | null, env: ShippedEnv, off?: Set<Switch>, known?: Market): Promise<SponsorBlock> {
   const window = await liveWindow(env, db);
   const [live, history, now, closes] = await Promise.all([
@@ -1337,7 +1336,7 @@ async function createBid(request: Request, env: ShippedEnv): Promise<Response> {
   const check = validateBid({ slot, name: text('name'), cta: text('cta'), url: text('url') });
   if (!check.ok) return json({ error: 'invalid', field: check.field, message: check.error }, 400);
 
-  // The price is ours: a whole-dollar raise in [+$1, +max($5, 10% of current)], or $1 on a house ad.
+  // The price is ours: a whole-dollar raise in [+$1, +max($5, 10% of current)], or $1 on an empty slot.
   const holder = await db
     .prepare(`SELECT amount_cents, live_at, email FROM shipped_bids WHERE slot = ? AND status = 'live'`)
     .bind(slot)
@@ -1389,7 +1388,7 @@ async function createBid(request: Request, env: ShippedEnv): Promise<Response> {
       amountCents: cents,
       origin: shippedOrigin(env, new URL(request.url)),
       returnPath: '/?bid={CHECKOUT_SESSION_ID}#sponsor',
-      cancelPath: '/#sponsor',
+      cancelPath: '/#board',
       expiresAt: checkoutExpiry(),
       express,
       metadata: { slot: String(slot) },
@@ -1743,7 +1742,7 @@ async function applyEvent(db: D1Database, env: ShippedEnv, payEvent: SponsorEven
       db.prepare(`UPDATE print_orders SET status = 'failed', note = 'checkout expired' WHERE checkout_id = ? AND status = 'checkout'`).bind(payEvent.checkoutId),
     ]);
   } else if (payEvent.type === 'refunded') {
-    // A full refund (from /admin or Stripe's dashboard) takes a bid down; its slot goes back to the house ad.
+    // A full refund (from /admin or Stripe's dashboard) takes a bid down; its slot goes back to empty.
     await db
       .prepare(`UPDATE shipped_bids SET status = 'refunded', ended_at = COALESCE(ended_at, ?), seen_at_end = ${IMPRESSIONS_NOW} WHERE order_id = ? AND status = 'live'`)
       .bind(now, payEvent.orderId)
@@ -1834,14 +1833,14 @@ const redirect = (to: string) => {
 };
 
 /**
- * /q/<key>: a printed QR code. Counts the scan and sends it to that slot's link (house ads: h<slot>). The link is
+ * /q/<key>: a printed QR code. Counts the scan and sends it to that paid slot's link. Legacy house links open the ad board. The link is
  * checked again on the way out, and a slot that was taken down, refunded or switched off goes to the home page.
  */
 export async function qrRedirect(env: ShippedEnv, key: string, ctx: ExecutionContext): Promise<Response> {
   env = withKeyAliases(env);
   const home = env.SHIPPED_HOST ? `https://${env.SHIPPED_HOST}/` : `${SHIPPED_URL}/`;
   const house = key.match(/^h(\d)$/);
-  if (house && isSlot(Number(house[1]))) return redirect(HOUSE_SLOTS[Number(house[1])].url);
+  if (house && isSlot(Number(house[1]))) return redirect(`${home}#board`);
   const db = await database(env);
   const id = /^\d{1,9}$/.test(key) ? Number(key) : 0;
   if (!db || !id) return redirect(home);
@@ -3003,7 +3002,7 @@ export async function adminShipped(request: Request, env: ShippedEnv): Promise<R
       return json({ ok: true });
     }
     if (body.action === 'remove-bid') {
-      // Instant kill: the slot goes back to the house ad at once and the sponsor gets everything back.
+      // Instant kill: the slot goes back to empty at once and the sponsor gets everything back.
       const refund =
         bid.order_id && provider && provider.id === bid.provider ? await provider.refund(bid.order_id, undefined, `bid-${bid.id}-removed`) : { ok: !bid.order_id, error: `provider ${bid.provider} not available` };
       await db

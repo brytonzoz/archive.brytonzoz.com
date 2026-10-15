@@ -1,8 +1,8 @@
 // The sponsor block at the foot of every Shipped 2026 receipt, share image and mailed print: one hero slot on
-// top and a 3×3 grid of nine small slots. Each slot has a name (or 1-bit logo), a one-line call to action and
-// its own QR code to the sponsor's link.
+// top and a 3×3 grid of nine small slots. A paid slot has a name, optional 1-bit logo, call to action and
+// its own QR code to the advertiser's link. Vacant slots contain no advertiser identity or QR.
 //
-// Pure bidding, enforced on the server. House ads are $0 and are not bids: the first outside bid is $1.
+// Pure bidding, enforced on the server. Vacant slots have no paid holder: the first bid is $1.
 // After that each raise is a whole-dollar amount, at least +$1 and at most +max($5, floor(10% of the holder's
 // price)). The holder cannot raise their own slot. A takeover cools the slot for 60 seconds. A bid in the last
 // 10 minutes of that slot extends that slot by 10 minutes. A sponsor who is taken over is refunded for the time
@@ -51,7 +51,7 @@ export const extendClose = (closesAt: number) => closesAt + BID_RULES.antiSnipeM
 
 const wholeDollars = (cents: number) => Number.isSafeInteger(cents) && cents >= 0 && cents % 100 === 0;
 
-/** Max raise in cents: +$1 on a house ad; otherwise +max($5, floor(10% of the current whole-dollar price)). */
+/** Max raise in cents: +$1 on an empty slot; otherwise +max($5, floor(10% of the current whole-dollar price)). */
 export function maxRaiseCents(currentCents: number): number {
   if (!wholeDollars(currentCents) || currentCents <= 0) return BID_RULES.minCents;
   const tenPercent = Math.floor(currentCents / 1000) * 100;
@@ -60,7 +60,7 @@ export function maxRaiseCents(currentCents: number): number {
 
 export type BidRange = { min: number; max: number };
 
-/** Posted range to take a slot: $1 on a house ad, else [holder+$1, holder+max raise], capped, whole dollars. */
+/** Posted range to take a slot: $1 on an empty slot, else [holder+$1, holder+max raise], capped, whole dollars. */
 export function bidRange(currentCents: number): BidRange {
   const current = wholeDollars(currentCents) ? currentCents : 0;
   if (current <= 0) return { min: BID_RULES.minCents, max: BID_RULES.minCents };
@@ -73,7 +73,7 @@ export const slotPrice = (currentCents: number) => bidRange(currentCents).min;
 export const minimumBid = slotPrice;
 export const maximumBid = (currentCents: number) => bidRange(currentCents).max;
 
-/** True when `cents` is a legal whole-dollar bid against the current holder (0 = house ad). */
+/** True when `cents` is a legal whole-dollar bid against the current holder (0 = empty slot). */
 export function isValidBid(currentCents: number, cents: number): boolean {
   if (!wholeDollars(cents) || cents < BID_RULES.minCents || cents > BID_RULES.maxCents) return false;
   const { min, max } = bidRange(currentCents);
@@ -95,26 +95,18 @@ export const SLOT_LIMITS = {
   small: { name: 16, cta: 30 },
 };
 
-export type HouseSlot = { slot: number; name: string; cta: string; url: string };
+export type EmptySlot = { slot: number; name: string; cta: string; url: string };
+export type HouseSlot = EmptySlot;
 
-/** Live and active work from data/shipped/businesses.json (never the maker's own site). */
-export const HOUSE_SLOTS: HouseSlot[] = [
-  { slot: 0, name: 'POCKET FACTORY', cta: 'Custom NFC tap cards for your business.', url: 'https://getpocketfactory.com/' },
-  { slot: 1, name: 'MOPKIN', cta: 'Snap your mess. Get one step.', url: 'https://mopkin.app/' },
-  { slot: 2, name: 'HABITUIZE', cta: 'Habits that survive missed days.', url: 'https://habituize.app/' },
-  { slot: 3, name: 'NONPARALLEL', cta: 'Music, merch, artist sites.', url: 'https://nonprllel.com/' },
-  { slot: 4, name: 'COVER ART', cta: 'Album covers, made to order.', url: 'https://nonprllel.com/' },
-  { slot: 5, name: 'PROFITSCANNER', cta: 'Scan thrift. Spot the flip.', url: 'https://getprofitscanner.com/' },
-  { slot: 6, name: 'ENTRELABZ', cta: 'Apps and sites in weeks.', url: 'https://entrelabz.com/' },
-  { slot: 7, name: 'EMBODY ELEGANCE', cta: 'Color analysis and styling.', url: 'https://embody-elegance.com/' },
-  { slot: 8, name: 'ZONOVA', cta: 'Med spa. Book online.', url: 'https://www.zonovaaesthetics.com/' },
-  { slot: 9, name: 'BEARADISE', cta: 'Smoky Mountain cabin. Book direct.', url: 'https://absolutebearadise.com/' },
-];
+/** Vacancies carry no advertiser identity or destination. Every slot starts at $1. */
+export const EMPTY_SLOTS: EmptySlot[] = Array.from({ length: SLOT_COUNT }, (_, slot) => ({ slot, name: '', cta: '', url: '' }));
+/** Compatibility for existing consumers; these are empty slots, never house advertisements. */
+export const HOUSE_SLOTS = EMPTY_SLOTS;
 
 export const isSlot = (value: unknown): value is number => Number.isInteger(value) && (value as number) >= 0 && (value as number) < SLOT_COUNT;
 
-/** Same-origin color mark for a house slot (Brandfetch / favicon, never a thermal 1-bit). */
-export const houseMarkPath = (slot: number) => (isSlot(slot) ? `/api/shipped/mark/${slot}` : null);
+/** Vacant slots have no business mark. Kept for clients using the former house-ad API. */
+export const houseMarkPath = (_slot: number): null => null;
 
 /** One or two letters for when a mark image is missing. */
 export function monogram(name: string): string {

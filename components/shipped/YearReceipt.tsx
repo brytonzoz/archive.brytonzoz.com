@@ -3,11 +3,11 @@
 // The "SHIPPED IN <year>" receipt every visitor prints. Set like a real ESC/POS print: no letter-spacing,
 // double-height for the store and the customer, one inverse band, dotted leaders, and the sponsor block at
 // the foot (the share images in lib/receipt-svg.ts match it).
-import React, { useEffect, useState } from 'react';
+import React from 'react';
 import Link from 'next/link';
-import { qr } from '../../lib/shipped-qr';
-import { HERO_SLOT } from '../../lib/shipped-sponsors';
-import { QR_PATH, groupItemsBySignificance, type SponsorBlock, type SponsorSlot } from '../../lib/shipped-year';
+import { groupItemsBySignificance, type SponsorBlock } from '../../lib/shipped-year';
+import { SponsorBlockView } from './ReceiptAds';
+export { SponsorBlockView } from './ReceiptAds';
 import { logoPlacement } from '../../lib/shipped-mark';
 import { Barcode, Line, Rule, Tall, ExternalLink } from './paper';
 import { ThermalMark } from './ThermalMark';
@@ -66,72 +66,6 @@ function ItemName({ item }: { item: ViewItem }) {
     );
   }
   return <ExternalLink href={item.href}>{item.name}</ExternalLink>;
-}
-
-/** The printed QR has to point at whichever host is serving the page (staging prints staging codes). */
-function useOrigin(): string | null {
-  const [origin, setOrigin] = useState<string | null>(null);
-  useEffect(() => setOrigin(window.location.origin), []);
-  return origin;
-}
-
-function QrCode({ text, label }: { text: string; label: string }) {
-  const code = qr(text);
-  const quiet = 2;
-  const box = code.size + quiet * 2;
-  return (
-    <svg viewBox={`${-quiet} ${-quiet} ${box} ${box}`} className="shipped-qr" role="img" aria-label={label}>
-      <path d={code.path} fill="currentColor" shapeRendering="crispEdges" />
-    </svg>
-  );
-}
-
-function Slot({ slot, origin, hero }: { slot: SponsorSlot; origin: string | null; hero: boolean }) {
-  const href = QR_PATH(slot.qr);
-  return (
-    <a href={href} target="_blank" rel="sponsored nofollow noopener noreferrer" className="shipped-slot">
-      <span className={hero ? 'w-[96px]' : 'w-[64px]'}>
-        {origin ? <QrCode text={new URL(href, origin).toString()} label={`QR code for ${slot.name}`} /> : <span className="shipped-qr" aria-hidden="true" />}
-      </span>
-      {slot.logo ? (
-        // eslint-disable-next-line @next/next/no-img-element
-        <img
-          src={slot.logo}
-          alt=""
-          loading="lazy"
-          className={`shipped-logo w-auto ${hero ? 'max-h-10' : 'max-h-6'} max-w-full`}
-          onError={(event) => {
-            event.currentTarget.hidden = true;
-          }}
-        />
-      ) : null}
-      <span className={`block break-words font-semibold leading-tight ${hero ? 'text-[14px]' : 'text-[10.5px]'}`}>{slot.name}</span>
-      <span className={`block break-words leading-snug opacity-75 ${hero ? 'text-[11.5px]' : 'text-[9.5px]'}`}>{slot.cta}</span>
-    </a>
-  );
-}
-
-/** The hero slot and the 3×3 grid, each with its own QR code. Every link is marked sponsored. */
-export function SponsorBlockView({ block }: { block: SponsorBlock | null }) {
-  const origin = useOrigin();
-  const hero = block?.slots.find((s) => s.slot === HERO_SLOT);
-  const rest = block?.slots.filter((s) => s.slot !== HERO_SLOT) ?? [];
-  if (!block || !hero) return null;
-  return (
-    <section className="shipped-paidby" aria-label="Sponsors">
-      <p className="shipped-paidby-head">{block.frozen ? 'SPONSORED BY (FINAL)' : 'SPONSORED BY'}</p>
-      <div className="mt-2">
-        <Slot slot={hero} origin={origin} hero />
-      </div>
-      {rest.length ? (
-        <div className="shipped-slot-grid">
-          {rest.map((slot) => (
-            <Slot key={slot.slot} slot={slot} origin={origin} hero={false} />
-          ))}
-        </div>
-      ) : null}
-    </section>
-  );
 }
 
 function ItemRow({ item, compact, mark }: { item: ViewItem; compact?: boolean; mark?: boolean }) {

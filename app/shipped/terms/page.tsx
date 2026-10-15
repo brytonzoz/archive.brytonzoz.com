@@ -70,17 +70,19 @@ export default function TermsPage() {
           </p>
         </Section>
 
-        <Section id="sponsors" title="SPONSOR SLOTS">
+        <Section id="sponsors" title="ADVERTISEMENT SLOTS">
           <p>
-            Every receipt, share image and mailed print ends with a sponsor block: {SLOT_COUNT} slots, one hero on top and nine small ones,
-            each with a name (or a 1-bit logo), one line of text and a QR code to the sponsor’s https link. Until someone pays for a slot
-            it shows a house ad.
+            Every receipt, share image and mailed print includes an advertisement block: {SLOT_COUNT} slots, one wide slot on top and nine
+            small ones. All slots start empty at {money(BID_RULES.minCents)}. A paid ad shows the advertiser’s name, an optional 1-bit logo,
+            one line of text and a QR code to their https link. Empty slots show no business, logo or QR code. The checkout form previews
+            the ad in its receipt placement before you pay.
           </p>
           <p>
-            It’s a live bid, not a raffle and not a floor-ladder. House ads show as HOUSE AD · $0 · bid {money(BID_RULES.minCents)} and
-            never count as bids. The first outside sponsor is permanently tagged SPONSOR #001. Each raise is a whole dollar: at least +
+            The first bid for any empty slot is exactly {money(BID_RULES.minCents)}. The first paid advertiser is permanently tagged
+            SPONSOR #001. Each raise is a whole dollar: at least +
             {money(BID_RULES.incrementCents)} and at most +{money(BID_RULES.maxRaiseFloorCents)} or 10% of the current bid, whichever is
-            larger. Lowest bid and Highest bid post those two amounts. Paying a legal bid takes the slot right away. You keep it until
+            larger. For an occupied slot, choose the lowest or highest legal bid, then continue to checkout. Paying a legal bid takes
+            the slot right away. You keep it until
             someone pays a higher legal bid or the slot closes. Whoever holds a slot when it closes keeps it in the archive for good. The
             holder of a slot cannot raise their own price. After a slot changes hands it cannot be taken again for{' '}
             {BID_RULES.cooldownSeconds} seconds. A bid in the last {BID_RULES.antiSnipeMinutes} minutes before that slot closes adds{' '}
@@ -93,7 +95,7 @@ export default function TermsPage() {
           <p>
             What you get is the placement, nothing more: no traffic, clicks, scans, views or rankings are promised, and links are marked
             sponsored. Text and links are checked automatically before checkout and can be taken down from the admin at any time. Logos
-            are shown only after a person approves them; until then your name prints instead.
+            are shown only after a person approves them; your name remains visible with or without a logo.
           </p>
           <p>
             Not allowed: hate, adult content, gambling, crypto and giveaways, loans, scams or phishing, impersonating another brand or

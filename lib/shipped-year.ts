@@ -89,33 +89,34 @@ export type YearReceipt = {
 
 export type Candidate = Subject & { detail: string };
 
-/** One slot of the sponsor block as printed on a receipt: the paying holder, or the house ad. */
+/** One advertisement slot as printed on a receipt: a paid holder, or an empty $1 placement. */
 export type SponsorSlot = {
   slot: number;
   name: string;
   cta: string;
-  /** Destination of the slot's link and QR code. */
+  /** Destination of the paid slot's link and QR code; empty for a vacancy. */
   url: string;
-  /** Key of the short QR link, printed as <origin>/q/<key> (counts scans, then redirects to url). */
+  /** Paid QR key, printed as <origin>/q/<key> (counts scans, then redirects to url); empty for a vacancy. */
   qr: string;
   /** Same-origin URL of an approved 1-bit logo, or null. */
   logo: string | null;
+  /** Legacy wire name: true means this slot is vacant, with no advertiser or QR code. */
   house: boolean;
-  /** What the holder paid (0 for a house ad). House ads are not bids. */
+  /** What the holder paid (0 for an empty slot). */
   cents: number;
-  /** Lowest legal bid to take it (holder + $1, or $1 for a house ad). */
+  /** Lowest legal bid to take it (holder + $1, or $1 for an empty slot). */
   next: number;
-  /** Highest legal bid to take it (holder + max($5, 10% of current), or $1 for a house ad). */
+  /** Highest legal bid to take it (holder + max($5, 10% of current), or $1 for an empty slot). */
   maxNext: number;
-  /** Times the sponsor block was on screen while this holder had it (house ad: since the slot was last held). */
+  /** Times the block was on screen while this holder had it (vacant: since the slot was last held). */
   impressions: number;
-  /** When the holder went live (null for a house ad). */
+  /** When the holder went live (null for an empty slot). */
   since: number | null;
   /** When a holder of this slot was last taken over, or null. */
   lastOutbid: number | null;
-  /** How many paid sponsors have held it (house ads never count). */
+  /** How many paid sponsors have held it (vacancies never count). */
   holders: number;
-  /** Global serial of this paid holder (1 = SPONSOR #001). Null for a house ad. */
+  /** Global serial of this paid holder (1 = SPONSOR #001). Null for an empty slot. */
   serial: number | null;
   /** When the per-slot cooldown lifts (null if the spot can be taken now). */
   cooldownUntil: number | null;

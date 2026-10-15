@@ -754,9 +754,6 @@ export function Machine({ job, display, tone, onPrinted, onTorn, tearSignal = 0,
             </span>
           )}
         </label>
-        <span className="shipped-plate" aria-hidden="true">
-          BZ-80
-        </span>
       </div>
       {keys}
       {desk?.under ?? null}

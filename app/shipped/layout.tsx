@@ -9,6 +9,7 @@ import shareImages from '../../lib/share-images.json';
 import { ShippedNav } from '../../components/shipped/ShippedNav';
 import './receipt.css';
 import './controls.css';
+import './advertising.css';
 
 const uiSans = Inter({
   subsets: ['latin'],

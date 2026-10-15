@@ -59,7 +59,7 @@ class WallCatch extends Component<{ children: React.ReactNode; page: boolean }, 
             <h2>The wall</h2>
             {!this.props.page ? <a className={styles.openWall} href="/wall/">Open wall →</a> : null}
           </header>
-          <div className="shipped-wall-board" style={{ height: 280 }}>
+          <div className={`shipped-wall-board ${styles.board}`} style={{ height: 280 }}>
             <div className={styles.boardEmpty}>
               <p>Receipts couldn’t load.</p>
               <button type="button" onClick={() => window.location.reload()}>Reload receipts</button>
@@ -91,10 +91,19 @@ function ReceiptWallBoard({ page = false }: { page?: boolean }) {
   const [width, setWidth] = useState(320);
   const [view, setView] = useState({ top: 0, height: 800 });
   const [crumpled, setCrumpledIds] = useState<Set<number>>(() => new Set());
+  const [imageRatios, setImageRatios] = useState<ReadonlyMap<number, number>>(() => new Map());
   const [focus, setFocus] = useState<number | null>(null);
   const [reduced, setReduced] = useState(false);
   const loading = useRef(false);
   const tries = useRef(0);
+  const rememberImage = useCallback((id: number, image: HTMLImageElement) => {
+    const ratio = image.naturalHeight / image.naturalWidth;
+    if (!Number.isFinite(ratio) || ratio <= 0) return;
+    setImageRatios((current) => {
+      if (current.get(id) === ratio) return current;
+      return new Map(current).set(id, ratio);
+    });
+  }, []);
 
   useEffect(() => {
     setCrumpledIds(new Set(readCrumpled()));
@@ -172,11 +181,11 @@ function ReceiptWallBoard({ page = false }: { page?: boolean }) {
     };
   }, [ready, receipts.length]);
 
-  const cols = wallColumns(width);
+  const cols = page ? wallColumns(width) : Math.min(3, wallColumns(width));
   const gutter = wallGutter(width);
   const { cards, height } = useMemo(
-    () => layoutWall(receipts, crumpled, width, cols, gutter),
-    [receipts, crumpled, width, cols, gutter],
+    () => layoutWall(receipts, crumpled, width, cols, gutter, imageRatios),
+    [receipts, crumpled, width, cols, gutter, imageRatios],
   );
   const byId = useMemo(() => new Map(receipts.map((row) => [row.id, row])), [receipts]);
   const visible = useMemo(() => {
@@ -205,7 +214,7 @@ function ReceiptWallBoard({ page = false }: { page?: boolean }) {
           {!page ? <a className={styles.openWall} href="/wall/">Open wall →</a> : null}
         </div>
       </header>
-      <div ref={board} className="shipped-wall-board" style={{ height: empty && !ready ? 520 : Math.max(height, 280) }}>
+      <div ref={board} className={`shipped-wall-board ${styles.board}`} style={{ height: empty && !ready ? 520 : Math.max(height, 280) }}>
         {empty && !ready ? <WallSkeleton width={width} count={page ? 8 : PREVIEW_COUNT} /> : null}
         {empty && ready ? (
           <div className={styles.boardEmpty} role="status">
@@ -225,8 +234,9 @@ function ReceiptWallBoard({ page = false }: { page?: boolean }) {
               receipt={receipt}
               crumpled={crumpled.has(card.id)}
               reduced={reduced}
-              parallax={reduced ? 0 : ((card.id % 5) - 2) * (page ? view.top : Math.max(-300, Math.min(300, view.top))) * 0.028}
+              parallax={reduced ? 0 : ((card.id % 5) - 2) * Math.max(-80, Math.min(80, view.top)) * 0.028}
               onOpen={() => setFocus(card.id)}
+              onImageLoad={(image) => rememberImage(card.id, image)}
             />
           );
         })}
@@ -272,6 +282,7 @@ function WallPin({
   reduced,
   parallax,
   onOpen,
+  onImageLoad,
 }: {
   card: WallCard;
   receipt: PileReceipt;
@@ -279,12 +290,13 @@ function WallPin({
   reduced: boolean;
   parallax: number;
   onOpen: () => void;
+  onImageLoad: (image: HTMLImageElement) => void;
 }) {
   const rotate = reduced ? 0 : card.rotate;
   return (
     <button
       type="button"
-      className={`shipped-wall-pin is-${card.kind}${crumpled ? ' is-crumpled' : ''}`}
+      className={`shipped-wall-pin ${styles.pin} is-${card.kind}${crumpled ? ' is-crumpled' : ''}`}
       data-wall-pin={card.id}
       data-crumpled={crumpled ? 'true' : 'false'}
       style={{
@@ -301,7 +313,15 @@ function WallPin({
       ) : (
         <span className="shipped-wall-tape" aria-hidden="true" />
       )}
-      {crumpled ? <span className="shipped-wall-ball" aria-hidden="true" /> : <WallSlip receipt={receipt} />}
+      {crumpled ? <span className="shipped-wall-ball" aria-hidden="true" /> : (
+        <>
+          <WallSlip receipt={receipt} onImageLoad={onImageLoad} />
+          <span className={styles.pinCaption} aria-hidden="true">
+            <span>{receipt.who}</span>
+            <small>{receipt.potential ? 'Potential' : `${receipt.count} shipped`}</small>
+          </span>
+        </>
+      )}
     </button>
   );
 }

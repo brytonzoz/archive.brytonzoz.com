@@ -15,7 +15,7 @@ const SWITCH_LABELS: Record<Switch, string> = {
   generate: 'Printing new receipts',
   sponsors: 'Selling sponsor slots',
   prints: 'Selling $5 mailed prints',
-  'sponsor-display': 'Showing paid sponsors (house ads instead)',
+  'sponsor-display': 'Showing paid sponsors (empty ad slots instead)',
 };
 
 type Bid = {
@@ -316,7 +316,7 @@ export function ShippedCard({ password }: { password: string }) {
       )}
 
       <h3 className="mt-5 text-[14px] font-semibold">Sponsor slots ({live.length} paid)</h3>
-      <p className="text-[12px] text-white/45">“Take down” puts the house ad back at once and refunds the sponsor in full.</p>
+      <p className="text-[12px] text-white/45">“Take down” empties the ad slot at once and refunds the sponsor in full.</p>
       {data.bids.length ? (
         <ul className="mt-2 space-y-2">
           {data.bids.map((bid) => (

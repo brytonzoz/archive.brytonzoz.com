@@ -1,7 +1,6 @@
 // Bryton's own "SHIPPED IN <year>" receipt as a ThermalReceipt: the long sample on /lab/print/.
 import { RUNNING_STATUSES, receiptDate } from '../../../lib/shipped';
 import { SHIPPED_ITEMS, SHIPPED_UPDATED } from '../../../lib/shipped-data';
-import { HOUSE_SLOTS } from '../../../lib/shipped-sponsors';
 import { SITE_YEAR } from '../../../lib/shipped-year';
 import type { ThermalReceipt } from './types';
 
@@ -27,8 +26,8 @@ export function brytonThermal(compact = false): ThermalReceipt {
     })),
     count: items.length,
     note: items.length ? `${parts.join(', ')}. Proof over hype.` : 'The register is open. Go ship something.',
-    presented: `${HOUSE_SLOTS[0].name}: ${HOUSE_SLOTS[0].cta}`,
-    paidBy: HOUSE_SLOTS.slice(1).map((slot) => slot.name),
+    presented: null,
+    paidBy: [],
     barcode: 'BRYTONZOZ/SHIPPED',
     compact,
   };

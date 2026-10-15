@@ -156,7 +156,7 @@ async function checkJourney(browser, viewport, name) {
   await cards.first().click();
   const wallDialog = page.getByRole('dialog', { name: `${pile[0].who}'s receipt`, exact: true });
   await wallDialog.waitFor({ state: 'visible' });
-  assert.equal(await wallDialog.getByRole('link', { name: 'Open', exact: true }).getAttribute('href'), `/r/${pile[0].id}/`, 'A wall pin opens the matching receipt');
+  assert.equal(await wallDialog.getByRole('link', { name: 'Open receipt', exact: true }).getAttribute('href'), `/r/${pile[0].id}/`, 'A wall pin opens the matching receipt');
   await noOverflow(page, `${name} wall dialog`);
   await page.keyboard.press('Escape');
   await wallDialog.waitFor({ state: 'hidden' });

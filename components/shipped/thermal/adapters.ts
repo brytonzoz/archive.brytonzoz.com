@@ -3,6 +3,7 @@
 // the pile and the DOM receipt never disagree.
 import { receiptDate } from '../../../lib/shipped';
 import { isFirstRun, receiptModules } from '../../../lib/shipped-modules';
+import { HERO_SLOT } from '../../../lib/shipped-sponsors';
 import { itemDate, itemsShipped, realReceiptItems, receiptNumber, subjectKicker, subjectLabel, type SponsorBlock, type YearReceipt } from '../../../lib/shipped-year';
 import type { ThermalReceipt } from './types';
 
@@ -16,11 +17,14 @@ function titleCustomer(raw: string): string {
   return name.replace(/[A-Za-z][A-Za-z']*/g, (word) => word[0].toUpperCase() + word.slice(1).toLowerCase());
 }
 
-/** The hero slot prints as "presented by", the grid as the paid-for lines (names only; QR codes stay on the DOM receipt). */
+/** Only paid ads print attribution; a vacant hero never promotes a small ad into its place. */
 export function paidByLines(sponsors: SponsorBlock | null): Pick<ThermalReceipt, 'presented' | 'paidBy'> {
-  const slots = [...(sponsors?.slots ?? [])].sort((a, b) => a.slot - b.slot);
-  const [hero, ...grid] = slots;
-  return { presented: hero ? `${hero.name}: ${hero.cta}` : null, paidBy: grid.map((slot) => slot.name) };
+  const slots = (sponsors?.slots ?? []).filter((slot) => !slot.house && slot.name.trim()).sort((a, b) => a.slot - b.slot);
+  const hero = slots.find((slot) => slot.slot === HERO_SLOT);
+  return {
+    presented: hero ? [hero.name.trim(), hero.cta.trim()].filter(Boolean).join(': ') : null,
+    paidBy: slots.filter((slot) => slot.slot !== HERO_SLOT).map((slot) => slot.name.trim()),
+  };
 }
 
 export function fromLoaded({ receipt, sponsors }: LoadedReceipt): ThermalReceipt {

@@ -1,53 +1,65 @@
 'use client';
 
-import React from 'react';
+import React, { useState } from 'react';
 import type { PileReceipt } from '../../../lib/shipped-pile';
+import { ROLLO_PNG_PATH } from '../../../lib/shipped-year';
+import styles from './ReceiptWall.module.css';
 
-/** Mini thermal face for a pinned receipt. Ink only — the pin/tape live on the card around it. */
-export function WallSlip({ receipt }: { receipt: PileReceipt }) {
-  const items = (receipt.items ?? []).slice(0, 5);
+/** The same flat receipt image used for physical prints, with the wall's paper and fastener around it. */
+export function WallSlip({ receipt, focused = false, onImageLoad }: {
+  receipt: PileReceipt;
+  focused?: boolean;
+  onImageLoad?: (image: HTMLImageElement) => void;
+}) {
+  const [status, setStatus] = useState<'loading' | 'ready' | 'failed'>('loading');
   return (
-    <article className="shipped-wall-slip">
-      <p className="shipped-wall-slip-kicker">SHIPPED 2026</p>
-      <h3 className="shipped-wall-slip-who">{receipt.who}</h3>
-      <p className="shipped-wall-slip-meta">{receipt.potential ? 'POTENTIAL' : `${receipt.count} SHIPPED`}</p>
-      <ul className="shipped-wall-slip-items">
-        {items.map((item) => (
-          <li key={item.name}>
-            <span>{item.name}</span>
-            <span>{item.status}</span>
-          </li>
-        ))}
-      </ul>
+    <article className={`shipped-wall-slip ${styles.slip}`} data-wall-artifact={status}>
+      {/* This same-origin, variable-height print is already rendered and cached by the Worker. */}
+      {/* eslint-disable-next-line @next/next/no-img-element */}
+      <img
+        src={ROLLO_PNG_PATH(receipt.id)}
+        alt={focused ? `${receipt.who}'s printed receipt, ${receipt.count} items shipped` : ''}
+        className={styles.receiptImage}
+        loading={focused ? 'eager' : 'lazy'}
+        draggable={false}
+        onLoad={(event) => {
+          setStatus('ready');
+          onImageLoad?.(event.currentTarget);
+        }}
+        onError={() => setStatus('failed')}
+      />
+      {status !== 'ready' ? (
+        <div className={styles.slipFallback}>
+          <p className="shipped-wall-slip-kicker">SHIPPED</p>
+          <h3 className="shipped-wall-slip-who">{receipt.who}</h3>
+          <p className="shipped-wall-slip-meta">{receipt.potential ? 'POTENTIAL' : `${receipt.count} SHIPPED`}</p>
+          <p className={styles.imageStatus}>{status === 'failed' ? 'Open receipt to view' : 'Loading receipt…'}</p>
+        </div>
+      ) : null}
+      {focused && receipt.items.length ? (
+        <ul className={styles.screenReaderText} aria-label="Receipt items">
+          {receipt.items.map((item, index) => <li key={`${item.name}-${index}`}>{item.name}: {item.status}</li>)}
+        </ul>
+      ) : null}
     </article>
   );
 }
 
-/** Offscreen texture for the local crumple — same words the slip shows. */
-export function paintWallSlip(ctx: CanvasRenderingContext2D, receipt: PileReceipt, width: number, height: number) {
+/** The crumple uses the actual print image too, retaining its full proportions and printed detail. */
+export function paintWallSlip(ctx: CanvasRenderingContext2D, receipt: PileReceipt, width: number, height: number, image?: HTMLImageElement | null) {
   ctx.fillStyle = '#f2ead4';
   ctx.fillRect(0, 0, width, height);
+  if (image?.complete && image.naturalWidth) {
+    ctx.imageSmoothingEnabled = true;
+    ctx.imageSmoothingQuality = 'high';
+    ctx.drawImage(image, 0, 0, width, height);
+    return;
+  }
   ctx.fillStyle = '#1d1b19';
   ctx.textBaseline = 'top';
-  const pad = width * 0.08;
-  let y = pad;
-  ctx.font = `600 ${Math.round(width * 0.045)}px "Fragment Mono", ui-monospace, monospace`;
   ctx.textAlign = 'center';
-  ctx.fillText('SHIPPED 2026', width / 2, y);
-  y += width * 0.08;
-  ctx.font = `600 ${Math.round(width * 0.09)}px "Fragment Mono", ui-monospace, monospace`;
-  ctx.fillText(receipt.who.toUpperCase().slice(0, 18), width / 2, y);
-  y += width * 0.12;
-  ctx.font = `500 ${Math.round(width * 0.04)}px "Fragment Mono", ui-monospace, monospace`;
-  ctx.globalAlpha = 0.6;
-  ctx.fillText(receipt.potential ? 'POTENTIAL' : `${receipt.count} SHIPPED`, width / 2, y);
-  ctx.globalAlpha = 1;
-  y += width * 0.1;
-  ctx.textAlign = 'left';
-  ctx.font = `600 ${Math.round(width * 0.042)}px "Fragment Mono", ui-monospace, monospace`;
-  for (const item of receipt.items.slice(0, 5)) {
-    ctx.fillText(item.name.toUpperCase().slice(0, 22), pad, y);
-    y += width * 0.07;
-    if (y > height - pad) break;
-  }
+  ctx.font = `600 ${Math.round(width * 0.06)}px ui-monospace, monospace`;
+  ctx.fillText('SHIPPED', width / 2, width * 0.1);
+  ctx.font = `600 ${Math.round(width * 0.055)}px ui-monospace, monospace`;
+  ctx.fillText(receipt.who.toUpperCase().slice(0, 26), width / 2, width * 0.24);
 }

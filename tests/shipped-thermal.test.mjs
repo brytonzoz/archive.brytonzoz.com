@@ -1,6 +1,10 @@
+import './resolve-ts.mjs';
 import assert from 'node:assert/strict';
 import { test } from 'node:test';
 import { COLS, COLS_SMALL, docText, printable, receiptToDoc, wrap } from '../components/shipped/thermal/layout.ts';
+
+const { paidByLines } = await import('../components/shipped/thermal/adapters.ts');
+const { sampleReceipt } = await import('../components/shipped/thermal/samples.ts');
 
 const RECEIPT = {
   id: 'r42',
@@ -47,6 +51,40 @@ test('the print job follows YearReceipt: store, inverse band, customer, items, t
   assert.ok(kinds.indexOf('box-bottom') < kinds.indexOf('barcode'));
   const total = doc.lines.find((line) => line.kind === 'lead' && line.left === 'ITEMS SHIPPED');
   assert.ok(total && total.kind === 'lead' && total.right === '2');
+});
+
+test('vacant sponsor slots produce no paid attribution or empty sponsor frame', () => {
+  const attribution = paidByLines({ slots: [
+    { slot: 0, house: true, name: '', cta: '' },
+    { slot: 1, house: true, name: 'Former house brand', cta: 'Not a paid ad' },
+  ], frozen: false });
+  assert.deepEqual(attribution, { presented: null, paidBy: [] });
+  const doc = receiptToDoc({ ...RECEIPT, ...attribution });
+  assert.doesNotMatch(doc.text, /PAID FOR BY|PRESENTED BY|Former house brand/);
+  assert.equal(doc.lines.some((line) => line.kind === 'box-top' || line.kind === 'box-bottom'), false);
+  assert.match(doc.text, /Proof over hype/);
+  assert.match(doc.text, /\[barcode BZ000042\]/);
+});
+
+test('paid small ads keep their position when the wide ad is vacant', () => {
+  const attribution = paidByLines({ slots: [
+    { slot: 4, house: false, name: 'Fourth ad', cta: 'Four' },
+    { slot: 0, house: true, name: '', cta: '' },
+    { slot: 1, house: false, name: 'First ad', cta: 'One' },
+    { slot: 2, house: false, name: '   ', cta: 'No name' },
+  ], frozen: false });
+  assert.deepEqual(attribution, { presented: null, paidBy: ['First ad', 'Fourth ad'] });
+  assert.deepEqual(paidByLines({ slots: [{ slot: 0, house: false, name: 'Wide ad', cta: '' }], frozen: false }), { presented: 'Wide ad', paidBy: [] });
+});
+
+test('fictional lab receipts retain their content without implying paid sponsors', () => {
+  const sample = sampleReceipt(0);
+  assert.equal(sample.presented, null);
+  assert.deepEqual(sample.paidBy, []);
+  const doc = receiptToDoc(sample);
+  assert.match(doc.text, /SAMPLE/);
+  assert.match(doc.text, /ITEMS SHIPPED/);
+  assert.doesNotMatch(doc.text, /PAID FOR BY|PRESENTED BY/);
 });
 
 test('long item names wrap and the status lands on the leader line', () => {

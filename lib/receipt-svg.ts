@@ -235,7 +235,7 @@ export function masterReceiptSvg(data: MasterOg): string {
 
 export type YearOgItem = { name: string; status: string; date: string | null; description: string; logo: string | null };
 /** One sponsor slot as drawn: its QR is a path in module units (lib/shipped-qr.ts), passed in so this file stays import-free. */
-export type YearOgSlot = { name: string; cta: string; logo: string | null; qr: { size: number; path: string } };
+export type YearOgSlot = { slot: number; house: boolean; name: string; cta: string; logo: string | null; qr: { size: number; path: string } | null };
 export type YearOg = {
   number: string;
   year: number;
@@ -254,49 +254,42 @@ export type YearOg = {
   modules?: { id: string; title: string; lines: string[] }[];
   shipScore?: number;
   printedAt?: string;
-  /** Resolved X handle (no @). Shown on the OG sticky when we already have it. */
+  /** Resolved X handle (no @). Shown on the share tape when we already have it. */
   handle?: string | null;
 };
 
 function qrMark(x: number, y: number, width: number, code: { size: number; path: string }) {
-  const scale = width / (code.size + 4);
-  return `<rect x="${x}" y="${y}" width="${width}" height="${width}" fill="${PAPER}"/><g transform="translate(${(x + 2 * scale).toFixed(2)} ${(y + 2 * scale).toFixed(2)}) scale(${scale.toFixed(4)})"><path d="${code.path}" fill="${INK}" shape-rendering="crispEdges"/></g>`;
+  const scale = width / (code.size + 8);
+  return `<rect x="${x}" y="${y}" width="${width}" height="${width}" fill="${PAPER}"/><g transform="translate(${(x + 4 * scale).toFixed(2)} ${(y + 4 * scale).toFixed(2)}) scale(${scale.toFixed(4)})"><path d="${code.path}" fill="${INK}" shape-rendering="crispEdges"/></g>`;
 }
 
-/** The sponsor block: the hero slot across the top, then a 3×3 grid, each with its QR code. Returns the new y. */
+/** One wide ad above a 3×3 grid. Vacancies keep their place without inventing a brand or QR. */
 function sponsorBlock(body: string[], c: number, top: number, slots: YearOgSlot[]): number {
-  let y = top + 20;
-  body.push(txt(c, y, 'THIS RECEIPT IS SPONSORED BY', 10.5, { weight: 600, anchor: 'middle' }));
-  y += 14;
-  const [hero, ...grid] = slots;
-  if (hero) {
-    const qrSize = 74;
-    body.push(qrMark(PAPER_W - 28 - qrSize - 6, y + 2, qrSize, hero.qr));
-    let ty = y + 26;
-    if (hero.logo) {
-      body.push(`<image x="40" y="${y + 6}" width="150" height="40" preserveAspectRatio="xMinYMid meet" image-rendering="optimizeSpeed" href="${hero.logo}"/>`);
-      ty = y + 64;
-    } else body.push(tall(40, ty, fit(hero.name.toUpperCase(), 20), 13));
-    wrap(hero.cta, 30, 2).forEach((line, i) => body.push(txt(40, ty + 20 + i * 14, line, 10.5, { opacity: 0.8 })));
-    y += qrSize + 14;
-    body.push(rule(y));
-    y += 12;
-  }
+  body.push(txt(c, top + 18, 'ADVERTISEMENTS', 10.5, { weight: 600, anchor: 'middle' }));
+  const firstY = top + 30;
   const cellW = (PAPER_W - 56) / 3;
-  for (let row = 0; row < Math.ceil(grid.length / 3); row++) {
-    for (let col = 0; col < 3; col++) {
-      const slot = grid[row * 3 + col];
-      if (!slot) continue;
-      const cx = 28 + cellW * col + cellW / 2;
-      body.push(qrMark(cx - 26, y, 52, slot.qr));
-      if (slot.logo) body.push(`<image x="${(cx - 50).toFixed(1)}" y="${y + 56}" width="100" height="18" preserveAspectRatio="xMidYMid meet" image-rendering="optimizeSpeed" href="${slot.logo}"/>`);
-      else body.push(txt(cx, y + 68, fit(slot.name.toUpperCase(), 16), 9, { weight: 600, anchor: 'middle' }));
-      wrap(slot.cta, 20, 2).forEach((line, i) => body.push(txt(cx, y + 81 + i * 10, line, 7.5, { anchor: 'middle', opacity: 0.75 })));
+  for (let position = 0; position < 10; position++) {
+    const slot = slots.find((candidate, index) => (candidate.slot ?? index) === position);
+    const hero = position === 0;
+    const x = hero ? 28 : 28 + cellW * ((position - 1) % 3);
+    const y = hero ? firstY : firstY + 104 + Math.floor((position - 1) / 3) * 124;
+    const width = hero ? PAPER_W - 56 : cellW;
+    const height = hero ? 104 : 124;
+    body.push(`<rect x="${x.toFixed(1)}" y="${y}" width="${width.toFixed(1)}" height="${height}" fill="none" stroke="${INK}" stroke-width="0.7" stroke-opacity="0.55"/>`);
+    body.push(txt(x + 9, y + 13, `AD SLOT ${position}`, 7, { weight: 600, opacity: 0.55 }));
+    if (!slot || slot.house) {
+      body.push(txt(x + width / 2, y + height / 2 + 6, 'EMPTY · $1', hero ? 13 : 10, { anchor: 'middle', opacity: 0.65 }));
+      continue;
     }
-    y += 104;
+    const qrSize = hero ? 80 : 58;
+    if (slot.qr) body.push(qrMark(x + width - qrSize - 6, y + 20, qrSize, slot.qr));
+    if (slot.logo) body.push(`<image x="${(x + 9).toFixed(1)}" y="${y + 23}" width="${hero ? 170 : 36}" height="${hero ? 24 : 40}" preserveAspectRatio="xMinYMid meet" image-rendering="optimizeSpeed" href="${slot.logo}"/>`);
+    const textX = hero ? x + 9 : x + width / 2;
+    const anchor = hero ? 'start' : 'middle';
+    body.push(txt(textX, y + (hero ? 64 : 88), fit(slot.name.toUpperCase(), hero ? 26 : 16), hero ? 11 : 8.5, { weight: 600, anchor }));
+    wrap(slot.cta, hero ? 32 : 20, 2).forEach((line, i) => body.push(txt(textX, y + (hero ? 80 : 103) + i * 11, line, hero ? 9.5 : 7.5, { anchor, opacity: 0.8 })));
   }
-  body.push(`<rect x="28" y="${top}" width="${PAPER_W - 56}" height="${y - top}" fill="none" stroke="${INK}" stroke-width="1.5"/>`);
-  return y;
+  return firstY + 104 + 3 * 124;
 }
 
 function wrap(text: string, max: number, lines: number): string[] {
@@ -321,8 +314,8 @@ function customer(c: number, y: number, year: number, who: string) {
   return [inverse(c, y, `SHIPPED IN ${year}`, 14), txt(c, y + 30, 'CUSTOMER', 10.5, { anchor: 'middle', opacity: 0.6 }), tall(c, y + 56, fit(who.toUpperCase(), 26), 15, { anchor: 'middle' })];
 }
 
-/** Condensed tape for a photo card: name large, a few items, the tally, a sponsor strip. */
-function photoReceipt(data: YearOg, limit: number, withDesc: boolean): { body: string; height: number } {
+/** Condensed photo tape: name, items, tally, and optionally the complete ad block. */
+function photoReceipt(data: YearOg, limit: number, withDesc: boolean, withAds = false): { body: string; height: number } {
   const c = PAPER_W / 2;
   const items = data.items.slice(0, limit);
   const who = fit(data.who.toUpperCase(), 18);
@@ -361,94 +354,33 @@ function photoReceipt(data: YearOg, limit: number, withDesc: boolean): { body: s
   y += 18;
   body.push(rule(y, true));
   y += 22;
-  const paid = data.sponsors.map((slot) => slot.name.toUpperCase()).filter(Boolean).slice(0, 4);
-  if (paid.length) {
-    body.push(txt(c, y, 'PAID FOR BY', 8.5, { weight: 600, anchor: 'middle', opacity: 0.48 }));
-    y += 16;
-    const mid = Math.ceil(paid.length / 2);
-    const lines = paid.length > 2 ? [paid.slice(0, mid), paid.slice(mid)] : [paid];
-    for (const line of lines) {
-      body.push(txt(c, y, line.join('  ·  '), 10, { weight: 600, anchor: 'middle' }));
-      y += 15;
-    }
+  if (withAds) y = sponsorBlock(body, c, y - 10, data.sponsors) + 20;
+  if (data.handle) {
+    body.push(txt(c, y, `@${data.handle}`, 11, { anchor: 'middle', weight: 600 }));
+    y += 20;
   }
   y += 6;
   body.push(txt(c, y, 'shipped.brytonzoz.com', 9, { anchor: 'middle', opacity: 0.4 }));
   return { body: body.join(''), height: y + 22 };
 }
 
-/** Irregular sticky-note outline — same torn language as the receipt. */
-function stickyPath(width: number, height: number, seed: string): string {
-  const random = prng(seed);
-  const j = (span: number) => (random() - 0.5) * span;
-  return `M${j(8).toFixed(1)},${(10 + j(6)).toFixed(1)} L${(width + j(8)).toFixed(1)},${j(10).toFixed(1)} L${(width + j(6)).toFixed(1)},${(height + j(8)).toFixed(1)} L${j(8).toFixed(1)},${(height - 3 + j(6)).toFixed(1)} Z`;
-}
-
-/** One word with a little wobble so it reads as written, not typeset. Avoids letter-spacing (resvg doubles the last glyph). */
-function handWord(cx: number, y: number, word: string, size: number, seed: string, fill = INK): string {
-  const random = prng(seed);
-  const advance = charW(size) * 1.04;
-  let x = cx - (word.length * advance) / 2;
-  return Array.from(word).map((ch) => {
-    const dy = (random() - 0.5) * size * 0.16;
-    const rot = (random() - 0.5) * 9;
-    const node = `<g transform="translate(${x.toFixed(1)} ${(y + dy).toFixed(1)}) rotate(${rot.toFixed(2)})">${txt(0, 0, ch, size, { weight: 600, fill })}</g>`;
-    x += advance;
-    return node;
-  }).join('');
-}
-
-function handleTape(handle: string, seed: string): string {
-  const label = fit(`@${handle}`, 16);
-  const width = Math.max(168, charW(18) * label.length + 40);
-  const height = 44;
-  const d = stickyPath(width, height, `${seed}:tape`);
-  return [
-    `<path d="${d}" transform="translate(3 5)" fill="#000" opacity="0.18"/>`,
-    `<path d="${d}" fill="#efe4c4"/>`,
-    `<path d="${d}" fill="url(#tape)"/>`,
-    `<g transform="translate(${(width / 2 - 30).toFixed(1)} -8) rotate(-6 30 8)"><rect x="0" y="0" width="60" height="18" fill="url(#tape)"/><rect x="0" y="0" width="60" height="18" fill="none" stroke="#7a5a20" stroke-opacity="0.2"/></g>`,
-    txt(width / 2, 30, label, 18, { weight: 600, anchor: 'middle' }),
-  ].join('');
-}
-
-/** Right-side desk props: a foxed sticky with the count, handle taped against it when we have one. */
-function deskCallout(data: YearOg): string {
-  const n = String(data.count);
-  const numberSize = n.length > 2 ? 72 : n.length > 1 ? 96 : 120;
-  const w = 300;
-  const h = 268;
-  const d = stickyPath(w, h, `sticky:${data.number}`);
-  const fold = `M${w - 36},2 L${w + 2},38 L${w - 28},44 Z`;
-  const sticky = [
-    `<path d="${d}" transform="translate(7 12)" fill="#000" opacity="0.2"/>`,
-    `<path d="${d}" transform="translate(3 5)" fill="#000" opacity="0.12"/>`,
-    `<path d="${d}" fill="#e0c056"/>`,
-    `<path d="${d}" fill="url(#fox)"/>`,
-    `<path d="${fold}" fill="#c9a43a" opacity="0.55"/>`,
-    `<g transform="translate(${w / 2 - 52} -11) rotate(8 52 11)"><rect x="0" y="0" width="104" height="24" fill="url(#tape)"/><rect x="0" y="0" width="104" height="24" fill="none" stroke="#7a5a20" stroke-opacity="0.2"/></g>`,
-    `<circle cx="${w / 2}" cy="11" r="8" fill="#b8362a"/>`,
-    `<circle cx="${w / 2 - 1.8}" cy="8.8" r="2.6" fill="#fff" opacity="0.4"/>`,
-    `<g transform="translate(${w / 2} ${64 + numberSize}) rotate(-4.6)">${txt(0, 0, n, numberSize, { weight: 600, anchor: 'middle' })}</g>`,
-    `<g transform="skewX(-8)">${handWord(w / 2 + 14, 64 + numberSize + 40, 'shipped', 26, `hand:${data.number}`)}</g>`,
-  ].join('');
-  const handle = data.handle
-    ? `<g transform="translate(778 392) rotate(-9.4 90 22)">${handleTape(data.handle, `h:${data.number}`)}</g>`
-    : '';
-  return `<g id="desk-callout"><g transform="translate(792 118) rotate(12.2 ${w / 2} ${h / 2})">${sticky}</g>${handle}</g>`;
-}
-
-/** The X card (1200×630): receipt offset left, sticky count (and taped handle) filling the right. */
+/** The X card (1200×630): receipt on the left, every ad placement on its own slip on the right. */
 export function yearCardSvg(data: YearOg): string {
   const { body, height } = photoReceipt(data, 4, false);
-  const receipt = sheet(height, body, `translate(28 18) rotate(-10.6 200 ${Math.round(height / 2)}) scale(1.52)`, `card:${data.number}`, { soft: true, photo: true });
-  return scene(1200, 630, `${receipt}${deskCallout(data)}`);
+  const scale = Math.min(1.3, 500 / (height + 20));
+  const receipt = sheet(height, body, `translate(80 64) rotate(-6 200 ${Math.round(height / 2)}) scale(${scale.toFixed(4)})`, `card:${data.number}`, { soft: true, photo: true });
+  const ads: string[] = [];
+  const adHeight = sponsorBlock(ads, PAPER_W / 2, 14, data.sponsors) + 18;
+  const adSlip = sheet(adHeight, ads.join(''), `translate(690 26) rotate(2 200 ${Math.round(adHeight / 2)}) scale(1.04)`, `ads:${data.number}`, { soft: true, photo: true });
+  return scene(1200, 630, `${receipt}${adSlip}`);
 }
 
-/** Share-image download (1080×1350): same photo, taller, a little more of the tape. */
+/** Share-image download (1080×1350): the condensed tape and its complete ad block fit inside the photo. */
 export function yearPortraitSvg(data: YearOg): string {
-  const { body, height } = photoReceipt(data, 5, true);
-  return scene(1080, 1350, sheet(height, body, `translate(188 90) rotate(-6.4 200 ${Math.round(height / 2)}) scale(1.72)`, `port:${data.number}`, { soft: true, photo: true }));
+  const { body, height } = photoReceipt(data, 5, true, true);
+  const scale = Math.min(1.72, 1200 / (height + 30));
+  const left = Math.round((1080 - PAPER_W * scale) / 2);
+  return scene(1080, 1350, sheet(height, body, `translate(${left} 70) rotate(-3 200 ${Math.round(height / 2)}) scale(${scale.toFixed(4)})`, `port:${data.number}`, { soft: true, photo: true }));
 }
 
 function paintItems(body: string[], data: YearOg, y: number): number {
@@ -491,7 +423,7 @@ function yearReceiptPaint(data: YearOg): { body: string; height: number } {
   return { body: body.join(''), height: y + 40 };
 }
 
-/** The whole receipt as one tall image (2×), PAID FOR BY block and all. Used by the Rollo path, not the share card. */
+/** Compatibility alias for the portrait share-image download. */
 export function yearTallSvg(data: YearOg): string {
   return yearPortraitSvg(data);
 }

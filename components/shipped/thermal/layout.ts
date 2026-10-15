@@ -147,19 +147,23 @@ export function receiptToDoc(receipt: ThermalReceipt): PrintDoc {
   lead(lines, `#${receipt.number}${receipt.full ? ' FULL' : receipt.firstRun ? ' FIRST RUN' : ''}`, stamp, { small: true });
   feed(16);
 
-  lines.push({ kind: 'box-top' });
-  text(lines, 'THIS RECEIPT WAS PAID FOR BY', 'center', { small: true, bold: true, boxed: true });
-  feed(6, true);
-  if (receipt.presented) {
-    text(lines, 'PRESENTED BY', 'center', { small: true, boxed: true });
-    text(lines, receipt.presented, 'center', { bold: true, tall: true, boxed: true });
+  const presented = receipt.presented?.trim();
+  const paidBy = receipt.paidBy.map((line) => line.trim()).filter(Boolean);
+  if (presented || paidBy.length) {
+    lines.push({ kind: 'box-top' });
+    text(lines, 'THIS RECEIPT WAS PAID FOR BY', 'center', { small: true, bold: true, boxed: true });
     feed(6, true);
+    if (presented) {
+      text(lines, 'PRESENTED BY', 'center', { small: true, boxed: true });
+      text(lines, presented, 'center', { bold: true, tall: true, boxed: true });
+      feed(6, true);
+    }
+    paidBy.forEach((line, index) => {
+      if (index > 0) feed(6, true);
+      text(lines, line, 'center', { bold: true, boxed: true });
+    });
+    lines.push({ kind: 'box-bottom' });
   }
-  receipt.paidBy.forEach((line, index) => {
-    if (index > 0) feed(6, true);
-    text(lines, line, 'center', { bold: true, boxed: true });
-  });
-  lines.push({ kind: 'box-bottom' });
 
   feed(18);
   lines.push({ kind: 'barcode', value: receipt.barcode, height: 64 });

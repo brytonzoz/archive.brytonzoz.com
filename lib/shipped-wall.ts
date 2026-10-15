@@ -90,7 +90,8 @@ export type WallCard = {
 
 export function estimateWallCardHeight(itemCount: number, crumpled: boolean, width: number): number {
   if (crumpled) return Math.round(width * 0.72);
-  return Math.round(88 + Math.min(5, Math.max(1, itemCount)) * 18 + 52);
+  // Reserve a plausible full tape until its actual print image dimensions are known.
+  return Math.round(Math.max(1, width - 12) * (2.7 + Math.min(8, Math.max(0, itemCount)) * 0.12) + 62);
 }
 
 /** Even gutter around and between columns. Wide enough that a slight tilt stays on the board. */
@@ -105,6 +106,7 @@ export function layoutWall<T extends { id: number; items: { name: string }[] }>(
   boardWidth: number,
   cols: number,
   gap = wallGutter(boardWidth),
+  imageRatios?: ReadonlyMap<number, number>,
 ): { cards: WallCard[]; height: number } {
   const columns = Math.max(1, cols);
   const inner = Math.max(0, boardWidth - gap * (columns + 1));
@@ -113,11 +115,17 @@ export function layoutWall<T extends { id: number; items: { name: string }[] }>(
   const cards: WallCard[] = receipts.map((receipt) => {
     const col = tops.indexOf(Math.min(...tops));
     const style = wallPinStyle(receipt.id);
-    const h = estimateWallCardHeight(receipt.items?.length ?? 0, crumpled.has(receipt.id), w);
+    const ratio = imageRatios?.get(receipt.id);
+    const h = !crumpled.has(receipt.id) && ratio && Number.isFinite(ratio) && ratio > 0
+      ? Math.round(Math.max(1, w - 12) * ratio + 62)
+      : estimateWallCardHeight(receipt.items?.length ?? 0, crumpled.has(receipt.id), w);
     const x = gap + col * (w + gap);
     const y = tops[col];
     tops[col] = y + h + gap;
-    return { id: receipt.id, x, y, w, h, rotate: style.rotate, kind: style.kind, pinX: style.pinX, pinColor: style.pinColor };
+    // Long print images need a smaller lean: their bottom edge must stay inside the same gutter.
+    const maxTilt = Math.atan((gap * 0.4) / Math.max(1, h)) * 180 / Math.PI;
+    const rotate = Math.sign(style.rotate) * Math.min(Math.abs(style.rotate), maxTilt);
+    return { id: receipt.id, x, y, w, h, rotate, kind: style.kind, pinX: style.pinX, pinColor: style.pinColor };
   });
   return { cards, height: Math.max(gap, ...tops) };
 }

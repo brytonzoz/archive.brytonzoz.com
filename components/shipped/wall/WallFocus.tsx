@@ -1,12 +1,13 @@
 'use client';
 
 import React, { useEffect, useRef, useState } from 'react';
-import { RECEIPT_PATH, SHIPPED_URL } from '../../../lib/shipped-year';
+import { RECEIPT_PATH, ROLLO_PNG_PATH, SHIPPED_URL } from '../../../lib/shipped-year';
 import type { PileReceipt } from '../../../lib/shipped-pile';
 import { press } from '../feel';
 import { prng } from '../physics';
 import { Crumple } from '../print/crumple';
 import { WallSlip, paintWallSlip } from './WallSlip';
+import styles from './ReceiptWall.module.css';
 
 type Props = {
   receipt: PileReceipt;
@@ -26,12 +27,14 @@ export function WallFocus({ receipt, crumpled, reduced, onClose, onCrumple, onUn
   const stage = useRef<HTMLDivElement>(null);
   const paper = useRef<HTMLDivElement>(null);
   const canvas = useRef<HTMLCanvasElement>(null);
+  const printImage = useRef<HTMLImageElement | null>(null);
+  const isCrumpled = useRef(crumpled);
+  isCrumpled.current = crumpled;
   const spin = useRef({ rx: 0, ry: 0, vx: 0, vy: 0, px: 0, py: 0, dragging: false, raf: 0 });
   const crumple = useRef<Crumple | null>(null);
   const anim = useRef(0);
   const [ball, setBall] = useState(crumpled);
   const [origin, setOrigin] = useState('');
-  const painted = useRef(false);
 
   useEffect(() => setOrigin(window.location.origin), []);
   useEffect(() => () => {
@@ -87,7 +90,7 @@ export function WallFocus({ receipt, crumpled, reduced, onClose, onCrumple, onUn
   }, [reduced, receipt.id]);
 
   function onPointerDown(event: React.PointerEvent<HTMLDivElement>) {
-    if (reduced || event.button > 0) return;
+    if (reduced || event.button > 0 || event.pointerType === 'touch') return;
     const state = spin.current;
     state.dragging = true;
     state.px = event.clientX;
@@ -141,24 +144,26 @@ export function WallFocus({ receipt, crumpled, reduced, onClose, onCrumple, onUn
     }
   }
 
-  function runCrumple(to: number) {
+  function runCrumple(to: number, immediate = false) {
     if (anim.current) window.cancelAnimationFrame(anim.current);
     anim.current = 0;
     const node = canvas.current;
     if (!node) return;
-    const width = 280;
-    const height = 360;
+    const width = Math.min(280, paper.current?.clientWidth || 280);
+    const viewportHeight = width * 360 / 280;
+    const image = printImage.current;
+    const height = image ? Math.round(width * image.naturalHeight / image.naturalWidth) : viewportHeight;
     const dpr = Math.min(2, window.devicePixelRatio || 1);
     node.width = width * dpr;
-    node.height = height * dpr;
+    node.height = viewportHeight * dpr;
     node.style.width = `${width}px`;
-    node.style.height = `${height}px`;
+    node.style.height = `${viewportHeight}px`;
     const texture = document.createElement('canvas');
     texture.width = width;
     texture.height = height;
     const ink = texture.getContext('2d');
     if (!ink) return;
-    paintWallSlip(ink, receipt, width, height);
+    paintWallSlip(ink, receipt, width, height, image);
     const engine = new Crumple({
       width,
       height,
@@ -171,10 +176,23 @@ export function WallFocus({ receipt, crumpled, reduced, onClose, onCrumple, onUn
     const ctx = node.getContext('2d');
     if (!ctx) return;
     const from = to > 0.5 ? 0 : 1;
-    if (reduced || (crumpled && to > 0.5 && painted.current)) {
-      engine.update(to);
+    const draw = (progress: number, angle = 0, squash = 0) => {
+      const fit = Math.min(1, viewportHeight / height);
+      const scale = (fit + (1 - fit) * progress) * (1 - squash);
+      const cos = Math.cos(angle) * scale;
+      const sin = Math.sin(angle) * scale;
+      ctx.setTransform(1, 0, 0, 1, 0, 0);
       ctx.clearRect(0, 0, node.width, node.height);
-      engine.draw(ctx, { x: 0, y: 0, angle: 0, scale: 1 }, dpr);
+      engine.draw(ctx, {
+        x: width / 2 - (width / 2 * cos - height / 2 * sin),
+        y: viewportHeight / 2 - (width / 2 * sin + height / 2 * cos),
+        angle,
+        scale,
+      }, dpr);
+    };
+    if (reduced || immediate) {
+      engine.update(to);
+      draw(to);
       setBall(to > 0.5);
       return;
     }
@@ -185,9 +203,9 @@ export function WallFocus({ receipt, crumpled, reduced, onClose, onCrumple, onUn
       const t = Math.min(1, (now - start) / dur);
       const eased = 1 - Math.pow(1 - t, 3);
       const squash = Math.sin(t * Math.PI) * 0.16;
-      engine.update(from + (to - from) * eased);
-      ctx.clearRect(0, 0, node.width, node.height);
-      engine.draw(ctx, { x: 0, y: 0, angle: (to > 0.5 ? 0.7 : -0.55) * eased, scale: 1 - squash }, dpr);
+      const progress = from + (to - from) * eased;
+      engine.update(progress);
+      draw(progress, (to > 0.5 ? 0.7 : -0.55) * eased, squash);
       if (t < 1) {
         anim.current = window.requestAnimationFrame(tick);
         return;
@@ -200,14 +218,25 @@ export function WallFocus({ receipt, crumpled, reduced, onClose, onCrumple, onUn
     anim.current = window.requestAnimationFrame(tick);
   }
 
-  // First paint of an already-crumpled slip; runCrumple always reads the current receipt.
+  // The lifted paper and its crumple share the same cached physical-print image.
   useEffect(() => {
-    if (!crumpled || painted.current) return;
-    painted.current = true;
-    const id = window.requestAnimationFrame(() => runCrumple(1));
-    return () => window.cancelAnimationFrame(id);
-    // eslint-disable-next-line react-hooks/exhaustive-deps -- mount paint only
-  }, [crumpled, receipt.id]);
+    let live = true;
+    printImage.current = null;
+    if (isCrumpled.current) runCrumple(1, true);
+    const image = new Image();
+    image.decoding = 'async';
+    image.onload = () => {
+      if (!live) return;
+      printImage.current = image;
+      if (isCrumpled.current) runCrumple(1, true);
+    };
+    image.onerror = () => {
+      if (live && isCrumpled.current) runCrumple(1, true);
+    };
+    image.src = ROLLO_PNG_PATH(receipt.id);
+    return () => { live = false; };
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- load once per receipt; the ref reads its latest crumple state
+  }, [receipt.id]);
 
   const path = RECEIPT_PATH(receipt.id);
   const link = origin ? `${origin}${path}` : `${SHIPPED_URL}${path}`;
@@ -216,21 +245,23 @@ export function WallFocus({ receipt, crumpled, reduced, onClose, onCrumple, onUn
   return (
     <div className="shipped-wall-focus" data-wall-focus="" role="dialog" aria-label={`${receipt.who}'s receipt`}>
       <button type="button" className="shipped-wall-focus-scrim" aria-label="Close" onClick={onClose} />
-      <div className="shipped-wall-focus-stage" ref={stage}>
+      <div className={`shipped-wall-focus-stage ${styles.focusStage}`} ref={stage}>
+        <div className={styles.focusScroll}>
         <div
           ref={paper}
-          className={`shipped-wall-focus-paper${ball ? ' is-ball' : ''}`}
+          className={`shipped-wall-focus-paper ${styles.focusPaper}${ball ? ' is-ball' : ''}`}
           onPointerDown={onPointerDown}
           onPointerMove={onPointerMove}
           onPointerUp={onPointerUp}
           onPointerCancel={onPointerUp}
         >
           <canvas ref={canvas} className={`shipped-wall-focus-canvas${ball ? ' is-on' : ''}`} aria-hidden="true" />
-          {ball ? null : <WallSlip receipt={receipt} />}
+          {ball ? null : <WallSlip receipt={receipt} focused />}
+        </div>
         </div>
         <div className="shipped-wall-focus-actions">
           <a href={path} className="shipped-button is-big" onPointerDown={press}>
-            Open
+            Open receipt
           </a>
           <a href={intent} target="_blank" rel="noopener noreferrer" className="shipped-button is-ghost" onPointerDown={press}>
             Share

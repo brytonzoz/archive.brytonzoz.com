@@ -53,7 +53,7 @@ export type LogoResolver = (path: string | null) => Promise<string | null>;
 async function yearOg(receipt: YearReceipt, block: SponsorBlock, origin: string, logo: LogoResolver, maxItems: number): Promise<YearOg> {
   const items = receipt.items.slice(0, maxItems);
   const logos = await Promise.all(items.map((item) => logo(item.logo).catch(() => null)));
-  const sponsorLogos = await Promise.all(block.slots.map((slot) => logo(slot.logo).catch(() => null)));
+  const sponsorLogos = await Promise.all(block.slots.map((slot) => slot.house ? null : logo(slot.logo).catch(() => null)));
   const modules = receiptModules({ receipt });
   return {
     number: receiptNumber(receipt.id),
@@ -70,7 +70,14 @@ async function yearOg(receipt: YearReceipt, block: SponsorBlock, origin: string,
     count: itemsShipped(receipt),
     note: receipt.note,
     // QR codes only ever point at our own /q/<key>, which checks the slot again before redirecting.
-    sponsors: block.slots.map((slot, i) => ({ name: slot.name, cta: slot.cta, logo: sponsorLogos[i], qr: qr(new URL(QR_PATH(slot.qr), origin).toString()) })),
+    sponsors: block.slots.map((slot, i) => ({
+      slot: slot.slot,
+      house: slot.house,
+      name: slot.house ? '' : slot.name,
+      cta: slot.house ? '' : slot.cta,
+      logo: sponsorLogos[i],
+      qr: slot.house || !slot.qr ? null : qr(new URL(QR_PATH(slot.qr), origin).toString()),
+    })),
     url: new URL(RECEIPT_PATH(receipt.id), origin).toString().replace(/^https?:\/\//, ''),
     barcode: receiptBarcodeUnits(`BZ${receiptNumber(receipt.id)}${receipt.year}`),
     deepCut: null,

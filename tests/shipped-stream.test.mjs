@@ -111,20 +111,13 @@ test('checkout always stands on /r/<id>/ in the same tab', () => {
   delete globalThis.history;
 });
 
-test('after a print the stage auto-tears; sponsors stay collapsed; Turnstile has a visible fallback', () => {
+test('after a print the stage auto-tears; Turnstile has a visible fallback', () => {
   const stage = fs.readFileSync(new URL('../components/shipped/ShippedStage.tsx', import.meta.url), 'utf8');
   assert.match(stage, /currentRef\.current/);
   assert.match(stage, /setTearSignal/);
   assert.match(stage, /pageshow/);
   assert.match(stage, /readPrintResponse/);
   assert.doesNotMatch(stage, /opening\.kind === 'loaded' && !touched\.current/);
-
-  const board = fs.readFileSync(new URL('../components/shipped/SponsorBoard.tsx', import.meta.url), 'utf8');
-  assert.match(board, /useState\(false\)/);
-  assert.match(board, /On the tape/);
-  assert.match(board, /shipped-board-stack/);
-  assert.match(board, /spots · from/);
-  assert.doesNotMatch(board, /shipped-board-marks/);
 
   // Form placement and receipt navigation are exercised in scripts/check-shipped-ux.cjs.
   assert.match(stage, /shipped-clock-k/);
@@ -135,7 +128,6 @@ test('after a print the stage auto-tears; sponsors stay collapsed; Turnstile has
   assert.match(feel, /pressTick/);
 
   const css = fs.readFileSync(new URL('../app/shipped/receipt.css', import.meta.url), 'utf8');
-  assert.match(css, /\.shipped-board-panel \{[\s\S]*max-height: 0;/);
   assert.match(css, /\.shipped-pill-root\.is-open/);
   assert.match(css, /\.shipped-turnstile\.is-challenge/);
 

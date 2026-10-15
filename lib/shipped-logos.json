@@ -1,0 +1,77 @@
+{
+  "1stopshop.webp": {
+    "src": "/shipped/logos/1stopshop.png",
+    "width": 50,
+    "height": 28
+  },
+  "entrelabz-wordmark.webp": {
+    "src": "/shipped/logos/entrelabz-wordmark.png",
+    "width": 72,
+    "height": 14
+  },
+  "entrelabz.png": {
+    "src": "/shipped/logos/entrelabz.png",
+    "width": 28,
+    "height": 28
+  },
+  "habituize.webp": {
+    "src": "/shipped/logos/habituize.png",
+    "width": 28,
+    "height": 28
+  },
+  "light4mood.png": {
+    "src": "/shipped/logos/light4mood.png",
+    "width": 72,
+    "height": 19
+  },
+  "mopkin.webp": {
+    "src": "/shipped/logos/mopkin.png",
+    "width": 32,
+    "height": 28
+  },
+  "nonparallel-v1.webp": {
+    "src": "/shipped/logos/nonparallel-v1.png",
+    "width": 72,
+    "height": 12
+  },
+  "nonparallel-v3.webp": {
+    "src": "/shipped/logos/nonparallel-v3.png",
+    "width": 35,
+    "height": 28
+  },
+  "nonparallel.webp": {
+    "src": "/shipped/logos/nonparallel.png",
+    "width": 70,
+    "height": 28
+  },
+  "phyra.png": {
+    "src": "/shipped/logos/phyra.png",
+    "width": 24,
+    "height": 28
+  },
+  "pocket-factory.webp": {
+    "src": "/shipped/logos/pocket-factory.png",
+    "width": 30,
+    "height": 28
+  },
+  "postballoon.png": {
+    "src": "/shipped/logos/postballoon.png",
+    "width": 27,
+    "height": 28
+  },
+  "profitscanner.webp": {
+    "src": "/shipped/logos/profitscanner.png",
+    "width": 27,
+    "height": 28
+  },
+  "zoz-studios.png": {
+    "src": "/shipped/logos/zoz-studios.png",
+    "width": 72,
+    "height": 11
+  },
+  "zoz-wear.png": {
+    "src": "/shipped/logos/zoz-wear.png",
+    "width": 72,
+    "height": 11
+  }
+}

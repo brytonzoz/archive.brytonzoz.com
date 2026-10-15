@@ -1,0 +1,217 @@
+'use client';
+
+// The "SHIPPED IN <year>" receipt every visitor prints. Set like a real ESC/POS print: no letter-spacing,
+// double-height for the store and the customer, one inverse band, dotted leaders, and the sponsor block at
+// the foot (the share images in lib/receipt-svg.ts match it).
+import React from 'react';
+import Link from 'next/link';
+import { groupItemsBySignificance, type SponsorBlock } from '../../lib/shipped-year';
+import { SponsorBlockView } from './ReceiptAds';
+export { SponsorBlockView } from './ReceiptAds';
+import { logoPlacement } from '../../lib/shipped-mark';
+import { Barcode, Line, Rule, Tall, ExternalLink } from './paper';
+import { ThermalMark } from './ThermalMark';
+
+export type ViewItem = {
+  key: string;
+  name: string;
+  status: string;
+  /** "MAR 14", "MAR 2026", or null. */
+  date: string | null;
+  description: string;
+  href: string | null;
+  /** Same-origin page: next/link keeps the music playing. */
+  internal?: boolean;
+  logo: { src: string; width: number; height: number } | null;
+  via?: string | null;
+  confidence?: number;
+  significance?: number;
+};
+
+export type YearReceiptProps = {
+  year: number;
+  who: string;
+  kicker?: React.ReactNode;
+  date: string;
+  number: string;
+  items: ViewItem[];
+  count: number;
+  note: string;
+  sponsors: SponsorBlock | null;
+  barcode: string;
+  /** Small print under the barcode. */
+  fine?: React.ReactNode;
+  /** Item names and statuses only (the opening example). */
+  compact?: boolean;
+  deepCut?: { name: string; why: string } | null;
+  badges?: string[];
+  firstRun?: boolean;
+  modules?: { id: string; title: string; lines: string[] }[];
+  shipScore?: number;
+  /** ISO time the Worker stamped; shown with the serial. */
+  printedAt?: string;
+  /** Paid deep pass. */
+  full?: boolean;
+  /** Honest upsell from the free pass. Never a guessed count. */
+  teaser?: string | null;
+};
+
+function ItemName({ item }: { item: ViewItem }) {
+  if (!item.href) return <>{item.name}</>;
+  if (item.internal) {
+    return (
+      <Link href={item.href} className="shipped-link">
+        {item.name}
+      </Link>
+    );
+  }
+  return <ExternalLink href={item.href}>{item.name}</ExternalLink>;
+}
+
+function ItemRow({ item, compact, mark }: { item: ViewItem; compact?: boolean; mark?: boolean }) {
+  return (
+    <li className="shipped-year-item">
+      {mark && item.logo ? <ThermalMark src={item.logo.src} className="shipped-item-logo" /> : null}
+      <div className="shipped-lead">
+        <h3 className="shipped-item-name min-w-0 font-semibold leading-snug">
+          <ItemName item={item} />
+        </h3>
+        <span className="shipped-lead-fill" aria-hidden="true" />
+        <p className="shipped-item-status">
+          <span className="sr-only">Status: </span>
+          {item.status}
+        </p>
+      </div>
+      {!compact && (item.date || item.description || item.via) ? (
+        <div className="shipped-lead shipped-item-meta">
+          <p className="shipped-item-desc text-[11.5px] leading-[1.45]">
+            {item.via ? <span className="block opacity-60">{item.via}</span> : null}
+            {item.description ? <span className={item.via ? 'mt-0.5 block' : undefined}>{item.description}</span> : null}
+          </p>
+          {item.date ? (
+            <>
+              <span className="shipped-lead-fill" aria-hidden="true" />
+              <p className="shipped-item-date">
+                <span className="sr-only">Date: </span>
+                {item.date}
+              </p>
+            </>
+          ) : null}
+        </div>
+      ) : null}
+    </li>
+  );
+}
+
+function ItemList({ props }: { props: YearReceiptProps }) {
+  const groups = props.items.length >= 8 && props.items.some((item) => item.significance != null) ? groupItemsBySignificance(props.items) : [{ key: 'all', label: '', items: props.items }];
+  return (
+    <>
+      <Rule />
+      <p className="shipped-lead text-[10.5px] opacity-60" aria-hidden="true">
+        <span>ITEM</span>
+        <span className="shipped-lead-fill is-blank" />
+        <span className="shipped-item-status">STATUS</span>
+      </p>
+      <div className="mt-1">
+        {groups.map((group) => {
+          const place = logoPlacement(group.items);
+          return (
+            <div key={group.key}>
+              {group.label ? (
+                <p className="shipped-group-head">
+                  {place.headerSrc ? <ThermalMark src={place.headerSrc} className="shipped-group-mark" /> : null}
+                  <span>{group.label}</span>
+                </p>
+              ) : null}
+              <ol>
+                {group.items.map((item) => (
+                  <ItemRow key={item.key} item={item} compact={props.compact} mark={place.itemKeys.includes(item.key)} />
+                ))}
+              </ol>
+            </div>
+          );
+        })}
+      </div>
+      <Rule heavy />
+      <div className="shipped-lead items-baseline py-1 text-[13px] font-semibold">
+        <span className="shrink-0">ITEMS SHIPPED</span>
+        <span className="shipped-lead-fill" aria-hidden="true" />
+        <span className="shipped-totals-end">
+          <Tall className="text-[18px] tabular-nums">{String(props.count)}</Tall>
+          {typeof props.shipScore === 'number' ? <span className="shipped-score">SCORE {props.shipScore}</span> : null}
+        </span>
+      </div>
+      <Rule heavy />
+    </>
+  );
+}
+
+function CashierNote({ note }: { note: string }) {
+  return (
+    <section className="mt-3" aria-label="Cashier’s note">
+      <p className="text-[10.5px] opacity-60">CASHIER’S NOTE</p>
+      <p className="mt-1 text-[12.5px] leading-snug">{note}</p>
+    </section>
+  );
+}
+
+function Stamp({ number, printed, firstRun, firstFull }: { number: string; printed?: string; firstRun?: boolean; firstFull?: boolean }) {
+  const stamp = printed?.replace('T', ' ').replace(/\.\d+Z$/, ' UTC') ?? '';
+  const serial = `#${number}${firstFull ? ' FULL' : firstRun ? ' FIRST RUN' : ''}`;
+  return (
+    <div className="mt-3 text-[11.5px] tabular-nums">
+      <Line label={serial} value={stamp || '—'} />
+    </div>
+  );
+}
+
+export function YearReceipt(props: YearReceiptProps) {
+  return (
+    <article className="shipped-receipt">
+      <header className="text-center">
+        <p>
+          <Tall className="text-[15px] font-semibold">SHIPPED {props.year}</Tall>
+        </p>
+        <p className="mt-1 text-[11px] opacity-75">THE PUBLIC RECEIPT PRINTER</p>
+      </header>
+
+      <Rule />
+      <div className="space-y-0.5 text-[12px]">
+        <Line label="DATE" value={props.date} />
+        <Line label="RECEIPT" value={`#${props.number}`} />
+      </div>
+      <Rule />
+
+      <h2 className="text-center">
+        <span className="sr-only">{`${props.who}. Shipped in ${props.year}.`}</span>
+        <span aria-hidden="true">
+          <span className="shipped-inverse">SHIPPED IN {props.year}</span>
+          <span className="mt-3 block text-[11px] font-normal opacity-70">CUSTOMER</span>
+          <span className="mt-0.5 block break-words">
+            <Tall className="text-[16px] font-semibold">{props.who.toUpperCase()}</Tall>
+          </span>
+        </span>
+      </h2>
+      {props.kicker ? <p className="mt-1 text-center text-[11px] opacity-70">{props.kicker}</p> : null}
+
+      <ItemList props={props} />
+      <CashierNote note={props.note} />
+      {props.full ? (
+        <p className="mt-3 text-center text-[11px] font-semibold tracking-[0.22em]" style={{ color: '#c9a227' }}>
+          VERIFIED FULL RUN
+        </p>
+      ) : props.teaser ? (
+        <p className="mt-3 text-center text-[11.5px] opacity-70">{props.teaser}</p>
+      ) : null}
+      <Stamp number={props.number} printed={props.printedAt} firstRun={props.firstRun} firstFull={props.full} />
+
+      <SponsorBlockView block={props.sponsors} />
+
+      <footer className="mt-4 text-center text-[11px] leading-relaxed">
+        <Barcode value={props.barcode} />
+        {props.fine ? <div className="mt-3 text-[10.5px] leading-relaxed opacity-70">{props.fine}</div> : null}
+      </footer>
+    </article>
+  );
+}

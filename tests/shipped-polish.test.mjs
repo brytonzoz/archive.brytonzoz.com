@@ -1,0 +1,1810 @@
+import './resolve-ts.mjs';
+import assert from 'node:assert/strict';
+import { test } from 'node:test';
+
+const polish = await import('../worker/shipped-polish.ts');
+const changelog = await import('../worker/shipped-changelog.ts');
+const ai = await import('../worker/shipped-ai.ts');
+const repos = await import('../worker/shipped-repos.ts');
+const dates = await import('../worker/shipped-dates.ts');
+
+const found = (item) => ({
+  description: '',
+  date: '2026-03-01',
+  link: 'https://cursor.com/changelog/item',
+  source: 'changelog',
+  status: 'LAUNCHED',
+  score: 7,
+  thisYear: true,
+  ...item,
+});
+
+test('bylines, docs nav, week-of roundups, and articles about the person are junk', () => {
+  assert.equal(polish.isJunkTitle('AUTHOR : CURSOR TEAM'), true);
+  assert.equal(polish.isJunkTitle('AUTHOR : SASHA RUSH'), true);
+  assert.equal(polish.isJunkTitle('OVERVIEW'), true);
+  assert.equal(polish.isJunkTitle('PROMPTING'), true);
+  assert.equal(polish.isJunkTitle('POOL'), true);
+  assert.equal(polish.isJunkTitle('WEEK OF OCTOBER 6'), true);
+  assert.equal(polish.isJunkTitle('MICHAEL TRUELL', { who: 'Michael Truell' }), true);
+  assert.equal(polish.isJunkTitle('S JACK', { who: 'Jack Friks' }), true);
+  assert.equal(polish.isJunkTitle('THE GUY WHO MADE POST BRIDGE'), true);
+  assert.equal(polish.isJunkTitle('MELKEY MOKSYAKOV, ESTEBAN SUÁREZ'), true);
+  assert.equal(polish.isJunkTitle('KEVIN DAWKINS, JERILYN ZHENG, AND 1 OTHER'), true);
+  assert.equal(polish.isJunkTitle('API TYPESAFE-COMPAT TYPESAFE-COMPAT DECISIONS API'), true);
+  assert.equal(polish.hasMashedDuplicateTokens('API TYPESAFE-COMPAT TYPESAFE-COMPAT DECISIONS API'), true);
+  assert.equal(polish.hasMashedDuplicateTokens('GPT-6 Sol and GPT-6 Luna'), false);
+  assert.equal(polish.titleSanityOk('Protect production deployments for free on every plan'), false);
+  assert.equal(polish.titleSanityOk('Agents can now buy domains with the Vercel CLI'), false);
+  assert.equal(polish.titleSanityOk('Kevin Dawkins, Jerilyn Zheng, and 1 other'), false);
+  assert.match(polish.rewriteShipTitle('We launched AI Gateway'), /ai gateway/i);
+  assert.ok(polish.titleSanityOk(polish.rewriteShipTitle('We launched AI Gateway')));
+  assert.ok(polish.rewriteShipTitle('Agents can now buy domains with the Vercel CLI').split(/\s+/).length < 8);
+  assert.ok(polish.rewriteShipTitle('Protect production deployments for free on every plan').split(/\s+/).length < 8);
+  assert.match(polish.rewriteShipTitle('Claude Haiku 5.5 now available on AI Gateway'), /claude haiku 5\.5/i);
+  assert.match(
+    polish.rewriteShipTitle('Vercel Agent now installs private packages from npm and', 'https://vercel.com/changelog/vercel-agent'),
+    /vercel agent/i,
+  );
+  assert.equal(polish.isJunkTitle('Cursor 2.0'), false);
+});
+
+test('title cleaner extracts a short product name or drops the line', () => {
+  assert.equal(polish.cleanShipTitle('GROK 4 6'), 'Grok-4.6');
+  assert.equal(polish.cleanShipTitle('GPT-5.4 MINI ,'), 'GPT-5.4 MINI');
+  assert.equal(polish.cleanShipTitle('READ THE CHANGELOG'), '');
+  assert.equal(polish.cleanShipTitle('RESPECTIVELY.'), '');
+  assert.equal(polish.cleanShipTitle('SETTINGS BROWSER , TURN ON ENABLE FULL'), '');
+  assert.equal(polish.cleanShipTitle('CODEX APP RELEASE NOTES.'), 'CODEX APP');
+  assert.equal(polish.cleanShipTitle('ONTROL IS AVAILABLE TODAY IN THE CURSOR'), '');
+  assert.equal(polish.cleanShipTitle('CURSOR IS ROLLING OUT A NEW KIND OF'), '');
+  assert.equal(polish.cleanShipTitle('CODEX APP LAUNCHED AS A DESKTOP'), 'CODEX APP');
+  assert.equal(polish.cleanShipTitle('BOOTSTRAPPING COMPOSER WITH'), '');
+  assert.equal(polish.cleanShipTitle('IMPROVING COMPOSER THROUGH REAL-TIME'), '');
+  assert.equal(polish.cleanShipTitle('IF YOU DON’T SEE GPT-5.4 YET, UPDATE'), '');
+  assert.match(polish.cleanShipTitle('GRAPHITE IS JOINING CURSOR'), /graphite joining cursor/i);
+  assert.equal(polish.cleanShipTitle('RILLET SHIPS 3× FASTER WITH AI AGENTS'), '');
+  assert.equal(polish.cleanShipTitle('TRUSTMRR REVENUECAT INTEGRATION (API'), '');
+  assert.ok(polish.cleanShipTitle('Remote control for local agents').length <= 60);
+  assert.match(polish.cleanShipTitle('Vercel Terraform Provider now available'), /vercel terraform provider/i);
+  assert.match(polish.cleanShipTitle('Deployment Pages now display key metrics'), /deployment pages/i);
+  assert.ok(!/\bnow display\b/i.test(polish.cleanShipTitle('Deployment Pages now display key metrics')));
+  assert.ok(polish.cleanShipTitle('AWS DATABASES ARE NOW LIVE ON THE VERCEL MARKETPLACE AND V0').length <= 48);
+  assert.equal(polish.endsWithCutOffWord('Vercel Terraform Provider Now'), true);
+  assert.equal(polish.endsWithCutOffWord('Observability Dashboard for Image'), true);
+  assert.equal(polish.endsWithCutOffWord('FLUX 3 Image'), false);
+  assert.equal(polish.endsWithCutOffWord('VERCEL PLATFORM · 4 UPDATES IN SEP'), false);
+  assert.equal(polish.endsWithCutOffWord('UNLIMITED VERCEL BLOB STORES ON EVERY PLAN'), false);
+  assert.equal(polish.endsWithCutOffWord('REDUCE FUTURE DEPLOYMENT SIZE BY REMOVING UNNECESSARY BUIL'), true);
+  assert.match(polish.cleanShipTitle('3.10 JUN 30, 2026'), /cursor 3\.10/i);
+  assert.equal(polish.dateFromLabeledTitle('3.11 JUL 10, 2026', 2026), '2026-07-10');
+  assert.equal(polish.isVagueOrCutTitle('BETA AND ROLLING OUT TO ALL USERS'), true);
+  assert.equal(polish.cleanShipTitle('Introducing Codex long-running work'), 'Codex long-running work');
+  assert.equal(polish.cleanShipTitle('VISIT OUR YOUTUBE CHANNEL ↗'), '');
+  assert.equal(polish.cleanShipTitle('TRY CURSOR NOW'), '');
+  assert.equal(polish.cleanShipTitle('EXPLORE ENTERPRISE →'), '');
+  assert.equal(polish.cleanShipTitle('IES A AND MAGIC'), '');
+  assert.equal(polish.cleanShipTitle('DOWNLOAD ON THE APP STORE'), '');
+  assert.equal(polish.cleanShipTitle('24K+ GITHUB STARS'), '');
+  assert.equal(polish.cleanShipTitle('FILED UNDER: COMPANY'), '');
+  assert.match(polish.cleanShipTitle('RELEASED GPT-4O IN THE API. GPT-4O IS') || 'GPT-4O', /gpt-?4o/i);
+  assert.equal(polish.isJunkTitle('USE A WEBSITE’S TOOLS: WITH SITE'), true);
+  const cli = polish.cleanShipTitle('CODEX CLI CAN ALSO IMPORT SUPPORTED');
+  assert.ok(!cli || /^codex cli$/i.test(cli));
+  assert.equal(polish.cleanShipTitle('USE WINDOWS APPS AND CONTROL CODEX'), '');
+  assert.match(polish.cleanShipTitle('IN THE CHATGPT MOBILE APP'), /chatgpt mobile app/i);
+  assert.equal(polish.cleanShipTitle('LINES OF CODE IN TWO WEEKS WITH CURSOR'), '');
+  assert.equal(polish.cleanShipTitle('START FROM SCRATCH, WITHOUT A REPO'), '');
+  assert.equal(polish.cleanShipTitle('CURSOR BUILT A FLEET OF SECURITY'), '');
+  assert.match(polish.cleanShipTitle('CURSOR ROUTER WORKS'), /cursor router/i);
+  assert.equal(polish.cleanShipTitle('GPT-5'), '');
+  assert.equal(polish.cleanShipTitle('GPT-5.4 MINI'), 'GPT-5.4 MINI');
+  assert.equal(polish.cleanShipTitle('RUN CODEX NATIVELY ON WINDOWS'), '');
+  assert.equal(polish.cleanShipTitle('CURSOR ANNOUNCES MAJOR UPDATE TO AI'), '');
+  assert.match(polish.cleanShipTitle('A TECHNICAL REPORT ON COMPOSER 2'), /composer 2/i);
+  assert.equal(polish.cleanShipTitle('JOINING SPACEX'), '');
+  assert.equal(polish.cleanShipTitle('MY MACHINES CONNECTS A SINGLE LAPTOP'), '');
+  assert.equal(polish.cleanShipTitle('AND PULLFROG'), '');
+  assert.match(polish.cleanShipTitle('WINDOWS. IN THE CHATGPT MOBILE APP'), /chatgpt mobile app/i);
+  assert.equal(polish.cleanShipTitle('THIS.CLASSLIST.REMOVE'), '');
+  assert.equal(polish.isProductNounPhrase('ChatGPT Mobile App'), true);
+  assert.equal(polish.isProductNounPhrase('USE WINDOWS APPS'), false);
+});
+
+test('undated crumbs sort last and stay under a quarter of a dated tape', () => {
+  const dated = ['Alpha', 'Beta', 'Gamma'].map((name, i) =>
+    found({ name, date: `2026-0${i + 1}-01`, source: 'github', link: `https://github.com/ada/${name.toLowerCase()}` }),
+  );
+  const crumbs = Array.from({ length: 10 }, (_, i) =>
+    found({ name: `Crumb ${i}`, date: null, source: 'site', link: `https://ada.dev/#c${i}`, thisYear: true }),
+  );
+  const inherited = polish.inheritDates([
+    found({ name: 'Post Bridge CLI', date: null, source: 'site', link: 'https://jackfriks.com/#post-bridge' }),
+    found({ name: 'postbridge-cli', date: '2026-09-09', source: 'github', link: 'https://github.com/jackfriks/postbridge-cli' }),
+  ]);
+  assert.equal(inherited.find((item) => /post bridge/i.test(item.name))?.date, '2026-09-09');
+  const capped = polish.capUndated([...dated, ...crumbs]);
+  assert.equal(capped.filter((item) => item.date).length, 3);
+  assert.equal(capped.filter((item) => !item.date).length, 1);
+  assert.ok(capped.slice(0, 3).every((item) => item.date));
+  const onlyUndated = polish.capUndated(crumbs);
+  assert.equal(onlyUndated.length, 10);
+});
+
+test('same article href collapses to the best title; changelog index cards stay distinct', () => {
+  const article = polish.collapseSameHref([
+    found({ name: 'Origin CLI', link: 'https://cursor.com/blog/origin-cli' }),
+    found({ name: 'Origin CLI is available today in the Cursor', link: 'https://cursor.com/blog/origin-cli#section' }),
+  ]);
+  assert.equal(article.length, 1);
+  const index = polish.collapseSameHref([
+    found({ name: 'Codex CLI 0.1', date: '2026-02-01', link: 'https://developers.openai.com/codex/changelog' }),
+    found({ name: 'Codex CLI 0.2', date: '2026-02-02', link: 'https://developers.openai.com/codex/changelog' }),
+  ]);
+  assert.equal(index.length, 2);
+  const journal = polish.collapseSameHref([
+    found({ name: 'hotelist.com', link: 'https://levels.io/', source: 'site' }),
+    found({ name: 'infiniteslop.ai', link: 'https://levels.io/', source: 'site' }),
+    found({ name: 'Photo AI feature', link: 'https://levels.io/#photo-ai', source: 'site' }),
+  ]);
+  assert.equal(journal.length, 3);
+  assert.equal(polish.isShipListHref('https://levels.io/projects'), true);
+  assert.equal(polish.isShipListHref('https://levels.io/'), true);
+});
+
+test('indie polish drops are labeled per item', () => {
+  const drops = [];
+  const kept = polish.polishCandidates(
+    [
+      found({ name: 'hotelist.com', date: '2026-10-05', source: 'site', link: 'https://levels.io/#hotelist' }),
+      found({ name: 'GPT-3.5 turbo leftover', date: '2026-01-01', source: 'site', link: 'https://levels.io/#old' }),
+      found({ name: 'READ THE CHANGELOG', date: '2026-02-01', source: 'site', link: 'https://levels.io/#read' }),
+    ],
+    { year: 2026, who: 'levelsio', handle: 'levelsio', onDrop: (drop) => drops.push(drop) },
+  );
+  assert.ok(kept.some((item) => /hotelist/i.test(item.name)));
+  assert.ok(drops.some((drop) => drop.reason === 'year-other' || drop.reason === 'junk-title' || drop.reason === 'title-empty'));
+});
+
+test('point releases roll up to one line per product per month unless named', () => {
+  const items = Array.from({ length: 26 }, (_, i) =>
+    found({
+      name: `Codex app 26.${String(203 + i)}`,
+      date: `2026-02-${String((i % 27) + 1).padStart(2, '0')}`,
+      link: `https://developers.openai.com/codex/changelog#${203 + i}`,
+    }),
+  );
+  const rolled = polish.rollupVersions(items);
+  assert.equal(rolled.length, 1);
+  assert.match(rolled[0].name, /Codex app · 26 updates in Feb/i);
+  const named = polish.rollupVersions([
+    found({ name: 'Codex app 26.203 long-running agents', date: '2026-02-01' }),
+    found({ name: 'Codex app 26.204', date: '2026-02-02' }),
+    found({ name: 'Codex app 26.205', date: '2026-02-03' }),
+  ]);
+  assert.ok(named.some((item) => /long-running/i.test(item.name)));
+  const commas = polish.rollupVersions([
+    found({ name: 'CODEX APP 26.318, 26.319', date: '2026-03-19' }),
+    found({ name: 'CODEX APP 26.325, 26.331, 26.401', date: '2026-04-01' }),
+  ]);
+  assert.equal(commas.length, 2);
+  assert.match(commas.find((item) => item.date?.startsWith('2026-03'))?.name ?? '', /Codex app · 2 updates in Mar/i);
+  assert.match(commas.find((item) => item.date?.startsWith('2026-04'))?.name ?? '', /Codex app · 3 updates in Apr/i);
+});
+
+test('2026 dates are required for changelog cards and older models are dropped', () => {
+  const items = polish.polishCandidates(
+    [
+      found({ name: 'GPT-3.5-turbo-0125', date: '2026-10-01', link: 'https://openai.com/blog/gpt-3-5' }),
+      found({ name: 'embedding v3', date: '2026-10-01', link: 'https://openai.com/blog/embeddings' }),
+      found({ name: 'Old launch', date: '2024-11-20', link: 'https://openai.com/blog/old' }),
+      found({ name: 'ADDED NEW MODELS FOR O1', date: '2026-12-17', link: 'https://developers.openai.com/codex/o1' }),
+      found({ name: 'Codex app for macOS', date: '2026-02-14', link: 'https://openai.com/codex' }),
+      found({ name: 'AUTHOR : CURSOR TEAM', date: '2026-08-13', link: 'https://cursor.com/blog/author' }),
+    ],
+    { year: 2026, who: 'Tibo', affiliation: { name: 'Tibo', company: 'OpenAI', role: 'lead', product: 'Codex', companyX: null, companyGithub: null, companySite: null, typedCompany: true } },
+  );
+  assert.equal(items.length, 1);
+  assert.match(items[0].name, /codex app/i);
+  assert.equal(items[0].date, '2026-02-14');
+});
+
+test('source lines are via Brand · host with no sitemap metadata', () => {
+  const [item] = polish.polishCandidates(
+    [
+      found({
+        name: 'Cursor 2',
+        description: 'Sitemap lastmod 2026-10-10',
+        date: '2026-09-10',
+        link: 'https://cursor.com/changelog',
+        via: 'via Anysphere · cursor.com',
+      }),
+    ],
+    { year: 2026, who: 'Michael Truell', affiliation: { name: 'Michael Truell', company: 'Anysphere (Cursor)', role: 'ceo', product: null, companyX: null, companyGithub: null, companySite: 'https://cursor.com', typedCompany: false } },
+  );
+  assert.equal(item.description, '');
+  assert.equal(item.via, 'via Cursor · cursor.com');
+  assert.equal(polish.sourceVia({ name: 'Cursor 2', date: '2026-10-10', link: 'https://cursor.com/changelog' }, { name: 'Michael Truell', company: 'Anysphere (Cursor)', role: 'ceo', product: null, companyX: null, companyGithub: null, companySite: null, typedCompany: false }), 'via Cursor · cursor.com');
+  assert.equal(polish.sourceVia({ name: 'Codex', date: '2026-02-01', link: 'https://learn.chatgpt.com/codex', via: 'via open ai · learn.chatgpt.com' }, { name: 'Tibo', company: 'open ai', role: 'lead', product: 'Codex', companyX: null, companyGithub: null, companySite: null, typedCompany: true }), 'via OpenAI · Codex');
+  assert.equal(polish.sourceVia({ name: 'PhotoAI', date: '2026-03-01', link: 'https://github.com/levelsio/photo-ai', source: 'github' }, { name: 'levelsio', company: 'Readmake', role: 'founder', product: null, companyX: null, companyGithub: null, companySite: null, typedCompany: false }), 'via github.com');
+  assert.equal(polish.prettyBrand('vercel'), 'Vercel');
+  assert.equal(polish.prettyBrand('open ai'), 'OpenAI');
+  assert.equal(polish.cleanStatus('LAUNCHED~'), 'LAUNCHED');
+  assert.equal(polish.cleanDescription('learn.chatgpt.com'), '');
+  assert.equal(polish.cleanDescription('ChatGPT for Education opens in a new window.'), '');
+  assert.equal(polish.cleanDescription('p align="center" h1 TypeScript loader'), '');
+  assert.equal(polish.cleanDescription('picture source media="(prefers-color-scheme: dark)" srcset=" 25px" alt="G'), '');
+  const clipped = polish.cleanDescription('Standalone TypeScript loader for Node.js from the Nub project — TypeScript, JSX, tsconfig paths, and data-format imports through a native transform');
+  assert.ok(clipped.length <= 60, clipped);
+  assert.doesNotMatch(clipped, /tr$/);
+  assert.equal(
+    polish.cleanDescription('1.3.0 (2026-01-30) ### Features update tar version ([#128](https://github.com/vercel/fun/pull/128))'),
+    'update tar version',
+  );
+  assert.equal(polish.cleanDescription('Patch Changes - Updated dependencies'), '');
+  assert.equal(polish.cleanDescription('- Fixed the empty tweet state on the profile'), 'Fixed the empty tweet state on the profile');
+  assert.equal(
+    polish.cleanDescription("What's Changed chore: Migrate suspense related tests to e2e"),
+    'Migrate suspense related tests to e2e',
+  );
+  assert.ok((polish.cleanDescription('- Fixed the empty tweet state on the profile') || '').length <= 60);
+  assert.equal(polish.cleanDescription('Updated dependencies'), '');
+  assert.equal(polish.cleanDescription('To install Bun v1.3.14 Windows: bash powershell'), '');
+  assert.equal(polish.cleanDescription('96e1bb1: Promote @vercel/passport to stable'), '');
+  assert.equal(polish.cleanDescription('Breaking changes - LLVM is the only code generation'), '');
+  assert.equal(
+    polish.cleanDescription('allow declarations in the template Patch Changes'),
+    'allow declarations',
+  );
+  assert.equal(polish.cleanDescription("See What's new in V5 for an overview of changes between"), '');
+  assert.equal(
+    polish.cleanDescription('XDR Boost is an open source alternative to Vivid without'),
+    'XDR Boost is an open source alternative to Vivid',
+  );
+  assert.equal(polish.looksIncompleteSubline('XDR Boost is an open source alternative to Vivid without'), true);
+  assert.equal(polish.storedSublineLooksJunk('96e1bb1: Promote @vercel/passport to stable'), true);
+  assert.equal(polish.storedSublineLooksJunk('Breaking changes - LLVM is the only code generation'), true);
+  assert.equal(polish.storedSublineLooksJunk('To install Bun v1.3.14 Windows: bash powershell'), true);
+  assert.equal(polish.storedSublineLooksJunk('Fixed the empty tweet state on the profile'), false);
+  assert.equal(
+    polish.receiptItemSublineIsClean({
+      name: 'PROFILE',
+      description: 'Fixed the empty tweet state on the profile',
+      source: 'github',
+    }),
+    true,
+  );
+  assert.equal(
+    polish.receiptItemSublineIsClean({
+      name: 'PASSPORT',
+      description: '96e1bb1: Promote @vercel/passport to stable',
+      source: 'github',
+    }),
+    false,
+  );
+  assert.equal(
+    polish.printedDescription({
+      name: 'BUN · 3 RELEASES IN JAN',
+      description: '3 Bun releases in JAN',
+      source: 'github',
+    }),
+    '',
+  );
+  assert.equal(polish.isUpdatedDependenciesOnly({ name: 'Updated dependencies', description: '' }), true);
+  assert.equal(polish.isUpdatedDependenciesOnly({ name: 'FUN 1.3', description: 'Patch Changes - Updated dependencies' }), false);
+  assert.equal(polish.isUpdatedDependenciesOnly({ name: 'FUN 1.3', description: 'update tar version' }), false);
+  assert.equal(polish.otherYearProduct('FIRST HOMEPAGE IN 1996', 2026), true);
+  assert.equal(polish.otherYearProduct('HOMEPAGE FOR MY BROTHER JEROEN IN 1997', 2026), true);
+  assert.equal(polish.otherYearProduct('hotelist.com', 2026), false);
+});
+
+test('platform npm packages roll into the parent name', () => {
+  const rolled = polish.rollupPlatformPackages([
+    found({ name: '@tsc-rs/linux-x64', source: 'npm', link: 'https://www.npmjs.com/package/@tsc-rs/linux-x64' }),
+    found({ name: '@tsc-rs/darwin-arm64', source: 'npm', link: 'https://www.npmjs.com/package/@tsc-rs/darwin-arm64' }),
+    found({ name: '@nubjs/loader-win32-arm64', source: 'npm', link: 'https://www.npmjs.com/package/@nubjs/loader-win32-arm64' }),
+    found({ name: '@nubjs/loader-linux-x64-musl', source: 'npm', link: 'https://www.npmjs.com/package/@nubjs/loader-linux-x64-musl' }),
+    found({ name: '@nubjs/types', source: 'npm', link: 'https://www.npmjs.com/package/@nubjs/types' }),
+    found({ name: '@nubjs/nub', source: 'npm', link: 'https://www.npmjs.com/package/@nubjs/nub' }),
+    found({ name: 'fs2-cli-linux-x64-musl', source: 'npm', link: 'https://www.npmjs.com/package/fs2-cli-linux-x64-musl' }),
+  ]);
+  const names = rolled.map((item) => item.name.toLowerCase());
+  assert.ok(names.some((n) => n === 'tsc-rs'));
+  assert.ok(names.some((n) => n === 'fs2-cli'));
+  assert.equal(names.filter((n) => n === 'nub' || n === 'nubjs').length, 1);
+  assert.equal(names.some((n) => /linux|darwin|win32|types|musl/.test(n)), false);
+});
+
+test('scrape-dated changelog cards are dropped', () => {
+  const today = new Date().toISOString().slice(0, 10);
+  const items = polish.polishCandidates(
+    [
+      found({ name: 'Visit our YouTube channel', date: '2026-06-01', link: 'https://cursor.com/youtube' }),
+      found({ name: 'Cursor 2', date: today, link: 'https://cursor.com/changelog/today' }),
+      found({ name: 'Agents Window', date: '2026-04-02', link: 'https://cursor.com/changelog/agents' }),
+      found({ name: 'Codex App', date: '2026-02-02', link: 'https://developers.openai.com/codex/app', source: 'changelog', thisYear: true }),
+      found({ name: 'Sora', date: null, link: 'https://openai.com/index/sora', source: 'changelog', thisYear: true }),
+      found({ name: 'Vicent Martí · 27M', date: '2026-08-14', link: 'https://cursor.com/blog/vicent' }),
+      found({ name: 'UNDER: COMPANY', date: '2026-07-06', link: 'https://cursor.com/blog/firetiger' }),
+      found({ name: 'CURSOR WEB ·', date: '2026-09-28', link: 'https://cursor.com/docs/release-notes' }),
+      found({ name: 'PULL REQUESTS', date: '2026-10-01', link: 'https://cursor.com/docs/release-notes' }),
+    ],
+    { year: 2026, who: 'Michael Truell' },
+  );
+  assert.equal(items.some((item) => /youtube|visit our/i.test(item.name)), false);
+  assert.equal(items.some((item) => item.date === today), false);
+  assert.ok(items.some((item) => /agents window/i.test(item.name)));
+  assert.ok(items.some((item) => /codex app/i.test(item.name) && item.date === '2026-02-02'));
+  assert.equal(items.some((item) => /^sora$/i.test(item.name)), false);
+  assert.equal(items.some((item) => /vicent|under:|cursor web\s*·|pull requests/i.test(item.name)), false);
+});
+
+test('notes must use the final post-filter count', () => {
+  assert.equal(polish.noteCountMismatch('Six printed items, one of them a drone simulator.', 5), true);
+  assert.equal(polish.noteCountMismatch('Twenty-three entries, most of them Codex.', 19), true);
+  assert.equal(polish.noteCountMismatch('Five printed items, one of them a drone simulator.', 5), false);
+  assert.equal(polish.noteCountMismatch("Tibo's OpenAI crew put 37 public ships on the year.", 162), true);
+  assert.equal(polish.noteCountMismatch("Tibo's OpenAI crew put 162 public ships on the year.", 162), false);
+  assert.equal(polish.noteCountMismatch('OpenAI shipped 40 public updates to keep it moving.', 54), true);
+  assert.equal(polish.noteCountMismatch('vercel put 37 items on the year.', 146), true);
+  const items = Array.from({ length: 12 }, (_, i) => ({
+    name: `SHIP ${i}`,
+    description: '',
+    date: `2026-03-${String(i + 1).padStart(2, '0')}`,
+    status: 'LAUNCHED',
+    link: `https://openai.com/p/${i}`,
+    icon: null,
+    source: 'changelog',
+  }));
+  const note = ai.groundedNote(items, 0, 'Tibo', [], { role: 'ceo', company: 'OpenAI', who: 'Tibo' });
+  assert.match(note, /Ship/i);
+  assert.doesNotMatch(note, /\b37\b|\b12 public\b|\blines\b|does one job|the pair is|opens on/i);
+  assert.equal(ai.noteFailsVoice(note), false);
+  assert.equal(polish.noteCountMismatch(note, 12), false);
+});
+
+test('changelog rows no longer print sitemap lastmod and docs nav slugs stay out of sitemaps', () => {
+  const xml = `<?xml version="1.0"?><urlset>
+    <url><loc>https://cursor.com/docs/agent/overview</loc><lastmod>2026-10-09</lastmod></url>
+    <url><loc>https://cursor.com/changelog/cursor-2</loc><lastmod>2026-10-10</lastmod></url>
+  </urlset>`;
+  const items = changelog.itemsFromSitemap(xml, 2026);
+  assert.equal(items.some((item) => /overview/i.test(item.name)), false);
+  assert.ok(items.some((item) => /cursor 2/i.test(item.name)));
+  const cursor2 = items.find((item) => /cursor 2/i.test(item.name));
+  assert.equal(cursor2?.date, null);
+  assert.equal(cursor2?.thisYear, true);
+  assert.doesNotMatch(cursor2?.description ?? '', /sitemap lastmod/i);
+});
+
+test('harvest drops other-year changelog dates and sorts remaining lines chronologically', () => {
+  const gathered = {
+    found: [
+      found({ name: 'Later', date: '2026-09-01', link: 'https://openai.com/later' }),
+      found({ name: 'Earlier', date: '2026-02-01', link: 'https://openai.com/earlier' }),
+      found({ name: 'Old', date: '2024-11-20', link: 'https://openai.com/old' }),
+    ],
+    web: [],
+    pages: [],
+    site: null,
+    profile: { name: 'Tibo', bio: '', site: null, x: null, github: null, affiliation: { name: 'Tibo', company: 'OpenAI', role: 'ceo', product: null, companyX: null, companyGithub: null, companySite: null, typedCompany: true } },
+    ran: [],
+    failed: [],
+    stats: [],
+  };
+  const items = ai.harvestItems(gathered, 2026);
+  assert.deepEqual(items.map((item) => item.name), ['EARLIER', 'LATER']);
+  const demo = ai.demoReceipt(gathered, 2026, 1);
+  assert.equal(demo.items.length, 2);
+  assert.doesNotMatch(demo.note, /\b37\b|\b3 public ships\b/i);
+});
+
+test('flagship company launches survive the title gate with a logged keep', () => {
+  const items = polish.polishCandidates(
+    [
+      found({ name: 'Meet the new Cursor', date: '2026-04-02', link: 'https://cursor.com/blog/cursor-3' }),
+      found({ name: 'Introducing Composer 2', date: '2026-03-19', link: 'https://cursor.com/blog/composer-2' }),
+      found({ name: 'A technical report on Composer 2', date: '2026-03-27', link: 'https://cursor.com/blog/composer-2-technical-report' }),
+      found({ name: 'Graphite is joining Cursor', date: '2025-12-19', link: 'https://cursor.com/blog/graphite' }),
+      found({ name: 'Graphite joining Cursor', date: '2026-05-22', link: 'https://cursor.com/blog/graphite' }),
+      found({ name: 'Bugbot is now over 3x faster, 22% cheaper, and finds 10% more bugs', date: '2026-06-10', link: 'https://cursor.com/changelog/bugbot-updates-june-2026' }),
+      found({ name: 'ORIGIN · SEP 14, 2026', date: '2026-09-14', link: 'https://cursor.com/changelog/origin' }),
+      found({ name: 'CURSOR WEB · CLOUD AGENTS · SEP 14', date: '2026-09-14', link: 'https://cursor.com/changelog/cursor-web' }),
+      found({ name: 'Introducing Grok 4.6', date: '2026-08-12', link: 'https://cursor.com/blog/grok-4-6' }),
+      found({ name: 'Introducing Grok 4.7', date: '2026-09-21', link: 'https://cursor.com/blog/grok-4-7' }),
+    ],
+    { year: 2026, who: 'Michael Truell', affiliation: { name: 'Michael Truell', company: 'Cursor', role: 'ceo', product: null, companyX: null, companyGithub: null, companySite: 'https://cursor.com', typedCompany: false } },
+  );
+  const names = items.map((item) => item.name);
+  assert.ok(names.some((name) => /cursor 3/i.test(name)), JSON.stringify(names));
+  assert.ok(names.some((name) => /composer 2/i.test(name)), JSON.stringify(names));
+  assert.equal(items.find((item) => /composer 2/i.test(item.name))?.date, '2026-03-19');
+  assert.equal(names.filter((name) => /graphite/i.test(name)).length, 0, JSON.stringify(names));
+  assert.ok(names.some((name) => /^bugbot$/i.test(name)), JSON.stringify(names));
+  assert.ok(names.some((name) => /^origin$/i.test(name)), JSON.stringify(names));
+  assert.ok(names.some((name) => /cursor web/i.test(name) && !/sep/i.test(name)), JSON.stringify(names));
+  assert.equal(names.filter((name) => /grok/i.test(name)).length, 0);
+  assert.ok(names.some((name) => /new models in cursor/i.test(name)), JSON.stringify(names));
+  const harvested = ai.harvestItems(
+    {
+      found: items,
+      web: [],
+      pages: [],
+      site: null,
+      profile: { name: 'Michael Truell', bio: '', site: null, x: null, github: 'truell20', affiliation: { name: 'Michael Truell', company: 'Cursor', role: 'ceo', product: null, companyX: null, companyGithub: null, companySite: 'https://cursor.com', typedCompany: false } },
+      ran: [],
+      failed: [],
+      stats: [],
+    },
+    2026,
+  );
+  const tape = harvested.map((item) => item.name);
+  assert.ok(tape.some((name) => /CURSOR 3/i.test(name)), JSON.stringify(tape));
+  assert.ok(tape.some((name) => /COMPOSER 2/i.test(name)), JSON.stringify(tape));
+  assert.equal(tape.filter((name) => /GRAPHITE/i.test(name)).length, 0, JSON.stringify(tape));
+  assert.ok(tape.some((name) => /BUGBOT/i.test(name)), JSON.stringify(tape));
+});
+
+test('repro bench demo and profile repos are not ships; @shoojs rolls into SHOO', () => {
+  assert.equal(repos.isJunkRepoName('nextjs-node-options-repro'), true);
+  assert.equal(repos.isJunkRepoName('remix-gvs-repro'), true);
+  assert.equal(repos.isJunkRepoName('hono-response-copy-benchmark'), true);
+  assert.equal(repos.isJunkRepoName('shoo-vite-demo'), true);
+  assert.equal(repos.isJunkRepoName('t3dotgg', 't3dotgg'), true);
+  assert.equal(repos.isJunkRepoName('T3 - THEO', 't3dotgg', 'Theo'), true);
+  assert.equal(repos.isJunkRepoName('yes'), true);
+  assert.equal(repos.isJunkProductName('YES'), true);
+  assert.equal(repos.isJunkProductName('t3dotgg', 't3dotgg'), true);
+  assert.equal(repos.isJunkProductName('@zod/mini', 'colinhacks'), false);
+  assert.equal(repos.isShipRepo({ name: 'zod', description: 'TypeScript-first schema validation', stars: 30000, homepage: 'https://zod.dev' }, 'colinhacks'), true);
+  assert.equal(repos.isShipRepo({ name: 'bun-workspaces', description: 'wip', stars: 2, homepage: null }, 'colinhacks'), false);
+  assert.equal(repos.isShipRepo({ name: 'turbopack-nested-namespace', description: '', stars: 1, homepage: null }, 'colinhacks'), false);
+  const rolled = polish.rollupPlatformPackages([
+    found({ name: '@shoojs/core', source: 'npm', link: 'https://www.npmjs.com/package/@shoojs/core' }),
+    found({ name: '@shoojs/vite', source: 'npm', link: 'https://www.npmjs.com/package/@shoojs/vite' }),
+  ]);
+  assert.equal(rolled.length, 1);
+  assert.equal(rolled[0].name, 'SHOO');
+  assert.equal(repos.isKnownPackageFamily('@shoojs/core'), true);
+  assert.equal(repos.isKnownPackageFamily('shoo'), true);
+  assert.equal(repos.isShipRepo({ name: '@shoojs/core', description: '', stars: 0, homepage: null }, 't3dotgg'), true);
+});
+
+test('owned pin dates keep 2026 first launches and drop pre-2026 evidence', () => {
+  assert.equal(dates.parseCdxTimestamp([['timestamp'], ['20260315120000']]), '2026-03-15');
+  assert.equal(dates.parseCdxTimestamp([['timestamp'], ['20240315120000']]), '2024-03-15');
+  assert.equal(dates.parseRdapRegistration({ events: [{ eventAction: 'registration', eventDate: '2026-02-01T00:00:00Z' }] }), '2026-02-01');
+  assert.equal(dates.parseCopyrightYear('© 2024 Jack Friks'), 2024);
+  assert.equal(dates.parseCopyrightYear('Copyright 2026'), 2026);
+  assert.equal(dates.parseAppStoreDate('"datePublished":"2026-03-11T00:00:00Z"'), '2026-03-11');
+  assert.equal(dates.parseProductHuntDate('"launchedAt":"2026-05-09T12:00:00Z"'), '2026-05-09');
+  assert.equal(dates.parseGithubCreated({ created_at: '2026-02-01T00:00:00Z' }), '2026-02-01');
+  const keep = dates.verdictFromEvidence(2026, [{ source: 'archive.org', date: '2026-04-12' }]);
+  assert.equal(keep.drop, false);
+  assert.equal(keep.date, '2026-04-12');
+  const drop = dates.verdictFromEvidence(2026, [{ source: 'archive.org', date: '2024-09-11' }, { source: 'rdap', date: '2024-09-08' }]);
+  assert.equal(drop.drop, true);
+  assert.equal(drop.reason, 'pre-2026');
+  const unknown = dates.verdictFromEvidence(2026, []);
+  assert.equal(unknown.drop, false);
+  assert.equal(unknown.date, null);
+  const html = 'https://www.lovelee-app.com/ https://ship-or-die.com https://post-bridge.com';
+  assert.ok(dates.urlsFromPageText(html).some((url) => /lovelee-app/.test(url)));
+  const lovelee = dates.productUrlsForPin({ name: 'lovelee' }, { pageText: html });
+  assert.ok(lovelee.some((url) => /lovelee-app/.test(url)), JSON.stringify(lovelee));
+  const wacko = dates.productUrlsForPin({ name: 'wacko' }, { pageText: 'no product url here' });
+  assert.equal(wacko.some((url) => /wacko\.com/.test(url)), false);
+  const shipGuesses = dates.datingHostGuesses('SHIP OR DIE');
+  assert.ok(shipGuesses.some((url) => /ship-or-die\.com/.test(url)), JSON.stringify(shipGuesses));
+  assert.equal(shipGuesses.some((url) => /shipordie\.com/.test(url)), false);
+  const bridgeGuesses = dates.datingHostGuesses('POST BRIDGE');
+  assert.ok(bridgeGuesses.some((url) => /post-bridge\.com/.test(url)), JSON.stringify(bridgeGuesses));
+  assert.equal(bridgeGuesses.some((url) => /postbridge\.com/.test(url)), false);
+  const shipUrls = dates.productUrlsForPin({ name: 'SHIP OR DIE' }, {});
+  assert.ok(shipUrls.some((url) => /ship-or-die\.com/.test(url)), JSON.stringify(shipUrls));
+  assert.equal(shipUrls.some((url) => /shipordie\.com/.test(url)), false);
+  const ownedBridge = dates.productUrlsForPin(
+    { name: 'POST BRIDGE', link: 'https://www.jackfriks.com/#postbridge' },
+    { owner: { name: 'Jack Friks', site: 'https://jackfriks.com', sites: ['https://jackfriks.com', 'https://post-bridge.com'] } },
+  );
+  assert.ok(ownedBridge.some((url) => /post-bridge\.com/.test(url)), JSON.stringify(ownedBridge));
+  assert.equal(dates.dropSameNameLeftovers([{ name: 'POST BRIDGE', source: 'npm' }], ['POST BRIDGE']).items.length, 0);
+  const leftover = dates.dropSameNameLeftovers(
+    [
+      { name: 'POST BRIDGE', source: 'npm', date: '2026-09-09' },
+      { name: 'POSTBRIDGE-CLI', source: 'npm', date: '2026-09-09' },
+      { name: 'SHIP OR DIE', source: 'site', date: '2026-06-09' },
+      { name: 'POST BRIDGE CHATGPT PLUGIN', source: 'web', date: '2026-09-11' },
+    ],
+    ['Post Bridge'],
+  );
+  assert.deepEqual(
+    leftover.items.map((item) => item.name),
+    ['POSTBRIDGE-CLI', 'SHIP OR DIE', 'POST BRIDGE CHATGPT PLUGIN'],
+  );
+  assert.equal(leftover.drops.length, 1);
+  assert.equal(leftover.drops[0].name, 'POST BRIDGE');
+  assert.equal(leftover.drops[0].reason, 'same-name-pre-2026');
+});
+
+test('undated sitemap flagships survive harvest (the gate that dropped Cursor 3)', () => {
+  const gathered = {
+    found: [
+      found({ name: 'cursor 3', date: null, link: 'https://cursor.com/blog/cursor-3', thisYear: true }),
+      found({ name: 'composer 2', date: null, link: 'https://cursor.com/blog/composer-2', thisYear: true }),
+      found({ name: 'graphite', date: null, link: 'https://cursor.com/blog/graphite', thisYear: true }),
+      found({ name: 'bugbot updates june 2026', date: null, link: 'https://cursor.com/blog/bugbot-updates-june-2026', thisYear: true }),
+    ],
+    web: [],
+    pages: [],
+    site: null,
+    profile: { name: 'Michael Truell', bio: '', site: null, x: null, github: 'truell20', affiliation: { name: 'Michael Truell', company: 'Cursor', role: 'ceo', product: null, companyX: null, companyGithub: null, companySite: 'https://cursor.com', typedCompany: false } },
+    ran: [],
+    failed: [],
+    stats: [],
+  };
+  const tape = ai.harvestItems(gathered, 2026).map((item) => item.name);
+  assert.ok(tape.some((name) => /CURSOR 3/i.test(name)), JSON.stringify(tape));
+  assert.ok(tape.some((name) => /COMPOSER 2/i.test(name)), JSON.stringify(tape));
+  assert.equal(tape.filter((name) => /GRAPHITE/i.test(name)).length, 0, JSON.stringify(tape));
+  assert.ok(tape.some((name) => /BUGBOT/i.test(name)), JSON.stringify(tape));
+});
+
+test('undated Vercel Agent and AI Gateway survive polish and the cheap cap', () => {
+  const vercelUndated = polish.polishCandidates(
+    [
+      found({ name: 'Vercel Agent', date: '2026-09-30', source: 'changelog', link: 'https://vercel.com/changelog/vercel-agent' }),
+      found({ name: 'AI Gateway', date: '2026-04-01', source: 'changelog', link: 'https://vercel.com/changelog/ai-gateway' }),
+      found({ name: 'NEXT.JS 16.4', date: '2026-04-01', source: 'changelog', link: 'https://vercel.com/changelog/next-16-4' }),
+    ],
+    {
+      year: 2026,
+      who: 'Guillermo Rauch',
+      affiliation: {
+        name: 'Guillermo Rauch',
+        company: 'Vercel',
+        role: 'ceo',
+        product: null,
+        companyX: null,
+        companyGithub: null,
+        companySite: 'https://vercel.com',
+        typedCompany: true,
+      },
+    },
+  );
+  const vercelNames = vercelUndated.map((item) => item.name);
+  assert.ok(vercelNames.some((name) => /vercel agent/i.test(name)), JSON.stringify(vercelNames));
+  assert.ok(vercelNames.some((name) => /ai gateway/i.test(name)), JSON.stringify(vercelNames));
+  const crumbs = Array.from({ length: 160 }, (_, i) =>
+    found({
+      name: `crumb-${i}`,
+      date: `2026-0${(i % 9) + 1}-01`,
+      source: 'npm',
+      link: `https://www.npmjs.com/package/crumb-${i}`,
+    }),
+  );
+  const cheap = polish.cheapHardFilter(
+    [
+      found({ name: 'Vercel Agent', date: null, source: 'changelog', link: 'https://vercel.com/changelog/vercel-agent', thisYear: true }),
+      found({ name: 'AI Gateway', date: null, source: 'changelog', link: 'https://vercel.com/changelog/ai-gateway', thisYear: true }),
+      ...crumbs,
+    ],
+    2026,
+  );
+  const cheapNames = cheap.map((item) => item.name);
+  assert.ok(cheapNames.some((name) => /vercel agent/i.test(name)), JSON.stringify(cheapNames.slice(0, 8)));
+  assert.ok(cheapNames.some((name) => /ai gateway/i.test(name)), JSON.stringify(cheapNames.slice(0, 8)));
+});
+
+test('versioned releases always roll into the monthly line; flagships keep real dates', () => {
+  const rolled = polish.rollupVersions([
+    found({ name: 'CURSOR SDK BRIDGE V1.0.26', date: '2026-07-30' }),
+    found({ name: 'CURSOR SDK BRIDGE V1.0.31', date: '2026-09-03' }),
+    found({ name: 'CURSOR SDK BRIDGE V1.0.32', date: '2026-09-22' }),
+    found({ name: 'CURSOR SDK BRIDGE · 4 UPDATES IN AUG', date: '2026-08-27' }),
+    found({ name: 'CURSOR V2026.09.15', date: '2026-09-16' }),
+    found({ name: 'CURSOR 1.9.0', date: '2026-09-17' }),
+    found({ name: 'CURSOR 1.12.0', date: '2026-10-01' }),
+    found({ name: 'CURSOR 3', date: '2026-09-15', link: 'https://cursor.com/blog/cursor-3' }),
+  ]);
+  const names = rolled.map((item) => item.name);
+  assert.equal(names.some((name) => /v1\.0\.|v2026|1\.9\.0|1\.12\.0/i.test(name)), false, JSON.stringify(names));
+  assert.ok(names.some((name) => /^cursor sdk bridge$/i.test(name)), JSON.stringify(names));
+  assert.equal(names.some((name) => /1 update in jul/i.test(name)), false, JSON.stringify(names));
+  assert.ok(names.some((name) => /cursor sdk bridge · 4 updates in aug/i.test(name)), JSON.stringify(names));
+  assert.ok(names.some((name) => /cursor sdk bridge · 2 updates in sep/i.test(name)), JSON.stringify(names));
+  assert.ok(names.some((name) => /cursor · \d+ updates? in sep/i.test(name)), JSON.stringify(names));
+  assert.ok(names.some((name) => /^cursor 3$/i.test(name)), JSON.stringify(names));
+});
+
+test('pricing, token-efficiency, person names, and code identifiers never print', () => {
+  assert.equal(polish.isPricingOrMetricNote('TEAMS PRICING JUNE 2026'), true);
+  assert.equal(polish.isPricingOrMetricNote('IMPROVED TOKEN EFFICIENCY'), true);
+  assert.equal(polish.isJunkTitle('TEAMS PRICING JUNE 2026'), true);
+  assert.equal(polish.isJunkTitle('IMPROVED TOKEN EFFICIENCY'), true);
+  assert.equal(polish.isJunkTitle('MATTIA ASTORINO'), true);
+  assert.equal(polish.isJunkTitle('Agents Window'), false);
+  assert.equal(repos.looksLikePersonName('Mattia Astorino'), true);
+  assert.equal(repos.looksLikePersonName('MATTIA ASTORINO'), true);
+  assert.equal(repos.looksLikePersonName('Agents Window'), false);
+  assert.equal(repos.looksLikePersonName('Ship or Die'), false);
+  assert.equal(repos.looksLikeCodeIdentifier('GREETING .QUERY'), true);
+  assert.equal(repos.looksLikeCodeIdentifier('CREATEHTTPSERVER'), true);
+  assert.equal(repos.looksLikeCodeIdentifier('LISTEN'), true);
+  assert.equal(repos.looksLikeCodeIdentifier('BUN-TYPES'), true);
+  assert.equal(repos.looksLikeCodeIdentifier('NUB'), false);
+  assert.equal(repos.looksLikeCodeIdentifier('AWAIT ASYNCCODEC.ENCODEASYNC'), true);
+  assert.equal(repos.looksLikeCodeIdentifier('AsyncCodec.encodeAsync'), true);
+  assert.equal(repos.looksLikeCodeIdentifier('encodeAsync()'), true);
+  assert.equal(repos.looksLikeCodeIdentifier('socket.io-client'), false);
+  assert.equal(repos.looksLikeCodeIdentifier('hotelist.com'), false);
+  assert.equal(repos.isJunkRepoName('emoji-todo'), true);
+  assert.equal(repos.isJunkProductName('emoji-todo'), true);
+  assert.equal(polish.isJunkTitle('AWAIT ASYNCCODEC.ENCODEASYNC'), true);
+  assert.equal(repos.isJunkProductName('MATTIA ASTORINO'), true);
+  assert.equal(repos.isJunkProductName('CREATEHTTPSERVER'), true);
+  const items = polish.polishCandidates(
+    [
+      found({ name: 'Teams pricing June 2026', date: '2026-06-01', link: 'https://cursor.com/changelog/pricing' }),
+      found({ name: 'Improved token efficiency', date: '2026-09-23', link: 'https://cursor.com/changelog/tokens' }),
+      found({ name: 'Mattia Astorino', date: '2026-03-01', source: 'github', link: 'https://github.com/t3dotgg/mattia' }),
+      found({ name: 'greeting.query', date: '2026-04-01', source: 'npm', link: 'https://www.npmjs.com/package/greeting.query' }),
+      found({ name: 'Nub', date: '2026-02-01', source: 'github', link: 'https://github.com/colinhacks/nub' }),
+      found({ name: 'NUB', date: '2026-02-08', source: 'npm', link: 'https://www.npmjs.com/package/nub' }),
+      found({ name: 'Meet the new Cursor', date: '2026-09-15', link: 'https://cursor.com/blog/cursor-3' }),
+    ],
+    { year: 2026, who: 'Theo' },
+  );
+  const names = items.map((item) => item.name);
+  assert.equal(names.some((name) => /pricing|token efficiency|mattia|greeting/i.test(name)), false, JSON.stringify(names));
+  assert.equal(names.filter((name) => /^nub$/i.test(name)).length, 1, JSON.stringify(names));
+  const cursor3 = items.find((item) => /cursor 3/i.test(item.name));
+  assert.equal(cursor3?.date, '2026-04-02');
+});
+
+test('Codex titles lose the marketing clause and launch-notes suffix', () => {
+  assert.match(polish.cleanShipTitle('CODEX, OUR CODE GENERATION CLI TOOL'), /codex cli/i);
+  assert.match(polish.cleanShipTitle('CODEX FOR CHROME LAUNCH NOTES'), /^codex for chrome$/i);
+});
+
+test('removals, docs, handles, and generic updates are not ships', () => {
+  assert.equal(polish.isNotAShipTitle('@CHATGPT'), true);
+  assert.equal(polish.isNotAShipTitle('CURSOR INTO THE CHATGPT DESKTOP APP'), true);
+  assert.equal(polish.isNotAShipTitle('CODEX MCP SERVER REMOVED'), true);
+  assert.equal(polish.isNotAShipTitle('CODEX ANALYTICS GOVERNANCE DOCS UPDATE'), true);
+  assert.equal(polish.isNotAShipTitle('CODEX MODELS FOR MODEL AVAILABILITY'), true);
+  assert.equal(polish.isNotAShipTitle('CODEX APP UPDATES'), true);
+  assert.equal(polish.isNotAShipTitle('GPT-5.5 AND CODEX APP UPDATES'), true);
+  assert.equal(polish.isNotAShipTitle('CHATGPT FOR IOS UPDATES: REDESIGNED'), true);
+  assert.equal(polish.isNotAShipTitle('Codex app · 26 updates in Feb'), false);
+  assert.equal(polish.isVagueOrCutTitle('ALSO RELEASED:'), true);
+  assert.equal(polish.isVagueOrCutTitle('UPDATED THE AGENTS SDK WITH NEW CAPABILITIES, INCLUDING:'), true);
+  assert.equal(polish.isVagueOrCutTitle('SUPPORT FOR ENHANCED API BUDGET ALERTS &'), true);
+  assert.equal(polish.isVagueOrCutTitle('MEM0 JOINING'), true);
+  assert.equal(polish.isDocsOrReferenceTitle('DOCUMENTATION'), true);
+  assert.equal(polish.isDocsOrReferenceTitle('IMPROVEMENTS AND BUG FIXES'), true);
+  assert.equal(polish.isDocsOrReferenceTitle('FULL RELEASE ON GITHUB'), true);
+  assert.equal(polish.isVagueOrCutTitle('STRONGER FOR SOFTWARE DEVELOPMENT'), true);
+  assert.match(polish.cleanShipTitle('GPT-5.3 INSTANT: SMOOTHER, MORE USEFUL EVERYDAY'), /gpt-5\.3 instant/i);
+  assert.doesNotMatch(polish.cleanShipTitle('GPT-5.3 INSTANT: SMOOTHER, MORE USEFUL EVERYDAY'), /smoother/i);
+  assert.equal(polish.isJunkTitle('CODEX APP UPDATES'), true);
+  assert.equal(polish.cleanShipTitle('CODEX MCP SERVER REMOVED'), '');
+  assert.equal(polish.looksFragment('E ACCESS BEFORE WORKSPACE'), true);
+  assert.equal(polish.looksFragment('ROVED WINDOW RENDERING ON SYSTEMS THAT DON’T SUPPORT'), true);
+  assert.equal(polish.looksFragment('AVAILABILITY DEPENDS ON ROLLOUT AND WORKSPACE SETTINGS'), true);
+  assert.equal(polish.looksFragment('Codex for Chrome'), false);
+  const items = polish.polishCandidates(
+    [
+      found({ name: '@CHATGPT', date: '2026-08-01', link: 'https://openai.com/chatgpt' }),
+      found({ name: 'CODEX MCP SERVER REMOVED', date: '2026-08-02', link: 'https://developers.openai.com/codex/mcp' }),
+      found({ name: 'CODEX ANALYTICS GOVERNANCE DOCS UPDATE', date: '2026-08-03', link: 'https://developers.openai.com/codex/docs' }),
+      found({ name: 'CODEX APP UPDATES', date: '2026-08-04', link: 'https://developers.openai.com/codex/app' }),
+      found({ name: 'GPT-5.5 AND CODEX APP UPDATES', date: '2026-08-05', link: 'https://developers.openai.com/codex/gpt' }),
+      found({ name: 'CHATGPT FOR IOS UPDATES: REDESIGNED', date: '2026-08-06', link: 'https://openai.com/chatgpt/ios' }),
+      found({ name: 'CURSOR INTO THE CHATGPT DESKTOP APP', date: '2026-08-07', link: 'https://openai.com/chatgpt/desktop' }),
+      found({ name: 'CODEX MODELS FOR MODEL AVAILABILITY', date: '2026-08-08', link: 'https://developers.openai.com/codex/models' }),
+      found({ name: 'GitLab support', date: '2026-08-19', link: 'https://developers.openai.com/codex/changelog#gitlab-19' }),
+      found({ name: 'GitLab support in Codex', date: '2026-08-20', link: 'https://developers.openai.com/codex/changelog#gitlab-20' }),
+      found({ name: 'Codex CLI', date: '2026-02-14', link: 'https://openai.com/codex' }),
+    ],
+    { year: 2026, who: 'Tibo' },
+  );
+  const names = items.map((item) => item.name);
+  assert.equal(names.some((name) => /@chatgpt|removed|docs update|app updates|redesigned|into the|model availability/i.test(name)), false, JSON.stringify(names));
+  assert.ok(names.some((name) => /codex cli/i.test(name)), JSON.stringify(names));
+  const tape = ai
+    .harvestItems(
+      {
+        found: items,
+        web: [],
+        pages: [],
+        site: null,
+        profile: { name: 'Tibo', bio: '', site: null, x: 'tibo_maker', github: null },
+        ran: [],
+        failed: [],
+        stats: [],
+      },
+      2026,
+    )
+    .map((item) => item.name);
+  assert.equal(tape.filter((name) => /gitlab/i.test(name)).length, 1, JSON.stringify(tape));
+});
+
+test('undated changelog phrases drop; Composer 2 keeps the March launch day', () => {
+  assert.equal(polish.isChangelogPhrase('Richer JavaScript representation', null), true);
+  assert.equal(polish.isChangelogPhrase('Typed middleware', null), true);
+  assert.equal(polish.isChangelogPhrase('New date', null), true);
+  assert.equal(polish.isChangelogPhrase('Richer JavaScript representation', '2026-04-01'), false);
+  assert.equal(polish.displayShipName('CODEX APP'), 'Codex app');
+  assert.equal(polish.displayShipName('CURSOR 3'), 'Cursor 3');
+  assert.equal(polish.displayShipName('CHATGPT IMAGES'), 'ChatGPT Images');
+  const items = polish.polishCandidates(
+    [
+      found({ name: 'Richer JavaScript representation', date: null, source: 'changelog', link: 'https://zod.dev/changelog#richer' }),
+      found({ name: 'Typed middleware', date: null, source: 'changelog', link: 'https://zod.dev/changelog#typed' }),
+      found({ name: 'Zod', date: '2026-01-15', source: 'npm', link: 'https://www.npmjs.com/package/zod' }),
+      found({ name: 'Composer 2', date: '2026-08-14', link: 'https://cursor.com/blog/composer-2' }),
+      found({ name: 'SHOO', date: '2026-03-01', source: 'npm', link: 'https://www.npmjs.com/package/@shoojs/core' }),
+    ],
+    { year: 2026, who: 'Colin' },
+  );
+  const names = items.map((item) => item.name);
+  assert.equal(names.some((name) => /richer|typed middleware/i.test(name)), false, JSON.stringify(names));
+  assert.equal(items.find((item) => /composer 2/i.test(item.name))?.date, '2026-03-19');
+  assert.ok(names.some((name) => /^shoo$/i.test(name)), JSON.stringify(names));
+});
+
+test('archive.org/RDAP product hosts beat an npm publish day for the product itself', () => {
+  const npmUrls = dates.productLaunchUrlsForNpm(
+    { name: 'POST BRIDGE', link: 'https://www.npmjs.com/package/post-bridge' },
+    { pageText: 'https://post-bridge.com https://zod.dev' },
+  );
+  assert.ok(npmUrls.some((url) => /post-bridge\.com/.test(url)), JSON.stringify(npmUrls));
+  assert.equal(npmUrls.some((url) => /npmjs|zod\.dev/.test(url)), false, JSON.stringify(npmUrls));
+  const zodUrls = dates.productLaunchUrlsForNpm({ name: 'ZOD', link: 'https://www.npmjs.com/package/zod' }, { pageText: 'https://zod.dev' });
+  assert.equal(zodUrls.length, 0);
+  const cliUrls = dates.productLaunchUrlsForNpm({ name: 'POSTBRIDGE-CLI', link: 'https://www.npmjs.com/package/postbridge-cli' }, { pageText: 'https://post-bridge.com' });
+  assert.equal(cliUrls.some((url) => /post-bridge\.com/.test(url)), false);
+  const socketUrls = dates.productLaunchUrlsForNpm({ name: 'socket.io-client', link: 'https://www.npmjs.com/package/socket.io-client' }, {});
+  assert.deepEqual(socketUrls, ['https://socket.io/']);
+  const engineUrls = dates.npmFamilyProductUrls('engine.io-client');
+  assert.deepEqual(engineUrls, ['https://engine.io/']);
+  assert.equal(dates.isLegacyNpmFamily('socket.io-client'), true);
+  assert.equal(dates.isLegacyNpmFamily('Engine.io-Client'), true);
+  assert.equal(dates.isLegacyNpmFamily('socket.io-adapter'), true);
+  assert.equal(dates.isLegacyNpmFamily('@zod/mini'), false);
+  assert.equal(dates.parseNpmCreatedYear({ time: { created: '2016-01-16T00:00:00.000Z' } }), 2016);
+  assert.equal(dates.parseNpmCreatedYear('{"time":{"created":"2026-03-01T00:00:00.000Z"}}'), 2026);
+  assert.equal(dates.isFirstPublishBeforeYear(2016, 2026), true);
+  assert.equal(dates.isFirstPublishBeforeYear(2026, 2026), false);
+  assert.equal(dates.isFirstPublishBeforeYear(null, 2026), false);
+  assert.match(dates.npmRegistryUrl('@zod/mini'), /@zod%2fmini/);
+  const socketTape = polish.polishCandidates(
+    [
+      found({ name: 'Serve', date: '2026-03-03', source: 'changelog', link: 'https://vercel.com/blog/serve' }),
+      found({ name: 'socket.io-client', date: '2026-04-01', source: 'npm', link: 'https://www.npmjs.com/package/socket.io-client' }),
+      found({ name: 'emoji-todo', date: '2026-04-24', source: 'github', link: 'https://github.com/rauchg/emoji-todo' }),
+      found({ name: 'AWAIT ASYNCCODEC.ENCODEASYNC', date: null, source: 'site', link: 'https://colinhacks.com/' }),
+    ],
+    { year: 2026, who: 'Guillermo Rauch' },
+  );
+  const socketNames = socketTape.map((item) => item.name);
+  assert.equal(socketNames.some((name) => /socket\.io|emoji-todo|encodeasync|asynccodec/i.test(name)), false, JSON.stringify(socketNames));
+  assert.ok(socketNames.some((name) => /serve/i.test(name)), JSON.stringify(socketNames));
+});
+
+test('sitemap slugs become flagship names and june-2026 slugs get a day', () => {
+  const xml = `<?xml version="1.0"?><urlset>
+    <url><loc>https://cursor.com/blog/cursor-3</loc></url>
+    <url><loc>https://cursor.com/blog/composer-2</loc></url>
+    <url><loc>https://cursor.com/blog/graphite</loc></url>
+    <url><loc>https://cursor.com/changelog/bugbot-updates-june-2026</loc></url>
+  </urlset>`;
+  const items = changelog.itemsFromSitemap(xml, 2026);
+  assert.ok(items.some((item) => /cursor 3/i.test(item.name)), JSON.stringify(items.map((i) => i.name)));
+  assert.ok(items.some((item) => /composer 2/i.test(item.name)));
+  assert.equal(items.filter((item) => /graphite/i.test(item.name)).length, 0);
+  const bugbot = items.find((item) => /bugbot/i.test(item.name));
+  assert.ok(bugbot);
+  assert.equal(bugbot.date, '2026-06-01');
+});
+
+test('vague leftover headings drop; spoken names keep source casing', () => {
+  assert.equal(polish.isVagueOrCutTitle('CHATGPT WORK OR CODEX CHAT AND WORK'), true);
+  assert.equal(polish.isVagueOrCutTitle('PETS CONTROLS IN THE CHATGPT DESKTOP'), true);
+  assert.equal(polish.isVagueOrCutTitle('CLOUD WORK'), true);
+  assert.equal(polish.isVagueOrCutTitle('NEW CONTROLS FOR LONG-RUNNING WORK'), true);
+  assert.equal(polish.isVagueOrCutTitle('ALL CHECKS'), true);
+  assert.equal(polish.isJunkTitle('ALL CHECKS'), true);
+  assert.equal(polish.isJunkTitle('NUMBER'), true);
+  assert.equal(polish.spokenShipName('TSC-RS'), 'tsc-rs');
+  assert.equal(polish.spokenShipName('BOTID'), 'BotID');
+  assert.equal(polish.spokenShipName('TSC-RS', 'tsc-rs'), 'tsc-rs');
+  assert.equal(polish.spokenShipName('BOTID', 'BotID'), 'BotID');
+  assert.equal(polish.displayShipName('CODEX APP'), 'Codex app');
+  assert.equal(polish.spokenShipName('AWS DATABASES ARE NOW LIVE'), 'AWS databases are now live');
+  assert.doesNotMatch(polish.spokenShipName('AWS DATABASES ARE NOW LIVE'), /Aws Databases Are Now Live|Aws databases/);
+  const leftover = polish.polishCandidates(
+    [
+      found({ name: 'CHATGPT WORK OR CODEX CHAT AND WORK', date: '2026-04-01', link: 'https://developers.openai.com/codex/or' }),
+      found({ name: 'PETS CONTROLS IN THE CHATGPT DESKTOP', date: '2026-04-02', link: 'https://openai.com/chatgpt/pets' }),
+      found({ name: 'CLOUD WORK', date: '2026-04-03', link: 'https://developers.openai.com/codex/cloud-work' }),
+      found({ name: 'NEW CONTROLS FOR LONG-RUNNING WORK', date: '2026-04-04', link: 'https://developers.openai.com/codex/controls' }),
+      found({ name: 'Codex CLI', date: '2026-02-14', link: 'https://openai.com/codex' }),
+    ],
+    { year: 2026, who: 'Tibo' },
+  );
+  const leftoverNames = leftover.map((item) => item.name);
+  assert.equal(leftoverNames.some((name) => / or |pets controls|cloud work|new controls/i.test(name)), false, JSON.stringify(leftoverNames));
+  assert.ok(leftoverNames.some((name) => /codex cli/i.test(name)));
+});
+
+test('undated crumbs need ownership plus a description', async () => {
+  const ownership = await import('../worker/shipped-ownership.ts');
+  const colin = { name: 'Colin McDonnell', github: 'colinhacks' };
+  assert.equal(
+    ownership.undatedPassesGate(
+      { name: 'TRPC', description: '', date: null, source: 'npm', link: 'https://www.npmjs.com/package/@trpc/server' },
+      colin,
+    ),
+    false,
+  );
+  assert.equal(
+    ownership.undatedPassesGate(
+      { name: 'NUMBER', description: '', date: null, source: 'npm', link: 'https://www.npmjs.com/package/number' },
+      colin,
+    ),
+    false,
+  );
+  assert.equal(
+    ownership.undatedPassesGate(
+      { name: 'ZOD', description: 'TypeScript-first schema validation', date: '2026-01-15', source: 'npm', link: 'https://www.npmjs.com/package/zod' },
+      colin,
+    ),
+    true,
+  );
+  assert.equal(
+    ownership.undatedPassesGate(
+      { name: 'TRPC', description: '', date: null, source: 'site', link: 'https://colinhacks.com/' },
+      { name: 'Colin McDonnell', github: 'colinhacks', site: 'https://colinhacks.com/' },
+    ),
+    false,
+  );
+  assert.equal(
+    ownership.undatedPassesGate(
+      { name: 'TRPC', description: 'end-to-end typesafe APIs', date: null, source: 'site', link: 'https://colinhacks.com/' },
+      { name: 'Colin McDonnell', github: 'colinhacks', site: 'https://colinhacks.com/' },
+    ),
+    false,
+  );
+  assert.equal(
+    ownership.undatedPassesGate(
+      { name: 'TRANSFORM', description: 'val = parseFloat(val', date: null, source: 'site', link: 'https://colinhacks.com/' },
+      { name: 'Colin McDonnell', github: 'colinhacks', site: 'https://colinhacks.com/' },
+    ),
+    false,
+  );
+  assert.equal(
+    ownership.undatedPassesGate(
+      { name: 'ALL CHECKS', description: '', date: null, source: 'site', link: 'https://colinhacks.com/' },
+      { name: 'Colin McDonnell', github: 'colinhacks', site: 'https://colinhacks.com/' },
+    ),
+    false,
+  );
+  const items = polish.polishCandidates(
+    [
+      found({ name: 'TRPC', date: null, source: 'npm', link: 'https://www.npmjs.com/package/@trpc/server', description: '' }),
+      found({ name: 'TRPC', date: null, source: 'site', link: 'https://colinhacks.com/', description: 'end-to-end typesafe APIs' }),
+      found({ name: 'TRANSFORM', date: null, source: 'site', link: 'https://colinhacks.com/', description: 'val = parseFloat(val' }),
+      found({ name: 'ALL CHECKS', date: null, source: 'site', link: 'https://colinhacks.com/', description: '' }),
+      found({ name: 'NUMBER', date: null, source: 'npm', link: 'https://www.npmjs.com/package/number', description: '' }),
+      found({ name: 'Zod', date: '2026-01-15', source: 'npm', link: 'https://www.npmjs.com/package/zod', description: 'Schema' }),
+      found({ name: 'Boron', date: '2026-02-01', source: 'github', link: 'https://github.com/colinhacks/boron', description: 'Schema core' }),
+      found({ name: 'Nub', date: '2026-02-08', source: 'github', link: 'https://github.com/colinhacks/nub', description: 'Tiny helper' }),
+      found({ name: 'Frizz', date: null, source: 'github', link: 'https://github.com/colinhacks/frizz', description: 'A small CSS helper Colin ships' }),
+    ],
+    { year: 2026, who: 'Colin McDonnell', handle: 'colinhacks', owner: colin },
+  );
+  const names = items.map((item) => item.name);
+  assert.equal(names.some((name) => /trpc|number|all checks/i.test(name)), false, JSON.stringify(names));
+  assert.ok(names.some((name) => /^zod$/i.test(name)), JSON.stringify(names));
+});
+
+test('OpenAI shutdown and migration leftovers drop', () => {
+  assert.equal(polish.isNotAShipTitle('ASSISTANTS API SHUT DOWN'), true);
+  assert.equal(polish.isNotAShipTitle('KEY CHANGES TO CONSIDER WHEN MIGRATING:'), true);
+});
+
+test('OpenAI index essays drop; named flagships stay', () => {
+  assert.equal(polish.isBlogEssayTitle('Customer journeys in the intelligence age'), true);
+  assert.equal(polish.isBlogEssayTitle('OpenAI Delivers low-latency Voice AI at Scale Engineering'), true);
+  assert.equal(polish.isBlogEssayTitle('Helping older adults use ChatGPT'), true);
+  assert.equal(polish.isBlogEssayTitle('GPT-6'), false);
+  assert.equal(polish.isBlogEssayTitle('Delphi ships 100 times a day with its Python backend'), true);
+  assert.equal(polish.isBlogEssayTitle('Jev is the fastest-adopted model in AI Gateway history'), true);
+  assert.equal(polish.isBlogEssayTitle("What's new in Svelte: January 2026"), true);
+  assert.equal(polish.isBlogEssayTitle("WHAT’S NEW IN SVELTE: MARCH 2026"), true);
+  assert.equal(polish.isBlogEssayTitle('ChatGPT Images'), false);
+  assert.equal(polish.isBlogEssayTitle('Sora'), false);
+});
+
+test('Vercel customer stories and chopped Decision-1 drop; two policy knobs roll up', () => {
+  assert.equal(polish.isJunkTitle("FEATURED'S USERS MAKE 100K MEDIA PITCHES PER MONTH"), true);
+  assert.equal(polish.isJunkTitle('MICROSOFT DECISION 1'), true);
+  assert.equal(polish.isMinorPlatformChange('PRO TEAMS NOW DEFAULT TO 30 DAY DEPLOYMENT RETENTION'), true);
+  assert.equal(polish.isMinorPlatformChange('SKIP SENDING REQUEST BODIES TO ROUTING MIDDLEWARE'), true);
+  assert.equal(polish.isMinorPlatformChange('V0 API'), false);
+  const items = polish.polishCandidates(
+    [
+      found({
+        name: 'Pro teams now default to 30-day deployment retention',
+        date: '2026-10-09',
+        link: 'https://vercel.com/changelog/new-pro-teams-now-default-to-30-day-deployment-retention',
+      }),
+      found({
+        name: 'Skip sending request bodies to Routing Middleware',
+        date: '2026-10-08',
+        link: 'https://vercel.com/changelog/skip-sending-request-bodies-to-routing-middleware',
+      }),
+      found({ name: 'v0 API', date: '2026-03-01', link: 'https://vercel.com/blog/v0-api' }),
+    ],
+    { year: 2026, who: 'Guillermo Rauch' },
+  );
+  const names = items.map((item) => item.name);
+  assert.ok(names.some((name) => /v0 api/i.test(name)), JSON.stringify(names));
+  assert.ok(names.some((name) => /vercel platform · 2 updates in oct/i.test(name)), JSON.stringify(names));
+  assert.equal(names.some((name) => /retention|request bodies|microsoft decision/i.test(name)), false, JSON.stringify(names));
+});
+
+test('prereleases, starters, and Gateway model listings are not ships', () => {
+  assert.equal(polish.isPrereleaseShip('TURBOREPO V2.11.3-CANARY.2'), true);
+  assert.equal(polish.isPrereleaseShip('v0 Platform API now in beta'), false);
+  assert.equal(polish.isNeverShipKind('NEXTJS-FOUNDATIONS-STARTER'), true);
+  assert.equal(polish.isNeverShipKind('WAIT-FOR-DEPLOYMENT-ACTION'), true);
+  assert.equal(polish.isNeverShipKind('ACADEMY-PYTHON-COURSE'), true);
+  assert.equal(polish.isGatewayModelListing("Liquid AI's d1 is available on AI Gateway"), true);
+  assert.equal(polish.isGatewayModelListing('Grok Imagine Video 1.5 Lite on AI Gateway'), true);
+  assert.equal(polish.isGatewayModelListing('Vercel Agent now in Slack'), false);
+  assert.equal(
+    polish.isGatewayModelListing('Claude Fable 5', 'https://vercel.com/changelog/claude-fable-5-now-available-on-ai-gateway'),
+    true,
+  );
+  assert.equal(
+    polish.isGatewayModelListing('AI Gateway adds Browserbase search and fetch tools', 'https://vercel.com/changelog/ai-gateway-adds-browserbase-search-and-fetch-tools'),
+    false,
+  );
+  assert.equal(polish.cleanShipTitle('GPT-IMAGE-2-'), '');
+  assert.equal(polish.cleanShipTitle('INSTALL THE CHATGPT DESKTOP APP ON LINUX'), 'ChatGPT Desktop for Linux');
+  assert.match(polish.cleanShipTitle('BETTER PROMPT CACHING FOR GPT-6 PRODUCT SEP 22, 2026'), /better prompt caching for gpt-6/i);
+  assert.match(polish.cleanShipTitle('GPT-6.1 SOL PRODUCT SEP 29, 2026'), /gpt-6\.1 sol/i);
+  assert.match(polish.cleanShipTitle('ChatGPT Voice and multi-folder projects 26.715'), /chatgpt voice and multi-folder projects/i);
+  assert.match(polish.cleanShipTitle('Agents can now buy domains with the Vercel CLI'), /agents can now buy domains/i);
+  assert.ok(polish.shortenWordyTitle('Agents can now buy domains with the Vercel CLI').split(/\s+/).length < 8);
+  assert.match(polish.shortenWordyTitle('Agents can now buy domains with the Vercel CLI'), /agents can now buy domains/i);
+  assert.ok(polish.shortenWordyTitle('Protect production deployments for free on every plan').split(/\s+/).length < 8);
+  assert.ok(polish.shortenWordyTitle('Secure compute and static IP builds start 64% faster').split(/\s+/).length < 8);
+  assert.equal(polish.isJournalShip({ name: 'hotelist.com', source: 'site', link: 'https://levels.io/#hotelist-com' }), true);
+  assert.equal(polish.isJournalShip({ name: 'nomads.com free', source: 'site', link: 'https://levels.io/#nomads-com' }), true);
+  assert.equal(polish.isJournalShip({ name: 'Photo AI feature', source: 'site', link: 'https://levels.io/#photo-ai-feature' }), true);
+  assert.equal(polish.isJournalShip({ name: 'Luxury hotels are mathematically bad value', source: 'site', link: 'https://levels.io/luxury-hotels' }), false);
+  assert.match(polish.cleanShipTitle('Use Codex with Amazon Bedrock'), /codex with amazon bedrock|use codex with amazon bedrock/i);
+  assert.match(polish.cleanShipTitle('Build and install plugins in Codex'), /plugins in codex|build and install plugins/i);
+  assert.match(polish.cleanShipTitle('Share an app window'), /share an app window/i);
+  assert.match(polish.cleanShipTitle('Sites'), /sites/i);
+  assert.match(polish.cleanShipTitle('Appshots'), /appshots/i);
+  assert.equal(polish.cleanShipTitle('Use a random leftover'), '');
+  assert.match(polish.cleanShipTitle('GPT-6 Astra: A new generation of intelligence'), /gpt-6 astra$/i);
+  assert.match(polish.cleanShipTitle('Deploy from Claude Design to Vercel'), /claude design deploys/i);
+  assert.equal(polish.cleanShipTitle('REDUCE FUTURE DEPLOYMENT SIZE BY REMOVING UNNECESSARY BUIL'), '');
+  assert.equal(polish.isDocsOrReferenceTitle('INSTALLATION AND CONNECTION'), true);
+  assert.equal(polish.isDocsOrReferenceTitle('MODEL SELECTION'), true);
+  assert.equal(polish.isVagueOrCutTitle('CHATGPT'), true);
+  assert.equal(polish.isVagueOrCutTitle('CODEX JOINING'), true);
+  assert.equal(polish.isVagueOrCutTitle('FEATURES'), true);
+  assert.equal(polish.isVagueOrCutTitle('WORK WITH CODEX FROM ANYWHERE'), true);
+  assert.equal(polish.isVagueOrCutTitle('CODEX CAN NOW HELP'), true);
+  assert.equal(polish.isVagueOrCutTitle('RELEASED SEVERAL NEW MODELS AND TOOLS AND A NEW API'), true);
+  assert.equal(polish.isVagueOrCutTitle('SUPPORT FOR IMAGE INPUTS TO THE ASSISTANTS API'), true);
+  assert.equal(polish.isVagueOrCutTitle('SUPPORT FOR FINE-TUNED MODELS TO THE BATCH API'), true);
+  assert.equal(polish.isVagueOrCutTitle('SUPPORT FOR SETTING COST LIMITS ON A PER-PROJECT'), true);
+  assert.equal(polish.isVagueOrCutTitle('SUPPORT FOR FILE SEARCH CUSTOMIZATIONS'), true);
+  assert.equal(polish.isVagueOrCutTitle('RELEASED UPLOADS TO UPLOAD LARGE FILES IN MULTIPLE PARTS'), true);
+  assert.equal(polish.isCeoApiMinutiae('SUPPORT FOR IMAGE INPUTS TO THE ASSISTANTS API', 'https://developers.openai.com/api/docs/changelog'), true);
+  assert.equal(polish.isCeoApiMinutiae('GPT-REALTIME-1', 'https://developers.openai.com/api/docs/changelog'), false);
+  assert.equal(polish.isCeoApiMinutiae('DATA RESIDENCY IN EUROPE', 'https://developers.openai.com/api/docs/changelog'), true);
+  const ceoApi = polish.gateReceiptItems(
+    [
+      found({
+        name: 'SUPPORT FOR IMAGE INPUTS TO THE ASSISTANTS API',
+        date: '2026-05-09',
+        link: 'https://developers.openai.com/api/docs/changelog',
+      }),
+      found({
+        name: 'GPT-REALTIME-1',
+        date: '2026-02-23',
+        link: 'https://developers.openai.com/api/docs/changelog',
+      }),
+      found({ name: 'GPT-6', date: '2026-09-03', link: 'https://openai.com/index/gpt-6-astra/' }),
+    ],
+    {
+      year: 2026,
+      who: 'Sam Altman',
+      affiliation: { role: 'ceo', company: 'OpenAI', name: 'Sam Altman' },
+    },
+  );
+  assert.equal(ceoApi.some((item) => /support for/i.test(item.name)), false, JSON.stringify(ceoApi.map((item) => item.name)));
+  assert.ok(ceoApi.some((item) => /gpt-realtime/i.test(item.name)));
+  assert.ok(ceoApi.some((item) => /gpt-6/i.test(item.name)));
+  assert.equal(polish.isVagueOrCutTitle('CONNECTIONS TO API.OPENAI.COM CAN NOW USE IPV6'), true);
+  assert.equal(polish.isVagueOrCutTitle('SERVER-SIDE COMPACTION IN THE RESPONSES API'), true);
+  assert.equal(polish.isCodeOrBugfixTitle('WEB_SEARCH = "DISABLED" TO REMOVE'), true);
+  assert.equal(polish.isCodeOrBugfixTitle('CONTROLS WILL CONTINUE TO SCALE WITH YOUR WORKSPACE'), true);
+  assert.equal(polish.isCodeOrBugfixTitle('FLAKY AVAILABILITY OF THE PLUGIN ON FIRST LAUNCH'), true);
+  assert.equal(polish.isJunkTitle('WEB_SEARCH = "DISABLED" TO REMOVE'), true);
+  assert.match(polish.cleanShipTitle('PREVIEWING ULTRAFAST MODE: GPT-5.6 SOL AT UP TO 14X'), /gpt-5\.6 sol/i);
+  assert.equal(polish.reconcileTitleWithHref('GPT-6 AND INTELLIGENT UI FOR EVERYONE', 'https://openai.com/index/gpt-5-6/'), 'GPT-5.6 AND INTELLIGENT UI FOR EVERYONE');
+  assert.equal(polish.semanticShipKey('HEALTH IN CHATGPT'), polish.semanticShipKey('CHATGPT HEALTH'));
+  const health = polish.dedupeNormalized([
+    found({ name: 'CHATGPT HEALTH', date: '2026-06-01', link: 'https://openai.com/index/chatgpt-health' }),
+    found({ name: 'HEALTH IN CHATGPT', date: '2026-06-11', link: 'https://openai.com/index/health-in-chatgpt' }),
+  ]);
+  assert.equal(health.length, 1, JSON.stringify(health.map((item) => item.name)));
+  const gptRows = polish.dedupeNormalized([
+    found({ name: 'GPT-5.6', date: '2026-09-01', link: 'https://openai.com/index/gpt-5-6/' }),
+    found({ name: 'GPT-5.6 AND INTELLIGENT UI FOR EVERYONE', date: '2026-09-01', link: 'https://openai.com/index/gpt-5-6/' }),
+  ]);
+  assert.equal(gptRows.length, 1, JSON.stringify(gptRows.map((item) => item.name)));
+  assert.match(gptRows[0].name, /^gpt-5\.6$/i);
+  assert.equal(polish.isDocsOrReferenceTitle('MORE CODEX FEATURES IN THE EEA, UK, AND SWITZERLAND'), true);
+  assert.equal(polish.cleanShipTitle('Codex, our code generation CLI'), 'Codex CLI');
+  assert.equal(polish.isNotAShipTitle('GPT-5.4 AND GPT-5.4 MINI RETIRE'), true);
+  assert.equal(polish.isBlogEssayTitle('GPT-5.6 Sol helps run quantum computing experiments applied'), true);
+  assert.equal(polish.isCustomerStoryTitle('Databricks brings GPT-5.5 to enterprise agent workflows'), true);
+  assert.equal(polish.isCustomerStoryTitle('Airbnb widens access to GPT-6 Astra and OpenAI frontier'), true);
+  assert.equal(polish.isCustomerStoryTitle('GPT-6.1 Sol'), false);
+  assert.equal(polish.isCustomerStoryTitle("Warp's big bet on building open source with GPT-5.5"), true);
+  assert.equal(polish.isCustomerStoryTitle('Nokia analyzes 50M+ network events with Cursor'), true);
+  assert.equal(polish.isCustomerStoryTitle('Grab put Cursor in the hands of design, ops, and engineering'), true);
+  assert.equal(polish.looksCutOff('SPEED INSIGHTS NOW HAS'), true);
+  assert.equal(polish.looksCutOff('VERCEL CONNECT NOW ACCEPTS SERVICE'), true);
+  assert.equal(polish.looksCutOff('TEAMS &'), true);
+  assert.equal(polish.looksCutOff('REMOTE CONTROL IS ON BY DEFAULT FOR EVERYONE EXCEPT'), true);
+  assert.equal(polish.isVagueOrCutTitle('REMOTE CONTROL IS ON BY DEFAULT'), true);
+  assert.equal(polish.cleanShipTitle('REMOTE CONTROL IS ON BY DEFAULT FOR EVERYONE EXCEPT'), '');
+  assert.equal(polish.looksCutOff('PARTNER SITES, STARTING WITH AIRTABLE, GI'), true);
+  assert.equal(polish.isBlogEssayTitle('BEST AI HEADSHOT GENERATORS 2026'), true);
+  assert.equal(polish.looksLikeEssayTitle('The Best AI Headshot Generators 2026'), true);
+  assert.equal(polish.isBlogEssayTitle('The Best AI Headshot Generators 2026'), true);
+  assert.equal(polish.looksCutOff('BROWSER EXTENSIONS, SITE TOOLS, AND CLOUD SIGN-IN'), false);
+  assert.equal(polish.isJunkTitle('BROWSER EXTENSIONS, SITE TOOLS, AND CLOUD SIGN-IN'), false);
+  assert.match(polish.cleanShipTitle('BROWSER EXTENSIONS, SITE TOOLS, AND CLOUD SIGN-IN'), /sign-in/i);
+  assert.equal(polish.looksMidWord('SO VISIBLE-TAB ROUTING AND ANNOTATIONS PERSIST'), true);
+  assert.equal(polish.isJunkTitle('SO VISIBLE-TAB ROUTING AND ANNOTATIONS PERSIST'), true);
+  assert.equal(polish.cleanShipTitle('SO VISIBLE-TAB ROUTING AND ANNOTATIONS PERSIST'), '');
+  assert.equal(polish.isBlogEssayTitle('Cursor is an applied research team building the best'), true);
+  assert.equal(polish.isBlogEssayTitle('Both are available today on Teams and Enterprise'), true);
+  assert.equal(polish.isStaleBioProduct({ name: 'HeadshotPro' }, { company: 'HeadshotPro' }, 2026), true);
+  assert.match(polish.cleanShipTitle('GPT-REALTIME-2, A NEW REALTIME VOICE MODEL'), /gpt-realtime-2$/i);
+  assert.match(polish.cleanShipTitle('RELEASED THE DECISIONS API IN BETA WITH GPT-6-LUNA'), /^decisions api$/i);
+  assert.match(polish.cleanShipTitle('AGENTS API IN PUBLIC BETA'), /agents api in public beta/i);
+  assert.equal(polish.isNotAShipTitle('UPDATED THE GPT-5.2-CHAT-LATEST SLUG TO POINT TO THE LATEST'), true);
+  assert.equal(polish.isNotAShipTitle('GPT-5.2-CHAT-LATEST SLUG TO POINT TO THE LATEST'), true);
+  assert.equal(polish.isPricingOrMetricNote('GPT-5.6 SOL NOW COSTS $4 PER MILLION INPUT TOKENS'), true);
+  const samTitles = polish.gateReceiptItems(
+    [
+      found({
+        name: 'UPDATED THE GPT-5.2-CHAT-LATEST SLUG TO POINT TO THE LATEST',
+        date: '2026-02-10',
+        link: 'https://developers.openai.com/api/docs/changelog',
+      }),
+      found({
+        name: 'UPDATED THE GPT-5.3-CHAT-LATEST SLUG TO POINT TO THE LATEST',
+        date: '2026-03-16',
+        link: 'https://developers.openai.com/api/docs/changelog',
+      }),
+      found({
+        name: 'GPT-5.6 SOL NOW COSTS $4 PER MILLION INPUT TOKENS',
+        date: '2026-08-21',
+        link: 'https://developers.openai.com/api/docs/changelog',
+      }),
+      found({
+        name: 'GPT-REALTIME-2, A NEW REALTIME VOICE MODEL',
+        date: '2026-05-07',
+        link: 'https://developers.openai.com/api/docs/changelog',
+      }),
+      found({
+        name: 'RELEASED THE DECISIONS API IN BETA WITH GPT-6-LUNA',
+        date: '2026-10-06',
+        link: 'https://developers.openai.com/api/docs/changelog',
+      }),
+      found({
+        name: 'AGENTS API IN PUBLIC BETA',
+        date: '2026-09-10',
+        link: 'https://developers.openai.com/api/docs/changelog',
+      }),
+      found({ name: 'GPT-6', date: '2026-09-03', link: 'https://openai.com/index/gpt-6-astra/' }),
+    ],
+    {
+      year: 2026,
+      who: 'Sam Altman',
+      affiliation: { role: 'ceo', company: 'OpenAI', name: 'Sam Altman' },
+    },
+  );
+  const samNames = samTitles.map((item) => item.name);
+  assert.equal(samNames.some((name) => /slug|now costs|per million/i.test(name)), false, JSON.stringify(samNames));
+  assert.ok(samNames.some((name) => /^gpt-realtime-2$/i.test(name)), JSON.stringify(samNames));
+  assert.ok(samNames.some((name) => /^decisions api$/i.test(name)), JSON.stringify(samNames));
+  assert.ok(samNames.some((name) => /agents api in public beta/i.test(name)), JSON.stringify(samNames));
+  assert.ok(samNames.some((name) => /gpt-6/i.test(name)), JSON.stringify(samNames));
+  assert.equal(polish.isBlogEssayTitle('Overview: GPT-6 Astra'), true);
+  assert.equal(polish.isForeignProductOnCompanyTape('STRIPE', 'Vercel'), true);
+  assert.equal(polish.isForeignProductOnCompanyTape('CURSOR', 'Vercel'), true);
+  assert.equal(polish.isForeignProductOnCompanyTape('CURSOR', 'Cursor'), false);
+  assert.equal(polish.isForeignProductOnCompanyTape('CURSOR CLOUD AGENTS', 'Vercel'), true);
+  assert.equal(polish.isForeignProductOnCompanyTape('GPT-5.6 SOL', 'Vercel'), true);
+  assert.equal(polish.isForeignProductOnCompanyTape('Vercel for Slack', 'Vercel'), false);
+  const vercelTape = polish.polishCandidates(
+    [
+      found({ name: 'STRIPE', date: '2026-10-01', link: 'https://vercel.com/changelog/stripe' }),
+      found({ name: 'Deploy from Claude Design to Vercel', date: '2026-10-01', link: 'https://vercel.com/changelog/claude-design' }),
+      found({ name: 'Vercel for Slack', date: '2026-10-01', link: 'https://vercel.com/changelog/vercel-for-slack' }),
+    ],
+    { year: 2026, who: 'Guillermo Rauch', affiliation: { company: 'Vercel', role: 'ceo' } },
+  );
+  const vercelNames = vercelTape.map((item) => item.name);
+  assert.ok(!vercelNames.some((name) => /^stripe$/i.test(name)), JSON.stringify(vercelNames));
+  assert.ok(vercelNames.some((name) => /claude design deploys/i.test(name)), JSON.stringify(vercelNames));
+  const items = polish.polishCandidates(
+    [
+      found({ name: "Liquid AI's d1 is available on AI Gateway", date: '2026-10-08', link: 'https://vercel.com/changelog/liquid-d1' }),
+      found({ name: 'Grok Imagine Video 1.5 Lite on AI Gateway', date: '2026-10-08', link: 'https://vercel.com/changelog/grok-imagine' }),
+      found({ name: 'Claude Fable 5', date: '2026-06-09', link: 'https://vercel.com/changelog/claude-fable-5-now-available-on-ai-gateway' }),
+      found({ name: 'v0 Platform API now in beta', date: '2026-04-01', link: 'https://vercel.com/changelog/v0-platform-api-now-in-beta' }),
+    ],
+    { year: 2026, who: 'Guillermo Rauch' },
+  );
+  const names = items.map((item) => item.name);
+  assert.ok(names.some((name) => /v0 platform api/i.test(name)), JSON.stringify(names));
+  assert.ok(names.some((name) => /new models on ai gateway/i.test(name)), JSON.stringify(names));
+  assert.equal(names.some((name) => /liquid ai|grok imagine/i.test(name)), false, JSON.stringify(names));
+});
+
+test('cut titles, changelog ids, jan-1 scrape dates, and minor fixes drop', () => {
+  assert.equal(polish.isChangelogIdOrHostCrumb('LATEST ARTICLES ABOUT HEADSHOT PHOTOGR'), true);
+  assert.equal(polish.isBlogEssayTitle('LATEST ARTICLES ABOUT HEADSHOT PHOTOGR'), true);
+  assert.equal(polish.isChangelogIdOrHostCrumb('PUBLIC', 'https://pub-abc.r2.dev/shot.jpg'), true);
+  assert.equal(polish.isChangelogIdOrHostCrumb('2026 08 13 CHANGELOG GOAL CPDECEWLXHBDQRA131C8YZJHDDOGZB'), true);
+  assert.equal(polish.isChangelogIdOrHostCrumb('Cursor 3', 'https://cursor.com/changelog/cursor-3'), false);
+  assert.equal(polish.looksMidWord('CIAL HARBOR EVALUATION FRAMEWORK'), true);
+  assert.equal(polish.dateFromNumericTitle('2026 08 13 CHANGELOG GOAL X', 2026), '2026-08-13');
+  assert.match(polish.cleanDescription('The most most capable model in the API.'), /most capable/i);
+  assert.doesNotMatch(polish.cleanDescription('The most most capable model in the API.'), /most most/i);
+  assert.equal(polish.isChangelogIdOrHostCrumb('AWS DATABASES ARE NOW LIVE ON THE VERCEL MARKETPLACE AND V0'), false);
+  assert.equal(polish.isChangelogIdOrHostCrumb('CHATGPT IMAGES'), false);
+  const nico = { name: 'Nico Jeannen', x: 'nico_jeannen', site: 'https://nicojeannen.com' };
+  const gated = polish.gateReceiptItems(
+    [
+      found({
+        name: 'Canva',
+        description: 'Listed on blog.go-publicly.com',
+        date: '2026-03-01',
+        source: 'site',
+        link: 'https://www.canva.com/',
+      }),
+      found({
+        name: 'CIAL HARBOR EVALUATION FRAMEWORK',
+        date: '2026-08-13',
+        source: 'changelog',
+        link: 'https://cursor.com/changelog/cial',
+        significance: 2,
+      }),
+      found({
+        name: 'MINOR FIX FOR LOGIN',
+        date: '2026-04-01',
+        source: 'changelog',
+        link: 'https://example.com/changelog/login',
+        significance: 0,
+      }),
+      found({
+        name: '2026 08 13 CHANGELOG GOAL CPDECEWLXHBDQRA131C8YZJHDDOGZB',
+        date: '2026-01-01',
+        source: 'changelog',
+        link: 'https://github.com/cursor/cursor/blob/main/CHANGELOG.md',
+      }),
+      found({
+        name: 'LATEST ARTICLES ABOUT HEADSHOT PHOTOGR',
+        date: '2026-06-01',
+        source: 'site',
+        link: 'https://headshotpro.com/blog',
+      }),
+      found({
+        name: 'Flowjam',
+        description: 'I made a canvas for founders. Listed on nicojeannen.com',
+        date: '2026-04-12',
+        source: 'site',
+        link: 'https://flowjam.com/',
+      }),
+    ],
+    { year: 2026, who: 'Nico Jeannen', handle: 'nico_jeannen', owner: nico },
+  );
+  const names = gated.map((item) => item.name);
+  assert.equal(names.some((name) => /canva|cial harbor|minor fix|changelog goal|latest articles|photogr/i.test(name)), false, JSON.stringify(names));
+  assert.ok(names.some((name) => /flowjam/i.test(name)), JSON.stringify(names));
+});
+
+test('undated HeadshotPro drops; leftover cut-offs and customer-story metrics drop', () => {
+  const gated = polish.gateReceiptItems(
+    [
+      found({ name: 'HeadshotPro', date: null, source: 'site', link: 'https://www.headshotpro.com/' }),
+      found({
+        name: 'AgentBar',
+        description: 'I made a launch bar. Listed on dannypostma.com',
+        date: '2026-03-18',
+        source: 'site',
+        link: 'https://dannypostma.com/agentbar',
+      }),
+      found({ name: 'SPEED INSIGHTS NOW HAS', date: '2026-04-11', source: 'changelog', link: 'https://vercel.com/changelog/speed' }),
+      found({ name: 'BEST AI HEADSHOT GENERATORS 2026', date: '2026-01-08', source: 'site', link: 'https://dannypostma.com/best-ai-headshot-generators-2026' }),
+      found({ name: 'NOKIA ANALYZES 50M+ NETWORK EVENTS WITH CURSOR', date: '2026-06-02', source: 'changelog', link: 'https://cursor.com/blog/nokia' }),
+      found({ name: 'GRAB PUT CURSOR IN THE HANDS OF DESIGN, OPS, AND ENGINEERING', date: '2026-08-01', source: 'changelog', link: 'https://cursor.com/blog/grab' }),
+      found({ name: 'LOCEAN DROPLET, CONFIGURE SSH ACCESS, AND CONNECT', date: '2026-04-02', source: 'changelog', link: 'https://developers.openai.com/codex/changelog' }),
+      found({ name: 'CURSOR CAN NOW READ, WRITE, AND ACT ACROSS YOUR GOOGLE', date: '2026-07-12', source: 'changelog', link: 'https://cursor.com/changelog/google' }),
+      found({ name: 'TEAMS &', date: '2026-06-04', source: 'changelog', link: 'https://cursor.com/blog/teams' }),
+    ],
+    {
+      year: 2026,
+      who: 'Danny Postma',
+      handle: 'dannypostmaa',
+      affiliation: {
+        name: 'Danny Postma',
+        company: 'HeadshotPro',
+        role: 'founder',
+        product: null,
+        companyX: null,
+        companyGithub: null,
+        companySite: 'https://www.headshotpro.com/',
+        typedCompany: false,
+      },
+      owner: { name: 'Danny Postma', handle: 'dannypostmaa', site: 'https://dannypostma.com', github: 'dannypostma' },
+    },
+  );
+  const names = gated.map((item) => item.name);
+  assert.equal(
+    names.some((name) => /headshotpro|headshot generators|speed insights|nokia|grab put|locean|across your google|teams\s*&/i.test(name)),
+    false,
+    JSON.stringify(names),
+  );
+  assert.ok(names.some((name) => /agentbar/i.test(name)), JSON.stringify(names));
+});
+
+test('cheap filters strip markup, drop prereleases and other years, and dedupe URLs', () => {
+  assert.equal(polish.stripMarkup('### Minor Changes - 17ee736'), 'Minor Changes - 17ee736');
+  assert.equal(polish.stripMarkup('h3Dub.co…/h3').replace(/\.{3}/g, '…'), 'h3Dub.co…/h3');
+  assert.equal(polish.stripMarkup('<h3>Dub.co</h3>'), 'Dub.co');
+  assert.equal(polish.cleanDescription('### Minor Changes - 17ee736'), '');
+  assert.equal(polish.titleSanityOk('Commission analytics you can'), false);
+  assert.equal(polish.titleSanityOk('Teams &'), false);
+  assert.equal(polish.titleSanityOk('Composer 2'), true);
+  assert.equal(polish.titleSanityOk('### Changelog'), false);
+  const cheap = polish.cheapHardFilter(
+    [
+      found({ name: 'Composer 2', date: '2026-03-19', link: 'https://cursor.com/blog/composer-2' }),
+      found({ name: 'eslint-plugin-vue@10.7.0-canary.1', date: '2026-04-01', link: 'https://www.npmjs.com/package/eslint-plugin-vue' }),
+      found({ name: 'Old ship', date: '2025-12-01', link: 'https://example.com/old' }),
+      found({ name: 'Composer 2 again', date: '2026-03-20', link: 'https://cursor.com/blog/composer-2?utm=1' }),
+      found({ name: '### Minor Changes', date: '2026-05-01', link: 'https://github.com/vuejs/core/releases/10', description: '### Minor Changes - 17ee736' }),
+      found({
+        name: "I've been coding almost solely on my VPS with Claude this year",
+        date: '2026-06-01',
+        link: 'https://x.com/levelsio/status/1',
+      }),
+      found({ name: '@dub/embed-react', date: '2026-07-01', link: 'https://www.npmjs.com/package/@dub/embed-react' }),
+      found({ name: "What's new in Svelte: January 2026", date: '2026-01-15', link: 'https://svelte.dev/blog/whats-new-in-svelte-january-2026' }),
+      found({ name: 'Hotel in Leiden', date: '2026-08-01', link: 'https://x.com/levelsio/status/2', source: 'x', kind: 'post' }),
+      found({ name: 'We launched AI Gateway', date: '2026-04-01', link: 'https://vercel.com/changelog/ai-gateway' }),
+      found({ name: 'Lisbon hotel thread', date: '2026-08-02', link: 'https://x.com/levelsio/status/3', source: 'web' }),
+      found({ name: 'BEST AI HEADSHOT GENERATORS 2026', date: '2026-01-08', link: 'https://dannypostma.com/best-ai-headshot-generators-2026' }),
+      found({ name: 'The Best AI Headshot Generators 2026', date: '2026-01-09', link: 'https://dannypostma.com/guides/headshots' }),
+    ],
+    2026,
+  );
+  const names = cheap.map((item) => item.name);
+  assert.ok(names.includes('Composer 2'), JSON.stringify(names));
+  assert.ok(names.includes('We launched AI Gateway'), JSON.stringify(names));
+  const journal = polish.cheapHardFilter(
+    [
+      found({
+        name: 'I made hotelist.com to fix ratings',
+        date: '2026-10-05',
+        link: 'https://levels.io/#hotelist-com',
+        source: 'site',
+        description: 'Announced 2026-10-05 on levels.io',
+      }),
+      found({
+        name: 'I added Photo AI features',
+        date: '2026-06-02',
+        link: 'https://levels.io/2026/photo-ai',
+        source: 'site',
+        description: 'I made this. Listed on levels.io',
+      }),
+      found({
+        name: "I've been coding almost solely on my VPS with Claude this year",
+        date: '2026-06-03',
+        link: 'https://levels.io/2026/vps',
+        source: 'site',
+        description: 'Announced 2026-06-03 on levels.io',
+      }),
+    ],
+    2026,
+  );
+  assert.ok(journal.some((item) => /hotelist/i.test(item.name)), JSON.stringify(journal.map((item) => item.name)));
+  assert.ok(journal.some((item) => /photo ai/i.test(item.name)), JSON.stringify(journal.map((item) => item.name)));
+  assert.equal(
+    journal.some((item) => /coding almost solely|vps with claude/i.test(item.name)),
+    false,
+    JSON.stringify(journal.map((item) => item.name)),
+  );
+  const sameHome = polish.cheapHardFilter(
+    [
+      found({
+        name: 'hotelist.com',
+        date: '2026-10-05',
+        link: 'https://levels.io/#hotelist-com',
+        source: 'site',
+        description: 'Announced 2026-10-05 on levels.io',
+      }),
+      found({
+        name: 'nomads.com',
+        date: '2026-09-05',
+        link: 'https://levels.io/#nomads-com',
+        source: 'site',
+        description: 'Announced 2026-09-05 on levels.io',
+      }),
+      found({
+        name: 'Photo AI feature',
+        date: '2026-08-01',
+        link: 'https://levels.io/#photo-ai-feature',
+        source: 'site',
+        description: 'Announced 2026-08-01 on levels.io',
+      }),
+    ],
+    2026,
+  );
+  assert.equal(sameHome.length, 3, JSON.stringify(sameHome.map((item) => item.name)));
+  assert.ok(sameHome.some((item) => /hotelist/i.test(item.name)));
+  assert.ok(sameHome.some((item) => /nomads/i.test(item.name)));
+  assert.ok(sameHome.some((item) => /photo ai/i.test(item.name)));
+  const essays = polish.cheapHardFilter(
+    [
+      found({
+        name: 'Luxury hotels are mathematically bad value',
+        date: '2026-08-01',
+        link: 'https://levels.io/luxury-hotels',
+        source: 'site',
+        description: 'Listed on levels.io',
+      }),
+      found({
+        name: "What's new in Svelte: January 2026",
+        date: '2026-01-15',
+        link: 'https://svelte.dev/blog/whats-new-in-svelte-january-2026',
+      }),
+    ],
+    2026,
+  );
+  assert.equal(essays.some((item) => /luxury hotels|what.?s new in svelte/i.test(item.name)), false, JSON.stringify(essays.map((item) => item.name)));
+  const printed = polish.gateReceiptItems(
+    [
+      found({
+        name: "What's new in Svelte: January 2026",
+        date: '2026-01-15',
+        link: 'https://svelte.dev/blog/whats-new-in-svelte-january-2026',
+      }),
+      found({
+        name: 'Svelte 5.29',
+        date: '2026-03-01',
+        link: 'https://github.com/sveltejs/svelte/releases/tag/svelte%405.29.0',
+        kind: 'oss-release',
+      }),
+      found({
+        name: "I've been coding almost solely on my VPS with Claude this year",
+        date: '2026-06-03',
+        link: 'https://levels.io/2026/vps',
+        source: 'site',
+        description: 'Announced 2026-06-03 on levels.io',
+      }),
+    ],
+    { year: 2026, who: 'Rich Harris' },
+  );
+  const printedNames = printed.map((item) => item.name);
+  assert.ok(printedNames.some((name) => /svelte 5\.29/i.test(name)), JSON.stringify(printedNames));
+  assert.equal(printedNames.some((name) => /what.?s new in svelte|coding almost solely/i.test(name)), false, JSON.stringify(printedNames));
+  assert.equal(names.filter((name) => /composer/i.test(name)).length, 1);
+  assert.equal(
+    names.some((name) => /canary|old ship|coding almost solely|@dub\/|what.?s new in svelte|hotel in leiden|lisbon hotel|headshot generators/i.test(name)),
+    false,
+    JSON.stringify(names),
+  );
+  assert.equal(names.includes('Minor Changes'), false, JSON.stringify(names));
+  const history = polish.cheapHardFilter(
+    [
+      found({
+        name: 'FIRST HOMEPAGE IN 1996',
+        date: '2026-01-15',
+        link: 'https://levels.io/#first-homepage',
+        source: 'site',
+        kind: 'journal-ship',
+        description: 'Announced 2026-01-15 on levels.io',
+      }),
+      found({
+        name: 'Updated dependencies',
+        date: '2026-01-30',
+        link: 'https://github.com/vercel/fun/releases/1',
+        description: 'Patch Changes - Updated dependencies',
+      }),
+      found({
+        name: 'FUN 1.3',
+        date: '2026-01-30',
+        link: 'https://github.com/vercel/fun/releases/tag/1.3.0',
+        description: '1.3.0 (2026-01-30) ### Features update tar version ([#128](https://github.com/vercel/fun/pull/128))',
+      }),
+    ],
+    2026,
+  );
+  const historyNames = history.map((item) => item.name);
+  assert.equal(historyNames.some((name) => /1996|updated dependencies/i.test(name)), false, JSON.stringify(historyNames));
+  const fun = history.find((item) => /fun 1\.3/i.test(item.name));
+  assert.ok(fun, JSON.stringify(historyNames));
+  assert.equal(fun?.description, 'update tar version');
+  assert.ok((fun?.description || '').length <= 60);
+});
+
+test('print-time polish rewrites 8+ word changelog sentences and drops junk', () => {
+  const gated = polish.gateReceiptItems(
+    [
+      found({
+        name: 'Protect production deployments for free on every plan',
+        date: '2026-09-01',
+        link: 'https://vercel.com/changelog/protect-production-deployments-for-free-on-every-plan',
+      }),
+      found({
+        name: 'Secure compute and static IP builds start 64% faster',
+        date: '2026-09-08',
+        link: 'https://vercel.com/changelog/secure-compute-static-ip',
+      }),
+      found({
+        name: 'AI Gateway',
+        date: '2026-04-01',
+        link: 'https://vercel.com/changelog/ai-gateway',
+      }),
+      found({
+        name: 'Kevin Dawkins, Jerilyn Zheng, and 1 other',
+        date: '2026-09-12',
+        link: 'https://vercel.com/blog/authors',
+      }),
+      found({
+        name: 'API typesafe-compat typesafe-compat Decisions API',
+        date: '2026-08-02',
+        link: 'https://vercel.com/changelog/typesafe-compat',
+      }),
+      found({
+        name: 'Vercel Agent now installs private packages from npm and',
+        date: '2026-07-01',
+        link: 'https://vercel.com/changelog/vercel-agent',
+      }),
+      found({
+        name: 'Chat SDK',
+        date: '2026-06-01',
+        link: 'https://vercel.com/changelog/chat-sdk',
+      }),
+    ],
+    { year: 2026, who: 'Guillermo Rauch', affiliation: { company: 'Vercel', role: 'ceo' } },
+  );
+  const names = gated.map((item) => item.name);
+  assert.equal(
+    names.some((name) => name.trim().split(/\s+/).filter(Boolean).length >= 8),
+    false,
+    JSON.stringify(names),
+  );
+  assert.equal(names.some((name) => /dawkins|and 1 other|typesafe-compat typesafe-compat/i.test(name)), false, JSON.stringify(names));
+  assert.ok(names.some((name) => /protect production deployments/i.test(name)), JSON.stringify(names));
+  assert.ok(names.some((name) => /secure compute/i.test(name)), JSON.stringify(names));
+  assert.ok(names.some((name) => /ai gateway/i.test(name)), JSON.stringify(names));
+  assert.ok(names.some((name) => /vercel agent/i.test(name)), JSON.stringify(names));
+  assert.ok(names.some((name) => /chat sdk/i.test(name)), JSON.stringify(names));
+});
+
+test('CEO tapes drop tiny npm utilities, strip npm blurbs, and lead with flagships', () => {
+  const affiliation = { name: 'Guillermo Rauch', company: 'Vercel', role: 'ceo', product: null, companyX: null, companyGithub: null, companySite: 'https://vercel.com', typedCompany: true };
+  const kept = polish.polishCandidates(
+    [
+      found({
+        name: 'serve',
+        description: 'Static file serving and directory listing',
+        date: '2026-01-08',
+        source: 'npm',
+        link: 'https://www.npmjs.com/package/serve',
+        significance: 4,
+      }),
+      found({
+        name: 'botid',
+        description: 'BotID invisible CAPTCHA for bots',
+        date: '2026-02-01',
+        source: 'npm',
+        link: 'https://www.npmjs.com/package/botid',
+        significance: 4,
+      }),
+      found({
+        name: 'canvas',
+        description: 'Canvas implementation for Node.js',
+        date: '2026-03-01',
+        source: 'npm',
+        link: 'https://www.npmjs.com/package/canvas',
+        significance: 4,
+      }),
+      found({
+        name: 'AI Gateway',
+        date: '2026-08-12',
+        source: 'changelog',
+        link: 'https://vercel.com/changelog/ai-gateway',
+        significance: 2,
+      }),
+      found({
+        name: 'Vercel Agent',
+        date: '2026-09-30',
+        source: 'changelog',
+        link: 'https://vercel.com/changelog/vercel-agent',
+        significance: 2,
+      }),
+      found({
+        name: 'v0',
+        date: '2026-04-02',
+        source: 'changelog',
+        link: 'https://vercel.com/changelog/introducing-the-new-v0',
+        significance: 2,
+      }),
+    ],
+    { year: 2026, who: 'Guillermo Rauch', handle: 'rauchg', affiliation },
+  );
+  const names = kept.map((item) => item.name);
+  assert.equal(names.some((name) => /^(serve|botid|canvas)$/i.test(name)), false, JSON.stringify(names));
+  assert.ok(names.some((name) => /ai gateway/i.test(name)), JSON.stringify(names));
+  assert.ok(names.some((name) => /vercel agent/i.test(name)), JSON.stringify(names));
+  assert.ok(names.some((name) => /^v0$/i.test(name)), JSON.stringify(names));
+  assert.equal(
+    kept.some((item) => /static file serving|invisible captcha|implementation for node/i.test(item.description || '')),
+    false,
+    JSON.stringify(kept.map((item) => item.description)),
+  );
+  assert.equal(polish.printedDescription({ source: 'npm', description: 'Static file serving and directory listing' }), '');
+  assert.equal(polish.isCeoNpmUtility({ name: 'serve', source: 'npm', link: 'https://www.npmjs.com/package/serve' }, affiliation), true);
+  const ordered = polish.orderReceiptItems(kept);
+  assert.match(ordered[0].name, /ai gateway|vercel agent|^v0$/i);
+  const draft = ai.finish(
+    kept.map((item) => ({
+      name: item.name.toUpperCase(),
+      spoken: item.name,
+      description: item.description || '',
+      date: item.date,
+      status: 'LAUNCHED',
+      link: item.link,
+      icon: null,
+      source: item.source,
+      significance: item.significance,
+    })),
+    'Vercel Agent is the one that belongs on this tape.',
+    1,
+    undefined,
+    [],
+    { who: 'Guillermo Rauch', handle: 'rauchg', year: 2026, affiliation, company: 'Vercel', role: 'ceo' },
+  );
+  assert.equal(draft.items.some((item) => /^(SERVE|BOTID|CANVAS)$/i.test(item.name)), false, JSON.stringify(draft.items.map((item) => item.name)));
+  assert.match(draft.items[0].name, /AI GATEWAY|VERCEL AGENT|^V0$/i);
+  const rauchBare = ai.finish(
+    [
+      {
+        name: 'V0 PLATFORM API',
+        description: '',
+        date: '2026-09-18',
+        status: 'LAUNCHED',
+        link: 'https://vercel.com/changelog/v0-platform-api',
+        icon: null,
+        source: 'changelog',
+      },
+      {
+        name: 'AGENT BROWSER',
+        description: 'Browser automation CLI for AI agents',
+        date: '2026-01-11',
+        status: 'LAUNCHED',
+        link: 'https://agent-browser.dev/',
+        icon: null,
+        source: 'company',
+      },
+    ],
+    'Eve is on the tape.',
+    1,
+    undefined,
+    [],
+    { who: 'Guillermo Rauch', handle: 'rauchg', year: 2026 },
+  );
+  const rauchBareNames = rauchBare.items.map((item) => item.name);
+  assert.ok(rauchBareNames.some((name) => /vercel agent/i.test(name)), JSON.stringify(rauchBareNames));
+  assert.ok(rauchBareNames.some((name) => /ai gateway/i.test(name)), JSON.stringify(rauchBareNames));
+  const colinBare = ai.finish(
+    [
+      {
+        name: 'NUB',
+        description: '',
+        date: '2026-02-08',
+        status: 'LAUNCHED',
+        link: 'https://github.com/colinhacks/nub',
+        icon: null,
+        source: 'github',
+      },
+    ],
+    'Nubjs did the heavy lifting.',
+    1,
+    undefined,
+    [],
+    { who: 'Colin McDonnell', handle: 'colinhacks', year: 2026, bio: 'Zod' },
+  );
+  assert.ok(colinBare.items.some((item) => /zod/i.test(item.name)), JSON.stringify(colinBare.items.map((item) => item.name)));
+});
+
+test('home PRINT demoReceipt drops CEO npm utilities even when affiliation.role is still unknown', () => {
+  const foundItems = [
+    found({
+      name: 'serve',
+      description: 'Static file serving and directory listing',
+      date: '2026-03-03',
+      source: 'npm',
+      link: 'https://www.npmjs.com/package/serve',
+      significance: 4,
+    }),
+    found({
+      name: 'botid',
+      description: 'A package with a client-side React component and a server-side API library.',
+      date: '2026-03-03',
+      source: 'npm',
+      link: 'https://www.npmjs.com/package/botid',
+      significance: 4,
+    }),
+    found({
+      name: 'canvas',
+      description: 'Canvas graphics API backed by Cairo',
+      date: '2026-03-31',
+      source: 'npm',
+      link: 'https://www.npmjs.com/package/canvas',
+      significance: 4,
+    }),
+    found({
+      name: 'superagent',
+      description: 'elegant & feature rich browser / node HTTP with a fluent API',
+      date: '2026-09-23',
+      source: 'npm',
+      link: 'https://www.npmjs.com/package/superagent',
+      significance: 4,
+    }),
+    found({
+      name: 'Vercel Plugin',
+      date: '2026-03-26',
+      source: 'changelog',
+      link: 'https://vercel.com/changelog/vercel-plugin-openai-codex-and-codex-cli-support',
+      significance: 2,
+    }),
+    found({
+      name: 'v0 Platform API',
+      date: '2026-09-18',
+      source: 'changelog',
+      link: 'https://vercel.com/changelog/v0-now-reads-npm-credentials-from-shared-environment-variables',
+      significance: 2,
+    }),
+    found({
+      name: 'Vercel Agent',
+      date: '2026-09-30',
+      source: 'changelog',
+      link: 'https://vercel.com/changelog/vercel-agent-now-installs-private-packages-from-npm-and-custom-registries',
+      significance: 2,
+    }),
+    found({
+      name: 'AI Gateway',
+      date: '2026-08-12',
+      source: 'changelog',
+      link: 'https://vercel.com/changelog/ai-gateway',
+      significance: 2,
+    }),
+  ];
+  assert.equal(polish.isCeoNpmUtility({ name: 'serve', source: 'npm', link: 'https://www.npmjs.com/package/serve' }, null), false);
+  assert.equal(polish.isHeadlinerItem(foundItems[0]), false);
+  const inferred = polish.effectivePrintAffiliation(foundItems, { name: 'Guillermo Rauch', role: 'unknown' });
+  assert.equal(inferred?.role, 'ceo');
+  assert.equal(inferred?.company, 'Vercel');
+  const gathered = {
+    found: foundItems,
+    rawFound: foundItems,
+    web: [],
+    pages: [],
+    site: null,
+    profile: {
+      name: 'Guillermo Rauch',
+      bio: '',
+      site: 'https://rauchg.com',
+      x: 'rauchg',
+      github: 'rauchg',
+      affiliation: { name: 'Guillermo Rauch', company: null, role: 'unknown', product: null, companyX: null, companyGithub: null, companySite: null, typedCompany: false },
+    },
+    ran: ['partial:npm', 'partial:company'],
+    failed: [],
+    stats: [],
+  };
+  const harvested = ai.harvestItems(gathered, 2026);
+  const names = harvested.map((item) => item.name);
+  assert.equal(names.some((name) => /^(serve|botid|canvas|superagent)$/i.test(name)), false, JSON.stringify(names));
+  const demo = ai.demoReceipt(gathered, 2026, 1);
+  const printed = demo.items.map((item) => item.name);
+  assert.equal(printed.some((name) => /^(SERVE|BOTID|CANVAS|SUPERAGENT)$/i.test(name)), false, JSON.stringify(printed));
+  assert.match(printed[0], /AI GATEWAY|VERCEL AGENT|V0/i);
+  const finished = ai.finish(
+    foundItems.map((item) => ({
+      name: item.name.toUpperCase(),
+      spoken: item.name,
+      description: item.description || '',
+      date: item.date,
+      status: 'LAUNCHED',
+      link: item.link,
+      icon: null,
+      source: item.source,
+      significance: item.significance,
+    })),
+    'Serve',
+    1,
+    undefined,
+    [],
+    { who: 'Guillermo Rauch', handle: 'rauchg', year: 2026 },
+  );
+  assert.equal(finished.items.some((item) => /^(SERVE|BOTID|CANVAS|SUPERAGENT)$/i.test(item.name)), false, JSON.stringify(finished.items.map((item) => item.name)));
+  assert.match(finished.items[0].name, /AI GATEWAY|VERCEL AGENT|V0/i);
+});
+
+test('patch and minor lines of one package roll into a single tape line', () => {
+  const rolled = polish.rollupSamePackageVersions([
+    found({ name: 'TRPC 10.45.4', date: '2026-01-12', source: 'npm', link: 'https://www.npmjs.com/package/@trpc/server' }),
+    found({ name: 'TRPC 11.9', date: '2026-06-01', source: 'npm', link: 'https://www.npmjs.com/package/@trpc/server' }),
+    found({ name: 'TRPC 11.10', date: '2026-07-01', source: 'npm', link: 'https://www.npmjs.com/package/@trpc/server' }),
+    found({ name: 'TRPC 11.11', date: '2026-08-01', source: 'npm', link: 'https://www.npmjs.com/package/@trpc/server' }),
+    found({ name: 'TRPC 11.12', date: '2026-09-01', source: 'npm', link: 'https://www.npmjs.com/package/@trpc/server' }),
+  ]);
+  assert.equal(rolled.length, 1, JSON.stringify(rolled.map((item) => item.name)));
+  assert.match(rolled[0].name, /trpc · 5 releases/i);
+  const range = polish.rollupSamePackageVersions([
+    found({ name: 'TRPC 11.9', date: '2026-06-01' }),
+    found({ name: 'TRPC 11.10', date: '2026-07-01' }),
+    found({ name: 'TRPC 11.11', date: '2026-08-01' }),
+    found({ name: 'TRPC 11.12', date: '2026-09-01' }),
+  ]);
+  assert.equal(range.length, 1);
+  assert.match(range[0].name, /trpc 11\.9–11\.12/i);
+  const vite = polish.rollupSamePackageVersions([
+    found({ name: 'Vite 7', date: '2026-01-01' }),
+    found({ name: 'Vite 8', date: '2026-06-01' }),
+    found({ name: 'Zod 4.1', date: '2026-03-01' }),
+  ]);
+  assert.deepEqual(
+    vite.map((item) => item.name).sort(),
+    ['Vite 7', 'Vite 8', 'Zod 4.1'].sort(),
+  );
+  const printed = polish.polishCandidates(
+    [
+      found({ name: 'tRPC 10.45.4', date: '2026-01-12', source: 'github', link: 'https://github.com/trpc/trpc/releases/tag/v10.45.4', kind: 'oss-release' }),
+      found({ name: 'tRPC 11.9', date: '2026-06-01', source: 'github', link: 'https://github.com/trpc/trpc/releases/tag/v11.9.0', kind: 'oss-release' }),
+      found({ name: 'tRPC 11.10', date: '2026-07-01', source: 'github', link: 'https://github.com/trpc/trpc/releases/tag/v11.10.0', kind: 'oss-release' }),
+      found({ name: 'tRPC 11.11', date: '2026-08-01', source: 'github', link: 'https://github.com/trpc/trpc/releases/tag/v11.11.0', kind: 'oss-release' }),
+      found({ name: 'tRPC 11.12', date: '2026-09-01', source: 'github', link: 'https://github.com/trpc/trpc/releases/tag/v11.12.0', kind: 'oss-release' }),
+      found({ name: 'TRPC · 3 RELEASES IN MAR', date: '2026-03-20', source: 'github', link: 'https://github.com/trpc/trpc/releases', kind: 'oss-release' }),
+    ],
+    { year: 2026, who: 'colinhacks', handle: 'colinhacks' },
+  );
+  const printedNames = printed.map((item) => item.name);
+  assert.equal(printedNames.filter((name) => /trpc 11\.|trpc 10\./i.test(name)).length, 0, JSON.stringify(printedNames));
+  assert.ok(printedNames.some((name) => /trpc · 5 releases/i.test(name)), JSON.stringify(printedNames));
+  assert.ok(printedNames.some((name) => /trpc · 3 releases in mar/i.test(name)), JSON.stringify(printedNames));
+});

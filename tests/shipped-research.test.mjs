@@ -1,0 +1,1052 @@
+import './resolve-ts.mjs';
+import assert from 'node:assert/strict';
+import { test } from 'node:test';
+
+const identity = await import('../worker/shipped-identity.ts');
+const sources = await import('../worker/shipped-sources.ts');
+const ai = await import('../worker/shipped-ai.ts');
+const research = await import('../worker/shipped-research.ts');
+
+test('handle variants stitch X spellings to GitHub logins', () => {
+  assert.ok(identity.handleVariants('dannypostmaa').includes('dannypostma'));
+  assert.ok(identity.handleVariants('tdinh_me').includes('tdinhme'));
+  assert.ok(identity.handleVariants('tibo_maker').includes('tibo-maker'));
+  assert.equal(identity.handleVariants('tibo_maker').includes('tibo'), false);
+  assert.ok(identity.handleTokens('fofrAI').includes('fofr'));
+  assert.equal(identity.handleVariants('fofrAI').includes('fofr'), false);
+  assert.ok(identity.handleVariants('alex').includes('alexio'));
+  assert.equal(identity.handleVariants('levelsio').includes('levelsioio'), false);
+  assert.ok(identity.handleVariants('steventey').includes('steven-tey'));
+});
+
+test('name queries split "Tibo from OpenAI"', () => {
+  assert.deepEqual(identity.parsePersonName('Tibo from OpenAI'), { name: 'Tibo', company: 'OpenAI', tokens: ['Tibo'], product: null });
+  assert.equal(identity.parsePersonName('Steven Tey').company, null);
+  assert.equal(identity.prettyPersonName('tibo from open ai'), 'Tibo');
+  assert.equal(identity.prettyPersonName('jack friks'), 'Jack Friks');
+  assert.equal(identity.prettyPersonName('Michael Truell'), 'Michael Truell');
+});
+
+test('bio text yields product URLs and skips social hosts', () => {
+  const urls = identity.urlsFromText('PhotoAI.com $86K/m and https://x.com/levelsio plus nomads.com');
+  assert.ok(urls.some((u) => /photoai\.com/i.test(u)));
+  assert.ok(urls.some((u) => /nomads\.com/i.test(u)));
+  assert.equal(urls.some((u) => /x\.com/i.test(u)), false);
+});
+
+test('public X payloads parse without a person table', () => {
+  const vx = identity.xUserFromPayload({
+    screen_name: 'tdinh_me',
+    name: 'Tony Dinh',
+    description: 'Creating software I love to use. https://t.co/p4T2vFYQTt',
+  });
+  assert.equal(vx?.screen_name, 'tdinh_me');
+  const fx = identity.xUserFromPayload({
+    code: 200,
+    user: { screen_name: 'fofrAI', name: 'fofr', description: 'models', website: { url: 'https://fofr.ai' } },
+  });
+  assert.equal(fx?.name, 'fofr');
+});
+
+test('a 0-repo decoy GitHub account scores below the real one', () => {
+  const decoy = { login: 'Dannypostmaa', name: '', bio: '', blog: null, x: null, repos: 0 };
+  const real = { login: 'dannypostma', name: 'Danny Postma', bio: 'HeadshotPro', blog: 'https://www.headshotpro.com', x: 'dannypostma', repos: 18 };
+  const decoyScore = identity.scoreGithubMatch({ user: decoy, wantX: 'dannypostmaa' });
+  const realScore = identity.scoreGithubMatch({ user: real, wantX: 'dannypostmaa', wantName: 'Danny Postma' });
+  assert.ok(realScore > decoyScore, `${realScore} vs ${decoyScore}`);
+  assert.ok(realScore >= 8);
+  const otherTibo = identity.scoreGithubMatch({
+    user: { login: 'T-Dnzt', name: 'Tibo', bio: '', blog: null, x: null, repos: 40 },
+    wantX: 'tibo_maker',
+    wantName: 'Tibo',
+  });
+  assert.ok(otherTibo < 8, `wrong Tibo scored ${otherTibo}`);
+  const nameOnly = identity.scoreGithubMatch({
+    user: { login: 'T-Dnzt', name: 'Tibo', bio: '', blog: null, x: null, repos: 40 },
+    wantName: 'Tibo',
+    wantCompany: 'OpenAI',
+  });
+  assert.ok(nameOnly < 8, `OpenAI-less Tibo scored ${nameOnly}`);
+  const copiedBlog = identity.scoreGithubMatch({
+    user: { login: 'fofrai', name: 'fofrAI', bio: '', blog: 'https://fofr.ai', x: 'fofrai', repos: 0 },
+    wantX: 'fofrAI',
+    wantName: 'fofr',
+    wantSite: 'https://fofr.ai/',
+  });
+  const realFofr = identity.scoreGithubMatch({
+    user: { login: 'fofr', name: 'fofr', bio: '', blog: null, x: 'fofrAI', repos: 164 },
+    wantX: 'fofrAI',
+    wantName: 'fofr',
+    wantSite: 'https://fofr.ai/',
+  });
+  assert.ok(copiedBlog <= 6, `0-repo blog copy scored ${copiedBlog}`);
+  assert.ok(realFofr > copiedBlog, `${realFofr} vs ${copiedBlog}`);
+  const parkedHandle = identity.scoreGithubMatch({
+    user: { login: 'alex', name: '', bio: '', blog: null, x: null, repos: 1 },
+    wantX: 'alex',
+  });
+  const realIo = identity.scoreGithubMatch({
+    user: { login: 'alexio', name: 'Alex', bio: '', blog: 'https://alex.io', x: 'alex', repos: 400 },
+    wantX: 'alex',
+    wantName: 'Alex',
+  });
+  assert.ok(parkedHandle <= 12, `parked exact login scored ${parkedHandle}`);
+  assert.ok(realIo > parkedHandle, `${realIo} vs ${parkedHandle}`);
+});
+
+test('undated own-site products become found items; other years do not', () => {
+  const profile = { name: 'Pieter', bio: '', site: 'https://levels.io/', x: 'levelsio', github: 'levelsio', sites: ['https://photoai.com/'] };
+  const items = sources.itemsFromWebEvidence({
+    profile,
+    site: {
+      url: 'https://levels.io/',
+      title: 'blog',
+      description: '',
+      icon: null,
+      text: 'PhotoAI',
+      links: [
+        { text: 'PhotoAI', url: 'https://photoai.com/' },
+        { text: 'Home', url: 'https://levels.io/' },
+      ],
+    },
+    pages: [],
+    web: [{ title: 'Old Thing', url: 'https://old.example/', snippet: '', date: '2024-01-01' }],
+    year: 2026,
+  });
+  assert.ok(items.some((item) => /photoai/i.test(item.name)));
+  assert.equal(items.some((item) => /old thing/i.test(item.name)), false);
+  const jackSite = sources.itemsFromWebEvidence({
+    profile: { name: 'Jack Friks', bio: '', site: 'https://jackfriks.com/', x: 'jackfriks', github: 'jackfriks', sites: ['https://jackfriks.com/'] },
+    site: {
+      url: 'https://jackfriks.com/',
+      title: 'Jack Friks',
+      description: '',
+      icon: null,
+      text: 'tools I use',
+      links: [
+        { text: 'DataFast', url: 'https://datafa.st/' },
+        { text: 'ShipFast', url: 'https://shipfa.st/' },
+        { text: 'Lovelee', url: 'https://jackfriks.com/#lovelee' },
+      ],
+    },
+    pages: [],
+    web: [{ title: 'ShipFast — The NextJS boilerplate', url: 'https://shipfa.st/', snippet: '', date: null }],
+    year: 2026,
+  });
+  assert.equal(jackSite.some((item) => /datafast|shipfast|unicorne|codefast|indiepage|gamifylist/i.test(item.name)), false);
+  const photo = items.find((item) => /photoai/i.test(item.name));
+  assert.equal(photo.date, null);
+  assert.ok(photo.dateConfidence === 'unknown' || photo.thisYear);
+});
+
+test('cashier note and stats are specific to the items, never stock copy', () => {
+  const items = [
+    { name: 'PHOTOAI', description: 'Headshots', date: '2026-03', status: 'LIVE', link: 'https://photoai.com/', icon: null, source: 'web', spoken: 'PhotoAI' },
+    { name: 'INTERIORAI', description: 'Rooms', date: '2026-04', status: 'LIVE', link: 'https://interiorai.com/', icon: null, source: 'site', spoken: 'InteriorAI' },
+    { name: 'SUPERLEVELS', description: 'Repo', date: '2026-04-23', status: 'SHIPPED', link: 'https://github.com/levelsio/superlevels', icon: null, source: 'github', spoken: 'SuperLevels', significance: 3 },
+  ];
+  const note = ai.groundedNote(items, 2, 'levelsio', ['553 GitHub stars SuperLevels · github.com/levelsio/superlevels']);
+  assert.match(note, /PhotoAI|InteriorAI|SuperLevels/i);
+  assert.doesNotMatch(note, /does one job|the pair is|opens on|kept \w+ busy:|spent the year on/i);
+  const clumsy = ai.groundedNote(
+    [
+      { name: 'LLM-MRCHATTERBOX', description: 'Chat', date: '2026-01', status: 'SHIPPED', link: 'https://github.com/simonw/llm-mrchatterbox', icon: null, source: 'github' },
+      { name: 'datasette', description: 'Tool', date: '2026-02', status: 'SHIPPED', link: 'https://github.com/simonw/datasette', icon: null, source: 'github' },
+    ],
+    1,
+    'simonw',
+    ['13k GitHub stars llm · github.com/simonw/llm'],
+  );
+  assert.doesNotMatch(clumsy, /stars llm for/i);
+  const ceoItems = [
+    { name: 'CODEX APP FOR MACOS', description: 'App', date: '2026-01', status: 'LAUNCHED', link: 'https://openai.com/codex', icon: null, source: 'changelog', spoken: 'Codex app', significance: 4 },
+    { name: 'CHATGPT IMAGES', description: 'Images', date: '2026-02', status: 'LAUNCHED', link: 'https://openai.com/index/images', icon: null, source: 'changelog', spoken: 'ChatGPT Images' },
+    { name: 'SORA', description: 'Video', date: '2026-03', status: 'LAUNCHED', link: 'https://openai.com/sora', icon: null, source: 'changelog', spoken: 'Sora' },
+    { name: 'GPT-5', description: 'Model', date: '2026-04', status: 'LAUNCHED', link: 'https://openai.com/gpt-5', icon: null, source: 'changelog', spoken: 'GPT-5' },
+  ];
+  const ceo = ai.groundedNote(ceoItems, 2, 'Sam Altman', [], { role: 'ceo', company: 'OpenAI', who: 'Sam Altman' });
+  assert.match(ceo, /Codex app|ChatGPT Images|Sora|GPT-5|Sam/i);
+  assert.doesNotMatch(ceo, /year opens|does one job|the pair is/i);
+  const stats = ai.formatStats(items);
+  assert.match(stats[0], /3 launches/);
+  assert.match(stats[0], /GitHub/);
+  assert.doesNotMatch(note, /Thank you for shipping|Come again|No refunds on momentum|Receipt paper running low|Someone likes the publish button|night shift|publish button|\bthe tape\b|\bthe register\b/i);
+  const one = ai.groundedNote(
+    [{ name: 'POSTBRIDGE-CLI', description: 'CLI', date: '2026-09-09', status: 'SHIPPED', link: 'https://github.com/jackfriks/postbridge-cli', icon: null, source: 'github', spoken: 'postbridge-cli' }],
+    0,
+    'Jack Friks',
+    [],
+  );
+  assert.doesNotMatch(one, /plus 0 more/i);
+  assert.match(one, /postbridge-cli/i);
+  assert.equal(ai.noteMisusesStats('44k GitHub stars on ZOD', 23, ['553 GitHub stars SuperLevels · github.com/x']), true);
+  assert.equal(ai.noteMisusesStats('Zod sits at 326k npm weekly downloads.', 21, ['326k npm weekly downloads Zod · npmjs.com/package/zod']), false);
+  assert.equal(ai.cashierNoteLooksCanned(note), false);
+  assert.doesNotMatch(note, /supposed to be quiet|still be quoting|plus \d+ more, and /i);
+  assert.equal(ai.cashierNoteLooksCanned('Hallmark passed 30k stars while the night shift counted receipts.'), true);
+  assert.equal(ai.cashierNoteLooksCanned('553 GitHub stars on SUPERLEVELS. Not bad for a year that was supposed to be quiet.'), true);
+  assert.equal(ai.cashierNoteLooksCanned('GPT-5.2-CODEX plus 60 more, and CODEX APP UPDATES is the one people will still be quoting.'), true);
+  assert.equal(ai.cashierNoteLooksCanned('runs on a wish and a prayer'), true);
+  assert.equal(ai.cashierNoteLooksCanned('Nobody asked for ChatGPT for Research.'), true);
+  assert.equal(ai.cashierNoteLooksCanned('200/mo public revenue. Same maker, more SKUs.'), true);
+  assert.equal(ai.noteFailsVoice("Tibo's year is CODEX APP through FASTER STEERING IN CODEX: 55 public lines, all theirs."), true);
+  assert.equal(ai.noteFailsVoice("Jack's year lives at https://www.npmjs.com/package/postbridge-cli."), true);
+  assert.equal(ai.noteFailsVoice('levelsio spent the year on Dronesim.com, then Infinite Slop.'), true);
+  assert.equal(ai.noteFailsVoice('Guillermo kept Vercel busy: BotID first, Serve later.'), true);
+  assert.equal(ai.noteFailsVoice('Sam kept OpenAI busy: Codex app first, GPT-5.3-Codex later.'), true);
+  assert.equal(ai.noteFailsVoice("Boron does one job. Zshy does another."), true);
+  assert.equal(ai.noteFailsVoice('The pair is claude-blocker and fs2-cli.'), true);
+  assert.equal(ai.noteFailsVoice("Sam's year opens on Codex app, with GPT-5.3-Codex beside it."), true);
+  assert.equal(ai.cashierNoteLooksCanned('Codex took the whole terminal and then the browser, and Tibo filed each one as a changelog entry like it was nothing.'), true);
+  assert.equal(ai.cashierNoteLooksCanned('Zod is still the schema everyone copies. Colin spent the rest of the year on Zshy.'), true);
+  assert.equal(ai.cashierNoteLooksCanned('Harbor is the whole receipt. The CLI is just the grip.'), true);
+  assert.equal(ai.cashierNoteLooksCanned("Codex grew long-running work this year, and Tibo's agents now stay clocked in overnight."), true);
+  assert.equal(ai.noteFailsVoice('Tibo kept Codex on long-running work, then shipped GitLab support into Codex Cloud.'), false);
+  const punch = ai.pickBestNote(
+    [
+      'The pair is PhotoAI and InteriorAI.',
+      'SuperLevels is sitting at 553 GitHub stars after the April push.',
+      'Pieter launched PhotoAI and two more .coms. The receipt looks like a weekend.',
+    ],
+    items,
+    ['553 GitHub stars SuperLevels · github.com/levelsio/superlevels'],
+    { who: 'Pieter Levels', handle: 'levelsio', usedNotes: ['PhotoAI kept the lights on this year.'] },
+  );
+  assert.match(punch, /SuperLevels/i);
+  assert.doesNotMatch(punch, /the pair is|does one job|opens on|receipt looks like a weekend/i);
+  const unique = ai.pickBestNote(
+    [
+      "Sam's year opens on Codex app, with GPT-5.3-Codex beside it.",
+      'Codex app took the desktop. Sora still feels like the dare.',
+      'The pair is Codex app and Sora.',
+    ],
+    ceoItems,
+    [],
+    { who: 'Sam Altman', company: 'OpenAI', usedNotes: [] },
+  );
+  assert.match(unique, /Codex app/i);
+  assert.doesNotMatch(unique, /year opens|the pair is/i);
+  const clash = ai.groundedNote(ceoItems, 0, 'Tibo', [], { who: 'Tibo', usedNotes: ['Codex app'] });
+  assert.notEqual(clash.toLowerCase(), 'codex app');
+  assert.equal(
+    ai.noteCitesUnknownShip('Post Bridge also landed as a ChatGPT plugin.', [{ name: 'POSTBRIDGE-CLI', description: 'CLI' }], 'Jack'),
+    true,
+  );
+  assert.equal(
+    ai.noteCitesUnknownShip('Post Bridge also landed as a ChatGPT plugin.', [{ name: 'POST BRIDGE IN CHATGPT', description: 'Pin' }], 'Jack'),
+    false,
+  );
+  assert.equal(ai.noteCitesUnknownShip('Jack shipped DataFast this year.', [{ name: 'POSTBRIDGE-CLI', description: 'CLI' }], 'Jack'), true);
+  assert.equal(
+    ai.noteCitesUnknownShip(
+      'Origin took the September spotlight and kept the receipt honest.',
+      [{ name: 'ORIGIN', description: 'Cursor launch', spoken: 'Origin' }],
+      { who: 'Michael Truell', company: 'Cursor' },
+    ),
+    false,
+  );
+  assert.equal(
+    ai.noteCitesUnknownShip('Sam shipped GPT-5 at OpenAI.', [{ name: 'GPT-5', description: 'Model', spoken: 'GPT-5' }], {
+      who: 'Sam Altman',
+      company: 'OpenAI',
+    }),
+    false,
+  );
+  assert.equal(
+    ai.hardRejectNote(
+      'Origin took the September spotlight and kept the receipt honest.',
+      [{ name: 'ORIGIN', description: 'Cursor launch', date: '2026-09-14', status: 'LAUNCHED', link: 'https://cursor.com/blog/origin', icon: null, source: 'changelog', spoken: 'Origin' }],
+      [],
+      { who: 'Michael Truell', company: 'Cursor' },
+    ),
+    null,
+  );
+  assert.equal(
+    ai.hardRejectNote('Codex app took the desktop and then the browser.', ceoItems, [], {
+      who: 'Sam Altman',
+      company: 'OpenAI',
+      usedNotes: ['Codex app took the desktop and then a longer stored sentence.'],
+    }),
+    null,
+  );
+  assert.equal(
+    ai.hardRejectNote('Codex app took the desktop and then the browser.', ceoItems, [], {
+      who: 'Sam',
+      usedNotes: ['Codex app took the desktop and then the browser.'],
+    }),
+    'duplicate',
+  );
+  assert.equal(ai.hardRejectNote('The pair is Codex app and Sora.', ceoItems, [], { who: 'Sam Altman' }), null);
+  assert.equal(
+    ai.hardRejectNote(
+      'Jev had a busy year. youtube-sponsor-detection is the one that matters.',
+      [{ name: 'YOUTUBE-SPONSOR-DETECTION', spoken: 'youtube-sponsor-detection' }],
+      [],
+      { who: 'Tony Dinh', handle: 'tdinh' },
+    ),
+    'other-person',
+  );
+  assert.equal(
+    ai.hardRejectNote(
+      'Tony shipped youtube-sponsor-detection and kept the rest of the year moving.',
+      [{ name: 'YOUTUBE-SPONSOR-DETECTION', spoken: 'youtube-sponsor-detection' }],
+      [],
+      { who: 'Tony Dinh', handle: 'tdinh' },
+    ),
+    null,
+  );
+  assert.equal(
+    ai.hardRejectNote(
+      'Zshy went out with no description and Pullfrog did the same.',
+      [{ name: 'ZSHY', spoken: 'Zshy' }, { name: 'PULLFROG', spoken: 'Pullfrog' }],
+      [],
+      { who: 'Colin McDonnell', handle: 'colinhacks' },
+    ),
+    null,
+  );
+  assert.equal(ai.noteCitesOtherPerson('Marc Lou already shipped Ship or Die.', [{ name: 'POST BRIDGE', spoken: 'Post Bridge' }], { who: 'Jack Friks', handle: 'jackfriks' }), true);
+  assert.equal(
+    ai.noteCitesOtherPerson(
+      'Eight printed items, and the strangest is jev-tetris, where Jev plays Tetris against other models.',
+      [{ name: 'JEV-TETRIS', spoken: 'jev-tetris' }],
+      { who: 'Tony Dinh', handle: 'tdinh_me' },
+    ),
+    true,
+  );
+  assert.equal(
+    ai.noteCitesOtherPerson(
+      'jev-tetris is the oddest repo on the pile.',
+      [{ name: 'JEV-TETRIS', spoken: 'jev-tetris' }],
+      { who: 'Tony Dinh', handle: 'tdinh_me' },
+    ),
+    false,
+  );
+  assert.equal(
+    ai.hardRejectNote(
+      'Vue 3.5 and Vite 7 kept the year moving.',
+      [
+        { name: 'VUE 3.5', spoken: 'Vue 3.5' },
+        { name: 'VITE 7', spoken: 'Vite 7' },
+        { name: 'ESLINT-PLUGIN-VUE', spoken: 'eslint-plugin-vue' },
+      ],
+      [],
+      { who: 'Evan You', handle: 'youyuxi' },
+    ),
+    null,
+  );
+  assert.equal(
+    ai.hardRejectNote(
+      'React 19.3 shipped and the monthly rollups filled the rest of the tape.',
+      [
+        { name: 'REACT 19.3', spoken: 'React 19.3' },
+        { name: 'REACT-DOM', spoken: 'react-dom' },
+      ],
+      [],
+      { who: 'Dan Abramov', handle: 'dan_abramov' },
+    ),
+    null,
+  );
+  assert.equal(
+    ai.hardRejectNote(
+      'Six printed items, one of them a drone simulator. The bio is a menu of incomes, and the receipt is just the receipt.',
+      [{ name: 'PHOTOAI', spoken: 'PhotoAI', source: 'site' }],
+      [],
+      { who: 'Pieter Levels', handle: 'levelsio' },
+    ),
+    'unsourced-number',
+  );
+  assert.equal(
+    ai.hardRejectNote(
+      'Twenty-three entries, most of them Codex.',
+      [{ name: 'CODEX APP', spoken: 'Codex app', source: 'changelog' }],
+      [],
+      { who: 'Sam Altman', handle: 'sama' },
+    ),
+    'unsourced-number',
+  );
+  assert.equal(
+    ai.hardRejectNote(
+      'From Codex app to Sora to GPT-6, the year read like a city being rebuilt one storefront at a time.',
+      [
+        { name: 'CODEX APP', spoken: 'Codex app', source: 'changelog' },
+        { name: 'SORA', spoken: 'Sora', source: 'changelog' },
+        { name: 'GPT-6', spoken: 'GPT-6', source: 'changelog' },
+      ],
+      [],
+      { who: 'Sam Altman', handle: 'sama' },
+    ),
+    null,
+  );
+  assert.equal(
+    ai.noteMisusesStats('GPT-6 landed like a flagship should.', 25, [], [{ name: 'GPT-6', spoken: 'GPT-6' }]),
+    false,
+  );
+  const thin = ai.scoreCashierNote(
+    'Levels is the one on this tape worth a second look. The rest are short and the bio does most of the talking.',
+    [{ name: 'PHOTOAI', spoken: 'PhotoAI', source: 'site' }],
+    [],
+    { who: 'Pieter Levels', handle: 'levelsio' },
+  );
+  const flat = ai.scoreCashierNote(
+    'Privacy Center and Security History both printed in September.',
+    [
+      { name: 'PRIVACY CENTER IN CHATGPT', spoken: 'Privacy Center in ChatGPT', source: 'changelog' },
+      { name: 'SECURITY HISTORY IN CHATGPT', spoken: 'Security History in ChatGPT', source: 'changelog' },
+    ],
+    [],
+    { who: 'Sam Altman', handle: 'sama' },
+  );
+  const punchy = ai.scoreCashierNote(
+    'PhotoAI is still the one people open first.',
+    [{ name: 'PHOTOAI', spoken: 'PhotoAI', source: 'site' }],
+    [],
+    { who: 'Pieter Levels', handle: 'levelsio' },
+  );
+  assert.ok(punchy > thin, `${punchy} vs ${thin}`);
+  assert.ok(punchy > flat, `${punchy} vs ${flat}`);
+  const softOnly = ai.pickBestNote(
+    [
+      'Harbor is the whole receipt. The CLI is just the grip.',
+      'Relay is the quiet one. The announcement posts are doing too much.',
+      'Northline shipped a radio, then a weather kite.',
+    ],
+    items,
+    [],
+    { who: 'Pieter Levels', handle: 'levelsio' },
+  );
+  assert.ok(softOnly.length > 8, softOnly);
+  assert.doesNotMatch(softOnly, /^(PhotoAI|InteriorAI|SuperLevels)$/i);
+  assert.equal(ai.isBareProductNote('PhotoAI', [{ name: 'PHOTOAI', spoken: 'PhotoAI' }]), true);
+  assert.equal(ai.isBareProductNote('PhotoAI is the one that stuck.', [{ name: 'PHOTOAI', spoken: 'PhotoAI' }]), false);
+  assert.equal(
+    ai.hardRejectNote(
+      'Lsp4j-MCP showed up.',
+      [{ name: 'LSP4J-MCP', spoken: 'Lsp4j-MCP', description: 'MCP server for language servers', source: 'github' }],
+      [],
+      { who: 'Stephanj' },
+    ),
+    null,
+  );
+  assert.equal(
+    ai.hardRejectNote(
+      'Twenty-five receipts, and Codex keeps coming back with new versions.',
+      [{ name: 'GPT-6', spoken: 'GPT-6', description: 'frontier model', source: 'changelog' }],
+      [],
+      { who: 'Sam Altman' },
+    ),
+    null,
+  );
+  const detailed = ai.scoreCashierNote(
+    'postbridge-cli posts to every network from one command.',
+    [{ name: 'POSTBRIDGE-CLI', spoken: 'postbridge-cli', description: 'posts to every network from one command', source: 'github' }],
+    [],
+    { who: 'Jack Friks', handle: 'jackfriks' },
+  );
+  const thinStuck = ai.scoreCashierNote(
+    'postbridge-cli is the one that stuck.',
+    [{ name: 'POSTBRIDGE-CLI', spoken: 'postbridge-cli', description: 'posts to every network from one command', source: 'github' }],
+    [],
+    { who: 'Jack Friks', handle: 'jackfriks' },
+  );
+  assert.ok(detailed > thinStuck, `${detailed} vs ${thinStuck}`);
+  const fallback = ai.sentenceFallbackNote(
+    [{ name: 'LSP4J-MCP', spoken: 'Lsp4j-MCP', description: 'bridges language servers over MCP', date: '2026-03-01', status: 'LAUNCHED', link: 'https://github.com/s/lsp', icon: null, source: 'github' }],
+    { who: 'Stephanj' },
+  );
+  assert.match(fallback, /language servers|MCP/i);
+  assert.doesNotMatch(fallback, /showed up|stuck|shipped this year|is a product/i);
+  const multi = ai.sentenceFallbackNote(
+    [
+      { name: 'V0', spoken: 'v0', description: 'generate UI from a prompt', date: '2026-03-01', status: 'LAUNCHED', link: 'https://v0.dev', icon: null, source: 'changelog' },
+      { name: 'VERCEL AGENT', spoken: 'Vercel Agent', description: 'installs private packages', date: '2026-09-30', status: 'LAUNCHED', link: 'https://vercel.com/changelog/agent', icon: null, source: 'changelog' },
+    ],
+    { who: 'Guillermo Rauch' },
+  );
+  assert.doesNotMatch(multi, /the one public ship|the one on this tape|leads \d+ ships|public tape|lead ship/i);
+  assert.match(multi, /v0|Vercel Agent|receipt/i);
+  assert.equal(
+    ai.hardRejectNote('v0 leads 54 ships: generate UI from a prompt', [
+      { name: 'V0', spoken: 'v0', description: 'generate UI from a prompt' },
+      { name: 'VERCEL AGENT', spoken: 'Vercel Agent' },
+    ], [], { who: 'Guillermo Rauch' }),
+    'unsourced-number',
+  );
+  assert.equal(
+    ai.hardRejectNote('Cursor in JetBrains IDEs · Cursor kept the year moving.', [{ name: 'CURSOR IN JETBRAINS IDES', spoken: 'Cursor in JetBrains IDEs' }], [], { who: 'Michael Truell' }),
+    null,
+  );
+  assert.equal(
+    ai.hardRejectNote('generate UI from a prompt and that is the whole story here.', [
+      { name: 'V0', spoken: 'v0', description: 'generate UI from a prompt' },
+    ], [], { who: 'Guillermo Rauch' }),
+    null,
+  );
+  assert.equal(
+    ai.hardRejectNote('v0 is the one public ship here, and that is the whole story.', [
+      { name: 'V0', spoken: 'v0' },
+      { name: 'VERCEL AGENT', spoken: 'Vercel Agent' },
+    ], [], { who: 'Guillermo Rauch' }),
+    'unsourced-number',
+  );
+  assert.equal(ai.hardRejectNote('ChatGPT for Education opens in a new window.', [{ name: 'CHATGPT FOR EDUCATION', spoken: 'ChatGPT for Education' }], [], { who: 'Sam Altman' }), null);
+  assert.equal(ai.hardRejectNote('Frizz is a product that shipped this year.', [{ name: 'FRIZZ', spoken: 'Frizz' }], [], { who: 'Colin McDonnell' }), null);
+  assert.equal(ai.hardRejectNote('Frizz shipped.', [{ name: 'FRIZZ', spoken: 'Frizz' }], [], { who: 'Colin McDonnell' }), null);
+  assert.equal(
+    ai.hardRejectNote("This year's public tape starts with AWS databases.", [
+      { name: 'AWS DATABASES ARE NOW LIVE', spoken: 'AWS databases are now live' },
+    ], [], { who: 'Guillermo Rauch' }),
+    'banned-phrase',
+  );
+  assert.equal(
+    ai.hardRejectNote('Frizz as the lead ship on a short receipt.', [{ name: 'FRIZZ', spoken: 'Frizz' }], [], { who: 'Colin McDonnell' }),
+    'banned-phrase',
+  );
+  assert.equal(
+    ai.hardRejectNote('Aws Databases Are Now Live sits next to Vercel Plugin on a crowded tape.', [
+      { name: 'AWS DATABASES ARE NOW LIVE', spoken: 'AWS databases are now live' },
+      { name: 'VERCEL PLUGIN FOR VSCODE', spoken: 'Vercel Plugin for VS Code' },
+    ], [], { who: 'Guillermo Rauch' }),
+    null,
+  );
+  assert.equal(
+    ai.hardRejectNote(
+      'Keep an eye on AWS databases are now live on the Vercel Marketplace and V0; 2 public ships landed this year.',
+      [
+        { name: 'AWS DATABASES ARE NOW LIVE ON THE VERCEL MARKETPLACE AND V0', spoken: 'AWS databases are now live on the Vercel Marketplace and V0' },
+        { name: 'VERCEL PLUGIN', spoken: 'Vercel Plugin' },
+      ],
+      [],
+      { who: 'Guillermo Rauch' },
+    ),
+    null,
+  );
+  const awsFallback = ai.sentenceFallbackNote(
+    [
+      { name: 'AWS DATABASES ARE NOW LIVE', spoken: 'AWS databases are now live', description: 'managed databases', date: '2026-10-01', status: 'LAUNCHED', link: 'https://vercel.com/changelog/aws', icon: null, source: 'changelog' },
+      { name: 'VERCEL PLUGIN', spoken: 'Vercel Plugin', description: 'editor plugin', date: '2026-09-01', status: 'LAUNCHED', link: 'https://vercel.com/changelog/plugin', icon: null, source: 'changelog' },
+    ],
+    { who: 'Guillermo Rauch' },
+  );
+  assert.doesNotMatch(awsFallback, /leads \d+ ships|Aws Databases Are Now Live sits|·|the rest of the tape|nothing public in 20\d{2} turned up|public tape|lead ship/i);
+  assert.match(awsFallback, /keep an eye on|are both on this|receipt|product this year|first line/i);
+  assert.equal(ai.isEmptyTapeNote(awsFallback), false, awsFallback);
+  const longAws = ai.finish(
+    [
+      {
+        name: 'AWS DATABASES ARE NOW LIVE ON THE VERCEL MARKETPLACE AND V0',
+        spoken: 'AWS databases are now live on the Vercel Marketplace and V0',
+        description: 'See all of the latest features and updates to the Vercel platform.',
+        date: '2026-10-01',
+        status: 'LAUNCHED',
+        link: 'https://vercel.com/changelog/aws',
+        icon: null,
+        source: 'changelog',
+      },
+      {
+        name: 'VERCEL PLUGIN FOR VSCODE',
+        spoken: 'Vercel Plugin for VS Code',
+        description: 'editor plugin',
+        date: '2026-09-01',
+        status: 'LAUNCHED',
+        link: 'https://vercel.com/changelog/plugin',
+        icon: null,
+        source: 'changelog',
+      },
+    ],
+    'Nothing public in 2026 turned up. Come back when something ships.',
+    7,
+    undefined,
+    [],
+    { who: 'Guillermo Rauch', handle: 'rauchg', apiDown: false, year: 2026 },
+  );
+  assert.equal(longAws.potential, false);
+  assert.ok(longAws.items.length > 0, JSON.stringify(longAws.items.map((item) => item.name)));
+  assert.equal(ai.isEmptyTapeNote(longAws.note), false, longAws.note);
+  assert.equal(ai.isBareProductNote(longAws.note, longAws.items), false, longAws.note);
+  assert.doesNotMatch(longAws.note, /public tape|lead ship/i);
+  assert.match(longAws.note, /AWS|Vercel Plugin|receipt/i);
+  const curatedForeign = ai.finish(
+    [
+      {
+        name: 'CURSOR CLOUD AGENTS',
+        spoken: 'Cursor Cloud Agents',
+        description: 'deploy Cursor agents',
+        date: '2026-10-01',
+        status: 'LAUNCHED',
+        link: 'https://vercel.com/changelog/cursor-cloud-agents',
+        icon: null,
+        source: 'changelog',
+      },
+      {
+        name: 'VERCEL AGENT',
+        spoken: 'Vercel Agent',
+        description: 'first-party agent',
+        date: '2026-10-09',
+        status: 'LAUNCHED',
+        link: 'https://vercel.com/changelog/vercel-agent',
+        icon: null,
+        source: 'changelog',
+      },
+    ],
+    'Vercel Agent is the one that belongs on this tape.',
+    4,
+    undefined,
+    [],
+    {
+      who: 'Guillermo Rauch',
+      handle: 'rauchg',
+      company: 'Vercel',
+      role: 'ceo',
+      year: 2026,
+      curated: true,
+      affiliation: { company: 'Vercel', role: 'ceo', name: 'Guillermo Rauch' },
+      apiDown: false,
+    },
+  );
+  assert.equal(
+    curatedForeign.items.some((item) => /cursor cloud agents/i.test(item.name)),
+    false,
+    JSON.stringify(curatedForeign.items.map((item) => item.name)),
+  );
+  assert.ok(
+    curatedForeign.items.some((item) => /vercel agent/i.test(item.name)),
+    JSON.stringify(curatedForeign.items.map((item) => item.name)),
+  );
+  const emptyOnly = ai.finish([], 'keep going', 3, undefined, [], { who: 'Nobody', apiDown: false, year: 2026 });
+  assert.equal(emptyOnly.potential, true);
+  assert.equal(ai.isEmptyTapeNote(emptyOnly.note), true, emptyOnly.note);
+  assert.equal(
+    ai.hardRejectNote(
+      'Keep an eye on Codex CLI; the rest of the tape is still filling in.',
+      [
+        { name: 'CODEX CLI', spoken: 'Codex CLI' },
+        { name: 'RECORD & REPLAY', spoken: 'Record & Replay' },
+      ],
+      [],
+      { who: 'Tibo' },
+    ),
+    null,
+  );
+  assert.equal(
+    ai.pickLeastBadNote(
+      ['See https://frizz.dev for the schema.', 'Read github.com/colinhacks/zod next.'],
+      [{ name: 'FRIZZ', spoken: 'Frizz', description: 'schema tooling' }],
+      [],
+      { who: 'Colin McDonnell' },
+    ),
+    '',
+  );
+  const sealedCanned = ai.finish(
+    [{ name: 'FRIZZ', spoken: 'Frizz', description: 'schema tooling for TypeScript', date: '2026-03-01', status: 'LAUNCHED', link: 'https://frizz.dev', icon: null, source: 'github' }],
+    "This year's public tape starts with Frizz as the lead ship.",
+    2,
+    undefined,
+    [],
+    { who: 'Colin McDonnell', handle: 'colinhacks', apiDown: false, year: 2026 },
+  );
+  assert.doesNotMatch(sealedCanned.note, /opens in a new window|shipped this year|is a product/i);
+  assert.ok(sealedCanned.note.split(/\s+/).length >= 8, sealedCanned.note);
+  const sealed = ai.finish(
+    [{ name: 'PHOTOAI', spoken: 'PhotoAI', description: 'headshots', date: '2026-01-20', status: 'LAUNCHED', link: 'https://photoai.com', icon: null, source: 'site' }],
+    '',
+    1,
+    undefined,
+    [],
+    { who: 'Pieter Levels', handle: 'levelsio', apiDown: false, year: 2026 },
+  );
+  assert.equal(ai.isBareProductNote(sealed.note, sealed.items), false, sealed.note);
+  const down = ai.finish(
+    [{ name: 'PHOTOAI', spoken: 'PhotoAI', description: 'headshots', date: '2026-01-20', status: 'LAUNCHED', link: 'https://photoai.com', icon: null, source: 'site' }],
+    '',
+    1,
+    undefined,
+    [],
+    { who: 'Pieter Levels', handle: 'levelsio', apiDown: true, year: 2026 },
+  );
+  assert.equal(ai.isBareProductNote(down.note, down.items), true, down.note);
+  assert.doesNotMatch(note, /\blines\b|https?:\/\/|CODEX APP/i);
+  assert.doesNotMatch(one, /\blines\b|https?:\/\/|www\./i);
+  assert.doesNotMatch(ceo, /\blines\b|https?:\/\/|\b\d+\s+public\s+ships\b/i);
+  const draft = ai.validateDraft(
+    {
+      items: items.map((item) => ({ name: item.name, description: item.description, date: item.date, status: item.status, link: item.link })),
+      note: 'SuperLevels is sitting at 553 GitHub stars after the April push.',
+      stats: ['553 GitHub stars SuperLevels · github.com/levelsio/superlevels'],
+    },
+    {
+      found: items.map((item) => ({ ...item, name: item.name.toLowerCase(), score: 4, thisYear: !item.date })),
+      web: [],
+      pages: [],
+      site: null,
+      profile: {
+        name: 'levelsio',
+        bio: '',
+        site: 'https://levels.io/',
+        sites: ['https://photoai.com/', 'https://interiorai.com/'],
+        x: 'levelsio',
+        github: 'levelsio',
+      },
+      ran: [],
+      failed: [],
+      stats: [],
+    },
+    items.map((item) => item.link),
+    2026,
+    2,
+  );
+  assert.ok(draft.items.length >= 3);
+  assert.ok(draft.stats[0]);
+  assert.doesNotMatch(draft.note, /night shift|publish button|the pair is/i);
+  assert.match(draft.note, /SuperLevels/i);
+  const okNote = ai.validateDraft(
+    {
+      items: [{ name: 'SuperX', description: 'Growth', date: '2026-02-09', status: 'LAUNCHED', link: 'https://www.producthunt.com/posts/superx' }],
+      note: 'SuperX is the launch Tibo actually meant this year.',
+      stats: ['929 Product Hunt upvotes SuperX · producthunt.com/posts/superx'],
+    },
+    {
+      found: [{ name: 'SuperX', description: 'Growth', date: '2026-02-09', link: 'https://www.producthunt.com/posts/superx', icon: null, source: 'producthunt', status: 'LAUNCHED', score: 8 }],
+      web: [],
+      pages: [],
+      site: null,
+      profile: { name: 'Tibo', bio: '', site: 'https://www.tmaker.io/', x: 'tibo_maker', github: null },
+      ran: [],
+      failed: [],
+    },
+    ['https://www.producthunt.com/posts/superx'],
+    2026,
+    1,
+  );
+  assert.match(okNote.note, /SuperX/i);
+  assert.doesNotMatch(okNote.note, /night shift|the tape|publish button|929 hunters|does one job|the pair is/i);
+});
+
+test('Product Hunt lookups follow X, handle tokens, and product sites', () => {
+  const profile = { name: 'Tibo', bio: '', site: 'https://superx.so/', x: 'tibo_maker', github: null, sites: ['https://superx.so/', 'https://www.tmaker.io/'], phUsers: ['tibo_maker'] };
+  const handles = sources.phLookupHandles(profile);
+  assert.ok(handles.some((h) => h.username.toLowerCase() === 'tibo_maker' && !h.guessed));
+  assert.ok(handles.some((h) => h.username.toLowerCase() === 'tibo' && h.guessed));
+  assert.equal(handles.some((h) => h.username.toLowerCase() === 'maker'), false);
+  assert.ok(sources.phTwitterUrls('tibo_maker').includes('https://twitter.com/tibo_maker'));
+  const sites = sources.phSiteLookups(profile.sites);
+  assert.ok(sites.urls.some((u) => /superx\.so/i.test(u)));
+  assert.ok(sites.slugs.includes('superx'));
+});
+
+test('paid search still runs when harvest is gappy, not only when the tape is empty', () => {
+  assert.equal(ai.SEARCH_BELOW, 8);
+  assert.equal(ai.maxSearches({}), 3);
+  assert.equal(ai.maxSearches({ SHIPPED_MAX_SEARCHES: '9' }), 5);
+  assert.equal(ai.maxSearches({ SHIPPED_MAX_SEARCHES: '0' }), 0);
+  const gathered = {
+    found: [
+      { name: 'A', description: '', date: '2026-01-01', link: 'https://example.com/a', icon: null, source: 'github', status: 'SHIPPED', score: 1, thisYear: true },
+      { name: 'B', description: '', date: '2026-02-01', link: 'https://example.com/b', icon: null, source: 'github', status: 'SHIPPED', score: 1, thisYear: true },
+    ],
+    web: [],
+    pages: [],
+    site: null,
+    profile: { name: '', bio: '', site: null, x: null, github: 'ada' },
+    ran: [],
+    failed: [],
+  };
+  assert.ok(sources.inYearCount(gathered, 2026) < ai.SEARCH_BELOW);
+});
+
+test('changelog/company beat npm on the same loose name, and old first-publish years drop', () => {
+  assert.ok(sources.sourcePriority('changelog') > sources.sourcePriority('npm'));
+  assert.ok(sources.sourcePriority('company') > sources.sourcePriority('npm'));
+  const kept = sources.dedupeFound([
+    { name: 'Serve', description: 'old npm', date: '2026-04-01', link: 'https://www.npmjs.com/package/serve', icon: null, source: 'npm', status: 'RELEASED', score: 9 },
+    { name: 'Serve', description: 'Vercel changelog', date: '2026-03-03', link: 'https://vercel.com/changelog/serve', icon: null, source: 'changelog', status: 'LAUNCHED', score: 4 },
+  ]);
+  assert.equal(kept[0].source, 'changelog');
+  assert.equal(kept.some((item) => item.source === 'npm'), false);
+});
+
+test('identity tables are not an eval cheat sheet', () => {
+  assert.deepEqual(identity.IDENTITY_COLLISIONS, {
+    jarredsumner: 'Jarred-Sumner',
+    youyuxi: 'yyx990803',
+    dan_abramov: 'gaearon',
+    rich_harris: 'Rich-Harris',
+  });
+  const realJarred = identity.scoreGithubMatch({
+    user: { login: 'Jarred-Sumner', name: 'Jarred Sumner', bio: '', blog: 'https://jarredsumner.com', x: 'jarredsumner', repos: 280 },
+    wantX: 'jarredsumner',
+    wantName: 'Jarred Sumner',
+  });
+  assert.ok(realJarred >= 40, `Jarred-Sumner scored ${realJarred}`);
+  assert.equal(identity.collisionOverride('jarredsumner'), 'Jarred-Sumner');
+  assert.equal(identity.collisionOverride('@youyuxi'), 'yyx990803');
+  assert.equal(identity.collisionOverride('dan_abramov'), 'gaearon');
+  assert.deepEqual(identity.githubReposFromText('see https://github.com/oven-sh/bun and github.com/vitejs/vite'), [
+    { owner: 'oven-sh', name: 'bun' },
+    { owner: 'vitejs', name: 'vite' },
+  ]);
+  assert.equal(identity.parseProductQuery('the guy who made Photo AI'), 'Photo AI');
+  assert.ok(identity.productHostGuesses('Photo AI').some((u) => /photoai\.com/i.test(u)));
+  assert.ok(identity.productHostGuesses('Dub').some((u) => /dub\.co/i.test(u)));
+  assert.ok(identity.githubLoginsFromText('see github.com/tony-dinh/app').includes('tony-dinh'));
+  assert.ok(identity.xHandlesFromText('built by @levelsio on photoai.com').includes('levelsio'));
+  assert.ok(identity.makerMentions('Built by @levelsio').x.includes('levelsio'));
+  assert.ok(identity.companyLogins('Tibo', 'OpenAI').includes('tibo-openai'));
+  assert.ok(identity.nameLogins('Steven Tey').includes('steven-tey'));
+});
+
+test('a /projects page dated 2026 becomes found items', () => {
+  const items = research.itemsFromProjectList({
+    text: '2026\n●2026-07 pieter.com Windows XP PC Active\n●2026-04 XDR Boost Active\n2025-03 Old Thing',
+    url: 'https://levels.io/projects',
+    year: 2026,
+  });
+  assert.ok(items.some((item) => /xdr boost/i.test(item.name)));
+  assert.ok(items.some((item) => /pieter/i.test(item.name)));
+  assert.equal(items.some((item) => /old thing/i.test(item.name)), false);
+  const news = research.itemsFromProjectList({
+    text: 'Introducing Codex — January 15, 2026\nSora 2 · 2026-08-07\nLegacy Widget — December 1, 2025',
+    url: 'https://openai.com/news',
+    year: 2026,
+  });
+  assert.ok(news.some((item) => /codex/i.test(item.name)), JSON.stringify(news.map((i) => i.name)));
+  assert.ok(news.some((item) => /sora/i.test(item.name)));
+  assert.equal(news.some((item) => /legacy/i.test(item.name)), false);
+  const pins = research.itemsFromProjectList({
+    text: "things i'm working on\n📌  post bridge ( social media scheduler )\n📌  lovelee ( couples app )\ncuriosity quench ( quit scrolling app )",
+    url: 'https://www.jackfriks.com/',
+    year: 2026,
+  });
+  assert.ok(pins.some((item) => /post bridge/i.test(item.name)), JSON.stringify(pins.map((i) => i.name)));
+  assert.ok(pins.some((item) => /lovelee/i.test(item.name)));
+  assert.ok(pins.some((item) => /curiosity quench/i.test(item.name)));
+  const tight = research.itemsFromProjectList({
+    text: '📌 post bridge(social media scheduler)→📌 lovelee(couples app)→ curiosity quench(quit scrolling app)→ deep work depot(deep work timer)→ you talk to jack (the founder)',
+    url: 'https://jackfriks.com/',
+    year: 2026,
+  });
+  assert.ok(tight.some((item) => /post bridge/i.test(item.name)), JSON.stringify(tight.map((i) => i.name)));
+  assert.ok(tight.some((item) => /deep work depot/i.test(item.name)));
+  assert.equal(tight.some((item) => /you talk to/i.test(item.name)), false);
+  const friends = research.itemsFromProjectList({
+    text: "things i'm working on\n📌 lovelee (couples app)\n\ntools I use\nDataFast (analytics for makers)\nShipFast (nextjs boilerplate)\nIndiePage (portfolio)",
+    url: 'https://jackfriks.com/',
+    year: 2026,
+  });
+  assert.ok(friends.some((item) => /lovelee/i.test(item.name)));
+  assert.equal(friends.some((item) => /datafast|shipfast|indiepage/i.test(item.name)), false);
+  assert.equal(identity.guessHandleDotCom('jackfriks'), 'https://jackfriks.com/');
+  assert.equal(identity.guessHandleDotCom('www'), null);
+  assert.ok(identity.guessHandleHomes('levelsio').includes('https://levelsio.com/'));
+  assert.ok(identity.guessHandleHomes('levelsio').includes('https://levels.io/'));
+  assert.deepEqual(identity.splitHandleHomes('levelsio'), ['https://levels.io/']);
+  assert.deepEqual(identity.splitHandleHomes('yyx990803'), []);
+});
+
+test('indie blog month archives become dated ships and skip commentary', () => {
+  const text = `October 2026
+
+- 8 Oct I discovered that thousands of bots monitor every new link posted on X
+- 5 Oct I made hotelist.com to fix Airbnb's 4.5 to 5.0 rating scale
+- 1 Oct An Apple Store in Dubai leaves Apple Watches lying freely
+
+September 2026
+
+- 23 Sep I passed $10M/y in revenue and investment gains with a 94.5% profit margin
+- 5 Sep After a decade, I have made nomads.com free for everyone now
+
+August 2026
+
+- 30 Aug I made infiniteslop.ai yesterday completely on my phone
+- 29 Aug I built Infinite Slop, an infinite interactive AI generated live stream
+- 1 Aug I vibecoded a full video editor into Photo AI that generates and edits videos
+`;
+  const items = research.itemsFromDatedJournal({ text, url: 'https://levels.io/', year: 2026 });
+  const names = items.map((item) => item.name).join(' | ');
+  assert.ok(items.some((item) => /hotelist/i.test(item.name)), names);
+  assert.ok(items.some((item) => /infiniteslop/i.test(item.name)), names);
+  assert.ok(items.some((item) => /nomads/i.test(item.name)), names);
+  assert.ok(items.some((item) => /photo ai/i.test(item.name)), names);
+  assert.ok(items.some((item) => /10m|milestone/i.test(item.name)), names);
+  assert.equal(items.some((item) => /bots monitor/i.test(item.name)), false);
+  assert.equal(items.some((item) => /apple store/i.test(item.name)), false);
+  assert.ok(items.every((item) => item.date && item.date.startsWith('2026-')));
+  assert.ok(items.find((item) => /hotelist/i.test(item.name))?.date === '2026-10-05');
+  assert.ok(items.every((item) => item.kind === 'journal-ship'));
+  const flat = research.itemsFromDatedJournal({
+    text: 'October 2026 - 5 Oct I made hotelist.com to fix Airbnb ratings - 8 Oct I discovered bots September 2026 - 23 Sep I passed $10M/y in revenue',
+    url: 'https://levels.io/',
+    year: 2026,
+  });
+  assert.ok(flat.some((item) => /hotelist/i.test(item.name)), flat.map((item) => item.name).join(' | '));
+  assert.ok(research.looksLikePersonalShip('I made hotelist.com to fix ratings'));
+  assert.equal(research.looksLikePersonalShip('I discovered that thousands of bots monitor X'), false);
+  assert.ok(research.extraResearchPaths('https://levels.io').some((url) => /\/blog$/.test(url)));
+  assert.ok(research.extraResearchPaths('https://levels.io').some((url) => /\/rss$/.test(url)));
+  assert.match(research.extraResearchPaths('https://levels.io')[0], /\/rss$/);
+  const liveHtml = `<div class="datesep"><a href="/2026/october">October 2026</a></div>
+    <ul><li><time>5 Oct</time><a class="cover-link" href="/booking-site-ratings"></a>
+    <a href="/booking-site-ratings" title="I analyzed booking site ratings">I analyzed booking site ratings</a></li>
+    <li><time>5 Oct</time><a class="cover-link" href="/hotelist-fixes-airbnb-ratings"></a>
+    <a href="/hotelist-fixes-airbnb-ratings" title="I made hotelist.com to fix Airbnb&#039;s 4.5 to 5.0 rating scale">I made hotelist.com</a></li></ul>`;
+  const copied = research.journalCopyFromHtml(liveHtml);
+  assert.match(copied, /October 2026/);
+  assert.match(copied, /hotelist\.com/);
+  const fromHtml = research.itemsFromDatedJournal({ text: copied, url: 'https://levels.io/', year: 2026 });
+  assert.ok(fromHtml.some((item) => /hotelist/i.test(item.name)), fromHtml.map((item) => item.name).join(' | '));
+  const history = `January 2026
+- 15 Jan I made hotelist.com to fix Airbnb ratings
+- 12 Jan I made my first homepage in 1996
+- 11 Jan I built a homepage for my brother Jeroen in 1997
+January 1997
+- 2 Jan I built a homepage for my brother Jeroen
+January 1996
+- 1 Jan I made my first homepage
+`;
+  const historyItems = research.itemsFromDatedJournal({ text: history, url: 'https://levels.io/', year: 2026 });
+  assert.ok(historyItems.some((item) => /hotelist/i.test(item.name)), historyItems.map((item) => item.name).join(' | '));
+  assert.equal(
+    historyItems.some((item) => /1996|1997|jeroen|first homepage/i.test(item.name)),
+    false,
+    historyItems.map((item) => `${item.name} ${item.date}`).join(' | '),
+  );
+  const historyHtml = `<div>January 2026</div>
+    <time>15 Jan</time><a title="I made hotelist.com to fix Airbnb ratings"></a>
+    <div>January 1996</div>
+    <time datetime="1996-01-01">1 Jan</time><a title="I made my first homepage in 1996"></a>
+    <div>January 1997</div>
+    <time datetime="1997-01-02">2 Jan</time><a title="I built a homepage for my brother Jeroen in 1997"></a>`;
+  const historyCopy = research.journalCopyFromHtml(historyHtml);
+  assert.match(historyCopy, /January 1996/);
+  assert.match(historyCopy, /January 1997/);
+  const fromHistoryHtml = research.itemsFromDatedJournal({ text: historyCopy, url: 'https://levels.io/', year: 2026 });
+  assert.ok(fromHistoryHtml.some((item) => /hotelist/i.test(item.name)), fromHistoryHtml.map((item) => item.name).join(' | '));
+  assert.equal(
+    fromHistoryHtml.some((item) => /1996|1997|jeroen|first homepage/i.test(item.name)),
+    false,
+    fromHistoryHtml.map((item) => `${item.name} ${item.date}`).join(' | '),
+  );
+  assert.equal(research.titleMentionsOtherYear('FIRST HOMEPAGE IN 1996', 2026), true);
+  assert.equal(research.titleMentionsOtherYear('hotelist.com', 2026), false);
+});
+
+test('Indie Page __NEXT_DATA__ keeps 2026 startups and drops older ones', () => {
+  const html = `<html><script id="__NEXT_DATA__" type="application/json">${JSON.stringify({
+    props: {
+      pageProps: {
+        user: {
+          name: 'Marc Lou',
+          startups: [
+            { name: 'ShipFast', url: 'https://shipfa.st', createdAt: '2023-08-28T00:00:00.000Z', bio: 'Ship your startup' },
+            { name: 'Ship or Die', url: 'https://www.ship-or-die.com/', createdAt: '2026-05-25T00:00:00.000Z', bio: 'Ship in 30 days' },
+            { name: 'Stalkr', url: 'https://stalkr.ai', createdAt: '2026-06-05T12:00:00.000Z', isShown: true },
+            { name: 'Hidden App', url: 'https://hidden.example', createdAt: '2026-03-01T00:00:00.000Z', isShown: false },
+            { name: 'DataRadar', url: 'https://dataradar.datafa.st/', createdAt: '2026-03-02T00:00:00.000Z' },
+          ],
+        },
+      },
+    },
+  })}</script></html>`;
+  const items = research.itemsFromEmbeddedPortfolio({ html, url: 'https://marclou.com/', year: 2026 });
+  const names = items.map((item) => item.name).join(' | ');
+  assert.ok(items.some((item) => /ship or die/i.test(item.name) && item.date === '2026-05-25'), names);
+  assert.ok(items.some((item) => /stalkr/i.test(item.name) && item.date === '2026-06-05'), names);
+  assert.ok(items.some((item) => /dataradar/i.test(item.name)), names);
+  assert.equal(items.some((item) => /shipfast/i.test(item.name)), false);
+  assert.equal(items.some((item) => /hidden app/i.test(item.name)), false);
+  assert.ok(items.every((item) => item.date && item.date.startsWith('2026-')));
+});
+
+test('personal RSS keeps dated ships and drops commentary', () => {
+  const xml = `<?xml version="1.0"?>
+  <rss><channel>
+    <item><title>I made hotelist.com to fix Airbnb ratings</title><link>https://levels.io/hotelist</link><pubDate>Sun, 05 Oct 2026 12:00:00 GMT</pubDate></item>
+    <item><title>I discovered that thousands of bots monitor X</title><link>https://levels.io/bots</link><pubDate>Wed, 08 Oct 2026 12:00:00 GMT</pubDate></item>
+  </channel></rss>`;
+  const items = research.itemsFromPersonalFeed({ text: xml, url: 'https://levels.io/rss', year: 2026 });
+  assert.ok(items.some((item) => /hotelist/i.test(item.name) && item.date === '2026-10-05'));
+  assert.equal(items.some((item) => /bots/i.test(item.name)), false);
+  const tony = research.itemsFromPersonalFeed({
+    text: `<?xml version="1.0"?><rss><channel>
+      <item><title>I made a game with AI</title><link>https://news.tonydinh.com/p/i-made-a-game-with-ai</link><pubDate>Sat, 29 Aug 2026 12:00:00 GMT</pubDate><description>Try it at http://www.survive10waves.com</description></item>
+      <item><title>I'm on Product Hunt! + Updates Jun 2026</title><link>https://news.tonydinh.com/p/im-on-product-hunt-updates-jun-2026</link><pubDate>Wed, 10 Jun 2026 12:00:00 GMT</pubDate><content:encoded>https://pulserevenue.app/ and https://makeawebsite.app/</content:encoded></item>
+    </channel></rss>`,
+    url: 'https://news.tonydinh.com/feed',
+    year: 2026,
+  });
+  assert.ok(tony.some((item) => /survive|10 waves/i.test(item.name) && item.link?.includes('survive10waves')), JSON.stringify(tony));
+  assert.equal(tony.some((item) => /pulse|product hunt/i.test(item.name)), false, JSON.stringify(tony));
+  assert.ok(tony.every((item) => item.link && /^https?:\/\//.test(item.link)));
+  assert.ok(tony.every((item) => /listed on/i.test(item.description || '')), JSON.stringify(tony));
+});
+
+test('personal feed product URLs count as portfolio ownership', async () => {
+  const ownership = await import('../worker/shipped-ownership.ts');
+  const tony = { name: 'Tony Dinh', site: 'https://tonydinh.com', x: 'tdinh_me' };
+  const item = {
+    name: 'survive 10 waves',
+    description: 'I made a game. Listed on news.tonydinh.com. Try it at http://www.survive10waves.com',
+    date: '2026-08-29',
+    source: 'site',
+    link: 'https://www.survive10waves.com/',
+  };
+  assert.equal(ownership.ownershipEvidence(item, tony), 'portfolio');
+  assert.equal(ownership.ownedByBuilder(item, tony), true);
+  assert.equal(
+    ownership.ownershipEvidence(
+      {
+        name: 'Canva',
+        description: 'Listed on blog.go-publicly.com',
+        date: '2026-03-01',
+        source: 'site',
+        link: 'https://www.canva.com/',
+      },
+      { name: 'Nico Jeannen', x: 'nico_jeannen', site: 'https://nicojeannen.com' },
+    ),
+    'none',
+  );
+});
+
+test('a third-party tools listicle is not a personal ship feed', () => {
+  const listicle = research.itemsFromPersonalFeed({
+    text: `<?xml version="1.0"?><rss><channel>
+      <item><title>100 tools founders use</title><link>https://blog.go-publicly.com/tools</link><pubDate>Sun, 01 Mar 2026 12:00:00 GMT</pubDate>
+      <description>https://www.canva.com/ https://stripe.com/ https://amazon.com/ https://wordpress.org/ https://www.capterra.com/ https://www.optimizely.com/</description></item>
+    </channel></rss>`,
+    url: 'https://blog.go-publicly.com/feed',
+    year: 2026,
+  });
+  assert.equal(listicle.some((item) => /canva|stripe|amazon|wordpress|capterra|optimizely/i.test(item.name)), false, JSON.stringify(listicle));
+});
+
+test('public MRR and stars keep their source URL', () => {
+  const stats = research.extractPublicStats(
+    'photoai.com is making $105,000/mo revenue and SuperLevels has 553 stars',
+    'https://levels.io/photoai-40870-line-index-php-105k-mo-revenue',
+    'Photo AI',
+  );
+  assert.ok(stats.some((s) => s.kind === 'mrr' && s.value === 105000 && s.url.includes('levels.io')));
+  const lines = research.formatReceiptStats(stats);
+  assert.ok(lines[0].includes('levels.io'));
+  const junk = research.extractPublicStats('Save $70 on monitors and 0000M impressions', 'https://interiorai.com/', 'Interior AI');
+  assert.equal(junk.some((s) => s.kind === 'mrr'), false);
+});
+
+test('cashier notes prefer a second sentence that follows the first', () => {
+  const items = [
+    {
+      name: 'AWS DATABASES ARE NOW LIVE ON THE VERCEL MARKETPLACE AND V0',
+      spoken: 'AWS databases',
+      description: 'provision a database from v0 while the app is still being built',
+      source: 'changelog',
+    },
+  ];
+  const ctx = { who: 'Guillermo Rauch' };
+  const follows = 'AWS databases now provision straight from v0 while the app is still being built. Those AWS databases come up before the first deploy.';
+  const leap = 'AWS databases now provision straight from v0 while the app is still being built. Guillermo, the boss, bought his own store out.';
+  assert.equal(ai.noteNonSequitur(leap, items), true);
+  assert.equal(ai.noteNonSequitur(follows, items), false);
+  assert.ok(
+    ai.scoreCashierNote(follows, items, [], ctx) > ai.scoreCashierNote(leap, items, [], ctx),
+    `${ai.scoreCashierNote(follows, items, [], ctx)} vs ${ai.scoreCashierNote(leap, items, [], ctx)}`,
+  );
+});

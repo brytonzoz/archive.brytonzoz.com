@@ -1,0 +1,2079 @@
+{
+  "at": "2026-10-09T18:05:53.789Z",
+  "year": 2026,
+  "envPresent": {
+    "GITHUB_TOKEN": false,
+    "PRODUCTHUNT": false,
+    "TINYFISH": false,
+    "BRANDFETCH": false,
+    "ANTHROPIC": false
+  },
+  "results": [
+    {
+      "query": "levelsio",
+      "ms": 2096,
+      "parsed": {
+        "kind": "handle",
+        "value": "levelsio"
+      },
+      "staging": {
+        "candidates": [
+          {
+            "kind": "github",
+            "id": "levelsio",
+            "display": "levelsio",
+            "detail": "GitHub \u00b7 3 public repos \u00b7 @levelsio on X"
+          }
+        ],
+        "auto": true
+      },
+      "chosen": {
+        "kind": "github",
+        "id": "levelsio",
+        "display": "levelsio"
+      },
+      "profile": {
+        "name": "levelsio",
+        "bio": "Chief Shitposting Officer @ Levels Synergies & Co",
+        "site": "https://levels.io/",
+        "x": "levelsio",
+        "github": "levelsio"
+      },
+      "gaps": {
+        "hasGithub": true,
+        "hasX": true,
+        "hasSite": true,
+        "hasName": true,
+        "xEqualsGithub": true,
+        "githubLinkedFromX": false
+      },
+      "sources": [
+        {
+          "id": "github",
+          "enabled": true,
+          "ok": true,
+          "n": 2,
+          "ms": 328,
+          "error": null,
+          "names": [
+            "superlevels",
+            "xdr-boost"
+          ]
+        },
+        {
+          "id": "appstore",
+          "enabled": true,
+          "ok": true,
+          "n": 0,
+          "ms": 57,
+          "error": null,
+          "names": []
+        },
+        {
+          "id": "hn",
+          "enabled": true,
+          "ok": true,
+          "n": 0,
+          "ms": 225,
+          "error": null,
+          "names": []
+        },
+        {
+          "id": "npm",
+          "enabled": true,
+          "ok": true,
+          "n": 0,
+          "ms": 164,
+          "error": null,
+          "names": []
+        },
+        {
+          "id": "producthunt",
+          "enabled": false,
+          "ok": null,
+          "n": 0,
+          "ms": 0,
+          "error": null,
+          "names": []
+        }
+      ],
+      "gather": {
+        "ms": 500,
+        "ran": [
+          "site",
+          "github",
+          "appstore",
+          "hn",
+          "npm"
+        ],
+        "failed": [],
+        "foundCount": 2,
+        "inYearCount": 2,
+        "web": 0,
+        "pages": 0,
+        "site": {
+          "url": "https://levels.io/",
+          "title": "@levelsio&#039;s blog",
+          "links": 40
+        },
+        "items": [
+          {
+            "name": "superlevels",
+            "source": "github",
+            "date": "2026-04-23",
+            "thisYear": true,
+            "status": "SHIPPED",
+            "link": "https://github.com/levelsio/superlevels"
+          },
+          {
+            "name": "xdr-boost",
+            "source": "github",
+            "date": "2026-04-01",
+            "thisYear": true,
+            "status": "SHIPPED",
+            "link": "https://github.com/levelsio/xdr-boost"
+          }
+        ]
+      },
+      "demo": {
+        "itemCount": 2,
+        "potential": false,
+        "note": "No refunds on momentum.",
+        "items": [
+          "XDR-BOOST [github] 2026-04-01",
+          "SUPERLEVELS [github] 2026-04-23"
+        ]
+      },
+      "searchWouldRun": false
+    },
+    {
+      "query": "marclou",
+      "ms": 2430,
+      "parsed": {
+        "kind": "handle",
+        "value": "marclou"
+      },
+      "staging": {
+        "candidates": [
+          {
+            "kind": "github",
+            "id": "marclou",
+            "display": "Marc Lou",
+            "detail": "GitHub \u00b7 25 public repos \u00b7 @marclou on X"
+          }
+        ],
+        "auto": true
+      },
+      "chosen": {
+        "kind": "github",
+        "id": "marclou",
+        "display": "Marc Lou"
+      },
+      "profile": {
+        "name": "Marc Lou",
+        "bio": "making stuff",
+        "site": "https://marclou.com/",
+        "x": "marclou",
+        "github": "marclou"
+      },
+      "gaps": {
+        "hasGithub": true,
+        "hasX": true,
+        "hasSite": true,
+        "hasName": true,
+        "xEqualsGithub": true,
+        "githubLinkedFromX": false
+      },
+      "sources": [
+        {
+          "id": "github",
+          "enabled": true,
+          "ok": true,
+          "n": 3,
+          "ms": 607,
+          "error": null,
+          "names": [
+            "McCreep",
+            "dataradar",
+            "posture-ai v2.7.5"
+          ]
+        },
+        {
+          "id": "appstore",
+          "enabled": true,
+          "ok": true,
+          "n": 0,
+          "ms": 327,
+          "error": null,
+          "names": []
+        },
+        {
+          "id": "hn",
+          "enabled": true,
+          "ok": true,
+          "n": 0,
+          "ms": 165,
+          "error": null,
+          "names": []
+        },
+        {
+          "id": "npm",
+          "enabled": true,
+          "ok": true,
+          "n": 0,
+          "ms": 359,
+          "error": null,
+          "names": []
+        },
+        {
+          "id": "producthunt",
+          "enabled": false,
+          "ok": null,
+          "n": 0,
+          "ms": 0,
+          "error": null,
+          "names": []
+        }
+      ],
+      "gather": {
+        "ms": 152,
+        "ran": [
+          "site",
+          "github",
+          "appstore",
+          "hn",
+          "npm"
+        ],
+        "failed": [],
+        "foundCount": 3,
+        "inYearCount": 3,
+        "web": 0,
+        "pages": 0,
+        "site": {
+          "url": "https://marclou.com/",
+          "title": "Marc Lou | Indie Page",
+          "links": 40
+        },
+        "items": [
+          {
+            "name": "McCreep",
+            "source": "github",
+            "date": "2026-05-13",
+            "thisYear": true,
+            "status": "SHIPPED",
+            "link": "https://github.com/marclou/McCreep"
+          },
+          {
+            "name": "posture-ai v2.7.5",
+            "source": "github",
+            "date": "2026-04-04",
+            "thisYear": false,
+            "status": "RELEASED",
+            "link": "https://github.com/marclou/posture-ai/releases/tag/v2.7.5"
+          },
+          {
+            "name": "dataradar",
+            "source": "github",
+            "date": "2026-02-28",
+            "thisYear": true,
+            "status": "LIVE",
+            "link": "https://github.com/marclou/dataradar"
+          }
+        ]
+      },
+      "demo": {
+        "itemCount": 3,
+        "potential": false,
+        "note": "No refunds on momentum.",
+        "items": [
+          "DATARADAR [github] 2026-02-28",
+          "POSTURE-AI V2.7.5 [github] 2026-04-04",
+          "MCCREEP [github] 2026-05-13"
+        ]
+      },
+      "searchWouldRun": false
+    },
+    {
+      "query": "tibo_maker",
+      "ms": 2557,
+      "parsed": {
+        "kind": "handle",
+        "value": "tibo_maker"
+      },
+      "staging": {
+        "candidates": [
+          {
+            "kind": "x",
+            "id": "tibo_maker",
+            "display": "@tibo_maker",
+            "detail": "X / Twitter handle"
+          }
+        ],
+        "auto": true
+      },
+      "chosen": {
+        "kind": "x",
+        "id": "tibo_maker",
+        "display": "@tibo_maker"
+      },
+      "profile": {
+        "name": "",
+        "bio": "",
+        "site": null,
+        "x": "tibo_maker",
+        "github": null
+      },
+      "gaps": {
+        "hasGithub": false,
+        "hasX": true,
+        "hasSite": false,
+        "hasName": false,
+        "xEqualsGithub": false,
+        "githubLinkedFromX": false
+      },
+      "sources": [
+        {
+          "id": "github",
+          "enabled": false,
+          "ok": null,
+          "n": 0,
+          "ms": 0,
+          "error": null,
+          "names": []
+        },
+        {
+          "id": "appstore",
+          "enabled": true,
+          "ok": true,
+          "n": 0,
+          "ms": 742,
+          "error": null,
+          "names": []
+        },
+        {
+          "id": "hn",
+          "enabled": true,
+          "ok": true,
+          "n": 0,
+          "ms": 597,
+          "error": null,
+          "names": []
+        },
+        {
+          "id": "npm",
+          "enabled": false,
+          "ok": null,
+          "n": 0,
+          "ms": 0,
+          "error": null,
+          "names": []
+        },
+        {
+          "id": "producthunt",
+          "enabled": false,
+          "ok": null,
+          "n": 0,
+          "ms": 0,
+          "error": null,
+          "names": []
+        }
+      ],
+      "gather": {
+        "ms": 169,
+        "ran": [
+          "appstore",
+          "hn"
+        ],
+        "failed": [],
+        "foundCount": 0,
+        "inYearCount": 0,
+        "web": 0,
+        "pages": 0,
+        "site": null,
+        "items": []
+      },
+      "demo": {
+        "itemCount": 1,
+        "potential": true,
+        "note": "Item on back order. Ships when you do.",
+        "items": [
+          "YOUR POTENTIAL [none] undated"
+        ]
+      },
+      "searchWouldRun": true
+    },
+    {
+      "query": "rauchg",
+      "ms": 2691,
+      "parsed": {
+        "kind": "handle",
+        "value": "rauchg"
+      },
+      "staging": {
+        "candidates": [
+          {
+            "kind": "github",
+            "id": "rauchg",
+            "display": "Guillermo Rauch",
+            "detail": "GitHub \u00b7 143 public repos \u00b7 @rauchg on X"
+          }
+        ],
+        "auto": true
+      },
+      "chosen": {
+        "kind": "github",
+        "id": "rauchg",
+        "display": "Guillermo Rauch"
+      },
+      "profile": {
+        "name": "Guillermo Rauch",
+        "bio": "",
+        "site": null,
+        "x": "rauchg",
+        "github": "rauchg"
+      },
+      "gaps": {
+        "hasGithub": true,
+        "hasX": true,
+        "hasSite": false,
+        "hasName": true,
+        "xEqualsGithub": true,
+        "githubLinkedFromX": false
+      },
+      "sources": [
+        {
+          "id": "github",
+          "enabled": true,
+          "ok": true,
+          "n": 4,
+          "ms": 938,
+          "error": null,
+          "names": [
+            "gdp-ts",
+            "skills",
+            "rst",
+            "ai-say"
+          ]
+        },
+        {
+          "id": "appstore",
+          "enabled": true,
+          "ok": true,
+          "n": 0,
+          "ms": 122,
+          "error": null,
+          "names": []
+        },
+        {
+          "id": "hn",
+          "enabled": true,
+          "ok": true,
+          "n": 0,
+          "ms": 198,
+          "error": null,
+          "names": []
+        },
+        {
+          "id": "npm",
+          "enabled": true,
+          "ok": true,
+          "n": 5,
+          "ms": 171,
+          "error": null,
+          "names": [
+            "ai",
+            "socket.io",
+            "socket.io-adapter",
+            "engine.io",
+            "socket.io-parser"
+          ]
+        },
+        {
+          "id": "producthunt",
+          "enabled": false,
+          "ok": null,
+          "n": 0,
+          "ms": 0,
+          "error": null,
+          "names": []
+        }
+      ],
+      "gather": {
+        "ms": 140,
+        "ran": [
+          "github",
+          "appstore",
+          "hn",
+          "npm"
+        ],
+        "failed": [],
+        "foundCount": 9,
+        "inYearCount": 9,
+        "web": 0,
+        "pages": 0,
+        "site": null,
+        "items": [
+          {
+            "name": "ai",
+            "source": "npm",
+            "date": "2026-10-09",
+            "thisYear": false,
+            "status": "RELEASED",
+            "link": "https://www.npmjs.com/package/ai"
+          },
+          {
+            "name": "socket.io",
+            "source": "npm",
+            "date": "2026-09-25",
+            "thisYear": false,
+            "status": "RELEASED",
+            "link": "https://www.npmjs.com/package/socket.io"
+          },
+          {
+            "name": "socket.io-adapter",
+            "source": "npm",
+            "date": "2026-06-16",
+            "thisYear": false,
+            "status": "RELEASED",
+            "link": "https://www.npmjs.com/package/socket.io-adapter"
+          },
+          {
+            "name": "engine.io",
+            "source": "npm",
+            "date": "2026-09-24",
+            "thisYear": false,
+            "status": "RELEASED",
+            "link": "https://www.npmjs.com/package/engine.io"
+          },
+          {
+            "name": "socket.io-parser",
+            "source": "npm",
+            "date": "2026-07-15",
+            "thisYear": false,
+            "status": "RELEASED",
+            "link": "https://www.npmjs.com/package/socket.io-parser"
+          },
+          {
+            "name": "gdp-ts",
+            "source": "github",
+            "date": "2026-10-04",
+            "thisYear": true,
+            "status": "SHIPPED",
+            "link": "https://github.com/rauchg/gdp-ts"
+          },
+          {
+            "name": "rst",
+            "source": "github",
+            "date": "2026-08-24",
+            "thisYear": true,
+            "status": "SHIPPED",
+            "link": "https://github.com/rauchg/rst"
+          },
+          {
+            "name": "skills",
+            "source": "github",
+            "date": "2026-10-03",
+            "thisYear": true,
+            "status": "SHIPPED",
+            "link": "https://github.com/rauchg/skills"
+          },
+          {
+            "name": "ai-say",
+            "source": "github",
+            "date": "2026-01-19",
+            "thisYear": true,
+            "status": "SHIPPED",
+            "link": "https://github.com/rauchg/ai-say"
+          }
+        ]
+      },
+      "demo": {
+        "itemCount": 9,
+        "potential": false,
+        "note": "Receipt paper running low. Keep going.",
+        "items": [
+          "AI-SAY [github] 2026-01-19",
+          "SOCKET.IO-ADAPTER [npm] 2026-06-16",
+          "SOCKET.IO-PARSER [npm] 2026-07-15",
+          "RST [github] 2026-08-24",
+          "ENGINE.IO [npm] 2026-09-24",
+          "SOCKET.IO [npm] 2026-09-25",
+          "SKILLS [github] 2026-10-03",
+          "GDP-TS [github] 2026-10-04",
+          "AI [npm] 2026-10-09"
+        ]
+      },
+      "searchWouldRun": false
+    },
+    {
+      "query": "dannypostmaa",
+      "ms": 1166,
+      "parsed": {
+        "kind": "handle",
+        "value": "dannypostmaa"
+      },
+      "staging": {
+        "candidates": [
+          {
+            "kind": "github",
+            "id": "Dannypostmaa",
+            "display": "@Dannypostmaa",
+            "detail": "GitHub \u00b7 0 public repos"
+          },
+          {
+            "kind": "x",
+            "id": "dannypostmaa",
+            "display": "@dannypostmaa",
+            "detail": "X / Twitter handle"
+          }
+        ],
+        "auto": false
+      },
+      "chosen": {
+        "kind": "github",
+        "id": "Dannypostmaa",
+        "display": "@Dannypostmaa"
+      },
+      "profile": {
+        "name": "",
+        "bio": "",
+        "site": null,
+        "x": null,
+        "github": "Dannypostmaa"
+      },
+      "gaps": {
+        "hasGithub": true,
+        "hasX": false,
+        "hasSite": false,
+        "hasName": false,
+        "xEqualsGithub": false,
+        "githubLinkedFromX": false
+      },
+      "sources": [
+        {
+          "id": "github",
+          "enabled": true,
+          "ok": true,
+          "n": 0,
+          "ms": 189,
+          "error": null,
+          "names": []
+        },
+        {
+          "id": "appstore",
+          "enabled": false,
+          "ok": null,
+          "n": 0,
+          "ms": 0,
+          "error": null,
+          "names": []
+        },
+        {
+          "id": "hn",
+          "enabled": true,
+          "ok": true,
+          "n": 0,
+          "ms": 198,
+          "error": null,
+          "names": []
+        },
+        {
+          "id": "npm",
+          "enabled": true,
+          "ok": true,
+          "n": 0,
+          "ms": 136,
+          "error": null,
+          "names": []
+        },
+        {
+          "id": "producthunt",
+          "enabled": false,
+          "ok": null,
+          "n": 0,
+          "ms": 0,
+          "error": null,
+          "names": []
+        }
+      ],
+      "gather": {
+        "ms": 167,
+        "ran": [
+          "github",
+          "hn",
+          "npm"
+        ],
+        "failed": [],
+        "foundCount": 0,
+        "inYearCount": 0,
+        "web": 0,
+        "pages": 0,
+        "site": null,
+        "items": []
+      },
+      "demo": {
+        "itemCount": 1,
+        "potential": true,
+        "note": "Item on back order. Ships when you do.",
+        "items": [
+          "YOUR POTENTIAL [none] undated"
+        ]
+      },
+      "searchWouldRun": true
+    },
+    {
+      "query": "tdinh_me",
+      "ms": 1440,
+      "parsed": {
+        "kind": "handle",
+        "value": "tdinh_me"
+      },
+      "staging": {
+        "candidates": [
+          {
+            "kind": "x",
+            "id": "tdinh_me",
+            "display": "@tdinh_me",
+            "detail": "X / Twitter handle"
+          }
+        ],
+        "auto": true
+      },
+      "chosen": {
+        "kind": "x",
+        "id": "tdinh_me",
+        "display": "@tdinh_me"
+      },
+      "profile": {
+        "name": "",
+        "bio": "",
+        "site": null,
+        "x": "tdinh_me",
+        "github": null
+      },
+      "gaps": {
+        "hasGithub": false,
+        "hasX": true,
+        "hasSite": false,
+        "hasName": false,
+        "xEqualsGithub": false,
+        "githubLinkedFromX": false
+      },
+      "sources": [
+        {
+          "id": "github",
+          "enabled": false,
+          "ok": null,
+          "n": 0,
+          "ms": 0,
+          "error": null,
+          "names": []
+        },
+        {
+          "id": "appstore",
+          "enabled": true,
+          "ok": true,
+          "n": 0,
+          "ms": 398,
+          "error": null,
+          "names": []
+        },
+        {
+          "id": "hn",
+          "enabled": true,
+          "ok": true,
+          "n": 0,
+          "ms": 193,
+          "error": null,
+          "names": []
+        },
+        {
+          "id": "npm",
+          "enabled": false,
+          "ok": null,
+          "n": 0,
+          "ms": 0,
+          "error": null,
+          "names": []
+        },
+        {
+          "id": "producthunt",
+          "enabled": false,
+          "ok": null,
+          "n": 0,
+          "ms": 0,
+          "error": null,
+          "names": []
+        }
+      ],
+      "gather": {
+        "ms": 178,
+        "ran": [
+          "appstore",
+          "hn"
+        ],
+        "failed": [],
+        "foundCount": 0,
+        "inYearCount": 0,
+        "web": 0,
+        "pages": 0,
+        "site": null,
+        "items": []
+      },
+      "demo": {
+        "itemCount": 1,
+        "potential": true,
+        "note": "Item on back order. Ships when you do.",
+        "items": [
+          "YOUR POTENTIAL [none] undated"
+        ]
+      },
+      "searchWouldRun": true
+    },
+    {
+      "query": "steventey",
+      "ms": 1793,
+      "parsed": {
+        "kind": "handle",
+        "value": "steventey"
+      },
+      "staging": {
+        "candidates": [
+          {
+            "kind": "github",
+            "id": "StevenTey",
+            "display": "Steven Tey",
+            "detail": "GitHub \u00b7 6 public repos"
+          },
+          {
+            "kind": "x",
+            "id": "steventey",
+            "display": "@steventey",
+            "detail": "X / Twitter handle"
+          }
+        ],
+        "auto": false
+      },
+      "chosen": {
+        "kind": "github",
+        "id": "StevenTey",
+        "display": "Steven Tey"
+      },
+      "profile": {
+        "name": "Steven Tey",
+        "bio": "In the progress of learning and applying Data Science into Business Operation, Supply Chain Management, etc.",
+        "site": null,
+        "x": null,
+        "github": "StevenTey"
+      },
+      "gaps": {
+        "hasGithub": true,
+        "hasX": false,
+        "hasSite": false,
+        "hasName": true,
+        "xEqualsGithub": false,
+        "githubLinkedFromX": false
+      },
+      "sources": [
+        {
+          "id": "github",
+          "enabled": true,
+          "ok": true,
+          "n": 0,
+          "ms": 337,
+          "error": null,
+          "names": []
+        },
+        {
+          "id": "appstore",
+          "enabled": true,
+          "ok": true,
+          "n": 0,
+          "ms": 129,
+          "error": null,
+          "names": []
+        },
+        {
+          "id": "hn",
+          "enabled": true,
+          "ok": true,
+          "n": 0,
+          "ms": 169,
+          "error": null,
+          "names": []
+        },
+        {
+          "id": "npm",
+          "enabled": true,
+          "ok": true,
+          "n": 5,
+          "ms": 321,
+          "error": null,
+          "names": [
+            "dub",
+            "@dub/embed-core",
+            "@dub/embed-react",
+            "@dub/react-native",
+            "@dub/ui"
+          ]
+        },
+        {
+          "id": "producthunt",
+          "enabled": false,
+          "ok": null,
+          "n": 0,
+          "ms": 0,
+          "error": null,
+          "names": []
+        }
+      ],
+      "gather": {
+        "ms": 205,
+        "ran": [
+          "github",
+          "appstore",
+          "hn",
+          "npm"
+        ],
+        "failed": [],
+        "foundCount": 5,
+        "inYearCount": 5,
+        "web": 0,
+        "pages": 0,
+        "site": null,
+        "items": [
+          {
+            "name": "dub",
+            "source": "npm",
+            "date": "2026-10-07",
+            "thisYear": false,
+            "status": "RELEASED",
+            "link": "https://www.npmjs.com/package/dub"
+          },
+          {
+            "name": "@dub/embed-core",
+            "source": "npm",
+            "date": "2026-09-07",
+            "thisYear": false,
+            "status": "RELEASED",
+            "link": "https://www.npmjs.com/package/@dub/embed-core"
+          },
+          {
+            "name": "@dub/embed-react",
+            "source": "npm",
+            "date": "2026-09-07",
+            "thisYear": false,
+            "status": "RELEASED",
+            "link": "https://www.npmjs.com/package/@dub/embed-react"
+          },
+          {
+            "name": "@dub/react-native",
+            "source": "npm",
+            "date": "2026-07-01",
+            "thisYear": false,
+            "status": "RELEASED",
+            "link": "https://www.npmjs.com/package/@dub/react-native"
+          },
+          {
+            "name": "@dub/ui",
+            "source": "npm",
+            "date": "2026-10-05",
+            "thisYear": false,
+            "status": "RELEASED",
+            "link": "https://www.npmjs.com/package/@dub/ui"
+          }
+        ]
+      },
+      "demo": {
+        "itemCount": 5,
+        "potential": false,
+        "note": "No refunds on momentum.",
+        "items": [
+          "@DUB/REACT-NATIVE [npm] 2026-07-01",
+          "@DUB/EMBED-CORE [npm] 2026-09-07",
+          "@DUB/EMBED-REACT [npm] 2026-09-07",
+          "@DUB/UI [npm] 2026-10-05",
+          "DUB [npm] 2026-10-07"
+        ]
+      },
+      "searchWouldRun": false
+    },
+    {
+      "query": "shadcn",
+      "ms": 2665,
+      "parsed": {
+        "kind": "handle",
+        "value": "shadcn"
+      },
+      "staging": {
+        "candidates": [
+          {
+            "kind": "github",
+            "id": "shadcn",
+            "display": "shadcn",
+            "detail": "GitHub \u00b7 228 public repos \u00b7 @shadcn on X"
+          }
+        ],
+        "auto": true
+      },
+      "chosen": {
+        "kind": "github",
+        "id": "shadcn",
+        "display": "shadcn"
+      },
+      "profile": {
+        "name": "shadcn",
+        "bio": "I own a computer.",
+        "site": null,
+        "x": "shadcn",
+        "github": "shadcn"
+      },
+      "gaps": {
+        "hasGithub": true,
+        "hasX": true,
+        "hasSite": false,
+        "hasName": true,
+        "xEqualsGithub": true,
+        "githubLinkedFromX": false
+      },
+      "sources": [
+        {
+          "id": "github",
+          "enabled": true,
+          "ok": true,
+          "n": 5,
+          "ms": 795,
+          "error": null,
+          "names": [
+            "model-picker-nested-combobox",
+            "improve",
+            "throwaway-00",
+            "my-app",
+            "shadcn-vite-geist"
+          ]
+        },
+        {
+          "id": "appstore",
+          "enabled": true,
+          "ok": true,
+          "n": 0,
+          "ms": 406,
+          "error": null,
+          "names": []
+        },
+        {
+          "id": "hn",
+          "enabled": true,
+          "ok": true,
+          "n": 0,
+          "ms": 241,
+          "error": null,
+          "names": []
+        },
+        {
+          "id": "npm",
+          "enabled": true,
+          "ok": true,
+          "n": 5,
+          "ms": 157,
+          "error": null,
+          "names": [
+            "shadcn",
+            "cn",
+            "@shadcn/react",
+            "@shadcn/lint",
+            "@shadcn/registry"
+          ]
+        },
+        {
+          "id": "producthunt",
+          "enabled": false,
+          "ok": null,
+          "n": 0,
+          "ms": 0,
+          "error": null,
+          "names": []
+        }
+      ],
+      "gather": {
+        "ms": 170,
+        "ran": [
+          "github",
+          "appstore",
+          "hn",
+          "npm"
+        ],
+        "failed": [],
+        "foundCount": 10,
+        "inYearCount": 10,
+        "web": 0,
+        "pages": 0,
+        "site": null,
+        "items": [
+          {
+            "name": "shadcn",
+            "source": "npm",
+            "date": "2026-10-07",
+            "thisYear": false,
+            "status": "RELEASED",
+            "link": "https://www.npmjs.com/package/shadcn"
+          },
+          {
+            "name": "cn",
+            "source": "npm",
+            "date": "2026-09-22",
+            "thisYear": false,
+            "status": "RELEASED",
+            "link": "https://www.npmjs.com/package/cn"
+          },
+          {
+            "name": "@shadcn/react",
+            "source": "npm",
+            "date": "2026-08-31",
+            "thisYear": false,
+            "status": "RELEASED",
+            "link": "https://www.npmjs.com/package/@shadcn/react"
+          },
+          {
+            "name": "@shadcn/lint",
+            "source": "npm",
+            "date": "2026-09-22",
+            "thisYear": false,
+            "status": "RELEASED",
+            "link": "https://www.npmjs.com/package/@shadcn/lint"
+          },
+          {
+            "name": "@shadcn/registry",
+            "source": "npm",
+            "date": "2026-10-07",
+            "thisYear": false,
+            "status": "RELEASED",
+            "link": "https://www.npmjs.com/package/@shadcn/registry"
+          },
+          {
+            "name": "improve",
+            "source": "github",
+            "date": "2026-06-10",
+            "thisYear": true,
+            "status": "SHIPPED",
+            "link": "https://github.com/shadcn/improve"
+          },
+          {
+            "name": "shadcn-vite-geist",
+            "source": "github",
+            "date": "2026-01-22",
+            "thisYear": true,
+            "status": "SHIPPED",
+            "link": "https://github.com/shadcn/shadcn-vite-geist"
+          },
+          {
+            "name": "my-app",
+            "source": "github",
+            "date": "2026-05-08",
+            "thisYear": true,
+            "status": "SHIPPED",
+            "link": "https://github.com/shadcn/my-app"
+          },
+          {
+            "name": "throwaway-00",
+            "source": "github",
+            "date": "2026-05-29",
+            "thisYear": true,
+            "status": "SHIPPED",
+            "link": "https://github.com/shadcn/throwaway-00"
+          },
+          {
+            "name": "model-picker-nested-combobox",
+            "source": "github",
+            "date": "2026-08-25",
+            "thisYear": true,
+            "status": "LIVE",
+            "link": "https://github.com/shadcn/model-picker-nested-combobox"
+          }
+        ]
+      },
+      "demo": {
+        "itemCount": 10,
+        "potential": false,
+        "note": "Receipt paper running low. Keep going.",
+        "items": [
+          "SHADCN-VITE-GEIST [github] 2026-01-22",
+          "MY-APP [github] 2026-05-08",
+          "THROWAWAY-00 [github] 2026-05-29",
+          "IMPROVE [github] 2026-06-10",
+          "MODEL-PICKER-NESTED-COMBOBOX [github] 2026-08-25",
+          "@SHADCN/REACT [npm] 2026-08-31",
+          "CN [npm] 2026-09-22",
+          "@SHADCN/LINT [npm] 2026-09-22",
+          "SHADCN [npm] 2026-10-07",
+          "@SHADCN/REGISTRY [npm] 2026-10-07"
+        ]
+      },
+      "searchWouldRun": false
+    },
+    {
+      "query": "pontusab",
+      "ms": 4026,
+      "parsed": {
+        "kind": "handle",
+        "value": "pontusab"
+      },
+      "staging": {
+        "candidates": [
+          {
+            "kind": "github",
+            "id": "pontusab",
+            "display": "Pontus Abrahamsson",
+            "detail": "GitHub \u00b7 106 public repos \u00b7 @pontusab on X"
+          }
+        ],
+        "auto": true
+      },
+      "chosen": {
+        "kind": "github",
+        "id": "pontusab",
+        "display": "Pontus Abrahamsson"
+      },
+      "profile": {
+        "name": "Pontus Abrahamsson",
+        "bio": "Building.",
+        "site": "https://midday.ai/",
+        "x": "pontusab",
+        "github": "pontusab"
+      },
+      "gaps": {
+        "hasGithub": true,
+        "hasX": true,
+        "hasSite": true,
+        "hasName": true,
+        "xEqualsGithub": true,
+        "githubLinkedFromX": false
+      },
+      "sources": [
+        {
+          "id": "github",
+          "enabled": true,
+          "ok": true,
+          "n": 10,
+          "ms": 1794,
+          "error": null,
+          "names": [
+            "behindthecode",
+            "homebrew-tap",
+            "cursy",
+            "message-ui",
+            "hyper",
+            "mcp-typegen",
+            "ai-sdk-heal",
+            "workbench",
+            "caltext",
+            "toolpick"
+          ]
+        },
+        {
+          "id": "appstore",
+          "enabled": true,
+          "ok": true,
+          "n": 0,
+          "ms": 310,
+          "error": null,
+          "names": []
+        },
+        {
+          "id": "hn",
+          "enabled": true,
+          "ok": true,
+          "n": 0,
+          "ms": 202,
+          "error": null,
+          "names": []
+        },
+        {
+          "id": "npm",
+          "enabled": true,
+          "ok": true,
+          "n": 0,
+          "ms": 141,
+          "error": null,
+          "names": []
+        },
+        {
+          "id": "producthunt",
+          "enabled": false,
+          "ok": null,
+          "n": 0,
+          "ms": 0,
+          "error": null,
+          "names": []
+        }
+      ],
+      "gather": {
+        "ms": 270,
+        "ran": [
+          "github",
+          "appstore",
+          "hn",
+          "npm"
+        ],
+        "failed": [],
+        "foundCount": 10,
+        "inYearCount": 10,
+        "web": 0,
+        "pages": 0,
+        "site": null,
+        "items": [
+          {
+            "name": "workbench",
+            "source": "github",
+            "date": "2026-04-21",
+            "thisYear": true,
+            "status": "LIVE",
+            "link": "https://github.com/pontusab/workbench"
+          },
+          {
+            "name": "hyper",
+            "source": "github",
+            "date": "2026-04-24",
+            "thisYear": true,
+            "status": "LIVE",
+            "link": "https://github.com/pontusab/hyper"
+          },
+          {
+            "name": "caltext",
+            "source": "github",
+            "date": "2026-04-08",
+            "thisYear": true,
+            "status": "SHIPPED",
+            "link": "https://github.com/pontusab/caltext"
+          },
+          {
+            "name": "message-ui",
+            "source": "github",
+            "date": "2026-06-01",
+            "thisYear": true,
+            "status": "LIVE",
+            "link": "https://github.com/pontusab/message-ui"
+          },
+          {
+            "name": "behindthecode",
+            "source": "github",
+            "date": "2026-06-04",
+            "thisYear": true,
+            "status": "LIVE",
+            "link": "https://github.com/pontusab/behindthecode"
+          },
+          {
+            "name": "toolpick",
+            "source": "github",
+            "date": "2026-03-21",
+            "thisYear": true,
+            "status": "SHIPPED",
+            "link": "https://github.com/pontusab/toolpick"
+          },
+          {
+            "name": "cursy",
+            "source": "github",
+            "date": "2026-06-01",
+            "thisYear": true,
+            "status": "LIVE",
+            "link": "https://github.com/pontusab/cursy"
+          },
+          {
+            "name": "ai-sdk-heal",
+            "source": "github",
+            "date": "2026-04-23",
+            "thisYear": true,
+            "status": "SHIPPED",
+            "link": "https://github.com/pontusab/ai-sdk-heal"
+          },
+          {
+            "name": "mcp-typegen",
+            "source": "github",
+            "date": "2026-04-23",
+            "thisYear": true,
+            "status": "SHIPPED",
+            "link": "https://github.com/pontusab/mcp-typegen"
+          },
+          {
+            "name": "homebrew-tap",
+            "source": "github",
+            "date": "2026-06-02",
+            "thisYear": true,
+            "status": "SHIPPED",
+            "link": "https://github.com/pontusab/homebrew-tap"
+          }
+        ]
+      },
+      "demo": {
+        "itemCount": 10,
+        "potential": false,
+        "note": "Receipt paper running low. Keep going.",
+        "items": [
+          "TOOLPICK [github] 2026-03-21",
+          "CALTEXT [github] 2026-04-08",
+          "WORKBENCH [github] 2026-04-21",
+          "AI-SDK-HEAL [github] 2026-04-23",
+          "MCP-TYPEGEN [github] 2026-04-23",
+          "HYPER [github] 2026-04-24",
+          "MESSAGE-UI [github] 2026-06-01",
+          "CURSY [github] 2026-06-01",
+          "HOMEBREW-TAP [github] 2026-06-02",
+          "BEHINDTHECODE [github] 2026-06-04"
+        ]
+      },
+      "searchWouldRun": false
+    },
+    {
+      "query": "nutlope",
+      "ms": 3674,
+      "parsed": {
+        "kind": "handle",
+        "value": "nutlope"
+      },
+      "staging": {
+        "candidates": [
+          {
+            "kind": "github",
+            "id": "Nutlope",
+            "display": "Hassan El Mghari",
+            "detail": "GitHub \u00b7 107 public repos \u00b7 @nutlope on X"
+          }
+        ],
+        "auto": true
+      },
+      "chosen": {
+        "kind": "github",
+        "id": "Nutlope",
+        "display": "Hassan El Mghari"
+      },
+      "profile": {
+        "name": "Hassan El Mghari",
+        "bio": "Building.",
+        "site": "https://nutlope.com/",
+        "x": "nutlope",
+        "github": "Nutlope"
+      },
+      "gaps": {
+        "hasGithub": true,
+        "hasX": true,
+        "hasSite": true,
+        "hasName": true,
+        "xEqualsGithub": true,
+        "githubLinkedFromX": false
+      },
+      "sources": [
+        {
+          "id": "github",
+          "enabled": true,
+          "ok": true,
+          "n": 15,
+          "ms": 1265,
+          "error": null,
+          "names": [
+            "geoguessbench",
+            "jev-fraud",
+            "1kpapers",
+            "open-customer-insights",
+            "variate",
+            "rate-limit-this",
+            "voice-to-voice",
+            "nyc-ai-atlas",
+            "togetherlink",
+            "ai-browser-games",
+            "inspo",
+            "hallmark",
+            "explainlikeimfive",
+            "ai-subtitles",
+            "aicommits v4.2.2"
+          ]
+        },
+        {
+          "id": "appstore",
+          "enabled": true,
+          "ok": true,
+          "n": 0,
+          "ms": 790,
+          "error": null,
+          "names": []
+        },
+        {
+          "id": "hn",
+          "enabled": true,
+          "ok": true,
+          "n": 0,
+          "ms": 386,
+          "error": null,
+          "names": []
+        },
+        {
+          "id": "npm",
+          "enabled": true,
+          "ok": true,
+          "n": 0,
+          "ms": 127,
+          "error": null,
+          "names": []
+        },
+        {
+          "id": "producthunt",
+          "enabled": false,
+          "ok": null,
+          "n": 0,
+          "ms": 0,
+          "error": null,
+          "names": []
+        }
+      ],
+      "gather": {
+        "ms": 259,
+        "ran": [
+          "site",
+          "github",
+          "appstore",
+          "hn",
+          "npm"
+        ],
+        "failed": [],
+        "foundCount": 15,
+        "inYearCount": 15,
+        "web": 0,
+        "pages": 0,
+        "site": {
+          "url": "https://www.nutlope.com/",
+          "title": "Hassan El Mghari",
+          "links": 12
+        },
+        "items": [
+          {
+            "name": "hallmark",
+            "source": "github",
+            "date": "2026-04-27",
+            "thisYear": true,
+            "status": "LIVE",
+            "link": "https://github.com/Nutlope/hallmark"
+          },
+          {
+            "name": "aicommits v4.2.2",
+            "source": "github",
+            "date": "2026-09-04",
+            "thisYear": false,
+            "status": "RELEASED",
+            "link": "https://github.com/Nutlope/aicommits/releases/tag/v4.2.2"
+          },
+          {
+            "name": "inspo",
+            "source": "github",
+            "date": "2026-04-29",
+            "thisYear": true,
+            "status": "LIVE",
+            "link": "https://github.com/Nutlope/inspo"
+          },
+          {
+            "name": "ai-subtitles",
+            "source": "github",
+            "date": "2026-02-25",
+            "thisYear": true,
+            "status": "LIVE",
+            "link": "https://github.com/Nutlope/ai-subtitles"
+          },
+          {
+            "name": "variate",
+            "source": "github",
+            "date": "2026-07-17",
+            "thisYear": true,
+            "status": "LIVE",
+            "link": "https://github.com/Nutlope/variate"
+          },
+          {
+            "name": "1kpapers",
+            "source": "github",
+            "date": "2026-08-04",
+            "thisYear": true,
+            "status": "LIVE",
+            "link": "https://github.com/Nutlope/1kpapers"
+          },
+          {
+            "name": "nyc-ai-atlas",
+            "source": "github",
+            "date": "2026-07-07",
+            "thisYear": true,
+            "status": "LIVE",
+            "link": "https://github.com/Nutlope/nyc-ai-atlas"
+          },
+          {
+            "name": "togetherlink",
+            "source": "github",
+            "date": "2026-06-22",
+            "thisYear": true,
+            "status": "LIVE",
+            "link": "https://github.com/Nutlope/togetherlink"
+          },
+          {
+            "name": "open-customer-insights",
+            "source": "github",
+            "date": "2026-07-22",
+            "thisYear": true,
+            "status": "SHIPPED",
+            "link": "https://github.com/Nutlope/open-customer-insights"
+          },
+          {
+            "name": "geoguessbench",
+            "source": "github",
+            "date": "2026-10-05",
+            "thisYear": true,
+            "status": "LIVE",
+            "link": "https://github.com/Nutlope/geoguessbench"
+          },
+          {
+            "name": "ai-browser-games",
+            "source": "github",
+            "date": "2026-06-05",
+            "thisYear": true,
+            "status": "LIVE",
+            "link": "https://github.com/Nutlope/ai-browser-games"
+          },
+          {
+            "name": "explainlikeimfive",
+            "source": "github",
+            "date": "2026-04-24",
+            "thisYear": true,
+            "status": "LIVE",
+            "link": "https://github.com/Nutlope/explainlikeimfive"
+          },
+          {
+            "name": "jev-fraud",
+            "source": "github",
+            "date": "2026-09-20",
+            "thisYear": true,
+            "status": "SHIPPED",
+            "link": "https://github.com/Nutlope/jev-fraud"
+          },
+          {
+            "name": "voice-to-voice",
+            "source": "github",
+            "date": "2026-07-07",
+            "thisYear": true,
+            "status": "SHIPPED",
+            "link": "https://github.com/Nutlope/voice-to-voice"
+          },
+          {
+            "name": "rate-limit-this",
+            "source": "github",
+            "date": "2026-07-13",
+            "thisYear": true,
+            "status": "SHIPPED",
+            "link": "https://github.com/Nutlope/rate-limit-this"
+          }
+        ]
+      },
+      "demo": {
+        "itemCount": 12,
+        "potential": false,
+        "note": "Receipt paper running low. Keep going.",
+        "items": [
+          "AI-SUBTITLES [github] 2026-02-25",
+          "EXPLAINLIKEIMFIVE [github] 2026-04-24",
+          "HALLMARK [github] 2026-04-27",
+          "INSPO [github] 2026-04-29",
+          "AI-BROWSER-GAMES [github] 2026-06-05",
+          "TOGETHERLINK [github] 2026-06-22",
+          "NYC-AI-ATLAS [github] 2026-07-07",
+          "VARIATE [github] 2026-07-17",
+          "OPEN-CUSTOMER-INSIGHTS [github] 2026-07-22",
+          "1KPAPERS [github] 2026-08-04",
+          "AICOMMITS V4.2.2 [github] 2026-09-04",
+          "GEOGUESSBENCH [github] 2026-10-05"
+        ]
+      },
+      "searchWouldRun": false
+    },
+    {
+      "query": "arvidkahl",
+      "ms": 2800,
+      "parsed": {
+        "kind": "handle",
+        "value": "arvidkahl"
+      },
+      "staging": {
+        "candidates": [
+          {
+            "kind": "github",
+            "id": "arvidkahl",
+            "display": "Arvid Kahl",
+            "detail": "GitHub \u00b7 51 public repos \u00b7 @arvidkahl on X"
+          }
+        ],
+        "auto": true
+      },
+      "chosen": {
+        "kind": "github",
+        "id": "arvidkahl",
+        "display": "Arvid Kahl"
+      },
+      "profile": {
+        "name": "Arvid Kahl",
+        "bio": "Writer, entrepreneur, and coder at heart. I co-founded and sold FeedbackPanda. Now building Podscan.fm, talking about it at tbf.fm. Be kind to each other.",
+        "site": "https://thebootstrappedfounder.com/",
+        "x": "arvidkahl",
+        "github": "arvidkahl"
+      },
+      "gaps": {
+        "hasGithub": true,
+        "hasX": true,
+        "hasSite": true,
+        "hasName": true,
+        "xEqualsGithub": true,
+        "githubLinkedFromX": false
+      },
+      "sources": [
+        {
+          "id": "github",
+          "enabled": true,
+          "ok": true,
+          "n": 0,
+          "ms": 640,
+          "error": null,
+          "names": []
+        },
+        {
+          "id": "appstore",
+          "enabled": true,
+          "ok": true,
+          "n": 0,
+          "ms": 116,
+          "error": null,
+          "names": []
+        },
+        {
+          "id": "hn",
+          "enabled": true,
+          "ok": true,
+          "n": 0,
+          "ms": 171,
+          "error": null,
+          "names": []
+        },
+        {
+          "id": "npm",
+          "enabled": true,
+          "ok": true,
+          "n": 0,
+          "ms": 340,
+          "error": null,
+          "names": []
+        },
+        {
+          "id": "producthunt",
+          "enabled": false,
+          "ok": null,
+          "n": 0,
+          "ms": 0,
+          "error": null,
+          "names": []
+        }
+      ],
+      "gather": {
+        "ms": 139,
+        "ran": [
+          "site",
+          "github",
+          "appstore",
+          "hn",
+          "npm"
+        ],
+        "failed": [],
+        "foundCount": 0,
+        "inYearCount": 0,
+        "web": 0,
+        "pages": 0,
+        "site": {
+          "url": "https://thebootstrappedfounder.com/",
+          "title": "The Bootstrapped Founder &#8211; How to Start, Run, and Sell a Bootstrapped Business \u2014 by Arvid Kahl",
+          "links": 40
+        },
+        "items": []
+      },
+      "demo": {
+        "itemCount": 1,
+        "potential": true,
+        "note": "Item on back order. Ships when you do.",
+        "items": [
+          "YOUR POTENTIAL [none] undated"
+        ]
+      },
+      "searchWouldRun": true
+    },
+    {
+      "query": "yongfook",
+      "ms": 4556,
+      "parsed": {
+        "kind": "handle",
+        "value": "yongfook"
+      },
+      "staging": {
+        "candidates": [
+          {
+            "kind": "github",
+            "id": "yongfook",
+            "display": "Jon Yongfook",
+            "detail": "GitHub \u00b7 36 public repos"
+          },
+          {
+            "kind": "x",
+            "id": "yongfook",
+            "display": "@yongfook",
+            "detail": "X / Twitter handle"
+          }
+        ],
+        "auto": false
+      },
+      "chosen": {
+        "kind": "github",
+        "id": "yongfook",
+        "display": "Jon Yongfook"
+      },
+      "profile": {
+        "name": "Jon Yongfook",
+        "bio": "Founder Bannerbear.com",
+        "site": "https://www.bannerbear.com/",
+        "x": null,
+        "github": "yongfook"
+      },
+      "gaps": {
+        "hasGithub": true,
+        "hasX": false,
+        "hasSite": true,
+        "hasName": true,
+        "xEqualsGithub": false,
+        "githubLinkedFromX": false
+      },
+      "sources": [
+        {
+          "id": "github",
+          "enabled": true,
+          "ok": true,
+          "n": 2,
+          "ms": 1976,
+          "error": null,
+          "names": [
+            "redacted-site",
+            "meaninglesslogowall"
+          ]
+        },
+        {
+          "id": "appstore",
+          "enabled": true,
+          "ok": true,
+          "n": 0,
+          "ms": 872,
+          "error": null,
+          "names": []
+        },
+        {
+          "id": "hn",
+          "enabled": true,
+          "ok": true,
+          "n": 0,
+          "ms": 236,
+          "error": null,
+          "names": []
+        },
+        {
+          "id": "npm",
+          "enabled": true,
+          "ok": true,
+          "n": 2,
+          "ms": 144,
+          "error": null,
+          "names": [
+            "bannerbear",
+            "@bannerbear/mcp"
+          ]
+        },
+        {
+          "id": "producthunt",
+          "enabled": false,
+          "ok": null,
+          "n": 0,
+          "ms": 0,
+          "error": null,
+          "names": []
+        }
+      ],
+      "gather": {
+        "ms": 158,
+        "ran": [
+          "site",
+          "github",
+          "appstore",
+          "hn",
+          "npm"
+        ],
+        "failed": [],
+        "foundCount": 4,
+        "inYearCount": 4,
+        "web": 0,
+        "pages": 0,
+        "site": {
+          "url": "https://www.bannerbear.com/",
+          "title": "API for Automated Image and Video Generation - Bannerbear",
+          "links": 40
+        },
+        "items": [
+          {
+            "name": "bannerbear",
+            "source": "npm",
+            "date": "2026-08-17",
+            "thisYear": false,
+            "status": "RELEASED",
+            "link": "https://www.npmjs.com/package/bannerbear"
+          },
+          {
+            "name": "@bannerbear/mcp",
+            "source": "npm",
+            "date": "2026-10-07",
+            "thisYear": false,
+            "status": "RELEASED",
+            "link": "https://www.npmjs.com/package/@bannerbear/mcp"
+          },
+          {
+            "name": "redacted-site",
+            "source": "github",
+            "date": "2026-09-30",
+            "thisYear": true,
+            "status": "SHIPPED",
+            "link": "https://github.com/yongfook/redacted-site"
+          },
+          {
+            "name": "meaninglesslogowall",
+            "source": "github",
+            "date": "2026-03-21",
+            "thisYear": true,
+            "status": "SHIPPED",
+            "link": "https://github.com/yongfook/meaninglesslogowall"
+          }
+        ]
+      },
+      "demo": {
+        "itemCount": 4,
+        "potential": false,
+        "note": "No refunds on momentum.",
+        "items": [
+          "MEANINGLESSLOGOWALL [github] 2026-03-21",
+          "BANNERBEAR [npm] 2026-08-17",
+          "REDACTED-SITE [github] 2026-09-30",
+          "@BANNERBEAR/MCP [npm] 2026-10-07"
+        ]
+      },
+      "searchWouldRun": false
+    },
+    {
+      "query": "Tibo from OpenAI",
+      "ms": 1172,
+      "parsed": {
+        "kind": "name",
+        "value": "Tibo from OpenAI"
+      },
+      "staging": {
+        "candidates": [
+          {
+            "kind": "name",
+            "id": "Tibo from OpenAI",
+            "display": "Tibo from OpenAI",
+            "detail": "Name or brand"
+          }
+        ],
+        "auto": true
+      },
+      "chosen": {
+        "kind": "name",
+        "id": "Tibo from OpenAI",
+        "display": "Tibo from OpenAI"
+      },
+      "profile": {
+        "name": "Tibo from OpenAI",
+        "bio": "",
+        "site": null,
+        "x": null,
+        "github": null
+      },
+      "gaps": {
+        "hasGithub": false,
+        "hasX": false,
+        "hasSite": false,
+        "hasName": true,
+        "xEqualsGithub": false,
+        "githubLinkedFromX": false
+      },
+      "sources": [
+        {
+          "id": "github",
+          "enabled": false,
+          "ok": null,
+          "n": 0,
+          "ms": 0,
+          "error": null,
+          "names": []
+        },
+        {
+          "id": "appstore",
+          "enabled": true,
+          "ok": true,
+          "n": 0,
+          "ms": 952,
+          "error": null,
+          "names": []
+        },
+        {
+          "id": "hn",
+          "enabled": false,
+          "ok": null,
+          "n": 0,
+          "ms": 0,
+          "error": null,
+          "names": []
+        },
+        {
+          "id": "npm",
+          "enabled": false,
+          "ok": null,
+          "n": 0,
+          "ms": 0,
+          "error": null,
+          "names": []
+        },
+        {
+          "id": "producthunt",
+          "enabled": false,
+          "ok": null,
+          "n": 0,
+          "ms": 0,
+          "error": null,
+          "names": []
+        }
+      ],
+      "gather": {
+        "ms": 10,
+        "ran": [
+          "appstore"
+        ],
+        "failed": [],
+        "foundCount": 0,
+        "inYearCount": 0,
+        "web": 0,
+        "pages": 0,
+        "site": null,
+        "items": []
+      },
+      "demo": {
+        "itemCount": 1,
+        "potential": true,
+        "note": "Item on back order. Ships when you do.",
+        "items": [
+          "YOUR POTENTIAL [none] undated"
+        ]
+      },
+      "searchWouldRun": true
+    }
+  ]
+}

@@ -3,14 +3,14 @@
   "version": "0.1.0",
   "private": true,
   "scripts": {
-    "media": "node scripts/build-media.mjs && node scripts/build-share-images.mjs",
+    "media": "node scripts/build-media.mjs && node scripts/build-share-images.mjs && node scripts/build-shipped-logos.mjs && node --experimental-strip-types --no-warnings scripts/build-shipped-og.mjs",
     "predev": "npm run media",
     "dev": "next dev",
     "prebuild": "npm run media",
     "build": "next build",
     "start": "next start",
     "lint": "next lint",
-    "test:motion": "node --experimental-strip-types --test tests/*.test.mjs",
+    "test": "node --experimental-transform-types --no-warnings --test tests/*.test.mjs",
     "preview": "npm run build && wrangler dev",
     "deploy:staging": "npm run build && wrangler deploy --env staging",
     "deploy": "npm run build && wrangler deploy --env=\"\"",
@@ -18,17 +18,23 @@
     "check:tracks": "node scripts/check-tracks.mjs"
   },
   "dependencies": {
+    "@dimforge/rapier3d-compat": "0.20.0",
+    "@react-three/fiber": "8.18.0",
     "autoprefixer": "^10.4.21",
-    "next": "^14.0.4",
+    "next": "^14.2.35",
     "postcss": "^8.5.5",
+    "qrcode-generator": "^1.5.2",
     "react": "^18.3.1",
-    "react-dom": "^18.3.1"
+    "react-dom": "^18.3.1",
+    "three": "0.186.0"
   },
   "devDependencies": {
     "@cloudflare/workers-types": "^5.20260928.1",
+    "@resvg/resvg-wasm": "^2.6.2",
     "@types/node": "^20",
     "@types/react": "^18",
     "@types/react-dom": "^18",
+    "@types/three": "0.186.0",
     "eslint": "^8.57.1",
     "eslint-config-next": "^14.0.4",
     "sharp": "^0.34.5",

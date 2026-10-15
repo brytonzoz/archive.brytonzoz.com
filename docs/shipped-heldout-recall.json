@@ -1,0 +1,836 @@
+{
+  "at": "2026-10-09T18:54:40.280Z",
+  "year": 2026,
+  "envPresent": {
+    "GITHUB_TOKEN": false,
+    "PRODUCTHUNT": false,
+    "TINYFISH": false,
+    "ANTHROPIC": false
+  },
+  "medianRecall": 1,
+  "pass": true,
+  "costNote": "Deterministic harvest is $0. Claude Haiku + 3 web searches worst-case is about $0.03–$0.04 of the $0.05 receipt cap. A fourth search wave would be +$0.01 and is only skipped when the remaining budget cannot buy it (coverageCapped).",
+  "rows": [
+    {
+      "query": "kitze",
+      "ms": 4118,
+      "error": null,
+      "identity": {
+        "name": "kitze 🚀",
+        "bio": "Rectangle mover",
+        "site": "https://kitze.io/",
+        "x": "kitze",
+        "github": "kitze",
+        "sites": [
+          "https://kitze.io/"
+        ],
+        "phUsers": [
+          "kitze"
+        ],
+        "npmUsers": [
+          "kitze"
+        ]
+      },
+      "items": 30,
+      "inYear": 30,
+      "receiptItems": 20,
+      "recall": 0.8,
+      "foundShips": [
+        "skillbox",
+        "unclutter",
+        "council",
+        "pagegrade"
+      ],
+      "missedShips": [
+        "Sizzy"
+      ],
+      "shouldFound": [],
+      "shouldMissed": [],
+      "statsFound": 1,
+      "statsExpected": 3,
+      "statLabels": [
+        "1.9k GitHub stars · github.com/kitze/react-hanger",
+        "1.1k GitHub stars · github.com/kitze/awesome-conference-practices",
+        "740 GitHub stars · github.com/kitze/react-genie",
+        "505 GitHub stars · github.com/kitze/mobx-router",
+        "5 npm weekly downloads · npmjs.com/package/benji-sdk",
+        "91 public GitHub repos · github.com/kitze"
+      ],
+      "gaps": [
+        "producthunt"
+      ],
+      "ran": [
+        "x-profile:miss",
+        "github:kitze repos=91 score=32",
+        "site",
+        "sites",
+        "research-pass:harvest",
+        "github",
+        "appstore",
+        "hn",
+        "npm",
+        "github-overview",
+        "research-pass:gaps:producthunt"
+      ],
+      "sourcedPct": 100,
+      "note": "20 launches · 1 npm · 19 on GitHub. BENJI-SDK is first on the tape.",
+      "names": [
+        "BENJI-SDK",
+        "CODEXMAXX",
+        "COUNCIL",
+        "UNCLUTTER",
+        "SKILLBOX",
+        "REACT-HANGER",
+        "AWESOME-CONFERENCE-PRACTICES",
+        "REACT-GENIE",
+        "MOBX-ROUTER",
+        "REACT-ELECTRON-EXAMPLE",
+        "STYLES-DEBUGGER",
+        "COPY-LITE",
+        "REACT-TINIEST-ROUTER",
+        "GRAPHQL-USER",
+        "VOICE-COMMAND-LIST",
+        "REACT-LONG",
+        "REACT-DISABLE",
+        "REACT-IN-MARKDOWN",
+        "CADDY",
+        "GTB"
+      ]
+    },
+    {
+      "query": "rameerez",
+      "ms": 2894,
+      "error": null,
+      "identity": {
+        "name": "Javi",
+        "bio": "amateur webmaster",
+        "site": "https://rameerez.com/",
+        "x": "rameerez",
+        "github": "rameerez",
+        "sites": [
+          "https://rameerez.com/"
+        ],
+        "phUsers": [
+          "rameerez"
+        ],
+        "npmUsers": [
+          "rameerez"
+        ]
+      },
+      "items": 30,
+      "inYear": 30,
+      "receiptItems": 20,
+      "recall": 1,
+      "foundShips": [
+        "bouncy",
+        "mappo",
+        "support_desk",
+        "clickwrap",
+        "chats"
+      ],
+      "missedShips": [],
+      "shouldFound": [],
+      "shouldMissed": [],
+      "statsFound": 1,
+      "statsExpected": 1,
+      "statLabels": [
+        "272 GitHub stars · github.com/rameerez/allgood",
+        "166 GitHub stars · github.com/rameerez/usage_credits",
+        "98 GitHub stars · github.com/rameerez/profitable",
+        "75 GitHub stars · github.com/rameerez/nondisposable",
+        "73 npm weekly downloads · npmjs.com/package/mappo",
+        "26 npm weekly downloads · npmjs.com/package/@licenseseat/js",
+        "10 npm weekly downloads · npmjs.com/package/make-model-dropdown",
+        "8 npm weekly downloads · npmjs.com/package/@licenseseat/tauri-plugin",
+        "57 public GitHub repos · github.com/rameerez"
+      ],
+      "gaps": [
+        "producthunt"
+      ],
+      "ran": [
+        "x-profile:miss",
+        "github:rameerez repos=57 score=81",
+        "site",
+        "sites",
+        "research-pass:harvest",
+        "github",
+        "appstore",
+        "hn",
+        "npm",
+        "github-overview",
+        "research-pass:gaps:producthunt"
+      ],
+      "sourcedPct": 100,
+      "note": "272 GitHub stars allgood · github.com/rameerez/allgood. 20 public things for Javi. MAPPO set the tone.",
+      "names": [
+        "CLAUDE-CODE-STARTUP-SKILLS",
+        "FOOTPRINTED",
+        "USAGE_CREDITS V0.5.0",
+        "PROFITABLE V0.6.0",
+        "SLUGIFIABLE",
+        "MAPPO",
+        "@LICENSESEAT/JS",
+        "@LICENSESEAT/TAURI-PLUGIN",
+        "TRACKDOWN",
+        "ALLGOOD",
+        "MAKE-MODEL-DROPDOWN",
+        "NONDISPOSABLE",
+        "TELEGRAMA",
+        "PRICING_PLANS",
+        "@RAMEEREZ",
+        "RAILSFAST",
+        "15+ OSS RUBY GEMS",
+        "JOBICIAN",
+        "VISUALHOUND",
+        "PROMPTHERO"
+      ]
+    },
+    {
+      "query": "steipete",
+      "ms": 5497,
+      "error": null,
+      "identity": {
+        "name": "Peter Steinberger",
+        "bio": "Came back from retirement to mess with AI. Clawdfather @OpenClaw Previously: Founder of @PSPDFKit.",
+        "site": "https://steipete.me/",
+        "x": "steipete",
+        "github": "steipete",
+        "sites": [
+          "https://steipete.me/"
+        ],
+        "phUsers": [
+          "steipete"
+        ],
+        "npmUsers": [
+          "steipete"
+        ]
+      },
+      "items": 30,
+      "inYear": 30,
+      "receiptItems": 20,
+      "recall": 0.75,
+      "foundShips": [
+        "gpui-kit",
+        "openclaw-code-agent",
+        "shellbench"
+      ],
+      "missedShips": [
+        "accesskit"
+      ],
+      "shouldFound": [],
+      "shouldMissed": [],
+      "statsFound": 1,
+      "statsExpected": 1,
+      "statLabels": [
+        "22k GitHub stars · github.com/steipete/CodexBar",
+        "7.3k GitHub stars · github.com/steipete/agent-scripts",
+        "6.7k GitHub stars · github.com/steipete/summarize",
+        "4k GitHub stars · github.com/steipete/oracle",
+        "4499k npm weekly downloads · npmjs.com/package/clawpdf",
+        "4446k npm weekly downloads · npmjs.com/package/rastermill",
+        "4288k npm weekly downloads · npmjs.com/package/openclaw",
+        "4284k npm weekly downloads · npmjs.com/package/@openclaw/proxyline",
+        "1449 HN points · news.ycombinator.com/item?id=47028013",
+        "4 HN points · news.ycombinator.com/item?id=46462942",
+        "221 public GitHub repos · github.com/steipete"
+      ],
+      "gaps": [
+        "own-site",
+        "project-list",
+        "producthunt"
+      ],
+      "ran": [
+        "x-profile:miss",
+        "github:steipete repos=221 score=83",
+        "site",
+        "sites",
+        "research-pass:harvest",
+        "github",
+        "appstore",
+        "hn",
+        "npm",
+        "github-overview",
+        "research-pass:gaps:own-site,project-list,producthunt",
+        "research-pass:gap-fill"
+      ],
+      "sourcedPct": 100,
+      "note": "20 launches · 20 on npm. Receipt paper running low.",
+      "names": [
+        "CLAWPDF",
+        "OSC-PROGRESS",
+        "RASTERMILL",
+        "LIBOPUS-WASM",
+        "@OPENCLAW/PROXYLINE",
+        "@OPENCLAW/CRABLINE",
+        "@CLAWDBOT/LOBSTER",
+        "ACPX",
+        "@OPENCLAW/UIROUTER",
+        "MCPORTER",
+        "@OPENCLAW/PLUGIN-INSPECTOR",
+        "@OPENCLAW/LIBTERMINAL",
+        "@OPENCLAW/FS-SAFE",
+        "OPENCLAW",
+        "@OPENCLAW/BRAVE-PLUGIN",
+        "@OPENCLAW/FS-SAFE-LINUX-X64-GNU",
+        "@OPENCLAW/AI",
+        "@OPENCLAW/CODEX",
+        "@OPENCLAW/FS-SAFE-DARWIN-ARM64",
+        "@OPENCLAW/SLACK"
+      ]
+    },
+    {
+      "query": "insidegui",
+      "ms": 2489,
+      "error": null,
+      "identity": {
+        "name": "Guilherme Rambo",
+        "bio": "Mac and iOS developer, security researcher.",
+        "site": "https://mastodon.social/@_inside",
+        "x": "insidegui",
+        "github": "insidegui",
+        "sites": [],
+        "phUsers": [
+          "insidegui"
+        ],
+        "npmUsers": [
+          "insidegui"
+        ]
+      },
+      "items": 21,
+      "inYear": 21,
+      "receiptItems": 20,
+      "recall": 1,
+      "foundShips": [
+        "LiquidGlassFlag",
+        "OpenRouterFoundationModels",
+        "USBIDKit",
+        "VMBridge"
+      ],
+      "missedShips": [],
+      "shouldFound": [],
+      "shouldMissed": [],
+      "statsFound": 1,
+      "statsExpected": 2,
+      "statLabels": [
+        "8.8k GitHub stars · github.com/insidegui/VirtualBuddy",
+        "8.7k GitHub stars · github.com/insidegui/WWDC",
+        "2.9k GitHub stars · github.com/insidegui/AssetCatalogTinkerer",
+        "1.1k GitHub stars · github.com/insidegui/MultipeerKit",
+        "235 public GitHub repos · github.com/insidegui"
+      ],
+      "gaps": [
+        "producthunt"
+      ],
+      "ran": [
+        "x-profile:miss",
+        "github:insidegui repos=235 score=33",
+        "site",
+        "sites",
+        "research-pass:harvest",
+        "github",
+        "appstore",
+        "hn",
+        "npm",
+        "github-overview",
+        "research-pass:gaps:producthunt"
+      ],
+      "sourcedPct": 100,
+      "note": "20 launches · 17 on GitHub · 3 on their site. Receipt paper running low.",
+      "names": [
+        "TATSUKIT",
+        "RESEARCHSDK",
+        "BUDDYKIT",
+        "MESHBUDDY",
+        "ASSETCATALOGTINKERER",
+        "DARKMODEBUDDY",
+        "LIQUIDGLASSFLAG",
+        "WWDC",
+        "OPENROUTERFOUNDATIONMODELS",
+        "MULTIPEERKIT",
+        "SRDZSH",
+        "SRDSKILLS",
+        "USBIDKIT",
+        "VMBRIDGE",
+        "STATUSBUDDY",
+        "VIRTUALBUDDY 2.2-B6",
+        "VIRTUALBUDDY",
+        "MASTODON",
+        "GUI RAMBO",
+        "NATIVE APPS"
+      ]
+    },
+    {
+      "query": "fofrAI",
+      "ms": 3534,
+      "error": null,
+      "identity": {
+        "name": "fofr",
+        "bio": "Playing with models at Google DeepMind",
+        "site": null,
+        "x": "fofrAI",
+        "github": "fofr",
+        "sites": [],
+        "phUsers": [
+          "fofrAI",
+          "fofr"
+        ],
+        "npmUsers": [
+          "fofrAI",
+          "fofr"
+        ]
+      },
+      "items": 11,
+      "inYear": 11,
+      "receiptItems": 11,
+      "recall": 1,
+      "foundShips": [
+        "nano-banana-pro-json-studio",
+        "fofr.ai"
+      ],
+      "missedShips": [],
+      "shouldFound": [],
+      "shouldMissed": [],
+      "statsFound": 1,
+      "statsExpected": 1,
+      "statLabels": [
+        "27 GitHub stars · github.com/fofr/prompter.fofr.ai",
+        "26 GitHub stars · github.com/fofr/nano-banana-pro-json-studio",
+        "4.7k npm weekly downloads · npmjs.com/package/@x-govuk/govuk-prototype-components",
+        "982 npm weekly downloads · npmjs.com/package/markdown-it-govuk",
+        "979 npm weekly downloads · npmjs.com/package/@x-govuk/govuk-eleventy-plugin",
+        "506 npm weekly downloads · npmjs.com/package/@x-govuk/govuk-prototype-filters",
+        "164 public GitHub repos · github.com/fofr"
+      ],
+      "gaps": [
+        "producthunt"
+      ],
+      "ran": [
+        "x-profile:miss",
+        "github:fofr repos=164 score=75",
+        "sites",
+        "research-pass:harvest",
+        "github",
+        "appstore",
+        "hn",
+        "npm",
+        "github-overview",
+        "research-pass:gaps:producthunt"
+      ],
+      "sourcedPct": 100,
+      "note": "11 launches · 9 on npm · 2 on GitHub. Someone likes the publish button.",
+      "names": [
+        "NANO-BANANA-PRO-JSON-STUDIO",
+        "NHSUK-PROTOTYPE-RIG",
+        "@X-GOVUK/GOVUK-PROTOTYPE-COMPONENTS",
+        "MARKDOWN-IT-GOVUK",
+        "@X-GOVUK/GOVUK-ELEVENTY-PLUGIN",
+        "PROMPT-LISTS",
+        "@X-GOVUK/GOVUK-PROTOTYPE-FILTERS",
+        "@X-GOVUK/ESLINT-CONFIG",
+        "NHSUK-DECORATED-COMPONENTS",
+        "@X-GOVUK/NHSUK-ELEVENTY-PLUGIN",
+        "PROMPTER.FOFR.AI"
+      ]
+    },
+    {
+      "query": "dabit3",
+      "ms": 4413,
+      "error": null,
+      "identity": {
+        "name": "nader dabit",
+        "bio": "Growth @cognition @devindevelopers @devinai",
+        "site": "https://nader.codes/",
+        "x": "dabit3",
+        "github": "dabit3",
+        "sites": [
+          "https://nader.codes/"
+        ],
+        "phUsers": [
+          "dabit3"
+        ],
+        "npmUsers": [
+          "dabit3"
+        ]
+      },
+      "items": 30,
+      "inYear": 30,
+      "receiptItems": 20,
+      "recall": 1,
+      "foundShips": [
+        "jev-experiments",
+        "intern",
+        "cloud-agent-automations",
+        "macos-experiments"
+      ],
+      "missedShips": [],
+      "shouldFound": [],
+      "shouldMissed": [],
+      "statsFound": 2,
+      "statsExpected": 2,
+      "statLabels": [
+        "1.3k GitHub stars · github.com/dabit3/react-native-ai",
+        "524 GitHub stars · github.com/dabit3/openform",
+        "401 GitHub stars · github.com/dabit3/jev-experiments",
+        "181 GitHub stars · github.com/dabit3/x402-starter-kit",
+        "37 npm weekly downloads · npmjs.com/package/rn-ai",
+        "1 HN points · news.ycombinator.com/item?id=47221851",
+        "507 public GitHub repos · github.com/dabit3"
+      ],
+      "gaps": [
+        "own-site",
+        "project-list",
+        "producthunt"
+      ],
+      "ran": [
+        "x-profile:dabit3",
+        "github:dabit3 repos=507 score=129",
+        "site",
+        "sites",
+        "research-pass:harvest",
+        "github",
+        "appstore",
+        "hn",
+        "npm",
+        "github-overview",
+        "research-pass:gaps:own-site,project-list,producthunt",
+        "research-pass:gap-fill"
+      ],
+      "sourcedPct": 100,
+      "note": "1.3k GitHub stars react-native-ai · github.com/dabit3/react-native-ai. 20 public things for nader. RN-AI set the tone.",
+      "names": [
+        "PORTFOLIO-TERMINAL-SUPREME",
+        "PORTFOLIO-TERMINAL-BLOOMBERG",
+        "RN-AI",
+        "SKILL-AUDIT",
+        "DESLOP",
+        "AGENT-ROUTER",
+        "LYSIUM",
+        "AI-AGENT-COGNITIVEDRIFTT",
+        "X402-STARTER-KIT",
+        "AGENT-HOOKS-IN-DEPTH",
+        "CLOUD-STACKED-DIFFS",
+        "VENDING-MACHINE",
+        "A2A-X402-TYPESCRIPT",
+        "LIGHTNING-ORCHESTRATOR",
+        "BASH-GUARD",
+        "GHOSTWRITER",
+        "CLOUD-AGENT-AUTOMATIONS",
+        "REACT-NATIVE-AI",
+        "JEV-EXPERIMENTS",
+        "OPENFORM"
+      ]
+    },
+    {
+      "query": "joshpuckett",
+      "ms": 2417,
+      "error": null,
+      "identity": {
+        "name": "Josh Puckett",
+        "bio": "I help startups with design. Co-founder Iteration, Upperstudy. Previously led teams at Dropbox, Wealthfront, Groupon & more.",
+        "site": null,
+        "x": "joshpuckett",
+        "github": "joshpuckett",
+        "sites": [],
+        "phUsers": [
+          "joshpuckett"
+        ],
+        "npmUsers": [
+          "joshpuckett"
+        ]
+      },
+      "items": 6,
+      "inYear": 6,
+      "receiptItems": 6,
+      "recall": 1,
+      "foundShips": [
+        "dialkit",
+        "bloom",
+        "pasito"
+      ],
+      "missedShips": [],
+      "shouldFound": [],
+      "shouldMissed": [],
+      "statsFound": 2,
+      "statsExpected": 2,
+      "statLabels": [
+        "1.2k GitHub stars · github.com/joshpuckett/dialkit",
+        "173 GitHub stars · github.com/joshpuckett/bloom",
+        "58 GitHub stars · github.com/joshpuckett/pasito",
+        "4 GitHub stars · github.com/joshpuckett/claude",
+        "190k npm weekly downloads · npmjs.com/package/dialkit",
+        "22k npm weekly downloads · npmjs.com/package/interface-kit",
+        "9.8k npm weekly downloads · npmjs.com/package/pasito",
+        "1.9k npm weekly downloads · npmjs.com/package/bloom-menu",
+        "27 public GitHub repos · github.com/joshpuckett"
+      ],
+      "gaps": [
+        "producthunt"
+      ],
+      "ran": [
+        "x-profile:miss",
+        "github:joshpuckett repos=27 score=80",
+        "sites",
+        "research-pass:harvest",
+        "github",
+        "appstore",
+        "hn",
+        "npm",
+        "github-overview",
+        "research-pass:gaps:producthunt"
+      ],
+      "sourcedPct": 100,
+      "note": "1.2k GitHub stars dialkit · github.com/joshpuckett/dialkit. 6 public things for Josh. DIALKIT set the tone.",
+      "names": [
+        "CLAUDE",
+        "BLOOM-MENU",
+        "BLOOM",
+        "PASITO",
+        "INTERFACE-KIT",
+        "DIALKIT"
+      ]
+    },
+    {
+      "query": "yacineMTB",
+      "ms": 2856,
+      "error": null,
+      "identity": {
+        "name": "yacine",
+        "bio": "",
+        "site": "https://yacine.ca/",
+        "x": "yacineMTB",
+        "github": "yacineMTB",
+        "sites": [
+          "https://yacine.ca/"
+        ],
+        "phUsers": [
+          "yacineMTB"
+        ],
+        "npmUsers": [
+          "yacineMTB"
+        ]
+      },
+      "items": 8,
+      "inYear": 8,
+      "receiptItems": 8,
+      "recall": 1,
+      "foundShips": [
+        "dingvid",
+        "dingcad",
+        "ee_in_two_weeks"
+      ],
+      "missedShips": [],
+      "shouldFound": [],
+      "shouldMissed": [],
+      "statsFound": 1,
+      "statsExpected": 1,
+      "statLabels": [
+        "507 GitHub stars · github.com/yacineMTB/dingcad",
+        "4 GitHub stars · github.com/yacineMTB/ee_in_two_weeks",
+        "1 GitHub stars · github.com/yacineMTB/dingvid",
+        "3.4 App Store rating · apps.apple.com/us/app/yacine-tv-live-scores/id6774677543",
+        "5 App Store ratings · apps.apple.com/us/app/yacine-tv-live-scores/id6774677543",
+        "30 public GitHub repos · github.com/yacineMTB"
+      ],
+      "gaps": [
+        "producthunt"
+      ],
+      "ran": [
+        "x-profile:miss",
+        "github:yacineMTB repos=30 score=80",
+        "site",
+        "sites",
+        "research-pass:harvest",
+        "github",
+        "appstore",
+        "hn",
+        "npm",
+        "github-overview",
+        "research-pass:gaps:producthunt"
+      ],
+      "sourcedPct": 100,
+      "note": "8 launches · 1 App Store · 3 on GitHub · 4 on their site. Receipt paper running low.",
+      "names": [
+        "DINGCAD",
+        "EE_IN_TWO_WEEKS",
+        "YACINE TV - LIVE SCORES",
+        "DINGVID",
+        "DINGCAD — LIVE AI CAD IN YOUR BROWSER",
+        "PARETO",
+        "AVL",
+        "HOW 2 MAKE MONEY"
+      ]
+    },
+    {
+      "query": "johnrushx",
+      "ms": 1391,
+      "error": null,
+      "identity": {
+        "name": "John Rush",
+        "bio": "",
+        "site": "https://marsx.dev/",
+        "x": "johnrushx",
+        "github": "johnrushx",
+        "sites": [
+          "https://marsx.dev/"
+        ],
+        "phUsers": [
+          "johnrushx"
+        ],
+        "npmUsers": [
+          "johnrushx"
+        ]
+      },
+      "items": 20,
+      "inYear": 20,
+      "receiptItems": 20,
+      "recall": 0.5,
+      "foundShips": [
+        "MarsX"
+      ],
+      "missedShips": [
+        "x-algorithm"
+      ],
+      "shouldFound": [],
+      "shouldMissed": [],
+      "statsFound": 1,
+      "statsExpected": 1,
+      "statLabels": [
+        "39k/mo public revenue · trustmrr.com/founder/johnrushx",
+        "1.7k/mo public revenue · trustmrr.com/founder/johnrushx",
+        "18 public GitHub repos · github.com/johnrushx"
+      ],
+      "gaps": [
+        "producthunt"
+      ],
+      "ran": [
+        "x-profile:miss",
+        "github:johnrushx repos=18 score=30",
+        "site",
+        "sites",
+        "research-pass:harvest",
+        "github",
+        "appstore",
+        "hn",
+        "npm",
+        "github-overview",
+        "research-pass:gaps:producthunt"
+      ],
+      "sourcedPct": 100,
+      "note": "20 launches · 20 on their site. INDEXRUSHER (FAST SITE INDEXING) closed the year.",
+      "names": [
+        "JOHN RUSH (@JOHNRUSHX)",
+        "MARSX IS A DEV TOOL THAT UNITES AI, NOCO",
+        "ORDER NOW",
+        "EXPLORE NOW",
+        "TRY FOR FREE",
+        "GO TO WEBSITE",
+        "JOIN DISCORD",
+        "GET IT NOW FOR",
+        "BRAND KIT",
+        "AUTOMATE ENTIRE SEO",
+        "WEBSITE BUILDER",
+        "UI GENERATOR",
+        "SUBMIT WEBSITE TO DIRECTORIES",
+        "RUSHHOSTER",
+        "SAAS EMAILER",
+        "WEEKLY BEST DEV TOOLS",
+        "TAILWIND UI KIT",
+        "AI MARKETPLACE BUILDER",
+        "MICROAPPS BUILDER",
+        "INDEXRUSHER (FAST SITE INDEXING)"
+      ]
+    },
+    {
+      "query": "keijiro",
+      "ms": 3386,
+      "error": null,
+      "identity": {
+        "name": "Keijiro Takahashi",
+        "bio": "",
+        "site": "https://www.keijiro.tokyo/",
+        "x": "keijiro",
+        "github": "keijiro",
+        "sites": [
+          "https://www.keijiro.tokyo/"
+        ],
+        "phUsers": [
+          "keijiro"
+        ],
+        "npmUsers": [
+          "keijiro"
+        ]
+      },
+      "items": 30,
+      "inYear": 30,
+      "receiptItems": 20,
+      "recall": 1,
+      "foundShips": [
+        "Jacquard",
+        "AudioTailor",
+        "MeshSlicer",
+        "KinoGlitchURP"
+      ],
+      "missedShips": [],
+      "shouldFound": [],
+      "shouldMissed": [],
+      "statsFound": 2,
+      "statsExpected": 2,
+      "statLabels": [
+        "240 GitHub stars · github.com/keijiro/Jacquard",
+        "215 GitHub stars · github.com/keijiro/Memo",
+        "148 GitHub stars · github.com/keijiro/MiniBokeh",
+        "138 GitHub stars · github.com/keijiro/UnityProjectTemplate",
+        "969 npm weekly downloads · npmjs.com/package/jp.keijiro.metatex",
+        "204 npm weekly downloads · npmjs.com/package/jp.keijiro.metamesh",
+        "202 npm weekly downloads · npmjs.com/package/jp.keijiro.klak.hap",
+        "197 npm weekly downloads · npmjs.com/package/jp.keijiro.beta",
+        "5.0 App Store rating · apps.apple.com/us/app/jacquard-music-app/id6804390464",
+        "3 App Store ratings · apps.apple.com/us/app/jacquard-music-app/id6804390464",
+        "947 public GitHub repos · github.com/keijiro"
+      ],
+      "gaps": [
+        "own-site",
+        "project-list",
+        "producthunt"
+      ],
+      "ran": [
+        "x-profile:miss",
+        "github:keijiro repos=947 score=34",
+        "site",
+        "sites",
+        "research-pass:harvest",
+        "github",
+        "appstore",
+        "hn",
+        "npm",
+        "github-overview",
+        "research-pass:gaps:own-site,project-list,producthunt",
+        "research-pass:gap-fill"
+      ],
+      "sourcedPct": 100,
+      "note": "20 launches · 1 App Store · 11 on npm · 8 on GitHub. AUDIOTAILOR is the through-line.",
+      "names": [
+        "JP.KEIJIRO.KLAK.TESTTOOLS",
+        "LOWLEVELDIGGER",
+        "JP.KEIJIRO.KLAK.HAP",
+        "JP.KEIJIRO.CMU-MOCAP",
+        "KINOGLITCHURP",
+        "JP.KEIJIRO.KLAK.NNUTILS",
+        "JP.KEIJIRO.BODYPIX",
+        "MINIBOKEH 1.2.1",
+        "JP.KEIJIRO.APRILTAG",
+        "JP.KEIJIRO.UNITY-CUSTOM-PACKAGE-TEST",
+        "MESHSLICER",
+        "JP.KEIJIRO.METATEX",
+        "JP.KEIJIRO.METAMESH",
+        "JP.KEIJIRO.METAWIRE",
+        "JP.KEIJIRO.BETA",
+        "AUDIOTAILOR",
+        "MEMO",
+        "JACQUARD",
+        "JACQUARD - MUSIC APP",
+        "UNITYPROJECTTEMPLATE"
+      ]
+    }
+  ]
+}

@@ -1,0 +1,67 @@
+/* The printer is the interface. Keep its controls legible on the physical object. */
+.shipped-lcd.is-input {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) 8px;
+  grid-template-rows: auto minmax(32px, 1fr) auto;
+  align-items: center;
+  height: 88px;
+  padding: 8px 10px;
+  row-gap: 2px;
+}
+.shipped-lcd-label,
+.shipped-lcd-status {
+  grid-column: 1 / -1;
+  font-size: 9px;
+  line-height: 1.2;
+  letter-spacing: .09em;
+}
+.shipped-lcd-label { opacity: .8; }
+.shipped-lcd-status { text-align: right; }
+.shipped-lcd.is-input .shipped-lcd-input {
+  grid-column: 1;
+  grid-row: 2;
+  width: 100%;
+  font-size: clamp(17px, 2vw, 22px);
+  letter-spacing: .04em;
+}
+.shipped-lcd-input::placeholder { color: #263917; opacity: .75; }
+.shipped-lcd-input:disabled { opacity: 1; -webkit-text-fill-color: var(--lcd-ink); }
+.shipped-lcd.is-input .shipped-lcd-block { grid-column: 2; grid-row: 2; margin: 0; }
+.shipped-key.is-print {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 3px;
+  min-width: 90px;
+  height: 52px;
+  font-size: 14px;
+}
+.shipped-key.is-print small { font-size: 8px; font-weight: 500; letter-spacing: .12em; }
+.shipped-key.is-wall { display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 5px; font-size: 8px; letter-spacing: .02em; padding: 0 8px; }
+.shipped-key.is-wall strong { display: flex; align-items: center; gap: 5px; font-size: 10px; letter-spacing: .1em; }
+.shipped-key.is-wall i { width: 5px; height: 5px; border-radius: 50%; background: #15130f; box-shadow: inset 0 1px 2px #000; }
+.shipped-key.is-wall[aria-pressed='true'] i { background: #b1c879; box-shadow: 0 0 5px #b1c87977; }
+.shipped-console-message { margin: 12px 0 0; padding: 8px 10px; border-top: 1px solid #f3ead82b; font: 11px/1.5 var(--font-receipt), monospace; color: #f3ead8; }
+.shipped-console-message.is-error { background: #efe3c9; border: 0; color: #733225; box-shadow: 0 2px 3px #0004; }
+.shipped-pick { scroll-margin-top: 16px; }
+.shipped-pick-legend { color: #e7d7ba; }
+html.shipped-focus .shipped-stack > .shipped-order-notice { display: block; }
+.shipped-nav a { min-height: 44px; display: inline-flex; align-items: center; }
+
+@media (max-width: 360px) {
+  .shipped-keys { gap: 6px; }
+  .shipped-keys-space { display: none; }
+  .shipped-key.is-wall { width: 68px; min-width: 68px; padding: 0 4px; }
+  .shipped-key.is-tear { min-width: 44px; padding: 0 6px; }
+  .shipped-key.is-print { min-width: 76px; padding: 0 8px; font-size: 13px; }
+}
+@media (max-width: 1099px) {
+  .shipped-stage > .shipped-board { order: 2; margin-top: 12px; }
+}
+@media (min-width: 1100px) {
+  .shipped-stage:not(.is-shared):not(.is-focus) {
+    grid-template-columns: minmax(8rem, 14rem) minmax(0, 38rem) minmax(10rem, 17rem);
+    column-gap: clamp(16px, 2vw, 32px);
+  }
+}

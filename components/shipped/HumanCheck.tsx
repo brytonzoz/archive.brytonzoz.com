@@ -1,0 +1,135 @@
+'use client';
+
+// "Are you human?" for printing, takedowns and checkouts: Cloudflare Turnstile when the server has its keys,
+// otherwise a small proof-of-work puzzle from /api/shipped/challenge, solved in the background (about a
+// second on a phone). Either way the parent gets a single-use token through onToken. execute() waits
+// until that token exists, so Print can run the check instead of showing a checkbox on the first screen.
+import React, { forwardRef, useEffect, useImperativeHandle, useRef } from 'react';
+import { SHIPPED_TURNSTILE_SITE_KEY } from '../../lib/shipped-turnstile';
+import { Turnstile, type TurnstileHandle } from './Turnstile';
+
+export type HumanCheckConfig = { kind: 'turnstile'; siteKey: string } | { kind: 'pow'; bits: number };
+export type HumanCheckHandle = { reset: () => void; execute: () => Promise<string | null>; warm: () => void };
+export const FALLBACK_HUMAN: HumanCheckConfig = { kind: 'turnstile', siteKey: SHIPPED_TURNSTILE_SITE_KEY };
+
+export function resolveHumanCheck(check: HumanCheckConfig | null | undefined): HumanCheckConfig {
+  return check ?? FALLBACK_HUMAN;
+}
+
+type Props = {
+  check: HumanCheckConfig | null | undefined;
+  onToken: (token: string | null) => void;
+  theme?: 'light' | 'dark';
+  appearance?: 'always' | 'interaction-only' | 'execute';
+};
+
+function zeroBits(bytes: Uint8Array): number {
+  let bits = 0;
+  for (let i = 0; i < bytes.length; i++) {
+    const byte = bytes[i];
+    if (byte === 0) {
+      bits += 8;
+      continue;
+    }
+    return bits + Math.clz32(byte) - 24;
+  }
+  return bits;
+}
+
+async function solve(signal: { cancelled: boolean }): Promise<string | null> {
+  const response = await fetch('/api/shipped/challenge', { cache: 'no-store' });
+  if (!response.ok) return null;
+  const { challenge, bits } = (await response.json()) as { challenge?: string; bits?: number };
+  if (!challenge || !bits) return null;
+  const encoder = new TextEncoder();
+  for (let nonce = 0; nonce < 50_000_000; nonce++) {
+    if (signal.cancelled) return null;
+    const digest = new Uint8Array(await crypto.subtle.digest('SHA-256', encoder.encode(`${challenge}:${nonce}`)));
+    if (zeroBits(digest) >= bits) return `pow:${challenge}:${nonce}`;
+    if (nonce % 2000 === 1999) await new Promise((resolve) => setTimeout(resolve, 0));
+  }
+  return null;
+}
+
+function Puzzle({ onToken, round }: { onToken: (token: string | null) => void; round: number }) {
+  const callback = useRef(onToken);
+  callback.current = onToken;
+  useEffect(() => {
+    const signal = { cancelled: false };
+    solve(signal)
+      .then((token) => !signal.cancelled && callback.current(token))
+      .catch(() => !signal.cancelled && callback.current(null));
+    return () => {
+      signal.cancelled = true;
+    };
+  }, [round]);
+  return null;
+}
+
+export const HumanCheck = forwardRef<HumanCheckHandle, Props>(function HumanCheck({ check, onToken, theme, appearance = 'execute' }, ref) {
+  const turnstile = useRef<TurnstileHandle>(null);
+  const token = useRef<string | null>(null);
+  const waiters = useRef<((value: string | null) => void)[]>([]);
+  const checkRef = useRef(check);
+  checkRef.current = check;
+  const [round, setRound] = React.useState(0);
+  const [needed, setNeeded] = React.useState(true);
+  React.useEffect(() => {
+    setNeeded(true);
+  }, [appearance]);
+
+  function emit(value: string | null) {
+    token.current = value;
+    onToken(value);
+    waiters.current.splice(0).forEach((resolve) => resolve(value));
+  }
+
+  useImperativeHandle(ref, () => ({
+    reset: () => {
+      token.current = null;
+      onToken(null);
+      setNeeded(true);
+      if (checkRef.current?.kind === 'pow') setRound((n) => n + 1);
+      else {
+        setRound((n) => n + 1);
+        turnstile.current?.reset();
+      }
+    },
+    warm: () => {
+      setNeeded(true);
+      turnstile.current?.warm();
+    },
+    execute: async () => {
+      token.current = null;
+      onToken(null);
+      setNeeded(true);
+      const start = Date.now();
+      const current = resolveHumanCheck(checkRef.current);
+      if (current.kind === 'turnstile') {
+        while (!turnstile.current && Date.now() - start < 8_000) {
+          await new Promise((resolve) => window.setTimeout(resolve, 50));
+        }
+        return turnstile.current?.execute() ?? null;
+      }
+      return new Promise<string | null>((resolve) => {
+        const finish = (value: string | null) => {
+          window.clearTimeout(timer);
+          waiters.current = waiters.current.filter((waiter) => waiter !== finish);
+          resolve(value);
+        };
+        const timer = window.setTimeout(() => finish(null), 15_000);
+        waiters.current.push(finish);
+        // The background puzzle may already have completed, and onToken consumers
+        // may have spent its proof. Start a fresh challenge for this execution.
+        setRound((n) => n + 1);
+      });
+    },
+  }));
+
+  const resolved = resolveHumanCheck(check);
+  if (resolved.kind === 'turnstile') {
+    if (!needed) return null;
+    return <Turnstile ref={turnstile} siteKey={resolved.siteKey} onToken={emit} theme={theme} appearance={appearance} />;
+  }
+  return <Puzzle onToken={emit} round={round} />;
+});

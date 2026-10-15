@@ -1,0 +1,500 @@
+/* PrintAndTear: a matte black counter printer under one warm lamp, thermal paper rising out of its top slot.
+   Everything that moves is a transform (or an opacity) written by engine.ts; nothing here transitions.
+   Shading is only what the one lamp would do: a lit top surface, 1px bevels, edges falling into shadow. */
+
+.root {
+  --paper: #f2eee6;
+  --paper-back: #ebe6dc;
+  --ink: #1d1b19;
+  --chassis: #202226;
+  --top: #292b30;
+  --cream: #f3ead8;
+  --steel: #a9afb7;
+  --steel-hi: #e3e6ea;
+  --steel-lo: #6e747c;
+  --coral: hsl(6 85% 60%);
+  --paper-w: min(340px, calc(100% - 32px));
+  --stage-h: clamp(300px, 56vh, 540px);
+  --back-h: 18px;
+  position: relative;
+  width: 100%;
+  color: var(--cream);
+  -webkit-tap-highlight-color: transparent;
+}
+
+@supports (height: 1svh) {
+  .root {
+    --stage-h: clamp(300px, 56svh, 540px);
+  }
+}
+
+@media (min-width: 720px) {
+  .root {
+    --paper-w: min(372px, calc(100% - 32px));
+    --stage-h: clamp(360px, 64vh, 640px);
+  }
+}
+
+.frame {
+  position: relative;
+}
+
+.guide {
+  position: absolute;
+  left: 0;
+  top: 0;
+  width: var(--paper-w);
+  height: 0;
+  visibility: hidden;
+  pointer-events: none;
+}
+
+.stage {
+  height: var(--stage-h);
+}
+
+/* ---- The printer ---------------------------------------------------------------------------------------- */
+
+.printer {
+  position: relative;
+  width: min(100%, calc(var(--paper-w) * 1.3 + 28px));
+  margin: 0 auto;
+}
+
+/* The top surface behind the slot: seen from above, lit by the lamp. Behind the paper. */
+.back {
+  position: relative;
+  z-index: 0;
+  height: var(--back-h);
+  border-radius: 14px 14px 0 0;
+  background: var(--top);
+  box-shadow:
+    inset 0 1px 0 rgba(255, 236, 205, 0.1),
+    inset 1px 0 0 rgba(255, 255, 255, 0.03),
+    inset -1px 0 0 rgba(0, 0, 0, 0.35);
+}
+
+/* The paper exit: a dark gap a little wider than the roll. */
+.slot {
+  position: absolute;
+  left: 50%;
+  bottom: 2px;
+  width: calc(var(--paper-w) + 16px);
+  height: 9px;
+  margin-left: calc(var(--paper-w) / -2 - 8px);
+  border-radius: 1px;
+  background: #050506;
+  box-shadow: 0 1px 0 rgba(255, 236, 205, 0.07);
+}
+
+/* In front of the paper: the tear bar, the front lip and the face. */
+.front {
+  position: relative;
+  z-index: 3;
+}
+
+/* The tear bar, placed by engine.ts so its teeth line up with the paper's tear. */
+.bar {
+  --teeth: 5px;
+  position: absolute;
+  left: 0;
+  top: -8px;
+  width: 100%;
+  height: 10px;
+  pointer-events: none;
+}
+
+/* Stamped steel with teeth (clip-path from engine.ts, the tear's own pitch). Flat bands, not a gradient:
+   the teeth, the bright bevel where the blade turns toward the lamp, the face, and its shadowed bottom edge. */
+.blade {
+  position: absolute;
+  inset: 0;
+  background: linear-gradient(
+    to bottom,
+    #9ba1a9 0 var(--teeth),
+    var(--steel-hi) var(--teeth) calc(var(--teeth) + 1px),
+    var(--steel) calc(var(--teeth) + 1px) calc(100% - 1px),
+    var(--steel-lo) calc(100% - 1px)
+  );
+}
+
+/* The paper going into the slot is in the slot's shadow: a little darker between the teeth. */
+.mouth {
+  position: absolute;
+  left: 14px;
+  right: 14px;
+  top: calc(var(--teeth) * -0.6);
+  height: calc(var(--teeth) * 1.6);
+  background: linear-gradient(to bottom, rgba(12, 9, 6, 0), rgba(12, 9, 6, 0.26));
+}
+
+.lip {
+  height: 12px;
+  background: var(--top);
+  box-shadow:
+    inset 0 -1px 0 rgba(255, 236, 205, 0.09),
+    inset 1px 0 0 rgba(255, 255, 255, 0.03),
+    inset -1px 0 0 rgba(0, 0, 0, 0.35);
+}
+
+/* The front of the printer: matte plastic, the top edge catching the lamp, a soft shadow on the counter. */
+.fascia {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  border-radius: 0 0 12px 12px;
+  background: var(--chassis);
+  padding: 10px 12px 12px;
+  box-shadow:
+    inset 0 1px 0 rgba(0, 0, 0, 0.55),
+    inset 1px 0 0 rgba(255, 255, 255, 0.025),
+    inset -1px 0 0 rgba(0, 0, 0, 0.4),
+    inset 0 -2px 0 rgba(0, 0, 0, 0.45),
+    0 1px 0 #0b0c0e,
+    0 26px 32px -18px rgba(0, 0, 0, 0.85);
+}
+
+.panel {
+  display: flex;
+  align-items: center;
+  gap: 7px;
+  padding: 0 2px;
+  font-size: 9px;
+  font-weight: 600;
+  letter-spacing: 0.16em;
+  line-height: 1;
+  color: rgba(243, 234, 216, 0.42);
+}
+
+/* A flat indicator lamp in a black bezel. */
+.led {
+  flex: none;
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  background: #4d9a62;
+  box-shadow: 0 0 0 1.5px #0b0c0d;
+}
+
+.root[data-tone='busy'] .led {
+  background: #d99a33;
+}
+
+.root[data-tone='error'] .led {
+  background: var(--coral);
+}
+
+.ledLabel {
+  flex: 1 1 auto;
+  min-width: 0;
+}
+
+/* The model plate: a small raised badge. */
+.plate {
+  flex: none;
+  border-radius: 2px;
+  padding: 3px 6px 3px 7px;
+  background: #26282d;
+  box-shadow:
+    inset 0 1px 0 rgba(255, 255, 255, 0.07),
+    0 1px 0 rgba(0, 0, 0, 0.6);
+  color: rgba(243, 234, 216, 0.5);
+  letter-spacing: 0.22em;
+}
+
+/* The key well: a recess the keys sit in. */
+.keys {
+  display: flex;
+  gap: 4px;
+  border-radius: 6px;
+  background: #141518;
+  padding: 4px;
+  box-shadow:
+    inset 0 1px 2px rgba(0, 0, 0, 0.7),
+    0 1px 0 rgba(255, 255, 255, 0.04);
+}
+
+.key {
+  flex: 1 1 0;
+  min-width: 44px;
+  min-height: 44px;
+  border: 0;
+  border-radius: 3px;
+  background: #2c2e33;
+  padding: 0 8px;
+  color: rgba(243, 234, 216, 0.84);
+  font: inherit;
+  font-size: 10px;
+  font-weight: 600;
+  letter-spacing: 0.12em;
+  line-height: 1.1;
+  text-transform: uppercase;
+  white-space: nowrap;
+  cursor: pointer;
+  touch-action: manipulation;
+  box-shadow:
+    inset 0 1px 0 rgba(255, 255, 255, 0.09),
+    inset 0 -2px 0 rgba(0, 0, 0, 0.32),
+    0 1px 0 rgba(0, 0, 0, 0.7);
+}
+
+.key.action {
+  flex-grow: 1.6;
+}
+
+.key:active:not([aria-disabled='true']) {
+  transform: translateY(1px);
+  box-shadow:
+    inset 0 1px 0 rgba(255, 255, 255, 0.05),
+    inset 0 -1px 0 rgba(0, 0, 0, 0.32),
+    0 0 0 rgba(0, 0, 0, 0.7);
+}
+
+.key[aria-pressed='true'] {
+  color: var(--cream);
+}
+
+.key[aria-disabled='true'] {
+  color: rgba(243, 234, 216, 0.3);
+  cursor: default;
+}
+
+.key:focus-visible {
+  outline: 2px solid var(--cream);
+  outline-offset: 2px;
+}
+
+@media (max-width: 400px) {
+  .key {
+    padding: 0 6px;
+    letter-spacing: 0.08em;
+  }
+}
+
+.hands {
+  height: 0;
+}
+
+/* ---- The paper ------------------------------------------------------------------------------------------ */
+
+/* Both layers stop at the slot (what's below is inside the printer) and at the top of the component. */
+.stubLayer,
+.paperLayer {
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  clip-path: inset(0 -120px calc(100% - var(--slot-y, 100%)) -120px);
+}
+
+/* The sheet's box runs far below the slot (the rest of the roll): keep it out of the page's scroll area. */
+@supports (overflow: clip) {
+  .paperLayer {
+    overflow-x: visible;
+    overflow-y: clip;
+  }
+}
+
+.stubLayer {
+  z-index: 1;
+}
+
+/* The eye is a little above the paper, so the curl rolls away from it over the top of the bend. */
+.paperLayer {
+  z-index: 2;
+  perspective: 1000px;
+  perspective-origin: 50% calc(var(--stage-h) * -0.5);
+}
+
+/* Torn off: in front of the printer, free to fall below it (still cut at the top of the component). */
+.paperLayer[data-free] {
+  z-index: 6;
+  clip-path: inset(0 -100vw -100000px -100vw);
+}
+
+.stub {
+  position: absolute;
+  background-color: var(--paper);
+  background-image: var(--paper-grain, none);
+  background-size: 56px 56px;
+}
+
+.sheet {
+  position: absolute;
+  left: 0;
+  top: 0;
+  transform-origin: 0 0;
+  transform-style: preserve-3d;
+  pointer-events: auto;
+  touch-action: pan-y;
+  -webkit-user-select: none;
+  user-select: none;
+  -webkit-touch-callout: none;
+  outline: none;
+  visibility: hidden;
+}
+
+.root[data-phase='hanging'] .sheet,
+.root[data-phase='inhand'] .sheet {
+  cursor: grab;
+}
+
+.root[data-phase='hanging'] .sheet:active,
+.root[data-phase='inhand'] .sheet:active {
+  cursor: grabbing;
+}
+
+.sheet .face {
+  position: absolute;
+  left: 0;
+  width: 100%;
+  background-color: var(--paper);
+  background-image: var(--paper-grain, none);
+  background-size: 56px 56px;
+  -webkit-backface-visibility: hidden;
+  backface-visibility: hidden;
+}
+
+.body {
+  overflow: hidden;
+}
+
+.sheet .foot {
+  visibility: hidden;
+}
+
+.ink {
+  position: absolute;
+  left: 0;
+  width: 100%;
+}
+
+/* Bands of the print (heights from engine.ts). */
+.ink canvas {
+  position: absolute;
+  left: 0;
+  top: 0;
+  display: block;
+  width: 100%;
+}
+
+.sliceFace canvas {
+  position: absolute;
+  left: 0;
+  top: 0;
+  display: block;
+  width: 100%;
+  height: 100%;
+}
+
+/* How much less lamp light a face gets (opacity from engine.ts). */
+.shade {
+  position: absolute;
+  inset: 0;
+  background: #1b1612;
+  opacity: 0;
+  pointer-events: none;
+  /* Its own (solid colour) layer: changing the opacity never repaints the paper under it. */
+  will-change: opacity;
+}
+
+/* Shading across a face of the curl (darker toward its top edge on the front, its bottom on the back). */
+.ramp {
+  position: absolute;
+  inset: 0;
+  background: linear-gradient(to top, rgba(27, 22, 18, 0), rgb(27, 22, 18));
+  opacity: 0;
+  pointer-events: none;
+  will-change: opacity;
+}
+
+.rampDown {
+  background: linear-gradient(to bottom, rgba(27, 22, 18, 0), rgb(27, 22, 18));
+}
+
+/* Near the bar, a touch pulls the paper instead of scrolling the page. A hair in front of the paper so it
+   is what a touch lands on (coplanar layers in a 3D context don't hit-test in DOM order). */
+.grip {
+  position: absolute;
+  left: 0;
+  top: 0;
+  width: 100%;
+  height: 0;
+  touch-action: none;
+  transform: translateZ(0.5px);
+}
+
+.ring {
+  position: absolute;
+  left: -6px;
+  right: -6px;
+  top: 0;
+  height: 0;
+  border: 2px solid transparent;
+  pointer-events: none;
+}
+
+.sheet:focus-visible .ring {
+  border-color: var(--cream);
+}
+
+/* The receipt's shadow on your hands, once it's down. */
+.shadow {
+  position: absolute;
+  left: 0;
+  top: 0;
+  width: 100%;
+  height: 0;
+  opacity: 0;
+  pointer-events: none;
+  transform: translateZ(-1px);
+  box-shadow:
+    0 1px 1px rgba(0, 0, 0, 0.4),
+    0 16px 26px -8px rgba(0, 0, 0, 0.6);
+}
+
+/* The curl: nested slices, each hinged on the one below. */
+.curl {
+  position: absolute;
+  left: 0;
+  top: 0;
+  width: 100%;
+  height: 0;
+  transform-style: preserve-3d;
+}
+
+.slice {
+  position: absolute;
+  left: 0;
+  bottom: 0;
+  width: 100%;
+  transform-origin: 50% 100%;
+  transform-style: preserve-3d;
+}
+
+.slice .slice {
+  bottom: 100%;
+}
+
+.sheet .sliceFace {
+  top: 0;
+  height: 100%;
+}
+
+.sheet .sliceBack {
+  background-color: var(--paper-back);
+  transform: rotateY(180deg);
+}
+
+/* ---- Screen readers ------------------------------------------------------------------------------------- */
+
+.srOnly {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  margin: -1px;
+  padding: 0;
+  overflow: hidden;
+  clip: rect(0 0 0 0);
+  white-space: pre-line;
+  border: 0;
+}

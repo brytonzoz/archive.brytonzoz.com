@@ -1,0 +1,149 @@
+{
+  "year": 2026,
+  "heldOut": true,
+  "criteria": "Same as the original truth set. None of these queries appear in docs/shipped-eval-builders.md or in worker identity tables.",
+  "builders": [
+    {
+      "query": "kitze",
+      "prolific": true,
+      "identity": { "github": "kitze", "x": "thekitze", "site": "https://kitze.io/" },
+      "ships": [
+        { "name": "skillbox", "aliases": ["skillbox"], "url": "https://github.com/kitze/skillbox", "date": "2026-09-17" },
+        { "name": "unclutter", "aliases": ["unclutter"], "url": "https://github.com/kitze/unclutter", "date": "2026-09-17" },
+        { "name": "council", "aliases": ["council"], "url": "https://github.com/kitze/council", "date": "2026-07-14" },
+        { "name": "pagegrade", "aliases": ["pagegrade"], "url": "https://github.com/kitze/pagegrade", "date": "2026-09-17" },
+        { "name": "Sizzy", "aliases": ["sizzy"], "url": "https://sizzy.co/", "date": "2026" }
+      ],
+      "stats": [
+        { "kind": "stars", "about": "unclutter", "min": 300, "url": "https://github.com/kitze/unclutter" },
+        { "kind": "stars", "about": "skillbox", "min": 200, "url": "https://github.com/kitze/skillbox" },
+        { "kind": "repos", "about": "kitze", "min": 50, "url": "https://github.com/kitze" }
+      ]
+    },
+    {
+      "query": "rameerez",
+      "prolific": true,
+      "identity": { "github": "rameerez", "x": "rameerez", "site": "https://rameerez.com/" },
+      "ships": [
+        { "name": "bouncy", "aliases": ["bouncy"], "url": "https://rubygems.org/gems/bouncy", "date": "2026-09-08" },
+        { "name": "mappo", "aliases": ["mappo"], "url": "https://rameerez.github.io/mappo/", "date": "2026-08-01" },
+        { "name": "support_desk", "aliases": ["support-desk", "support_desk"], "url": "https://github.com/rameerez/support_desk", "date": "2026-09-16" },
+        { "name": "clickwrap", "aliases": ["clickwrap"], "url": "https://github.com/rameerez/clickwrap", "date": "2026-08-15" },
+        { "name": "chats", "aliases": ["chats"], "url": "https://github.com/rameerez/chats", "date": "2026-06-09" }
+      ],
+      "stats": [
+        { "kind": "repos", "about": "rameerez", "min": 40, "url": "https://github.com/rameerez" }
+      ]
+    },
+    {
+      "query": "steipete",
+      "prolific": true,
+      "identity": { "github": "steipete", "x": "steipete", "site": "https://steipete.me/" },
+      "ships": [
+        { "name": "accesskit", "aliases": ["accesskit"], "url": "https://accesskit.dev/", "date": "2026-09-26" },
+        { "name": "gpui-kit", "aliases": ["gpui-kit"], "url": "https://github.com/steipete/gpui-kit", "date": "2026-09-26" },
+        { "name": "openclaw-code-agent", "aliases": ["openclaw-code-agent"], "url": "https://www.npmjs.com/package/openclaw-code-agent", "date": "2026-09-13" },
+        { "name": "shellbench", "aliases": ["shellbench"], "url": "https://github.com/steipete/shellbench", "date": "2026-09-16" }
+      ],
+      "stats": [
+        { "kind": "repos", "about": "steipete", "min": 100, "url": "https://github.com/steipete" }
+      ]
+    },
+    {
+      "query": "insidegui",
+      "prolific": true,
+      "identity": { "github": "insidegui", "x": "_inside", "site": "https://github.com/insidegui" },
+      "ships": [
+        { "name": "LiquidGlassFlag", "aliases": ["liquidglassflag", "liquid glass"], "url": "https://github.com/insidegui/LiquidGlassFlag", "date": "2026-05-26" },
+        { "name": "OpenRouterFoundationModels", "aliases": ["openrouterfoundationmodels"], "url": "https://github.com/insidegui/OpenRouterFoundationModels", "date": "2026-06-17" },
+        { "name": "USBIDKit", "aliases": ["usbidkit"], "url": "https://github.com/insidegui/USBIDKit", "date": "2026-08-27" },
+        { "name": "VMBridge", "aliases": ["vmbridge"], "url": "https://github.com/insidegui/VMBridge", "date": "2026-09-10" }
+      ],
+      "stats": [
+        { "kind": "stars", "about": "LiquidGlassFlag", "min": 20, "url": "https://github.com/insidegui/LiquidGlassFlag" },
+        { "kind": "repos", "about": "insidegui", "min": 100, "url": "https://github.com/insidegui" }
+      ]
+    },
+    {
+      "query": "fofrAI",
+      "prolific": true,
+      "identity": { "github": "fofr", "x": "fofrAI", "site": "https://fofr.ai/" },
+      "ships": [
+        { "name": "nano-banana-pro-json-studio", "aliases": ["nano-banana", "json-studio"], "url": "https://github.com/fofr/nano-banana-pro-json-studio", "date": "2026-01-06" },
+        { "name": "fofr.ai", "aliases": ["fofr"], "url": "https://fofr.ai/", "date": "2026" }
+      ],
+      "stats": [
+        { "kind": "stars", "about": "nano-banana", "min": 20, "url": "https://github.com/fofr/nano-banana-pro-json-studio" }
+      ]
+    },
+    {
+      "query": "dabit3",
+      "prolific": true,
+      "identity": { "github": "dabit3", "x": "dabit3", "site": "https://nader.codes/" },
+      "ships": [
+        { "name": "jev-experiments", "aliases": ["jev-experiments"], "url": "https://github.com/dabit3/jev-experiments", "date": "2026-09-17" },
+        { "name": "intern", "aliases": ["intern"], "url": "https://github.com/dabit3/intern", "date": "2026-09-19" },
+        { "name": "cloud-agent-automations", "aliases": ["cloud-agent-automations"], "url": "https://github.com/dabit3/cloud-agent-automations", "date": "2026-08-19" },
+        { "name": "macos-experiments", "aliases": ["macos-experiments"], "url": "https://github.com/dabit3/macos-experiments", "date": "2026-09-07" }
+      ],
+      "stats": [
+        { "kind": "stars", "about": "jev-experiments", "min": 200, "url": "https://github.com/dabit3/jev-experiments" },
+        { "kind": "repos", "about": "dabit3", "min": 200, "url": "https://github.com/dabit3" }
+      ]
+    },
+    {
+      "query": "joshpuckett",
+      "prolific": true,
+      "identity": { "github": "joshpuckett", "x": "joshpuckett", "site": "https://x.com/joshpuckett" },
+      "ships": [
+        { "name": "dialkit", "aliases": ["dialkit"], "url": "https://github.com/joshpuckett/dialkit", "date": "2026-01-24" },
+        { "name": "bloom", "aliases": ["bloom"], "url": "https://github.com/joshpuckett/bloom", "date": "2026-01-08" },
+        { "name": "pasito", "aliases": ["pasito"], "url": "https://github.com/joshpuckett/pasito", "date": "2026-03-04" }
+      ],
+      "stats": [
+        { "kind": "stars", "about": "dialkit", "min": 1000, "url": "https://github.com/joshpuckett/dialkit" },
+        { "kind": "stars", "about": "bloom", "min": 100, "url": "https://github.com/joshpuckett/bloom" }
+      ]
+    },
+    {
+      "query": "yacineMTB",
+      "prolific": true,
+      "identity": { "github": "yacineMTB", "x": "yacineMTB", "site": "https://yacine.ca/" },
+      "ships": [
+        { "name": "dingvid", "aliases": ["dingvid"], "url": "https://github.com/yacineMTB/dingvid", "date": "2026-06-25" },
+        { "name": "dingcad", "aliases": ["dingcad"], "url": "https://github.com/yacineMTB/dingcad", "date": "2026" },
+        { "name": "ee_in_two_weeks", "aliases": ["ee_in_two_weeks"], "url": "https://github.com/yacineMTB/ee_in_two_weeks", "date": "2026-03-08" }
+      ],
+      "stats": [
+        { "kind": "stars", "about": "dingcad", "min": 400, "url": "https://github.com/yacineMTB/dingcad" }
+      ]
+    },
+    {
+      "query": "johnrushx",
+      "prolific": true,
+      "identity": { "github": "johnrushx", "x": "johnrushx", "site": "https://marsx.dev/" },
+      "ships": [
+        { "name": "MarsX", "aliases": ["marsx", "marsx.dev"], "url": "https://marsx.dev/", "date": "2026" },
+        { "name": "x-algorithm", "aliases": ["x-algorithm"], "url": "https://github.com/johnrushx/x-algorithm", "date": "2026-01-20" }
+      ],
+      "stats": [
+        { "kind": "repos", "about": "johnrushx", "min": 10, "url": "https://github.com/johnrushx" }
+      ]
+    },
+    {
+      "query": "keijiro",
+      "prolific": true,
+      "identity": { "github": "keijiro", "x": null, "site": "https://www.keijiro.tokyo/" },
+      "ships": [
+        { "name": "Jacquard", "aliases": ["jacquard"], "url": "https://github.com/keijiro/Jacquard", "date": "2026-07-30" },
+        { "name": "AudioTailor", "aliases": ["audiotailor"], "url": "https://github.com/keijiro/AudioTailor", "date": "2026-06-24" },
+        { "name": "MeshSlicer", "aliases": ["meshslicer"], "url": "https://github.com/keijiro/MeshSlicer", "date": "2026-05-12" },
+        { "name": "KinoGlitchURP", "aliases": ["kinoglitchurp", "kinoglitch"], "url": "https://github.com/keijiro/KinoGlitchURP", "date": "2026-02-18" }
+      ],
+      "stats": [
+        { "kind": "stars", "about": "Jacquard", "min": 200, "url": "https://github.com/keijiro/Jacquard" },
+        { "kind": "repos", "about": "keijiro", "min": 200, "url": "https://github.com/keijiro" }
+      ]
+    }
+  ]
+}

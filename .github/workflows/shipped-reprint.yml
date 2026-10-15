@@ -1,0 +1,188 @@
+name: Shipped reprint (manual)
+
+# Reprint existing wall receipts without spending Claude/Decisions on every staging deploy.
+# Push with commit message containing "[shipped-reprint]" to run from a branch (e.g. cloud agents without dispatch ACL).
+on:
+  push:
+    branches: [cursor/shipped-receipt-page-918f]
+    paths:
+      - .github/workflows/shipped-reprint.yml
+      - scripts/reprint-shipped.mjs
+      - scripts/sanitize-shipped-receipts.mjs
+      - scripts/scan-shipped-junk.mjs
+      - worker/shipped.ts
+      - worker/shipped-sources.ts
+      - worker/shipped-source-cache.ts
+      - worker/shipped-affiliation.ts
+      - worker/shipped-company-seeds.ts
+      - worker/shipped-polish.ts
+      - worker/shipped-changelog.ts
+      - worker/shipped-research.ts
+      - worker/shipped-ai.ts
+      - worker/shipped-curate.ts
+      - worker/shipped-identity.ts
+      - worker/shipped-ownership.ts
+      - worker/shipped-decisions.ts
+      - worker/shipped-flagship.ts
+      - worker/shipped-company.ts
+      - worker/shipped-repos.ts
+      - worker/shipped-oss.ts
+      - worker/shipped-products.ts
+      - worker/shipped-dates.ts
+      - scripts/check-shipped-live-goldens.mjs
+      - scripts/eval-shipped-heldout-live.mjs
+      - tests/lib/shipped-goldens.mjs
+      - tests/fixtures/shipped-golden/tapes.json
+      - tests/fixtures/shipped-junk.json
+  workflow_dispatch:
+    inputs:
+      ids:
+        description: Comma-separated receipt ids (e.g. 17,13)
+        required: true
+        default: '6,7,13,16,17,18,19,20'
+      origin:
+        description: Shipped origin
+        required: true
+        default: https://shipped-staging.brytonzoz.com
+
+permissions:
+  contents: read
+
+concurrency:
+  group: shipped-company-cache
+  cancel-in-progress: false
+
+jobs:
+  sanitize-sublines:
+    name: Sanitize stored receipt sub-lines
+    if: github.event_name == 'push' && contains(github.event.head_commit.message, '[shipped-sanitize]')
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v5
+      - uses: actions/setup-node@v5
+        with:
+          node-version: 22
+          cache: npm
+      - run: npm ci
+      - name: Wait for staging Worker
+        run: sleep 360
+      - name: Sanitize all receipts on staging
+        env:
+          ADMIN_PASSWORD: ${{ secrets.ADMIN_PASSWORD }}
+          SHIPPED_ORIGIN: https://shipped-staging.brytonzoz.com
+        run: |
+          if [ -z "$ADMIN_PASSWORD" ]; then
+            echo "::error::ADMIN_PASSWORD is required."
+            exit 1
+          fi
+          node --no-warnings scripts/sanitize-shipped-receipts.mjs
+          node --experimental-transform-types --no-warnings scripts/scan-shipped-junk.mjs
+          echo "sanitize_sha=${GITHUB_SHA}" >> "$GITHUB_ENV"
+      - name: Summary
+        run: |
+          echo "### Sanitize complete" >> "$GITHUB_STEP_SUMMARY"
+          echo "SHA: \`${GITHUB_SHA}\`" >> "$GITHUB_STEP_SUMMARY"
+
+  reprint:
+    name: Reprint receipts (no xAI)
+    if: github.event_name == 'workflow_dispatch' || contains(github.event.head_commit.message, '[shipped-reprint')
+    runs-on: ubuntu-latest
+    timeout-minutes: 60
+    steps:
+      - uses: actions/checkout@v5
+
+      - uses: actions/setup-node@v5
+        with:
+          node-version: 22
+          cache: npm
+
+      - run: npm ci
+
+      - name: Refresh Vercel and OpenAI caches
+        if: ${{ github.event_name == 'workflow_dispatch' || !contains(github.event.head_commit.message, '[shipped-skip-cache]') }}
+        env:
+          ADMIN_PASSWORD: ${{ secrets.ADMIN_PASSWORD }}
+          SHIPPED_GITHUB_TOKEN: ${{ secrets.SHIPPED_GITHUB_TOKEN }}
+          TINYFISH: ${{ secrets.TINYFISH }}
+          TINYFISH_API_KEY: ${{ secrets.TINYFISH_API_KEY }}
+          SHIPPED_XAI_OFF: '1'
+          SHIPPED_YEAR: '2026'
+          SHIPPED_CACHE_TARGET: staging
+        run: |
+          if [ -z "$ADMIN_PASSWORD" ]; then
+            echo "::error::ADMIN_PASSWORD is required to write the company cache."
+            exit 1
+          fi
+          SHIPPED_CACHE_ONLY=vercel node --experimental-transform-types --no-warnings scripts/cache-shipped-companies.mjs
+          SHIPPED_CACHE_ONLY=openai node --experimental-transform-types --no-warnings scripts/cache-shipped-companies.mjs
+
+      - name: Wait for staging Worker
+        if: ${{ github.event_name == 'push' }}
+        run: sleep 200
+
+      - name: Reprint
+        env:
+          ADMIN_PASSWORD: ${{ secrets.ADMIN_PASSWORD }}
+          SHIPPED_ORIGIN: ${{ github.event_name == 'workflow_dispatch' && inputs.origin || 'https://shipped-staging.brytonzoz.com' }}
+          SHIPPED_REPRINT_FORCE: '1'
+          SHIPPED_REPRINT_FORCE_IDS: ${{ github.event_name == 'workflow_dispatch' && inputs.ids || (contains(github.event.head_commit.message, '[shipped-skip-cache]') && '18,19,20,21,22' || '6,7,13,16,17,18,19,20,21,22') }}
+          SHIPPED_PRINT_SUBJECTS: ''
+          SHIPPED_REPORT: shipped-reprint-report.json
+          GITHUB_SHA: ${{ github.sha }}
+        run: |
+          if [ -z "$ADMIN_PASSWORD" ]; then
+            echo "::error::ADMIN_PASSWORD is required to reprint receipts."
+            exit 1
+          fi
+          if [ "${GITHUB_EVENT_NAME}" != "workflow_dispatch" ]; then
+            MSG=$(git log -1 --pretty=%B)
+            PARSED=$(printf '%s\n' "$MSG" | sed -n 's/.*\[shipped-reprint \([0-9][0-9, ]*\)\].*/\1/p' | tr -d ' ' | head -n1)
+            if [ -n "$PARSED" ]; then
+              export SHIPPED_REPRINT_FORCE_IDS="$PARSED"
+            fi
+            PRINT=$(printf '%s\n' "$MSG" | sed -n 's/.*\[shipped-print \([A-Za-z0-9_,-]*\)\].*/\1/p' | head -n1)
+            if [ -n "$PRINT" ]; then
+              export SHIPPED_PRINT_SUBJECTS="$PRINT"
+            fi
+            if printf '%s\n' "$MSG" | grep -q '\[shipped-reprint-wall\]'; then
+              export SHIPPED_REPRINT_WALL=1
+            fi
+          fi
+          echo "Reprint ids: $SHIPPED_REPRINT_FORCE_IDS"
+          echo "Print subjects: $SHIPPED_PRINT_SUBJECTS"
+          echo "Wall reprint: ${SHIPPED_REPRINT_WALL:-}"
+          node --no-warnings scripts/reprint-shipped.mjs
+
+      - name: Held-out live prints
+        if: ${{ github.event_name == 'push' && contains(github.event.head_commit.message, '[shipped-heldout]') }}
+        env:
+          ADMIN_PASSWORD: ${{ secrets.ADMIN_PASSWORD }}
+          SHIPPED_ORIGIN: ${{ github.event_name == 'workflow_dispatch' && inputs.origin || 'https://shipped-staging.brytonzoz.com' }}
+          SHIPPED_XAI_OFF: '1'
+          SHIPPED_REPORT: shipped-heldout-report.json
+          SHIPPED_HELD_OUT_TWICE: '1'
+          GITHUB_SHA: ${{ github.sha }}
+        run: |
+          if [ -z "$ADMIN_PASSWORD" ]; then
+            echo "::error::ADMIN_PASSWORD is required to print held-out names."
+            exit 1
+          fi
+          node --no-warnings scripts/eval-shipped-heldout-live.mjs
+
+      - name: Assert live goldens
+        if: always()
+        env:
+          SHIPPED_ORIGIN: ${{ github.event_name == 'workflow_dispatch' && inputs.origin || 'https://shipped-staging.brytonzoz.com' }}
+          SHIPPED_LIVE_WAIT_MS: '65000'
+        run: node --no-warnings --experimental-transform-types scripts/check-shipped-live-goldens.mjs
+
+      - name: Upload live reports
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: shipped-live-eval
+          path: |
+            shipped-heldout-report.json
+            shipped-reprint-report.json
+          if-no-files-found: ignore

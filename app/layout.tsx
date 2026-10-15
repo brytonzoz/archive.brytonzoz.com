@@ -6,8 +6,9 @@ import { motionVariables } from '../lib/scene-motion'
 import { PlayerProvider } from '../components/player/PlayerProvider'
 import { PageViews } from '../components/PageViews'
 import { ServiceWorker } from '../components/ServiceWorker'
+import { ArtistJsonLd } from '../components/ArtistJsonLd'
 import shareImages from '../lib/share-images.json'
-import { ARTIST, artistJsonLd, jsonLdScript } from '../lib/artist'
+import { ARTIST } from '../lib/artist'
 
 const inter = Inter({ 
   subsets: ['latin'],
@@ -63,9 +64,11 @@ export const metadata: Metadata = {
     apple: [{ url: shareImages.icons['180'], sizes: '180x180', type: 'image/png' }],
   },
   appleWebApp: {
-    capable: true,
     title: 'Bryton Zoz',
     statusBarStyle: 'black-translucent',
+  },
+  other: {
+    'mobile-web-app-capable': 'yes',
   },
 }
 
@@ -83,10 +86,7 @@ export default function RootLayout({
   return (
     <html lang="en" className="dark" style={motionVariables as React.CSSProperties}>
       <body className={`${inter.variable} font-body antialiased`}>
-        <script
-          type="application/ld+json"
-          dangerouslySetInnerHTML={{ __html: jsonLdScript(artistJsonLd()) }}
-        />
+        <ArtistJsonLd />
         <PageViews />
         <ServiceWorker />
         <PlayerProvider>

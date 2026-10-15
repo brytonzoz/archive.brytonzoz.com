@@ -1,0 +1,89 @@
+/* The counter lab: printer and pile side by side on wide screens, stacked on phones (pile under your hands). */
+
+.counter {
+  width: min(100%, 72rem);
+  display: flex;
+  flex-direction: column;
+  gap: 1.5rem;
+  color: #f3ead8;
+}
+
+.bar {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 6px 8px;
+}
+
+.plate {
+  margin-right: 6px;
+  font-size: 10px;
+  font-weight: 600;
+  letter-spacing: 0.24em;
+  color: rgba(243, 234, 216, 0.5);
+}
+
+.key {
+  display: inline-flex;
+  align-items: center;
+  min-width: 44px;
+  min-height: 44px;
+  border: 0;
+  border-radius: 3px;
+  background: #2c2e33;
+  padding: 0 12px;
+  color: rgba(243, 234, 216, 0.78);
+  font: inherit;
+  font-size: 10px;
+  font-weight: 600;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  text-decoration: none;
+  cursor: pointer;
+  box-shadow:
+    inset 0 1px 0 rgba(255, 255, 255, 0.09),
+    inset 0 -2px 0 rgba(0, 0, 0, 0.32),
+    0 1px 0 rgba(0, 0, 0, 0.7);
+}
+
+.key:active {
+  transform: translateY(1px);
+}
+
+.key[aria-pressed='true'] {
+  color: #f3ead8;
+}
+
+.key:focus-visible {
+  outline: 2px solid #f3ead8;
+  outline-offset: 2px;
+}
+
+.status {
+  margin-left: auto;
+  font-size: 10px;
+  letter-spacing: 0.2em;
+  color: rgba(243, 234, 216, 0.55);
+}
+
+.stage {
+  display: grid;
+  gap: 2rem;
+}
+
+.printer,
+.pile {
+  min-width: 0;
+}
+
+@media (min-width: 960px) {
+  .stage {
+    grid-template-columns: minmax(0, 26rem) minmax(0, 1fr);
+    align-items: start;
+  }
+
+  .pile {
+    position: sticky;
+    top: 1.5rem;
+  }
+}

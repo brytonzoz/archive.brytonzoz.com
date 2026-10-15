@@ -1,0 +1,650 @@
+{
+  "year": 2026,
+  "heldOut": true,
+  "fresh": true,
+  "excluded": [
+    "steventey",
+    "ajlkn",
+    "shadcn",
+    "leerob",
+    "swyx",
+    "mckaywrigley",
+    "pontusab",
+    "rauchg",
+    "nico_jeannen",
+    "jarredsumner",
+    "dannypostmaa"
+  ],
+  "builders": [
+    {
+      "query": "yyx990803",
+      "who": "Evan You",
+      "handle": "youyuxi",
+      "github": "yyx990803",
+      "site": "https://evanyou.me/",
+      "company": "VoidZero",
+      "companyGithub": "voidzero-dev",
+      "role": "founder",
+      "bio": "Creator of Vue. Founder of VoidZero.",
+      "knownLaunches": true,
+      "required": ["voidzero", "vite"],
+      "found": [
+        {
+          "name": "VoidZero",
+          "description": "I made the toolchain studio. Listed on evanyou.me",
+          "date": "2026-03-12",
+          "link": "https://voidzero.dev/",
+          "source": "site",
+          "status": "LAUNCHED",
+          "thisYear": true
+        },
+        {
+          "name": "Vite 8",
+          "description": "Bundler release on the VoidZero org",
+          "date": "2026-05-20",
+          "link": "https://vite.dev/blog/announcing-vite8",
+          "source": "company",
+          "status": "SHIPPED",
+          "thisYear": true
+        },
+        {
+          "name": "Oxc",
+          "description": "Compiler work under voidzero-dev",
+          "date": "2026-02-02",
+          "link": "https://oxc.rs/blog/2026-oxc",
+          "source": "company",
+          "status": "SHIPPED",
+          "thisYear": true
+        }
+      ]
+    },
+    {
+      "query": "Rich-Harris",
+      "who": "Rich Harris",
+      "handle": "Rich_Harris",
+      "github": "Rich-Harris",
+      "site": "https://rich-harris.dev/",
+      "company": "Svelte",
+      "companyGithub": "sveltejs",
+      "role": "founder",
+      "bio": "Creator of Svelte and SvelteKit.",
+      "knownLaunches": true,
+      "required": ["svelte"],
+      "found": [
+        {
+          "name": "Svelte 6",
+          "description": "I shipped the compiler release.",
+          "date": "2026-04-08",
+          "link": "https://svelte.dev/blog/svelte-6",
+          "source": "company",
+          "status": "SHIPPED",
+          "thisYear": true
+        },
+        {
+          "name": "SvelteKit 3",
+          "description": "App framework release",
+          "date": "2026-06-01",
+          "link": "https://svelte.dev/blog/sveltekit-3",
+          "source": "company",
+          "status": "SHIPPED",
+          "thisYear": true
+        },
+        {
+          "name": "rollup-plugin-svelte",
+          "description": "Plugin update on my GitHub",
+          "date": "2026-01-22",
+          "link": "https://github.com/Rich-Harris/rollup-plugin-svelte",
+          "source": "github",
+          "status": "SHIPPED",
+          "thisYear": true
+        }
+      ]
+    },
+    {
+      "query": "dhh",
+      "who": "David Heinemeier Hansson",
+      "handle": "dhh",
+      "github": "dhh",
+      "site": "https://dhh.dk/",
+      "company": "37signals",
+      "companyGithub": "basecamp",
+      "role": "ceo",
+      "bio": "Creator of Ruby on Rails. CEO of 37signals.",
+      "knownLaunches": true,
+      "required": ["campfire", "rails"],
+      "found": [
+        {
+          "name": "Campfire 2",
+          "description": "I made the chat rewrite.",
+          "date": "2026-02-18",
+          "link": "https://once.com/campfire",
+          "source": "company",
+          "status": "SHIPPED",
+          "thisYear": true
+        },
+        {
+          "name": "Rails 8.1",
+          "description": "Framework release",
+          "date": "2026-01-10",
+          "link": "https://rubyonrails.org/2026/1/10/rails-8-1",
+          "source": "company",
+          "status": "SHIPPED",
+          "thisYear": true
+        },
+        {
+          "name": "Kamal 2.8",
+          "description": "Deploy tool on basecamp",
+          "date": "2026-03-03",
+          "link": "https://kamal-deploy.org/blog/2-8",
+          "source": "company",
+          "status": "SHIPPED",
+          "thisYear": true
+        }
+      ]
+    },
+    {
+      "query": "spolu",
+      "who": "Stanislas Polu",
+      "handle": "spolu",
+      "github": "spolu",
+      "site": "https://spolu.me/",
+      "company": "Dust",
+      "companyGithub": "dust-tt",
+      "role": "founder",
+      "bio": "Creator of Dust.",
+      "knownLaunches": true,
+      "required": ["dust"],
+      "found": [
+        {
+          "name": "Dust Agents",
+          "description": "I made the agent runtime.",
+          "date": "2026-04-14",
+          "link": "https://dust.tt/blog/agents",
+          "source": "company",
+          "status": "SHIPPED",
+          "thisYear": true
+        },
+        {
+          "name": "Dust Platform",
+          "description": "Workspace release",
+          "date": "2026-07-01",
+          "link": "https://dust.tt/blog/platform",
+          "source": "changelog",
+          "status": "LAUNCHED",
+          "thisYear": true
+        },
+        {
+          "name": "dust-cli",
+          "description": "CLI on my GitHub",
+          "date": "2026-02-11",
+          "link": "https://github.com/spolu/dust-cli",
+          "source": "github",
+          "status": "SHIPPED",
+          "thisYear": true
+        }
+      ]
+    },
+    {
+      "query": "developit",
+      "who": "Jason Miller",
+      "handle": "_developit",
+      "github": "developit",
+      "site": "https://jasonformat.com/",
+      "company": "Preact",
+      "companyGithub": "preactjs",
+      "role": "founder",
+      "bio": "Creator of Preact.",
+      "knownLaunches": true,
+      "required": ["preact"],
+      "found": [
+        {
+          "name": "Preact 11",
+          "description": "I shipped the library.",
+          "date": "2026-03-19",
+          "link": "https://preactjs.com/blog/preact-11",
+          "source": "company",
+          "status": "SHIPPED",
+          "thisYear": true
+        },
+        {
+          "name": "htm 4",
+          "description": "Tagged templates on my GitHub",
+          "date": "2026-01-30",
+          "link": "https://github.com/developit/htm",
+          "source": "github",
+          "status": "SHIPPED",
+          "thisYear": true
+        },
+        {
+          "name": "Microbundle 0.16",
+          "description": "Bundler release",
+          "date": "2026-05-05",
+          "link": "https://github.com/developit/microbundle",
+          "source": "github",
+          "status": "SHIPPED",
+          "thisYear": true
+        }
+      ]
+    },
+    {
+      "query": "pi0",
+      "who": "Pooya Parsa",
+      "handle": "_pi0_",
+      "github": "pi0",
+      "site": "https://www.pooya.ir/",
+      "company": "UnJS",
+      "companyGithub": "unjs",
+      "role": "founder",
+      "bio": "Creator of UnJS and Nitro.",
+      "knownLaunches": true,
+      "required": ["nitro", "unjs"],
+      "found": [
+        {
+          "name": "Nitro 3",
+          "description": "I made the server engine.",
+          "date": "2026-04-02",
+          "link": "https://nitro.build/blog/nitro-3",
+          "source": "company",
+          "status": "SHIPPED",
+          "thisYear": true
+        },
+        {
+          "name": "UnJS CLI",
+          "description": "Org toolchain",
+          "date": "2026-06-16",
+          "link": "https://unjs.io/blog/cli",
+          "source": "company",
+          "status": "SHIPPED",
+          "thisYear": true
+        },
+        {
+          "name": "listhen 2",
+          "description": "Listener helper",
+          "date": "2026-02-09",
+          "link": "https://unjs.io/blog/listhen-2",
+          "source": "company",
+          "status": "SHIPPED",
+          "thisYear": true
+        }
+      ]
+    },
+    {
+      "query": "mxstbr",
+      "who": "Max Stoiber",
+      "handle": "mxstbr",
+      "github": "mxstbr",
+      "site": "https://mxstbr.com/",
+      "company": null,
+      "companyGithub": null,
+      "role": "founder",
+      "bio": "Maker. Styled Components, Spectrum, Dossier.",
+      "knownLaunches": true,
+      "required": ["dossier"],
+      "found": [
+        {
+          "name": "Dossier",
+          "description": "I made a reading list.",
+          "date": "2026-03-21",
+          "link": "https://github.com/mxstbr/dossier",
+          "source": "github",
+          "status": "SHIPPED",
+          "thisYear": true
+        },
+        {
+          "name": "micro-analytics",
+          "description": "Privacy analytics on my GitHub",
+          "date": "2026-01-14",
+          "link": "https://github.com/mxstbr/micro-analytics",
+          "source": "github",
+          "status": "SHIPPED",
+          "thisYear": true
+        },
+        {
+          "name": "sharingbuttons",
+          "description": "I shipped the button generator.",
+          "date": "2026-07-07",
+          "link": "https://github.com/mxstbr/sharingbuttons",
+          "source": "github",
+          "status": "SHIPPED",
+          "thisYear": true
+        }
+      ]
+    },
+    {
+      "query": "threepointone",
+      "who": "Sunil Pai",
+      "handle": "threepointone",
+      "github": "threepointone",
+      "site": "https://sunilpai.dev/",
+      "company": null,
+      "companyGithub": null,
+      "role": "founder",
+      "bio": "Maker. Redux, Cloudflare, workers.",
+      "knownLaunches": true,
+      "required": ["partykit"],
+      "found": [
+        {
+          "name": "PartyKit",
+          "description": "I made the realtime kit.",
+          "date": "2026-02-26",
+          "link": "https://github.com/threepointone/partykit",
+          "source": "github",
+          "status": "SHIPPED",
+          "thisYear": true
+        },
+        {
+          "name": "glamor",
+          "description": "CSS helper on my GitHub",
+          "date": "2026-05-11",
+          "link": "https://github.com/threepointone/glamor",
+          "source": "github",
+          "status": "SHIPPED",
+          "thisYear": true
+        },
+        {
+          "name": "react-worker-components",
+          "description": "I shipped worker components.",
+          "date": "2026-08-03",
+          "link": "https://github.com/threepointone/react-worker-components",
+          "source": "github",
+          "status": "SHIPPED",
+          "thisYear": true
+        }
+      ]
+    },
+    {
+      "query": "mattpocock",
+      "who": "Matt Pocock",
+      "handle": "mattpocockuk",
+      "github": "mattpocock",
+      "site": "https://www.mattpocock.com/",
+      "company": null,
+      "companyGithub": null,
+      "role": "founder",
+      "bio": "Total TypeScript. I make courses and tools.",
+      "knownLaunches": true,
+      "required": ["total-typescript"],
+      "found": [
+        {
+          "name": "Total TypeScript 2",
+          "description": "I made the course rewrite.",
+          "date": "2026-03-08",
+          "link": "https://github.com/mattpocock/total-typescript",
+          "source": "github",
+          "status": "SHIPPED",
+          "thisYear": true
+        },
+        {
+          "name": "xstate-docs",
+          "description": "Docs work on my GitHub",
+          "date": "2026-01-19",
+          "link": "https://github.com/mattpocock/xstate-docs",
+          "source": "github",
+          "status": "SHIPPED",
+          "thisYear": true
+        },
+        {
+          "name": "ts-reset",
+          "description": "I shipped the type reset.",
+          "date": "2026-06-22",
+          "link": "https://github.com/mattpocock/ts-reset",
+          "source": "github",
+          "status": "SHIPPED",
+          "thisYear": true
+        }
+      ]
+    },
+    {
+      "query": "TkDodo",
+      "who": "Dominik Dorfmeister",
+      "handle": "TkDodo",
+      "github": "TkDodo",
+      "site": "https://tkdodo.eu/",
+      "company": "TanStack",
+      "companyGithub": "TanStack",
+      "role": "founder",
+      "bio": "TanStack Query maintainer.",
+      "knownLaunches": true,
+      "required": ["query"],
+      "found": [
+        {
+          "name": "TanStack Query 6",
+          "description": "I shipped the cache rewrite.",
+          "date": "2026-04-17",
+          "link": "https://tanstack.com/blog/query-6",
+          "source": "company",
+          "status": "SHIPPED",
+          "thisYear": true
+        },
+        {
+          "name": "query-key-factory",
+          "description": "Helper on my GitHub",
+          "date": "2026-02-04",
+          "link": "https://github.com/TkDodo/query-key-factory",
+          "source": "github",
+          "status": "SHIPPED",
+          "thisYear": true
+        },
+        {
+          "name": "blog-2026",
+          "description": "I made the essay kit.",
+          "date": "2026-07-28",
+          "link": "https://github.com/TkDodo/blog",
+          "source": "github",
+          "status": "SHIPPED",
+          "thisYear": true
+        }
+      ]
+    },
+    {
+      "query": "joshwcomeau",
+      "who": "Josh Comeau",
+      "handle": "JoshWComeau",
+      "github": "joshwcomeau",
+      "site": "https://www.joshwcomeau.com/",
+      "company": null,
+      "companyGithub": null,
+      "role": "founder",
+      "bio": "I make courses and little tools.",
+      "knownLaunches": true,
+      "required": ["css-for-js"],
+      "found": [
+        {
+          "name": "CSS for JS 2026",
+          "description": "I made the course update.",
+          "date": "2026-03-15",
+          "link": "https://github.com/joshwcomeau/css-for-js",
+          "source": "github",
+          "status": "SHIPPED",
+          "thisYear": true
+        },
+        {
+          "name": "use-sound",
+          "description": "Hook on my GitHub",
+          "date": "2026-01-08",
+          "link": "https://github.com/joshwcomeau/use-sound",
+          "source": "github",
+          "status": "SHIPPED",
+          "thisYear": true
+        },
+        {
+          "name": "rainbow-sprinkles",
+          "description": "I shipped the sprinkles kit.",
+          "date": "2026-05-26",
+          "link": "https://github.com/joshwcomeau/rainbow-sprinkles",
+          "source": "github",
+          "status": "SHIPPED",
+          "thisYear": true
+        }
+      ]
+    },
+    {
+      "query": "brianlovin",
+      "who": "Brian Lovin",
+      "handle": "brian_lovin",
+      "github": "brianlovin",
+      "site": "https://brianlovin.com/",
+      "company": null,
+      "companyGithub": null,
+      "role": "founder",
+      "bio": "I make design tools and Staff Design.",
+      "knownLaunches": true,
+      "required": ["staff-design"],
+      "found": [
+        {
+          "name": "Staff Design 2",
+          "description": "I made the interviews.",
+          "date": "2026-02-20",
+          "link": "https://github.com/brianlovin/staff-design",
+          "source": "github",
+          "status": "SHIPPED",
+          "thisYear": true
+        },
+        {
+          "name": "security-list",
+          "description": "Checklist on my GitHub",
+          "date": "2026-04-09",
+          "link": "https://github.com/brianlovin/security-list",
+          "source": "github",
+          "status": "SHIPPED",
+          "thisYear": true
+        },
+        {
+          "name": "figma-plugins",
+          "description": "I shipped a plugin pack.",
+          "date": "2026-08-18",
+          "link": "https://github.com/brianlovin/figma-plugins",
+          "source": "github",
+          "status": "SHIPPED",
+          "thisYear": true
+        }
+      ]
+    },
+    {
+      "query": "gaearon",
+      "who": "Dan Abramov",
+      "handle": "dan_abramov",
+      "github": "gaearon",
+      "site": "https://overreacted.io/",
+      "company": null,
+      "companyGithub": null,
+      "role": "founder",
+      "bio": "I write and ship React tools.",
+      "knownLaunches": true,
+      "required": ["overreacted"],
+      "found": [
+        {
+          "name": "overreacted 2026",
+          "description": "I made the essay engine.",
+          "date": "2026-01-16",
+          "link": "https://github.com/gaearon/overreacted.io",
+          "source": "github",
+          "status": "SHIPPED",
+          "thisYear": true
+        },
+        {
+          "name": "redux-devtools",
+          "description": "Devtools on my GitHub",
+          "date": "2026-03-27",
+          "link": "https://github.com/gaearon/redux-devtools",
+          "source": "github",
+          "status": "SHIPPED",
+          "thisYear": true
+        },
+        {
+          "name": "react-hot-loader",
+          "description": "I shipped the hot reload kit.",
+          "date": "2026-06-06",
+          "link": "https://github.com/gaearon/react-hot-loader",
+          "source": "github",
+          "status": "SHIPPED",
+          "thisYear": true
+        }
+      ]
+    },
+    {
+      "query": "wesbos",
+      "who": "Wes Bos",
+      "handle": "wesbos",
+      "github": "wesbos",
+      "site": "https://wesbos.com/",
+      "company": null,
+      "companyGithub": null,
+      "role": "founder",
+      "bio": "I make courses and apps.",
+      "knownLaunches": true,
+      "required": ["beginner-javascript"],
+      "found": [
+        {
+          "name": "Beginner JavaScript 2026",
+          "description": "I made the course update.",
+          "date": "2026-02-14",
+          "link": "https://github.com/wesbos/beginner-javascript",
+          "source": "github",
+          "status": "SHIPPED",
+          "thisYear": true
+        },
+        {
+          "name": "dump-and-die",
+          "description": "Helper on my GitHub",
+          "date": "2026-04-04",
+          "link": "https://github.com/wesbos/dump-and-die",
+          "source": "github",
+          "status": "SHIPPED",
+          "thisYear": true
+        },
+        {
+          "name": "hot-tips",
+          "description": "I shipped the tips archive.",
+          "date": "2026-07-12",
+          "link": "https://github.com/wesbos/hot-tips",
+          "source": "github",
+          "status": "SHIPPED",
+          "thisYear": true
+        }
+      ]
+    },
+    {
+      "query": "pomber",
+      "who": "Rodrigo Pombo",
+      "handle": "pomber",
+      "github": "pomber",
+      "site": "https://pomb.us/",
+      "company": null,
+      "companyGithub": null,
+      "role": "founder",
+      "bio": "I make Code Hike and talk tools.",
+      "knownLaunches": true,
+      "required": ["code-hike"],
+      "found": [
+        {
+          "name": "Code Hike 2",
+          "description": "I made the MDX scrollytelling kit.",
+          "date": "2026-03-11",
+          "link": "https://github.com/pomber/code-hike",
+          "source": "github",
+          "status": "SHIPPED",
+          "thisYear": true
+        },
+        {
+          "name": "git-history",
+          "description": "File history on my GitHub",
+          "date": "2026-01-25",
+          "link": "https://github.com/pomber/git-history",
+          "source": "github",
+          "status": "SHIPPED",
+          "thisYear": true
+        },
+        {
+          "name": "stargazer",
+          "description": "I shipped the star movie.",
+          "date": "2026-05-19",
+          "link": "https://github.com/pomber/stargazer",
+          "source": "github",
+          "status": "SHIPPED",
+          "thisYear": true
+        }
+      ]
+    }
+  ]
+}

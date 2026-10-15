@@ -5,6 +5,7 @@ import { isOptedOut, setOptedOut } from '../../lib/analytics';
 import { SITE_URL } from '../../lib/artist';
 import { formatPrice, products } from '../../lib/store';
 import { releases } from '../../lib/tracks';
+import { ShippedCard } from './ShippedCard';
 import { StoryKit } from './StoryKit';
 
 // /admin: listening metrics for the owner. The password is checked by the Worker on every request
@@ -592,6 +593,10 @@ export function Dashboard() {
 
       <div className="mt-3">
         <StoreCard password={password} funnel={stats.store?.funnel ?? {}} views={stats.store?.views ?? []} />
+      </div>
+
+      <div className="mt-3">
+        <ShippedCard password={password} />
       </div>
 
       <Card title="Story kit" subtitle="A story image from the real cover, sized for Instagram and TikTok" className="mt-3">

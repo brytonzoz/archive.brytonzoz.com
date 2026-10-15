@@ -181,7 +181,9 @@ function ReceiptWallBoard({ page = false }: { page?: boolean }) {
     };
   }, [ready, receipts.length]);
 
-  const cols = page ? wallColumns(width) : Math.min(3, wallColumns(width));
+  // Real thermal prints can be very long. Keep the desk preview at paper-strip scale
+  // on wide screens; clicking a pin opens the full readable print.
+  const cols = !page && width >= 1180 ? PREVIEW_COUNT : wallColumns(width);
   const gutter = wallGutter(width);
   const { cards, height } = useMemo(
     () => layoutWall(receipts, crumpled, width, cols, gutter, imageRatios),

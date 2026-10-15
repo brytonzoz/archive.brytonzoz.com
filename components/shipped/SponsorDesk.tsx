@@ -63,6 +63,19 @@ export function SponsorDesk() {
   useEffect(() => { if (state) serverOffset.current = state.event.now - Date.now(); }, [state]);
   const uploadRound = useRef(0);
   const uploading = useRef(false);
+  const availabilityAttempts = useRef(0);
+
+  // A cold Worker may return a quick skeleton before inventory is ready. Refresh only
+  // while the ad desk is open; keep the draft intact and leave a manual retry if it stays offline.
+  useEffect(() => {
+    if (pick.open !== 'form') { availabilityAttempts.current = 0; return; }
+    if (state === undefined || block?.slots.length || availabilityAttempts.current >= 3) return;
+    const timer = window.setTimeout(() => {
+      availabilityAttempts.current += 1;
+      refreshShippedState();
+    }, 1000);
+    return () => window.clearTimeout(timer);
+  }, [pick.open, state, block]);
 
   useEffect(() => {
     if (pick.open === 'form') {
@@ -244,7 +257,8 @@ export function SponsorDesk() {
           <HumanCheck ref={human} check={state?.generator.human ?? FALLBACK_HUMAN} onToken={receiveToken} />
           <button type="submit" className="shipped-button shipped-ad-checkout" disabled={busy || preparing || !open || soldOut} aria-busy={busy}>{busy ? 'Opening checkout…' : `Continue to checkout — ${money(bid)}`}</button>
           {fieldError('form')}
-          {!open || soldOut ? <p role="status" className="shipped-ad-help">{!state ? 'Checking availability…' : block?.frozen ? 'These placements are final.' : soldOut ? 'This slot has reached its maximum bid.' : cooling ? 'This slot just changed hands. Available again in a moment.' : 'Advertising is closed right now.'}</p> : null}
+          {!open || soldOut ? <p role="status" className="shipped-ad-help">{!picked ? availabilityAttempts.current >= 3 ? 'Availability couldn’t load. Try again.' : 'Checking availability…' : block?.frozen ? 'These placements are final.' : soldOut ? 'This slot has reached its maximum bid.' : cooling ? 'This slot just changed hands. Available again in a moment.' : 'Advertising is closed right now.'}</p> : null}
+          {state !== undefined && !picked ? <button type="button" className="shipped-ad-text-button" onClick={() => { availabilityAttempts.current = 0; refreshShippedState(); }}>Retry availability</button> : null}
           <p className="shipped-ad-help shipped-ad-payment-note">One payment, plus any applicable tax. Pay securely at checkout.</p>
           {payments?.provider === 'stripe' && !payments.live ? <p className="shipped-ad-help">Stripe test mode. No real money moves.</p> : null}
           {payments?.provider === 'sandbox' ? <p className="shipped-ad-help">Staging sandbox. No real money moves.</p> : null}

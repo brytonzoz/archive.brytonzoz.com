@@ -48,7 +48,7 @@ const { chromium } = require('playwright');
     else if (/^\/r\/\d+\/rollo.png$/.test(request.url)) { response.setHeader('content-type', 'image/png'); response.end(artifacts.get(Number(request.url.split('/')[2])) || artifacts.get(120)); }
     else if (request.url === '/mono.ttf') { response.setHeader('content-type', 'font/ttf'); response.end(fonts[0]); }
     else if (request.url === '/fixture.css') { response.setHeader('content-type', 'text/css'); response.end(css); }
-    else { response.setHeader('content-type', 'text/html'); response.end('<style>@font-face{font-family:Mono;src:url(/mono.ttf)}*{box-sizing:border-box}body{margin:0}button{font:inherit}.shipped-page{--font-ui:Arial;--font-receipt:Mono}.shipped-stack{max-width:960px;margin:auto}</style><link rel="stylesheet" href="/fixture.css"><div id="root"></div><script src="/fixture.js"></script>'); }
+    else { response.setHeader('content-type', 'text/html'); response.end('<style>@font-face{font-family:Mono;src:url(/mono.ttf)}*{box-sizing:border-box}body{margin:0}button{font:inherit}.shipped-page{--font-ui:Arial;--font-receipt:Mono}.shipped-stack{max-width:1366px;margin:auto}</style><link rel="stylesheet" href="/fixture.css"><div id="root"></div><script src="/fixture.js"></script>'); }
   });
   await new Promise(resolve => server.listen(0, '127.0.0.1', resolve));
   const origin = `http://127.0.0.1:${server.address().port}`;
@@ -91,7 +91,18 @@ const { chromium } = require('playwright');
       assert.ok(ink > 20, `first receipt must visibly paint its header, got ${ink} ink pixels`);
       await page.screenshot({path:path.join(ARTIFACTS, 'shipped-real-wall-mobile.png'),fullPage:true});
       await page.setViewportSize({width:1440,height:1000});
-      await page.waitForTimeout(150);
+      await page.waitForFunction(() => {
+        const pins = [...document.querySelectorAll('[data-wall-pin]')].map(pin => pin.getBoundingClientRect());
+        return document.querySelector('.shipped-wall-board').clientWidth >= 1180 && pins.length === 6 && pins.every(pin => Math.abs(pin.top - pins[0].top) < 1);
+      });
+      const desktop = await page.locator('.shipped-wall-board').evaluate(board => {
+        const bounds = board.getBoundingClientRect();
+        const pins = [...board.querySelectorAll('[data-wall-pin]')].map(pin => pin.getBoundingClientRect());
+        return {width:bounds.width, height:bounds.height, columns:new Set(pins.map(pin => Math.round(pin.left))).size, fits:pins.every(pin => pin.left >= bounds.left && pin.right <= bounds.right && pin.top >= bounds.top && pin.bottom <= bounds.bottom)};
+      });
+      assert.equal(desktop.columns, 6);
+      assert.ok(desktop.fits, 'all six desktop papers must stay within the board');
+      console.log(`Desktop board: ${desktop.width}px wide, ${desktop.height}px tall, ${desktop.columns} columns`);
       await page.screenshot({path:path.join(ARTIFACTS, 'shipped-real-wall-desktop.png'),fullPage:true});
       await page.setViewportSize({width:390,height:844});
       await page.locator('[data-wall-pin="120"]').click();

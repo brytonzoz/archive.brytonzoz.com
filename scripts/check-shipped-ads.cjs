@@ -54,6 +54,7 @@ function makeState(mode) {
 async function fixture(browser, viewport, mode = 'empty') {
   const context = await browser.newContext({ viewport, reducedMotion: 'reduce' });
   const state = makeState(mode);
+  const recovery = { ready: mode !== 'cold-manual', wait: null };
   const requests = { bids: [], unexpected: [], states: 0 };
   const replies = [];
   const errors = [];
@@ -65,7 +66,13 @@ async function fixture(browser, viewport, mode = 'empty') {
     const request = route.request();
     const path = new URL(request.url()).pathname;
     const json = (body, status = 200) => route.fulfill({ status, contentType: 'application/json', body: JSON.stringify(body) });
-    if (path === '/api/shipped/state') { requests.states++; return json(state); }
+    if (path === '/api/shipped/state') {
+      requests.states++;
+      const cold = mode.startsWith('cold-') && (requests.states === 1 || !recovery.ready);
+      if (cold) return json({ ...state, payments: { ...state.payments, open: false }, sponsors: { slots: [], frozen: false } });
+      if (recovery.wait) await recovery.wait;
+      return json(state);
+    }
     if (path === '/api/shipped/pile') return json({ receipts: [], total: 0, frozen: state.sponsors.frozen, next: null });
     if (path === '/api/shipped/bid') {
       const form = await new Request(`${origin}/api/shipped/bid`, { method: 'POST', headers: request.headers(), body: request.postDataBuffer() }).formData();
@@ -87,7 +94,7 @@ async function fixture(browser, viewport, mode = 'empty') {
   await until(() => requests.states > 0, 'Live sponsor fixture loads');
   await until(() => page.getByRole('button', { name: 'Print your receipt for free', exact: true }).isEnabled(), 'Shared live state reaches the page');
   await page.waitForFunction(() => Boolean(window.__adHuman));
-  return { context, page, board, state, requests, replies, errors };
+  return { context, page, board, state, requests, replies, errors, recovery };
 }
 
 async function editor(f, slot = 0) {
@@ -304,6 +311,49 @@ async function checkExpiryDuringVerification(browser) {
   console.log('PASS ads stale verification: a slot closing during the human check cannot POST a bid');
 }
 
+async function checkColdAvailability(browser) {
+  for (const mode of ['cold-auto', 'cold-manual']) {
+    const f = await fixture(browser, { width: 390, height: 844 }, mode);
+    let releaseState;
+    if (mode === 'cold-auto') f.recovery.wait = new Promise(resolve => { releaseState = resolve; });
+    const e = await editor(f, 4);
+    assert.ok(await e.submit.isDisabled(), 'Missing live slots keep checkout unavailable');
+    await fillAd(e);
+    assert.ok(await e.submit.isDisabled(), 'A draft can be entered before availability recovers');
+    assert.equal(f.requests.bids.length, 0);
+    if (mode === 'cold-auto') {
+      await until(() => f.requests.states >= 2, 'Opening a fallback placement automatically refreshes cold state');
+      releaseState();
+    } else {
+      await until(() => f.requests.states === 4, 'Initial state plus three background recovery attempts are made');
+      await e.dialog.getByRole('status').filter({ hasText: /Availability couldn.t load/ }).waitFor({ state: 'visible' });
+      await f.page.waitForTimeout(1250);
+      assert.equal(f.requests.states, 4, 'Background recovery stops after three attempts');
+      assert.ok(await e.submit.isDisabled());
+      f.recovery.ready = true;
+      await e.dialog.getByRole('button', { name: 'Retry availability', exact: true }).click();
+      await until(() => f.requests.states === 5, 'Manual availability retry requests fresh state');
+    }
+    await until(() => e.submit.isEnabled(), 'Recovered placements enable checkout');
+    assert.equal(await e.name.inputValue(), 'Quiet Kit', 'Availability refresh preserves brand');
+    assert.equal(await e.cta.inputValue(), 'Small tools. Good days.', 'Availability refresh preserves message');
+    assert.equal(await e.url.inputValue(), 'https://example.org/quiet-kit', 'Availability refresh preserves QR destination');
+    assert.equal(await e.preview.locator('[data-ad-slot="4"]').getAttribute('aria-pressed'), 'true', 'Availability refresh preserves selected placement');
+    assert.match(await e.submit.innerText(), /Continue to checkout.*\$1\.00/);
+    await e.terms.check();
+    await f.page.evaluate(() => window.__adHuman.release());
+    await e.submit.click();
+    await f.page.waitForURL(`${origin}/__ad-checkout-fixture?session=local`);
+    assert.equal(f.requests.bids.length, 1);
+    assert.equal(f.requests.bids[0].cents, '100');
+    assert.equal(f.requests.bids[0].slot, '4');
+    assert.equal(f.requests.bids[0].name, 'Quiet Kit');
+    assert.deepEqual(f.errors, []); assert.deepEqual(f.requests.unexpected, []);
+    await f.context.close();
+  }
+  console.log('PASS ads cold state: automatic bounded refresh, manual retry after exhaustion, preserved draft and placement, exact $1 checkout');
+}
+
 (async () => {
   const browser = await chromium.launch({ executablePath: process.env.CHROMIUM_PATH || '/usr/bin/chromium', headless: true, args: ['--no-sandbox'] });
   try {
@@ -313,5 +363,6 @@ async function checkExpiryDuringVerification(browser) {
     await checkPaidAndFrozen(browser);
     await checkUnavailable(browser);
     await checkExpiryDuringVerification(browser);
+    await checkColdAvailability(browser);
   } finally { await browser.close(); }
 })().catch(error => { console.error(error); process.exitCode = 1; });

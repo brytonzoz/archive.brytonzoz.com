@@ -5,8 +5,10 @@ import { layoutWall, wallColumns, wallGutter } from '../lib/shipped-wall.ts';
 test('long printed receipts keep their proportions and tilted corners inside the board', () => {
   const receipts = Array.from({ length: 12 }, (_, index) => ({ id: index + 1, items: [{ name: 'A release' }] }));
   const ratios = new Map(receipts.map(({ id }) => [id, id % 2 ? 6 : 2.5]));
-  for (const width of [320, 390, 800, 1200]) {
-    const { cards, height } = layoutWall(receipts, new Set(), width, wallColumns(width), wallGutter(width), ratios);
+  const layouts = [320, 390, 800, 1200].map(width => [width, wallColumns(width)]);
+  layouts.push([1180, 6], [1200, 6], [1440, 6]);
+  for (const [width, columns] of layouts) {
+    const { cards, height } = layoutWall(receipts, new Set(), width, columns, wallGutter(width), ratios);
     for (const card of cards) {
       // The print fills the available paper width; the remaining height is fastener and caption space.
       assert.ok(Math.abs((card.h - 62) / (card.w - 12) - ratios.get(card.id)) < 0.01);

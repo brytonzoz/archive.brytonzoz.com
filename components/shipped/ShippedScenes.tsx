@@ -21,6 +21,7 @@ import {
   SceneIndexContext,
   cardMotion,
   clamp,
+  easeOutCubic,
   scaleValue,
   sceneImageSizes,
   useSceneMotion,
@@ -120,29 +121,6 @@ const STICKERS: Record<string, SceneSticker[]> = {
       intro: { x: 170, y: -140, rotate: 12, delay: '0.12s' },
     },
     {
-      // Peeks over the top of the cover, hands on its edge (the art's ledge is 80% down).
-      key: 'peek',
-      src: mk.peek,
-      alt: 'Mopkin peeking over the card',
-      frame: { left: 330, top: CARD_TOP - 240, size: 300 },
-      zIndex: 12,
-      movement: { x: 30, y: -120, rotate: 6, scale: 0.05, fadeRate: 1.1 },
-      float: { x: 0, y: 0, rotate: 0, duration: '8s', delay: '0s' },
-      intro: { x: 0, y: -160, rotate: 0, delay: '0.5s' },
-    },
-    {
-      // Standing on the cover's bottom-left corner, like the homepage's birds over SOLENYA's.
-      key: 'happy',
-      src: mk.happy,
-      alt: 'Happy Mopkin',
-      frame: { left: 0, top: 690, size: 250 },
-      zIndex: 25,
-      baseRotate: -10,
-      movement: { x: -54, y: -92, rotate: -9, scale: 0.08, fadeRate: 1.15 },
-      float: { x: -8, y: -8, rotate: -3, duration: '6.6s', delay: '0.7s' },
-      intro: { x: -140, y: -24, rotate: -14, delay: '0.34s' },
-    },
-    {
       key: 'wave',
       src: mk.wave,
       alt: 'Mopkin waving',
@@ -167,6 +145,21 @@ const STICKERS: Record<string, SceneSticker[]> = {
     },
   ],
 };
+
+// Stickers that sit on the card itself (hands on its top edge, feet on a corner) ride inside it, so
+// they stay on it however the card scales and moves; they pop up from where they touch it.
+type CardSticker = { key: string; src: MediaAsset; frame: { left: number; top: number; size: number }; rotate?: number; origin: string };
+const CARD_STICKERS: Record<string, CardSticker[]> = {
+  mopkin: [
+    { key: 'peek', src: mk.peek, frame: { left: 330, top: CARD_TOP - 240, size: 300 }, origin: '50% 80%' },
+    { key: 'happy', src: mk.happy, frame: { left: 0, top: 690, size: 250 }, rotate: -10, origin: '50% 95%' },
+  ],
+};
+
+function cardStickerMotion(distance: number) {
+  const shown = distance < 0 ? easeOutCubic(clamp((distance + 0.4) / 0.4, 0, 1)) : 1 - easeOutCubic(clamp(distance / 0.3, 0, 1));
+  return { opacity: shown, transform: `scale(${0.6 + (shown * 0.4)})` };
+}
 
 function AppleIcon({ size }: { size: string }) {
   return (
@@ -196,10 +189,17 @@ function ShippedCard({ project, cover, loadImages, priority, revealed }: { proje
       style={{ left: scaleValue(120), top: scaleValue(CARD_TOP), width: scaleValue(722), zIndex: 10, animationDelay: '0.14s' }}
     >
       <div
-        className="scene-card"
+        className="scene-card relative"
         ref={motion.ref('card', cardMotion)}
         style={{ ...motion.initial(cardMotion), transformOrigin: 'center center', willChange: 'transform' }}
       >
+        {(CARD_STICKERS[project.slug] ?? []).map((sticker) => (
+          <div key={sticker.key} aria-hidden="true" className="pointer-events-none absolute" style={{ left: scaleValue(sticker.frame.left - 120), top: scaleValue(sticker.frame.top - CARD_TOP), width: scaleValue(sticker.frame.size), height: scaleValue(sticker.frame.size), zIndex: 2, rotate: `${sticker.rotate ?? 0}deg` }}>
+            <div className="h-full w-full" ref={motion.ref(sticker.key, cardStickerMotion)} style={{ ...motion.initial(cardStickerMotion), transformOrigin: sticker.origin, willChange: 'transform, opacity' }}>
+              {loadImages ? <ResponsiveImage asset={sticker.src} alt="" sizes={sceneImageSizes(sticker.frame.size)} draggable={false} className="h-full w-full select-none object-contain" /> : null}
+            </div>
+          </div>
+        ))}
         {/* Tapping the art does what the button does (as the homepage's album art opens its player);
             the button is the one link for keyboards and screen readers. */}
         <a
@@ -282,7 +282,7 @@ function ShippedCard({ project, cover, loadImages, priority, revealed }: { proje
 
 const ShippedScene = React.memo(function ShippedScene({ project, loadImages, priority, revealed }: { project: ShippedProject; loadImages: boolean; priority: boolean; revealed: boolean }) {
   return (
-    <div className="relative h-full w-full overflow-hidden">
+    <div className="shipped-clip relative h-full w-full">
       {/* Without JavaScript the backgrounds can't cross-fade, so each scene shows its own (app/shipped/page.tsx). */}
       <div aria-hidden="true" className="shipped-nojs-bg absolute inset-0" style={{ background: project.background.base }} />
       <SceneStickers stickers={STICKERS[project.slug] ?? []} loadImages={loadImages} />
@@ -457,7 +457,7 @@ export function ShippedScenes() {
   }, [sceneCount]);
 
   const sceneClass = (index: number) =>
-    `scene-wrap relative h-screen snap-center overflow-hidden${Math.abs(index - activeIndex) > 1 ? ' scene-still' : ''}`;
+    `scene-wrap shipped-clip relative h-screen snap-center${Math.abs(index - activeIndex) > 1 ? ' scene-still' : ''}`;
 
   return (
     <div className="relative min-h-screen overflow-hidden bg-black">

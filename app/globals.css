@@ -2293,6 +2293,8 @@ button[class*="transition"], a[class*="transition"] {
 }
 
 .shipped-home {
+  /* A little more solid than the standard glass: the totals scroll under it. */
+  background: rgba(28, 28, 30, 0.86);
   top: max(14px, env(safe-area-inset-top));
   left: max(14px, env(safe-area-inset-left));
   height: 34px;

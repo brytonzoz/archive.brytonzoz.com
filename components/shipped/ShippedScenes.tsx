@@ -128,7 +128,7 @@ const STICKERS: Record<string, SceneSticker[]> = {
       key: 'phone',
       src: mk.phone,
       alt: 'Mopkin on an iPhone: pick up the clothes on the floor',
-      frame: { left: 640, top: 380, size: 780 },
+      frame: { left: 664, top: 960, size: 640 },
       zIndex: 4,
       baseRotate: 11,
       movement: { x: 84, y: -60, rotate: 6, scale: 0.06, fadeRate: 0.95 },
@@ -150,7 +150,7 @@ const STICKERS: Record<string, SceneSticker[]> = {
       key: 'happy',
       src: mk.happy,
       alt: 'Happy Mopkin',
-      frame: { left: 668, top: 1476, size: 300 },
+      frame: { left: 584, top: 1480, size: 290 },
       zIndex: 5,
       baseRotate: -6,
       movement: { x: 78, y: 130, rotate: 5, scale: 0.08, fadeRate: 1.08 },
@@ -230,7 +230,7 @@ function ShippedCard({ project, cover, loadImages, priority, revealed }: { proje
               background: project.tone === 'light' ? 'rgba(255, 255, 255, 0.16)' : 'rgba(18, 18, 14, 0.07)',
               boxShadow: `inset 0 0 0 1px ${hairline}`,
               fontFamily: SCENE_FONT,
-              fontSize: scaleValue(27),
+              fontSize: `max(9px, ${scaleValue(27)})`,
               fontWeight: 600,
               color: colors.ink,
             }}
@@ -259,12 +259,12 @@ function ShippedCard({ project, cover, loadImages, priority, revealed }: { proje
           {project.stats.map((stat, statIndex) => (
             <div
               key={stat.label}
-              className="flex min-w-0 flex-col-reverse"
+              className="flex min-w-0 flex-col-reverse justify-end"
               style={{ paddingLeft: statIndex ? scaleValue(28) : 0, borderLeft: statIndex ? `1px solid ${hairline}` : undefined }}
             >
               <dt
-                className={`truncate ${titleShadow ?? ''}`}
-                style={{ marginTop: scaleValue(12), fontFamily: SCENE_FONT, fontSize: scaleValue(29), lineHeight: 1.2, fontWeight: 500, color: colors.muted }}
+                className={`${titleShadow ?? ''}`}
+                style={{ marginTop: scaleValue(12), fontFamily: SCENE_FONT, fontSize: `max(9px, ${scaleValue(31)})`, lineHeight: 1.2, fontWeight: 500, color: colors.muted }}
               >
                 {stat.label}
               </dt>
@@ -316,14 +316,14 @@ function ShippedTotals({ revealed, loadImages }: { revealed: boolean; loadImages
   ];
 
   return (
-    <div className="mx-auto max-w-[1120px] px-5 pt-24 sm:px-8 sm:pt-28">
+    <div className="mx-auto max-w-4xl px-5 pt-24 sm:px-8 sm:pt-28">
       <h2 className="text-[40px] font-bold leading-none tracking-[-0.035em] text-white sm:text-[56px]">Shipped</h2>
       <p className="mt-3 text-[15px] text-white/50">As of {formatAsOf(SHIPPED_AS_OF)}</p>
       <dl className="mt-8 grid grid-cols-2 gap-3 sm:grid-cols-3 sm:gap-4">
         {tiles.map((tile, index) => (
           <div
             key={tile.label}
-            className={`shipped-tile flex flex-col-reverse rounded-[22px] p-5 sm:p-6${index === 0 ? ' col-span-2 sm:col-span-1' : ''}`}
+            className={`shipped-tile flex flex-col-reverse justify-end rounded-[22px] p-5 sm:p-6${index === 0 ? ' col-span-2 sm:col-span-1' : ''}`}
           >
             <dt className="mt-2 text-[13px] font-medium text-white/55 sm:text-[14px]">{tile.label}</dt>
             <dd className="text-[40px] font-semibold leading-none tracking-[-0.03em] text-white tabular-nums sm:text-[48px]">

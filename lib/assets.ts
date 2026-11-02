@@ -53,3 +53,24 @@ export const nonparallelAssets = {
     purple: media['scenes/nonparallel/tee-purple'],
   },
 };
+
+// /shipped (components/shipped/): each product's icon as its cover, and cut-outs of its own art
+// (its site's hero cards and stickers, Mopkin's mascot and its live demo phone).
+export const shippedSceneAssets = {
+  pocketFactory: {
+    cover: media['covers/shipped-pocket-factory'],
+    cardLime: media['scenes/shipped-pocket-factory/card-lime'],
+    cardBlack: media['scenes/shipped-pocket-factory/card-black'],
+    cardBack: media['scenes/shipped-pocket-factory/card-back'],
+    cardFront: media['scenes/shipped-pocket-factory/card-front'],
+    tapBadge: media['scenes/shipped-pocket-factory/tap-badge'],
+  },
+  mopkin: {
+    cover: media['covers/shipped-mopkin'],
+    wave: media['scenes/shipped-mopkin/wave'],
+    peek: media['scenes/shipped-mopkin/peek'],
+    magnify: media['scenes/shipped-mopkin/magnify'],
+    happy: media['scenes/shipped-mopkin/happy'],
+    phone: media['scenes/shipped-mopkin/phone'],
+  },
+};

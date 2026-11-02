@@ -101,6 +101,13 @@ push, and give the owner the staging link from the PR comment once the Staging w
     `SceneIndexContext`; `useIsActiveScene()` is for things that flip once per scene (grid flips, warming a song).
   - Photos load when needed: shop tiles lazily, the hover photo only with a mouse, gallery photos one ahead of the
     swipe. `public/sw.js` keeps shop photos in their own cache so they never push out the scenes' artwork.
+- Shipped (`/shipped/`): Bryton's technical products in the homepage's scene format (one product per screen, its icon as
+  the cover, its own art as stickers, up to three numbers under it), then the totals and the footer. Products, numbers
+  and colors are in `lib/shipped.ts`, in page order; every number is real and dated (`SHIPPED_AS_OF`) and names its
+  `source` (Shopify for Pocket Factory, PostHog project "Mopkin" and the App Store for Mopkin). Update them from those
+  sources, never estimate. Scenes and sticker placement: `components/shipped/ShippedScenes.tsx`; art in
+  `assets-src/covers/shipped-*` and `assets-src/scenes/shipped-*/`. The scene engine both pages share (frame units,
+  scroll-linked card and sticker motion, backgrounds, page dots) is `components/scenes/kit.tsx`.
 - Search and AI (SEO/GEO): how Bryton shows up is one story in `lib/artist.ts` (`ARTIST`: headline "New York Artist,
   Musician & Designer", the meta description, the bio, `knowsAbout`, NonParallel and Scrapwrk). It feeds the root title
   and description (app/layout.tsx), the JSON-LD graph (Person with New York, occupations and founder links, ProfilePage,

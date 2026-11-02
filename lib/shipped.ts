@@ -90,16 +90,16 @@ export const SHIPPED_PROJECTS: ShippedProject[] = [
     },
     stats: [
       {
-        label: 'Active users',
-        value: 224,
+        label: 'Monthly users',
+        value: 220,
         format: 'count',
-        source: 'PostHog project "Mopkin": distinct people with any in-app event (posthog-ios) in the 30 days to Nov 2, 2026, test-account cohort excluded (105 in the last 7 days)',
+        source: 'PostHog project "Mopkin": distinct people with any in-app event ($lib posthog-ios) in the 30 days to Nov 2, 2026 21:48 UTC, iOS Simulator runs ($is_emulator) and the test cohort excluded (102 in the last 7 days)',
       },
       {
         label: 'Tasks done',
-        value: 1877,
+        value: 1873,
         format: 'count',
-        source: 'PostHog project "Mopkin": "task completed" events, all time to Nov 2, 2026',
+        source: 'PostHog project "Mopkin": "task completed" events from real devices (posthog-ios, iOS Simulator excluded), all time to Nov 2, 2026 21:48 UTC',
       },
       {
         label: 'Rating',
@@ -109,9 +109,9 @@ export const SHIPPED_PROJECTS: ShippedProject[] = [
       },
     ],
     // Free, no in-app purchases (App Store, Nov 2, 2026).
-    // The totals add up what the cards show, so Mopkin counts its 224 active users (395 people have
-    // used it since the App Store release on Aug 18, 2026, per the same PostHog query).
-    totals: { revenue: 0, people: 224, source: 'The Active users number above' },
+    // The totals add up what the cards show, so Mopkin counts its 220 monthly users (358 people have
+    // used it on a real iPhone since the App Store release on Aug 18, 2026, per the same query).
+    totals: { revenue: 0, people: 220, source: 'The Monthly users number above' },
   },
 ];
 

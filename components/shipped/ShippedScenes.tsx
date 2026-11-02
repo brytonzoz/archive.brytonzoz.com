@@ -249,7 +249,8 @@ function ShippedCard({ project, cover, loadImages, priority, revealed }: { proje
         <dl
           className="grid"
           style={{
-            gridTemplateColumns: `repeat(${project.stats.length}, minmax(0, 1fr))`,
+            // Dollar amounts are the widest numbers, so their column gets a little more room.
+            gridTemplateColumns: project.stats.map((stat) => `minmax(0, ${stat.format === 'usd' ? 1.25 : 1}fr)`).join(' '),
             marginTop: scaleValue(40),
             paddingTop: scaleValue(34),
             borderTop: `1px solid ${hairline}`,

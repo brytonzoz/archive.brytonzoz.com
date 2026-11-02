@@ -32,9 +32,10 @@ export const metadata: Metadata = {
 export default function ShippedPage() {
   return (
     <>
-      {/* Without JavaScript the counters can't roll, so they show their numbers straight away. */}
+      {/* Without JavaScript the counters can't roll and the backgrounds can't cross-fade, so the numbers
+          show straight away and each scene carries its own background. */}
       <noscript>
-        <style>{'.odo .odo-strip{transform:translate3d(0,calc(var(--stop) * -1em),0)!important}'}</style>
+        <style>{'.odo .odo-strip{transform:translate3d(0,calc(var(--stop) * -1em),0)!important}.shipped-nojs-bg{display:block!important}'}</style>
       </noscript>
       <ShippedScenes />
     </>

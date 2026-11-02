@@ -23,7 +23,6 @@ import {
   clamp,
   scaleValue,
   sceneImageSizes,
-  useIsActiveScene,
   useSceneMotion,
   type MotionRegistry,
 } from '../scenes/kit';
@@ -170,16 +169,12 @@ function AppleIcon({ size }: { size: string }) {
 }
 
 // The product itself: its art, its name, the numbers, and the one way in.
-function ShippedCard({ project, cover, loadImages, priority }: { project: ShippedProject; cover: MediaAsset; loadImages: boolean; priority: boolean }) {
+// `revealed` turns true as the scene starts coming on screen (ShippedScenes' frame loop), so the
+// numbers are already rolling by the time they can be read; then they stay put.
+function ShippedCard({ project, cover, loadImages, priority, revealed }: { project: ShippedProject; cover: MediaAsset; loadImages: boolean; priority: boolean; revealed: boolean }) {
   const motion = useSceneMotion();
-  const active = useIsActiveScene();
   const index = React.useContext(SceneIndexContext);
   const entry = React.useContext(EntrySceneContext) === index;
-  // The numbers roll in the first time their scene comes on screen, then stay put.
-  const [revealed, setRevealed] = useState(entry);
-  useEffect(() => {
-    if (active) setRevealed(true);
-  }, [active]);
 
   const colors = SCENE_TONES[project.tone];
   const hairline = project.tone === 'light' ? 'rgba(255, 255, 255, 0.18)' : 'rgba(18, 18, 14, 0.14)';
@@ -276,7 +271,7 @@ function ShippedCard({ project, cover, loadImages, priority }: { project: Shippe
                 className={`tabular-nums ${titleShadow ?? ''}`}
                 style={{ margin: 0, fontFamily: SCENE_FONT, fontSize: scaleValue(64), lineHeight: 1, fontWeight: 650, letterSpacing: '-0.03em', color: colors.ink }}
               >
-                <Odometer value={formatStat(stat)} on={revealed} entry={entry} />
+                <Odometer value={formatStat(stat)} on={revealed || entry} entry={entry} />
               </dd>
             </div>
           ))}
@@ -294,13 +289,15 @@ function ShippedCard({ project, cover, loadImages, priority }: { project: Shippe
   );
 }
 
-const ShippedScene = React.memo(function ShippedScene({ project, loadImages, priority }: { project: ShippedProject; loadImages: boolean; priority: boolean }) {
+const ShippedScene = React.memo(function ShippedScene({ project, loadImages, priority, revealed }: { project: ShippedProject; loadImages: boolean; priority: boolean; revealed: boolean }) {
   return (
     <div className="relative h-full w-full overflow-hidden">
+      {/* Without JavaScript the backgrounds can't cross-fade, so each scene shows its own (app/shipped/page.tsx). */}
+      <div aria-hidden="true" className="shipped-nojs-bg absolute inset-0" style={{ background: project.background.base }} />
       <SceneStickers stickers={STICKERS[project.slug] ?? []} loadImages={loadImages} />
       <div className="absolute inset-0 flex items-center justify-center">
         <div className="relative" style={{ width: SCENE_FRAME_WIDTH, height: SCENE_FRAME_HEIGHT }}>
-          <ShippedCard project={project} cover={COVERS[project.slug]} loadImages={loadImages} priority={priority} />
+          <ShippedCard project={project} cover={COVERS[project.slug]} loadImages={loadImages} priority={priority} revealed={revealed} />
         </div>
       </div>
     </div>
@@ -373,7 +370,8 @@ export function ShippedScenes() {
   const sceneCount = projects.length;
   const [activeIndex, setActiveIndex] = useState(0);
   const [loadDeferredScenes, setLoadDeferredScenes] = useState(false);
-  const [totalsRevealed, setTotalsRevealed] = useState(false);
+  // The furthest scene whose numbers have started rolling (sceneCount = the totals).
+  const [revealedThrough, setRevealedThrough] = useState(0);
   const scrollContainerRef = useRef<HTMLDivElement | null>(null);
   const motionUpdaters = useRef(new Map<number, Set<(distance: number) => void>>());
   const lastDistances = useRef(new Map<number, number>());
@@ -405,10 +403,6 @@ export function ShippedScenes() {
     window.addEventListener('load', handleLoad, { once: true });
     return () => window.removeEventListener('load', handleLoad);
   }, []);
-
-  useEffect(() => {
-    if (activeIndex >= sceneCount) setTotalsRevealed(true);
-  }, [activeIndex, sceneCount]);
 
   // One pass per display frame, as on the homepage: read the scroll position once, then move every
   // registered card and sticker and cross-fade the backgrounds.
@@ -444,6 +438,9 @@ export function ShippedScenes() {
       const totals = document.getElementById('totals');
       container.classList.toggle('is-free', Boolean(totals) && scrollTop >= (totals?.offsetTop ?? Infinity) - 2);
       if (progress > 0.01) setLoadDeferredScenes(true);
+      // A scene's numbers start rolling once a quarter of it is on screen.
+      const reach = Math.min(Math.floor(progress + 0.75), sceneCount);
+      setRevealedThrough((current) => (reach > current ? reach : current));
 
       const newIndex = Math.min(Math.round(scrollTop / containerHeight), sceneCount);
       setActiveIndex((current) => (newIndex !== current && newIndex >= 0 ? newIndex : current));
@@ -502,7 +499,7 @@ export function ShippedScenes() {
               {projects.map((project, index) => (
                 <SceneIndexContext.Provider key={project.slug} value={index}>
                   <section aria-label={project.name} className={sceneClass(index)}>
-                    <ShippedScene project={project} loadImages={index === 0 || loadDeferredScenes} priority={index === 0} />
+                    <ShippedScene project={project} loadImages={index === 0 || loadDeferredScenes} priority={index === 0} revealed={index <= revealedThrough} />
                   </section>
                 </SceneIndexContext.Provider>
               ))}
@@ -512,7 +509,7 @@ export function ShippedScenes() {
                 aria-label="Totals"
                 className={`shop-section shop-section-home relative min-h-screen snap-start${activeIndex < sceneCount - 1 ? ' scene-still' : ''}`}
               >
-                <ShippedTotals revealed={totalsRevealed} loadImages={loadDeferredScenes} />
+                <ShippedTotals revealed={revealedThrough >= sceneCount} loadImages={loadDeferredScenes} />
                 <SiteFooter />
               </section>
             </div>

@@ -26,8 +26,8 @@ export type ShippedProject = {
   background: SlideBackground;
   // Up to three numbers under the card.
   stats: ShippedStat[];
-  // What this product adds to the totals below the scenes: revenue in USD, and the people who
-  // have paid for it or used it (all time).
+  // What this product adds to the totals below the scenes: revenue in USD, and the people who paid
+  // for it or use it. Use numbers the card shows, so the totals add up from the page itself.
   totals: { revenue: number; people: number; source: string };
 };
 
@@ -109,7 +109,9 @@ export const SHIPPED_PROJECTS: ShippedProject[] = [
       },
     ],
     // Free, no in-app purchases (App Store, Nov 2, 2026).
-    totals: { revenue: 0, people: 395, source: 'PostHog project "Mopkin": distinct in-app people since the App Store release (Aug 18 - Nov 2, 2026), test accounts excluded' },
+    // The totals add up what the cards show, so Mopkin counts its 224 active users (395 people have
+    // used it since the App Store release on Aug 18, 2026, per the same PostHog query).
+    totals: { revenue: 0, people: 224, source: 'The Active users number above' },
   },
 ];
 

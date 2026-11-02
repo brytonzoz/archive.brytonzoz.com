@@ -247,6 +247,8 @@ export function SceneDots({ names, activeIndex, onSelect, hidden, label = 'Proje
           key={name}
           type="button"
           onClick={() => onSelect(index)}
+          // Hidden dots (below the last scene) are out of the tab order too, not just invisible.
+          tabIndex={hidden ? -1 : undefined}
           aria-label={name}
           aria-current={index === activeIndex ? 'true' : undefined}
           className="group flex h-6 w-6 items-center justify-center rounded-full focus-visible:outline focus-visible:outline-2 focus-visible:outline-white/70"

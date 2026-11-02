@@ -2313,3 +2313,8 @@ button[class*="transition"], a[class*="transition"] {
   background: rgba(255, 255, 255, 0.05);
   box-shadow: inset 0 0 0 1px rgba(255, 255, 255, 0.08);
 }
+
+/* Each /shipped scene's own background, shown only without JavaScript (app/shipped/page.tsx). */
+.shipped-nojs-bg {
+  display: none;
+}

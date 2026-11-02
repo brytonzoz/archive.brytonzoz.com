@@ -1,1 +1,0 @@
-export { ReceiptWall } from './ReceiptWall';

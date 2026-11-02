@@ -195,8 +195,10 @@ function ShippedCard({ project, cover, loadImages, priority }: { project: Shippe
         ref={motion.ref('card', cardMotion)}
         style={{ ...motion.initial(cardMotion), transformOrigin: 'center center', willChange: 'transform' }}
       >
+        {/* Tapping the art does what the button does (as the homepage's album art opens its player);
+            the button is the one link for keyboards and screen readers. */}
         <a
-          href={project.url}
+          href={project.action.href}
           target="_blank"
           rel="noopener noreferrer"
           tabIndex={-1}
@@ -306,7 +308,7 @@ const ShippedScene = React.memo(function ShippedScene({ project, loadImages, pri
 });
 
 // Below the scenes the page scrolls freely: everything added up, each product on one line, the footer.
-function ShippedTotals({ revealed }: { revealed: boolean }) {
+function ShippedTotals({ revealed, loadImages }: { revealed: boolean; loadImages: boolean }) {
   const revenue = shippedTotal('revenue');
   const people = shippedTotal('people');
   const tiles = [
@@ -342,8 +344,14 @@ function ShippedTotals({ revealed }: { revealed: boolean }) {
               rel="noopener noreferrer"
               className="group flex items-center gap-4 py-4 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-white/60 sm:gap-5 sm:py-5"
             >
-              <span className="tile-cover relative block h-12 w-12 shrink-0 overflow-hidden rounded-[12px] sm:h-14 sm:w-14 sm:rounded-[14px]">
-                <ResponsiveImage asset={COVERS[project.slug]} alt="" sizes="56px" loading="lazy" draggable={false} className="h-full w-full object-cover" />
+              <span
+                className="tile-cover relative block h-12 w-12 shrink-0 overflow-hidden rounded-[12px] sm:h-14 sm:w-14 sm:rounded-[14px]"
+                style={placeholderBackground(COVERS[project.slug])}
+              >
+                {/* Two screens down is inside the browser's lazy-load distance, so wait for the scenes' own art. */}
+                {loadImages ? (
+                  <ResponsiveImage asset={COVERS[project.slug]} alt="" sizes="56px" loading="lazy" draggable={false} className="h-full w-full object-cover" />
+                ) : null}
               </span>
               <span className="min-w-0 flex-1">
                 <span className="block truncate text-[16px] font-semibold text-white sm:text-[17px]">{project.name}</span>
@@ -504,7 +512,7 @@ export function ShippedScenes() {
                 aria-label="Totals"
                 className={`shop-section shop-section-home relative min-h-screen snap-start${activeIndex < sceneCount - 1 ? ' scene-still' : ''}`}
               >
-                <ShippedTotals revealed={totalsRevealed} />
+                <ShippedTotals revealed={totalsRevealed} loadImages={loadDeferredScenes} />
                 <SiteFooter />
               </section>
             </div>

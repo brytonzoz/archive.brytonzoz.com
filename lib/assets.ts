@@ -62,7 +62,7 @@ export const shippedSceneAssets = {
     cardLime: media['scenes/shipped-pocket-factory/card-lime'],
     cardBlack: media['scenes/shipped-pocket-factory/card-black'],
     cardBack: media['scenes/shipped-pocket-factory/card-back'],
-    cardFront: media['scenes/shipped-pocket-factory/card-front'],
+    cardSample: media['scenes/shipped-pocket-factory/card-sample'],
     tapBadge: media['scenes/shipped-pocket-factory/tap-badge'],
   },
   mopkin: {

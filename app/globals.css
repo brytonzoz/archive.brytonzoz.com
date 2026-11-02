@@ -2302,6 +2302,13 @@ button[class*="transition"], a[class*="transition"] {
   transition: transform 200ms var(--motion-ease);
 }
 
+/* On the light Pocket Factory scene the button turns to light glass, as the page dots turn to ink. */
+.shipped-home.is-light {
+  background: rgba(255, 255, 255, 0.66);
+  color: #15170F;
+  box-shadow: inset 0 0 0 0.5px rgba(21, 23, 15, 0.08), 0 8px 24px -8px rgba(21, 23, 15, 0.22), 0 1px 3px rgba(21, 23, 15, 0.08);
+}
+
 .shipped-home:active {
   transform: scale(0.97);
 }

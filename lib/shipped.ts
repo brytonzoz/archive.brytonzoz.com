@@ -23,6 +23,8 @@ export type ShippedProject = {
   url: string;
   action: { label: string; href: string; icon: 'arrow' | 'apple' };
   tone: 'light' | 'dark';
+  // The product's own colour, for its share of the totals.
+  accent: string;
   background: SlideBackground;
   // Up to three numbers under the card.
   stats: ShippedStat[];
@@ -43,12 +45,13 @@ export const SHIPPED_PROJECTS: ShippedProject[] = [
     action: { label: 'Visit site', href: 'https://getpocketfactory.com', icon: 'arrow' },
     // Its own paper, ink and lime (getpocketfactory.com: --paper #f5f2eb, --ink #15170f, --acid #d6f753).
     tone: 'dark',
+    accent: '#D6F753',
     background: {
-      base: 'linear-gradient(160deg, #F8F6F0 0%, #F2EFE7 46%, #E6E9C9 100%)',
-      overlay: 'radial-gradient(circle at 84% 88%, rgba(214, 247, 83, 0.42), transparent 36%), radial-gradient(circle at 14% 10%, rgba(255, 255, 255, 0.8), transparent 30%)',
+      base: 'linear-gradient(160deg, #F8F6F0 0%, #EFEEE3 40%, #DFE7AE 76%, #CCDC74 100%)',
+      overlay: 'radial-gradient(circle at 50% 100%, rgba(214, 247, 83, 0.55), transparent 46%), radial-gradient(circle at 12% 8%, rgba(255, 255, 255, 0.95), transparent 34%)',
       topGlow: 'rgba(255, 255, 255, 0.55)',
-      bottomGlow: 'rgba(214, 247, 83, 0.3)',
-      edgeGlow: 'rgba(21, 23, 15, 0.05)',
+      bottomGlow: 'rgba(214, 247, 83, 0.42)',
+      edgeGlow: 'rgba(21, 23, 15, 0.06)',
     },
     stats: [
       {
@@ -81,11 +84,12 @@ export const SHIPPED_PROJECTS: ShippedProject[] = [
     action: { label: 'App Store', href: 'https://apps.apple.com/us/app/mopkin-ai-cleaning-buddy/id6792544692', icon: 'apple' },
     // Its App Store washes: deep indigo into violet, warming to apricot (mopkin.app --violet #6e5eec).
     tone: 'light',
+    accent: '#7B6BF2',
     background: {
-      base: 'linear-gradient(165deg, #1F1A5C 0%, #3B2DB0 38%, #5F4CE0 66%, #E58C74 100%)',
-      overlay: 'radial-gradient(circle at 18% 14%, rgba(165, 138, 247, 0.32), transparent 30%), radial-gradient(circle at 84% 90%, rgba(253, 185, 122, 0.38), transparent 34%)',
+      base: 'linear-gradient(165deg, #1F1A5C 0%, #3B2DB0 38%, #4F3FD2 66%, #6A4CC6 86%, #E58C74 116%)',
+      overlay: 'radial-gradient(circle at 18% 14%, rgba(165, 138, 247, 0.32), transparent 30%), radial-gradient(circle at 84% 98%, rgba(253, 185, 122, 0.42), transparent 28%)',
       topGlow: 'rgba(140, 118, 255, 0.28)',
-      bottomGlow: 'rgba(253, 131, 119, 0.26)',
+      bottomGlow: 'rgba(253, 131, 119, 0.13)',
       edgeGlow: 'rgba(255, 255, 255, 0.05)',
     },
     stats: [
@@ -125,6 +129,6 @@ export function shippedTotal(key: 'revenue' | 'people'): number {
   return SHIPPED_PROJECTS.reduce((sum, project) => sum + project.totals[key], 0);
 }
 
-export function formatAsOf(date: string): string {
-  return new Date(`${date}T12:00:00Z`).toLocaleDateString('en-US', { month: 'long', day: 'numeric', year: 'numeric', timeZone: 'UTC' });
+export function formatAsOf(date: string, month: 'long' | 'short' = 'long'): string {
+  return new Date(`${date}T12:00:00Z`).toLocaleDateString('en-US', { month, day: 'numeric', year: 'numeric', timeZone: 'UTC' });
 }

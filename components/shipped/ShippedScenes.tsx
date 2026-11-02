@@ -44,14 +44,16 @@ const COVERS: Record<string, MediaAsset> = {
 };
 
 const STICKERS: Record<string, SceneSticker[]> = {
+  // A card pushed off one side of the screen only shows its other end, so each one is turned so the
+  // end that shows is the part worth seeing (the QR, the P mark), and nothing is cut through words.
   'pocket-factory': [
     {
-      key: 'card-lime',
-      src: pf.cardLime,
-      alt: 'Lime Pocket Factory card',
-      frame: { left: -372, top: -236, size: 700 },
+      key: 'card-back',
+      src: pf.cardBack,
+      alt: 'Back of a card: tap a phone, or scan the QR code',
+      frame: { left: -350, top: -210, size: 696 },
       zIndex: 4,
-      baseRotate: -17,
+      baseRotate: -13,
       movement: { x: -70, y: -112, rotate: -7, scale: 0.06, fadeRate: 0.95 },
       float: { x: -8, y: -10, rotate: -2.2, duration: '8.6s', delay: '0.1s' },
       intro: { x: -170, y: -130, rotate: -12, delay: '0.12s' },
@@ -68,10 +70,11 @@ const STICKERS: Record<string, SceneSticker[]> = {
       intro: { x: 170, y: -140, rotate: 12, delay: '0.18s' },
     },
     {
+      // Over the cover's right edge, clear of the P.
       key: 'tap-badge',
       src: pf.tapBadge,
       alt: 'Tap + QR sticker',
-      frame: { left: 642, top: 452, size: 290 },
+      frame: { left: 684, top: 452, size: 270 },
       zIndex: 25,
       baseRotate: 12,
       movement: { x: 60, y: -96, rotate: 12, scale: 0.08, fadeRate: 1.15 },
@@ -79,23 +82,24 @@ const STICKERS: Record<string, SceneSticker[]> = {
       intro: { x: 150, y: -30, rotate: 18, delay: '0.34s' },
     },
     {
-      key: 'card-back',
-      src: pf.cardBack,
-      alt: 'Back of a card: tap phone, or scan the QR code',
-      frame: { left: -430, top: 1330, size: 800 },
+      key: 'card-lime',
+      src: pf.cardLime,
+      alt: 'Lime Pocket Factory card',
+      frame: { left: -60, top: 1420, size: 560 },
       zIndex: 5,
-      baseRotate: -13,
+      baseRotate: -11,
       movement: { x: -72, y: 118, rotate: 5, scale: 0.08, fadeRate: 1.04 },
       float: { x: -8, y: -10, rotate: -1.8, duration: '8.9s', delay: '0.26s' },
       intro: { x: -180, y: 168, rotate: 10, delay: '0.36s' },
     },
     {
-      key: 'card-front',
-      src: pf.cardFront,
-      alt: 'Front of a card with your logo',
-      frame: { left: 486, top: 1350, size: 800 },
+      // A printed sample from Pocket Factory's own gallery.
+      key: 'card-sample',
+      src: pf.cardSample,
+      alt: 'A printed Pocket Factory card for a social media studio',
+      frame: { left: 500, top: 1390, size: 600 },
       zIndex: 5,
-      baseRotate: 9,
+      baseRotate: 6,
       movement: { x: 78, y: 130, rotate: -4, scale: 0.08, fadeRate: 1.08 },
       float: { x: 9, y: -9, rotate: 1.8, duration: '8.2s', delay: '0.62s' },
       intro: { x: 160, y: 176, rotate: -10, delay: '0.44s' },
@@ -103,43 +107,46 @@ const STICKERS: Record<string, SceneSticker[]> = {
   ],
   mopkin: [
     {
+      // Top right, turned to inspect the icon (top left is where the back button sits).
       key: 'magnify',
       src: mk.magnify,
       alt: 'Mopkin with a magnifying glass',
-      frame: { left: -282, top: -10, size: 470 },
+      frame: { left: 640, top: -30, size: 380 },
       zIndex: 18,
-      baseRotate: -8,
-      movement: { x: -82, y: -116, rotate: -8, scale: 0.06, fadeRate: 0.95 },
-      float: { x: -8, y: -9, rotate: -2.4, duration: '7.8s', delay: '0.1s' },
-      intro: { x: -180, y: -120, rotate: -12, delay: '0.12s' },
+      baseRotate: 8,
+      flipX: true,
+      movement: { x: 76, y: -120, rotate: 6, scale: 0.06, fadeRate: 0.95 },
+      float: { x: 8, y: -9, rotate: 2.4, duration: '7.8s', delay: '0.1s' },
+      intro: { x: 170, y: -140, rotate: 12, delay: '0.12s' },
     },
     {
       // Peeks over the top of the cover, hands on its edge (the art's ledge is 80% down).
       key: 'peek',
       src: mk.peek,
       alt: 'Mopkin peeking over the card',
-      frame: { left: 470, top: CARD_TOP - 240, size: 300 },
+      frame: { left: 330, top: CARD_TOP - 240, size: 300 },
       zIndex: 12,
       movement: { x: 30, y: -120, rotate: 6, scale: 0.05, fadeRate: 1.1 },
       float: { x: 0, y: 0, rotate: 0, duration: '8s', delay: '0s' },
       intro: { x: 0, y: -160, rotate: 0, delay: '0.5s' },
     },
     {
-      key: 'phone',
-      src: mk.phone,
-      alt: 'Mopkin on an iPhone: pick up the clothes on the floor',
-      frame: { left: 664, top: 960, size: 640 },
-      zIndex: 4,
-      baseRotate: 11,
-      movement: { x: 84, y: -60, rotate: 6, scale: 0.06, fadeRate: 0.95 },
-      float: { x: 8, y: -12, rotate: 1.6, duration: '9.4s', delay: '0.4s' },
-      intro: { x: 190, y: -40, rotate: 12, delay: '0.2s' },
+      // Standing on the cover's bottom-left corner, like the homepage's birds over SOLENYA's.
+      key: 'happy',
+      src: mk.happy,
+      alt: 'Happy Mopkin',
+      frame: { left: 0, top: 690, size: 250 },
+      zIndex: 25,
+      baseRotate: -10,
+      movement: { x: -54, y: -92, rotate: -9, scale: 0.08, fadeRate: 1.15 },
+      float: { x: -8, y: -8, rotate: -3, duration: '6.6s', delay: '0.7s' },
+      intro: { x: -140, y: -24, rotate: -14, delay: '0.34s' },
     },
     {
       key: 'wave',
       src: mk.wave,
       alt: 'Mopkin waving',
-      frame: { left: -236, top: 1380, size: 600 },
+      frame: { left: -190, top: 1380, size: 600 },
       zIndex: 5,
       baseRotate: 6,
       movement: { x: -70, y: 122, rotate: -5, scale: 0.08, fadeRate: 1.04 },
@@ -147,14 +154,15 @@ const STICKERS: Record<string, SceneSticker[]> = {
       intro: { x: -170, y: 170, rotate: -10, delay: '0.38s' },
     },
     {
-      key: 'happy',
-      src: mk.happy,
-      alt: 'Happy Mopkin',
-      frame: { left: 584, top: 1480, size: 290 },
-      zIndex: 5,
-      baseRotate: -6,
+      // Bottom right, where all of its screen shows on a phone.
+      key: 'phone',
+      src: mk.phone,
+      alt: 'Mopkin on an iPhone: pick up the clothes on the floor',
+      frame: { left: 600, top: 1400, size: 520 },
+      zIndex: 4,
+      baseRotate: 10,
       movement: { x: 78, y: 130, rotate: 5, scale: 0.08, fadeRate: 1.08 },
-      float: { x: 8, y: -10, rotate: 2.4, duration: '6.6s', delay: '0.7s' },
+      float: { x: 8, y: -12, rotate: 1.6, duration: '9.4s', delay: '0.4s' },
       intro: { x: 160, y: 176, rotate: 10, delay: '0.46s' },
     },
   ],
@@ -179,6 +187,8 @@ function ShippedCard({ project, cover, loadImages, priority, revealed }: { proje
   const colors = SCENE_TONES[project.tone];
   const hairline = project.tone === 'light' ? 'rgba(255, 255, 255, 0.18)' : 'rgba(18, 18, 14, 0.14)';
   const titleShadow = project.tone === 'light' ? 'scene-title' : undefined;
+  // A little stronger than the homepage's muted text: these labels sit on brighter gradients.
+  const muted = project.tone === 'light' ? 'rgba(255, 255, 255, 0.86)' : 'rgba(30, 23, 18, 0.7)';
 
   return (
     <div
@@ -213,35 +223,15 @@ function ShippedCard({ project, cover, loadImages, priority, revealed }: { proje
           ) : null}
         </a>
 
-        <div className="flex items-center justify-between" style={{ marginTop: scaleValue(52), gap: scaleValue(24) }}>
-          <h2
-            className={`text-balance ${titleShadow ?? ''}`}
-            style={{ margin: 0, fontFamily: SCENE_FONT, fontSize: scaleValue(62), lineHeight: 1.08, fontWeight: 650, letterSpacing: '-0.035em', color: colors.ink }}
-          >
-            {project.name}
-          </h2>
-          <span
-            className="inline-flex shrink-0 items-center"
-            style={{
-              gap: scaleValue(12),
-              height: scaleValue(54),
-              padding: `0 ${scaleValue(22)}`,
-              borderRadius: 999,
-              background: project.tone === 'light' ? 'rgba(255, 255, 255, 0.16)' : 'rgba(18, 18, 14, 0.07)',
-              boxShadow: `inset 0 0 0 1px ${hairline}`,
-              fontFamily: SCENE_FONT,
-              fontSize: `max(9px, ${scaleValue(27)})`,
-              fontWeight: 600,
-              color: colors.ink,
-            }}
-          >
-            <span aria-hidden="true" className="live-dot rounded-full" style={{ width: scaleValue(15), height: scaleValue(15), background: '#30D158' }} />
-            Live
-          </span>
-        </div>
+        <h2
+          className={`text-balance ${titleShadow ?? ''}`}
+          style={{ margin: `${scaleValue(52)} 0 0`, fontFamily: SCENE_FONT, fontSize: scaleValue(62), lineHeight: 1.08, fontWeight: 650, letterSpacing: '-0.035em', color: colors.ink }}
+        >
+          {project.name}
+        </h2>
         <p
           className={titleShadow}
-          style={{ margin: `${scaleValue(10)} 0 0`, fontFamily: SCENE_FONT, fontSize: scaleValue(34), lineHeight: 1.2, fontWeight: 500, color: colors.muted }}
+          style={{ margin: `${scaleValue(10)} 0 0`, fontFamily: SCENE_FONT, fontSize: scaleValue(34), lineHeight: 1.2, fontWeight: 500, color: muted }}
         >
           {project.kind} · {project.year}
         </p>
@@ -251,8 +241,8 @@ function ShippedCard({ project, cover, loadImages, priority, revealed }: { proje
           style={{
             // Dollar amounts are the widest numbers, so their column gets a little more room.
             gridTemplateColumns: project.stats.map((stat) => `minmax(0, ${stat.format === 'usd' ? 1.25 : 1}fr)`).join(' '),
-            marginTop: scaleValue(40),
-            paddingTop: scaleValue(34),
+            marginTop: scaleValue(34),
+            paddingTop: scaleValue(32),
             borderTop: `1px solid ${hairline}`,
           }}
         >
@@ -264,13 +254,13 @@ function ShippedCard({ project, cover, loadImages, priority, revealed }: { proje
             >
               <dt
                 className={`${titleShadow ?? ''}`}
-                style={{ marginTop: scaleValue(12), fontFamily: SCENE_FONT, fontSize: `max(9px, ${scaleValue(31)})`, lineHeight: 1.2, fontWeight: 500, color: colors.muted }}
+                style={{ marginTop: scaleValue(12), fontFamily: SCENE_FONT, fontSize: `max(9px, ${scaleValue(31)})`, lineHeight: 1.2, fontWeight: 500, color: muted }}
               >
                 {stat.label}
               </dt>
               <dd
                 className={`tabular-nums ${titleShadow ?? ''}`}
-                style={{ margin: 0, fontFamily: SCENE_FONT, fontSize: scaleValue(64), lineHeight: 1, fontWeight: 650, letterSpacing: '-0.03em', color: colors.ink }}
+                style={{ margin: 0, fontFamily: SCENE_FONT, fontSize: scaleValue(56), lineHeight: 1, fontWeight: 650, letterSpacing: '-0.03em', color: colors.ink }}
               >
                 <Odometer value={formatStat(stat)} on={revealed || entry} entry={entry} />
               </dd>
@@ -278,7 +268,7 @@ function ShippedCard({ project, cover, loadImages, priority, revealed }: { proje
           ))}
         </dl>
 
-        <div className="flex" style={{ gap: scaleValue(20), marginTop: scaleValue(48) }}>
+        <div className="flex" style={{ gap: scaleValue(20), marginTop: scaleValue(44) }}>
           <a href={project.action.href} target="_blank" rel="noopener noreferrer" className="scene-button" style={colors.primary}>
             {project.action.icon === 'apple' ? <AppleIcon size={scaleValue(40)} /> : null}
             {project.action.label}
@@ -307,33 +297,39 @@ const ShippedScene = React.memo(function ShippedScene({ project, loadImages, pri
 
 // Below the scenes the page scrolls freely: everything added up, each product on one line, the footer.
 function ShippedTotals({ revealed, loadImages }: { revealed: boolean; loadImages: boolean }) {
-  const revenue = shippedTotal('revenue');
-  const people = shippedTotal('people');
   const tiles = [
-    { label: 'Revenue', value: formatStat({ value: revenue, format: 'usd' }) },
-    { label: 'Customers & users', value: formatStat({ value: people, format: 'count' }) },
-    { label: 'Products live', value: formatStat({ value: SHIPPED_PROJECTS.length, format: 'count' }) },
+    { key: 'revenue' as const, label: 'Revenue', format: 'usd' as const },
+    { key: 'people' as const, label: 'Customers & users', format: 'count' as const },
   ];
 
   return (
     <div className="mx-auto max-w-4xl px-5 pt-24 sm:px-8 sm:pt-28">
-      <h2 className="text-[40px] font-bold leading-none tracking-[-0.035em] text-white sm:text-[56px]">Shipped</h2>
-      <p className="mt-3 text-[15px] text-white/50">As of {formatAsOf(SHIPPED_AS_OF)}</p>
-      <dl className="mt-8 grid grid-cols-2 gap-3 sm:grid-cols-3 sm:gap-4">
-        {tiles.map((tile, index) => (
-          <div
-            key={tile.label}
-            className={`shipped-tile flex flex-col-reverse justify-end rounded-[22px] p-5 sm:p-6${index === 0 ? ' col-span-2 sm:col-span-1' : ''}`}
-          >
-            <dt className="mt-2 text-[13px] font-medium text-white/55 sm:text-[14px]">{tile.label}</dt>
-            <dd className="text-[40px] font-semibold leading-none tracking-[-0.03em] text-white tabular-nums sm:text-[48px]">
-              <Odometer value={tile.value} on={revealed} />
-            </dd>
-          </div>
-        ))}
+      {/* Headed like the homepage's shop: a small dateline, then the title. */}
+      <p className="shop-eyebrow uppercase tabular-nums">{formatAsOf(SHIPPED_AS_OF, 'short')}</p>
+      <h2 className="shop-title">Shipped</h2>
+      <dl className="mt-6 grid grid-cols-2 gap-3 sm:gap-4">
+        {tiles.map((tile) => {
+          const parts = SHIPPED_PROJECTS.filter((project) => project.totals[tile.key] > 0);
+          return (
+            <div key={tile.key} className="shipped-tile flex flex-col-reverse justify-end rounded-[22px] p-5 sm:p-6">
+              <dt className="mt-2 text-[13px] font-medium text-white/60 sm:text-[14px]">
+                {tile.label}
+                {/* Each product's share, in its own colour, so the total visibly adds up from the two. */}
+                <span aria-hidden="true" className="mt-[18px] flex h-1 gap-[3px]">
+                  {parts.map((project) => (
+                    <span key={project.slug} className="rounded-full" style={{ flex: `${project.totals[tile.key]} 1 0`, background: project.accent }} />
+                  ))}
+                </span>
+              </dt>
+              <dd className="text-[clamp(28px,8.6vw,34px)] font-semibold leading-none tracking-[-0.03em] text-white tabular-nums sm:text-[48px]">
+                <Odometer value={formatStat({ value: shippedTotal(tile.key), format: tile.format })} on={revealed} />
+              </dd>
+            </div>
+          );
+        })}
       </dl>
 
-      <ul className="mt-10 border-t border-white/[0.08]">
+      <ul className="mt-7 border-t border-white/[0.08]">
         {SHIPPED_PROJECTS.map((project) => (
           <li key={project.slug} className="border-b border-white/[0.08]">
             <a
@@ -477,7 +473,7 @@ export function ShippedScenes() {
       ))}
       <div className="solenya-gradient-reveal pointer-events-none fixed inset-0 z-[1] bg-black" />
 
-      <Link href="/" className="shipped-home glass-capsule fixed z-40 inline-flex items-center gap-1.5 rounded-full text-[13px] font-semibold text-white">
+      <Link href="/" className={`shipped-home glass-capsule fixed z-40 inline-flex items-center gap-1.5 rounded-full text-[13px] font-semibold text-white${projects[activeIndex]?.tone === 'dark' ? ' is-light' : ''}`}>
         <svg width="13" height="13" viewBox="0 0 24 24" fill="none" aria-hidden="true">
           <path d="M15 18l-6-6 6-6" stroke="currentColor" strokeWidth="2.6" strokeLinecap="round" strokeLinejoin="round" />
         </svg>

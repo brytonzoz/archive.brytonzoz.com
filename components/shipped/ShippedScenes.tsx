@@ -1,0 +1,518 @@
+'use client';
+
+import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import Link from 'next/link';
+import { ResponsiveImage, placeholderBackground } from '../ResponsiveImage';
+import { SiteFooter } from '../SiteFooter';
+import { ArrowUpRightIcon } from '../player/icons';
+import { shippedSceneAssets } from '../../lib/assets';
+import type { MediaAsset } from '../../lib/media';
+import { SHIPPED_AS_OF, SHIPPED_PROJECTS, formatAsOf, formatStat, shippedTotal, type ShippedProject } from '../../lib/shipped';
+import {
+  ActiveSceneContext,
+  BackgroundLayer,
+  EntrySceneContext,
+  MotionContext,
+  SCENE_FONT,
+  SCENE_FRAME_HEIGHT,
+  SCENE_FRAME_WIDTH,
+  SCENE_TONES,
+  SceneDots,
+  SceneIndexContext,
+  cardMotion,
+  clamp,
+  easeOutCubic,
+  scaleValue,
+  sceneImageSizes,
+  useSceneMotion,
+  type MotionRegistry,
+} from '../scenes/kit';
+import { SceneStickers, type SceneSticker } from '../scenes/SceneStickers';
+import { Odometer } from './Odometer';
+
+// The card sits at (120, CARD_TOP) in the 961x1758 scene frame, 722 wide; its cover is the first 722.
+const CARD_TOP = 214;
+
+// Each product's icon is its cover, and its own art floats around it (the same cut-outs its site
+// and App Store page use), placed like the homepage's scenes: around the corners, a few over the
+// card's edge.
+const pf = shippedSceneAssets.pocketFactory;
+const mk = shippedSceneAssets.mopkin;
+
+const COVERS: Record<string, MediaAsset> = {
+  'pocket-factory': pf.cover,
+  mopkin: mk.cover,
+};
+
+const STICKERS: Record<string, SceneSticker[]> = {
+  // A card pushed off one side of the screen only shows its other end, so each one is turned so the
+  // end that shows is the part worth seeing (the QR, the P mark), and nothing is cut through words.
+  'pocket-factory': [
+    {
+      key: 'card-back',
+      src: pf.cardBack,
+      alt: 'Back of a card: tap a phone, or scan the QR code',
+      frame: { left: -350, top: -210, size: 696 },
+      zIndex: 4,
+      baseRotate: -13,
+      movement: { x: -70, y: -112, rotate: -7, scale: 0.06, fadeRate: 0.95 },
+      float: { x: -8, y: -10, rotate: -2.2, duration: '8.6s', delay: '0.1s' },
+      intro: { x: -170, y: -130, rotate: -12, delay: '0.12s' },
+    },
+    {
+      key: 'card-black',
+      src: pf.cardBlack,
+      alt: 'Black Pocket Factory card',
+      frame: { left: 548, top: -300, size: 700 },
+      zIndex: 4,
+      baseRotate: 19,
+      movement: { x: 76, y: -120, rotate: 6, scale: 0.06, fadeRate: 0.95 },
+      float: { x: 9, y: -9, rotate: 2, duration: '9.2s', delay: '0.5s' },
+      intro: { x: 170, y: -140, rotate: 12, delay: '0.18s' },
+    },
+    {
+      // Over the cover's right edge, clear of the P.
+      key: 'tap-badge',
+      src: pf.tapBadge,
+      alt: 'Tap + QR sticker',
+      frame: { left: 684, top: 452, size: 270 },
+      zIndex: 25,
+      baseRotate: 12,
+      movement: { x: 60, y: -96, rotate: 12, scale: 0.08, fadeRate: 1.15 },
+      float: { x: 8, y: -8, rotate: 5, duration: '6.4s', delay: '0.8s' },
+      intro: { x: 150, y: -30, rotate: 18, delay: '0.34s' },
+    },
+    {
+      key: 'card-lime',
+      src: pf.cardLime,
+      alt: 'Lime Pocket Factory card',
+      frame: { left: -60, top: 1420, size: 560 },
+      zIndex: 5,
+      baseRotate: -11,
+      movement: { x: -72, y: 118, rotate: 5, scale: 0.08, fadeRate: 1.04 },
+      float: { x: -8, y: -10, rotate: -1.8, duration: '8.9s', delay: '0.26s' },
+      intro: { x: -180, y: 168, rotate: 10, delay: '0.36s' },
+    },
+    {
+      // A printed sample from Pocket Factory's own gallery.
+      key: 'card-sample',
+      src: pf.cardSample,
+      alt: 'A printed Pocket Factory card for a social media studio',
+      frame: { left: 500, top: 1390, size: 600 },
+      zIndex: 5,
+      baseRotate: 6,
+      movement: { x: 78, y: 130, rotate: -4, scale: 0.08, fadeRate: 1.08 },
+      float: { x: 9, y: -9, rotate: 1.8, duration: '8.2s', delay: '0.62s' },
+      intro: { x: 160, y: 176, rotate: -10, delay: '0.44s' },
+    },
+  ],
+  mopkin: [
+    {
+      // Top right, turned to inspect the icon (top left is where the back button sits).
+      key: 'magnify',
+      src: mk.magnify,
+      alt: 'Mopkin with a magnifying glass',
+      frame: { left: 640, top: -30, size: 380 },
+      zIndex: 18,
+      baseRotate: 8,
+      flipX: true,
+      movement: { x: 76, y: -120, rotate: 6, scale: 0.06, fadeRate: 0.95 },
+      float: { x: 8, y: -9, rotate: 2.4, duration: '7.8s', delay: '0.1s' },
+      intro: { x: 170, y: -140, rotate: 12, delay: '0.12s' },
+    },
+    {
+      key: 'wave',
+      src: mk.wave,
+      alt: 'Mopkin waving',
+      frame: { left: -190, top: 1380, size: 600 },
+      zIndex: 5,
+      baseRotate: 6,
+      movement: { x: -70, y: 122, rotate: -5, scale: 0.08, fadeRate: 1.04 },
+      float: { x: -7, y: -12, rotate: -2, duration: '7.2s', delay: '0.3s' },
+      intro: { x: -170, y: 170, rotate: -10, delay: '0.38s' },
+    },
+    {
+      // Bottom right, where all of its screen shows on a phone.
+      key: 'phone',
+      src: mk.phone,
+      alt: 'Mopkin on an iPhone: pick up the clothes on the floor',
+      frame: { left: 600, top: 1400, size: 520 },
+      zIndex: 4,
+      baseRotate: 10,
+      movement: { x: 78, y: 130, rotate: 5, scale: 0.08, fadeRate: 1.08 },
+      float: { x: 8, y: -12, rotate: 1.6, duration: '9.4s', delay: '0.4s' },
+      intro: { x: 160, y: 176, rotate: 10, delay: '0.46s' },
+    },
+  ],
+};
+
+// Stickers that sit on the card itself (hands on its top edge, feet on a corner) ride inside it, so
+// they stay on it however the card scales and moves; they pop up from where they touch it.
+type CardSticker = { key: string; src: MediaAsset; frame: { left: number; top: number; size: number }; rotate?: number; origin: string };
+const CARD_STICKERS: Record<string, CardSticker[]> = {
+  mopkin: [
+    { key: 'peek', src: mk.peek, frame: { left: 330, top: CARD_TOP - 240, size: 300 }, origin: '50% 80%' },
+    { key: 'happy', src: mk.happy, frame: { left: 0, top: 690, size: 250 }, rotate: -10, origin: '50% 95%' },
+  ],
+};
+
+function cardStickerMotion(distance: number) {
+  const shown = distance < 0 ? easeOutCubic(clamp((distance + 0.4) / 0.4, 0, 1)) : 1 - easeOutCubic(clamp(distance / 0.3, 0, 1));
+  return { opacity: shown, transform: `scale(${0.6 + (shown * 0.4)})` };
+}
+
+function AppleIcon({ size }: { size: string }) {
+  return (
+    <svg style={{ width: size, height: size }} viewBox="0 0 24 24" fill="currentColor" aria-hidden="true" className="shrink-0">
+      <path d="M16.37 12.68c-.02-2.26 1.85-3.35 1.93-3.4-1.05-1.54-2.69-1.75-3.27-1.77-1.39-.14-2.72.82-3.42.82-.71 0-1.8-.8-2.96-.78-1.52.02-2.92.89-3.71 2.25-1.58 2.74-.4 6.8 1.14 9.02.75 1.09 1.65 2.31 2.82 2.27 1.13-.05 1.56-.73 2.93-.73 1.36 0 1.75.73 2.95.71 1.22-.02 1.99-1.11 2.73-2.2.86-1.26 1.22-2.49 1.24-2.55-.03-.01-2.37-.91-2.38-3.64ZM14.13 6.04c.62-.76 1.04-1.8.93-2.84-.9.04-1.98.6-2.62 1.35-.58.66-1.08 1.73-.95 2.75 1 .08 2.02-.51 2.64-1.26Z" />
+    </svg>
+  );
+}
+
+// The product itself: its art, its name, the numbers, and the one way in.
+// `revealed` turns true as the scene starts coming on screen (ShippedScenes' frame loop), so the
+// numbers are already rolling by the time they can be read; then they stay put.
+function ShippedCard({ project, cover, loadImages, priority, revealed }: { project: ShippedProject; cover: MediaAsset; loadImages: boolean; priority: boolean; revealed: boolean }) {
+  const motion = useSceneMotion();
+  const index = React.useContext(SceneIndexContext);
+  const entry = React.useContext(EntrySceneContext) === index;
+
+  const colors = SCENE_TONES[project.tone];
+  const hairline = project.tone === 'light' ? 'rgba(255, 255, 255, 0.18)' : 'rgba(18, 18, 14, 0.14)';
+  const titleShadow = project.tone === 'light' ? 'scene-title' : undefined;
+  // A little stronger than the homepage's muted text: these labels sit on brighter gradients.
+  const muted = project.tone === 'light' ? 'rgba(255, 255, 255, 0.86)' : 'rgba(30, 23, 18, 0.7)';
+
+  return (
+    <div
+      className="absolute solenya-card-enter"
+      style={{ left: scaleValue(120), top: scaleValue(CARD_TOP), width: scaleValue(722), zIndex: 10, animationDelay: '0.14s' }}
+    >
+      <div
+        className="scene-card relative"
+        ref={motion.ref('card', cardMotion)}
+        style={{ ...motion.initial(cardMotion), transformOrigin: 'center center', willChange: 'transform' }}
+      >
+        {(CARD_STICKERS[project.slug] ?? []).map((sticker) => (
+          <div key={sticker.key} aria-hidden="true" className="pointer-events-none absolute" style={{ left: scaleValue(sticker.frame.left - 120), top: scaleValue(sticker.frame.top - CARD_TOP), width: scaleValue(sticker.frame.size), height: scaleValue(sticker.frame.size), zIndex: 2, rotate: `${sticker.rotate ?? 0}deg` }}>
+            <div className="h-full w-full" ref={motion.ref(sticker.key, cardStickerMotion)} style={{ ...motion.initial(cardStickerMotion), transformOrigin: sticker.origin, willChange: 'transform, opacity' }}>
+              {loadImages ? <ResponsiveImage asset={sticker.src} alt="" sizes={sceneImageSizes(sticker.frame.size)} draggable={false} className="h-full w-full select-none object-contain" /> : null}
+            </div>
+          </div>
+        ))}
+        {/* Tapping the art does what the button does (as the homepage's album art opens its player);
+            the button is the one link for keyboards and screen readers. */}
+        <a
+          href={project.action.href}
+          target="_blank"
+          rel="noopener noreferrer"
+          tabIndex={-1}
+          aria-hidden="true"
+          className="scene-cover relative block w-full overflow-hidden"
+          style={{ aspectRatio: '1 / 1', borderRadius: scaleValue(34), ...placeholderBackground(cover) }}
+        >
+          {loadImages ? (
+            <ResponsiveImage
+              asset={cover}
+              alt=""
+              sizes={sceneImageSizes(722)}
+              priority={priority}
+              draggable={false}
+              className="absolute inset-0 h-full w-full select-none object-cover"
+            />
+          ) : null}
+        </a>
+
+        <h2
+          className={`text-balance ${titleShadow ?? ''}`}
+          style={{ margin: `${scaleValue(52)} 0 0`, fontFamily: SCENE_FONT, fontSize: scaleValue(62), lineHeight: 1.08, fontWeight: 650, letterSpacing: '-0.035em', color: colors.ink }}
+        >
+          {project.name}
+        </h2>
+        <p
+          className={titleShadow}
+          style={{ margin: `${scaleValue(10)} 0 0`, fontFamily: SCENE_FONT, fontSize: scaleValue(34), lineHeight: 1.2, fontWeight: 500, color: muted }}
+        >
+          {project.kind} · {project.year}
+        </p>
+
+        <dl
+          className="grid"
+          style={{
+            // Dollar amounts are the widest numbers, so their column gets a little more room.
+            gridTemplateColumns: project.stats.map((stat) => `minmax(0, ${stat.format === 'usd' ? 1.25 : 1}fr)`).join(' '),
+            marginTop: scaleValue(34),
+            paddingTop: scaleValue(32),
+            borderTop: `1px solid ${hairline}`,
+          }}
+        >
+          {project.stats.map((stat, statIndex) => (
+            <div
+              key={stat.label}
+              className="flex min-w-0 flex-col-reverse justify-end"
+              style={{ paddingLeft: statIndex ? scaleValue(28) : 0, borderLeft: statIndex ? `1px solid ${hairline}` : undefined }}
+            >
+              <dt
+                className={`${titleShadow ?? ''}`}
+                style={{ marginTop: scaleValue(12), fontFamily: SCENE_FONT, fontSize: `max(9px, ${scaleValue(31)})`, lineHeight: 1.2, fontWeight: 500, color: muted }}
+              >
+                {stat.label}
+              </dt>
+              <dd
+                className={`tabular-nums ${titleShadow ?? ''}`}
+                style={{ margin: 0, fontFamily: SCENE_FONT, fontSize: scaleValue(56), lineHeight: 1, fontWeight: 650, letterSpacing: '-0.03em', color: colors.ink }}
+              >
+                <Odometer value={formatStat(stat)} on={revealed || entry} entry={entry} />
+              </dd>
+            </div>
+          ))}
+        </dl>
+
+        <div className="flex" style={{ gap: scaleValue(20), marginTop: scaleValue(44) }}>
+          <a href={project.action.href} target="_blank" rel="noopener noreferrer" className="scene-button" style={colors.primary}>
+            {project.action.icon === 'apple' ? <AppleIcon size={scaleValue(40)} /> : null}
+            {project.action.label}
+            {project.action.icon === 'arrow' ? <ArrowUpRightIcon size={scaleValue(34)} className="shrink-0" /> : null}
+          </a>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+const ShippedScene = React.memo(function ShippedScene({ project, loadImages, priority, revealed }: { project: ShippedProject; loadImages: boolean; priority: boolean; revealed: boolean }) {
+  return (
+    <div className="shipped-clip relative h-full w-full">
+      {/* Without JavaScript the backgrounds can't cross-fade, so each scene shows its own (app/shipped/page.tsx). */}
+      <div aria-hidden="true" className="shipped-nojs-bg absolute inset-0" style={{ background: project.background.base }} />
+      <SceneStickers stickers={STICKERS[project.slug] ?? []} loadImages={loadImages} />
+      <div className="absolute inset-0 flex items-center justify-center">
+        <div className="relative" style={{ width: SCENE_FRAME_WIDTH, height: SCENE_FRAME_HEIGHT }}>
+          <ShippedCard project={project} cover={COVERS[project.slug]} loadImages={loadImages} priority={priority} revealed={revealed} />
+        </div>
+      </div>
+    </div>
+  );
+});
+
+// Below the scenes the page scrolls freely: everything added up, each product on one line, the footer.
+function ShippedTotals({ revealed, loadImages }: { revealed: boolean; loadImages: boolean }) {
+  const tiles = [
+    { key: 'revenue' as const, label: 'Revenue', format: 'usd' as const },
+    { key: 'people' as const, label: 'Customers & users', format: 'count' as const },
+  ];
+
+  return (
+    <div className="mx-auto max-w-4xl px-5 pt-24 sm:px-8 sm:pt-28">
+      {/* Headed like the homepage's shop: a small dateline, then the title. */}
+      <p className="shop-eyebrow uppercase tabular-nums">{formatAsOf(SHIPPED_AS_OF, 'short')}</p>
+      <h2 className="shop-title">Shipped</h2>
+      <dl className="mt-6 grid grid-cols-2 gap-3 sm:gap-4">
+        {tiles.map((tile) => {
+          const parts = SHIPPED_PROJECTS.filter((project) => project.totals[tile.key] > 0);
+          return (
+            <div key={tile.key} className="shipped-tile flex flex-col-reverse justify-end rounded-[22px] p-5 sm:p-6">
+              <dt className="mt-2 text-[13px] font-medium text-white/60 sm:text-[14px]">
+                {tile.label}
+                {/* Each product's share, in its own colour, so the total visibly adds up from the two. */}
+                <span aria-hidden="true" className="mt-[18px] flex h-1 gap-[3px]">
+                  {parts.map((project) => (
+                    <span key={project.slug} className="rounded-full" style={{ flex: `${project.totals[tile.key]} 1 0`, background: project.accent }} />
+                  ))}
+                </span>
+              </dt>
+              <dd className="text-[clamp(28px,8.6vw,34px)] font-semibold leading-none tracking-[-0.03em] text-white tabular-nums sm:text-[48px]">
+                <Odometer value={formatStat({ value: shippedTotal(tile.key), format: tile.format })} on={revealed} />
+              </dd>
+            </div>
+          );
+        })}
+      </dl>
+
+      <ul className="mt-7 border-t border-white/[0.08]">
+        {SHIPPED_PROJECTS.map((project) => (
+          <li key={project.slug} className="border-b border-white/[0.08]">
+            <a
+              href={project.url}
+              target="_blank"
+              rel="noopener noreferrer"
+              className="group flex items-center gap-4 py-4 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-white/60 sm:gap-5 sm:py-5"
+            >
+              <span
+                className="tile-cover relative block h-12 w-12 shrink-0 overflow-hidden rounded-[12px] sm:h-14 sm:w-14 sm:rounded-[14px]"
+                style={placeholderBackground(COVERS[project.slug])}
+              >
+                {/* Two screens down is inside the browser's lazy-load distance, so wait for the scenes' own art. */}
+                {loadImages ? (
+                  <ResponsiveImage asset={COVERS[project.slug]} alt="" sizes="56px" loading="lazy" draggable={false} className="h-full w-full object-cover" />
+                ) : null}
+              </span>
+              <span className="min-w-0 flex-1">
+                <span className="block truncate text-[16px] font-semibold text-white sm:text-[17px]">{project.name}</span>
+                <span className="block truncate text-[13px] text-white/50 sm:text-[14px]">
+                  {project.kind} · {project.year}
+                </span>
+              </span>
+              <ArrowUpRightIcon size={18} className="shrink-0 text-white/40 transition-colors group-hover:text-white" />
+            </a>
+          </li>
+        ))}
+      </ul>
+    </div>
+  );
+}
+
+export function ShippedScenes() {
+  const projects = SHIPPED_PROJECTS;
+  const sceneCount = projects.length;
+  const [activeIndex, setActiveIndex] = useState(0);
+  const [loadDeferredScenes, setLoadDeferredScenes] = useState(false);
+  // The furthest scene whose numbers have started rolling (sceneCount = the totals).
+  const [revealedThrough, setRevealedThrough] = useState(0);
+  const scrollContainerRef = useRef<HTMLDivElement | null>(null);
+  const motionUpdaters = useRef(new Map<number, Set<(distance: number) => void>>());
+  const lastDistances = useRef(new Map<number, number>());
+  const progressRef = useRef(0);
+  const backgroundLayers = useRef<(HTMLDivElement | null)[]>([]);
+  const motionRegistry = useMemo<MotionRegistry>(() => ({
+    register(index, apply) {
+      const set = motionUpdaters.current.get(index) ?? new Set();
+      motionUpdaters.current.set(index, set);
+      set.add(apply);
+      apply(clamp(progressRef.current - index, -1, 1));
+      return () => { set.delete(apply); };
+    },
+  }), []);
+
+  const scrollToScene = useCallback((index: number) => {
+    const container = scrollContainerRef.current;
+    const reducedMotion = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+    container?.scrollTo({ top: container.clientHeight * index, behavior: reducedMotion ? 'instant' : 'smooth' });
+  }, []);
+
+  // Only the first scene's art is in the initial HTML; the rest loads once that has finished.
+  useEffect(() => {
+    if (document.readyState === 'complete') {
+      setLoadDeferredScenes(true);
+      return;
+    }
+    const handleLoad = () => setLoadDeferredScenes(true);
+    window.addEventListener('load', handleLoad, { once: true });
+    return () => window.removeEventListener('load', handleLoad);
+  }, []);
+
+  // One pass per display frame, as on the homepage: read the scroll position once, then move every
+  // registered card and sticker and cross-fade the backgrounds.
+  useEffect(() => {
+    const container = scrollContainerRef.current;
+    if (!container) return;
+    let frame = 0;
+
+    const update = () => {
+      frame = 0;
+      const scrollTop = container.scrollTop;
+      const containerHeight = container.clientHeight || 1;
+      const progress = Math.min(scrollTop / containerHeight, sceneCount);
+      progressRef.current = progress;
+
+      motionUpdaters.current.forEach((updaters, index) => {
+        const distance = clamp(progress - index, -1, 1);
+        if (lastDistances.current.get(index) === distance) return;
+        lastDistances.current.set(index, distance);
+        updaters.forEach((apply) => apply(distance));
+      });
+
+      const backgroundProgress = clamp(progress, 0, sceneCount - 1);
+      backgroundLayers.current.forEach((layer, index) => {
+        if (!layer) return;
+        const opacity = index === 0 ? 1 : clamp(backgroundProgress - index + 1, 0, 1);
+        const covered = index + 1 < backgroundLayers.current.length && backgroundProgress >= index + 1;
+        layer.style.opacity = String(opacity);
+        layer.style.visibility = opacity > 0 && !covered ? 'visible' : 'hidden';
+      });
+
+      // The totals below the last scene scroll freely (no snapping), like the homepage's shop.
+      const totals = document.getElementById('totals');
+      container.classList.toggle('is-free', Boolean(totals) && scrollTop >= (totals?.offsetTop ?? Infinity) - 2);
+      if (progress > 0.01) setLoadDeferredScenes(true);
+      // A scene's numbers start rolling once a quarter of it is on screen.
+      const reach = Math.min(Math.floor(progress + 0.75), sceneCount);
+      setRevealedThrough((current) => (reach > current ? reach : current));
+
+      const newIndex = Math.min(Math.round(scrollTop / containerHeight), sceneCount);
+      setActiveIndex((current) => (newIndex !== current && newIndex >= 0 ? newIndex : current));
+    };
+    const schedule = () => {
+      if (!frame) frame = requestAnimationFrame(update);
+    };
+
+    update();
+    container.addEventListener('scroll', schedule, { passive: true });
+    window.addEventListener('resize', schedule);
+    return () => {
+      if (frame) cancelAnimationFrame(frame);
+      container.removeEventListener('scroll', schedule);
+      window.removeEventListener('resize', schedule);
+    };
+  }, [sceneCount]);
+
+  const sceneClass = (index: number) =>
+    `scene-wrap shipped-clip relative h-screen snap-center${Math.abs(index - activeIndex) > 1 ? ' scene-still' : ''}`;
+
+  return (
+    <div className="relative min-h-screen overflow-hidden bg-black">
+      <h1 className="sr-only">Shipped: products built by Bryton Zoz</h1>
+      <div className="fixed inset-0 bg-black" />
+      {projects.map((project, index) => (
+        <BackgroundLayer
+          key={project.slug}
+          background={project.background}
+          visible={index === 0}
+          layerRef={(element) => { backgroundLayers.current[index] = element; }}
+        />
+      ))}
+      <div className="solenya-gradient-reveal pointer-events-none fixed inset-0 z-[1] bg-black" />
+
+      <Link href="/" className={`shipped-home glass-capsule fixed z-40 inline-flex items-center gap-1.5 rounded-full text-[13px] font-semibold text-white${projects[activeIndex]?.tone === 'dark' ? ' is-light' : ''}`}>
+        <svg width="13" height="13" viewBox="0 0 24 24" fill="none" aria-hidden="true">
+          <path d="M15 18l-6-6 6-6" stroke="currentColor" strokeWidth="2.6" strokeLinecap="round" strokeLinejoin="round" />
+        </svg>
+        Bryton Zoz
+      </Link>
+
+      <SceneDots
+        label="Shipped"
+        names={[...projects.map((project) => project.name), 'Totals']}
+        activeIndex={activeIndex}
+        onSelect={scrollToScene}
+        hidden={activeIndex >= sceneCount}
+        dark={projects[activeIndex]?.tone === 'dark'}
+      />
+
+      <EntrySceneContext.Provider value={0}>
+        <MotionContext.Provider value={motionRegistry}>
+          <ActiveSceneContext.Provider value={activeIndex}>
+            <div ref={scrollContainerRef} className="scroll-container relative z-10 h-screen snap-y snap-mandatory overflow-y-auto scroll-smooth">
+              {projects.map((project, index) => (
+                <SceneIndexContext.Provider key={project.slug} value={index}>
+                  <section aria-label={project.name} className={sceneClass(index)}>
+                    <ShippedScene project={project} loadImages={index === 0 || loadDeferredScenes} priority={index === 0} revealed={index <= revealedThrough} />
+                  </section>
+                </SceneIndexContext.Provider>
+              ))}
+
+              <section
+                id="totals"
+                aria-label="Totals"
+                className={`shop-section shop-section-home relative min-h-screen snap-start${activeIndex < sceneCount - 1 ? ' scene-still' : ''}`}
+              >
+                <ShippedTotals revealed={revealedThrough >= sceneCount} loadImages={loadDeferredScenes} />
+                <SiteFooter />
+              </section>
+            </div>
+          </ActiveSceneContext.Provider>
+        </MotionContext.Provider>
+      </EntrySceneContext.Provider>
+    </div>
+  );
+}

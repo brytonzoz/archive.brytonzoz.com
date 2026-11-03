@@ -4,7 +4,7 @@ import { MERCH_PATH, merchPath, merchProducts } from '../lib/merch';
 import { productPath, products, STORE_PATH } from '../lib/store';
 import { releasePath, releases, trackPath } from '../lib/tracks';
 
-// brytonzoz.com/sitemap.xml: the homepage, the about page, every release and song page, and the Scrapwrk store.
+// brytonzoz.com/sitemap.xml: the homepage, the about page, every release and song page, the Scrapwrk store, and Shipped.
 export const dynamic = 'force-static';
 
 export default function sitemap(): MetadataRoute.Sitemap {
@@ -21,6 +21,7 @@ export default function sitemap(): MetadataRoute.Sitemap {
     ...merchProducts.map((product) => ({ url: `${SITE_URL}${merchPath(product)}`, changeFrequency: 'weekly' as const, priority: 0.6 })),
     { url: `${SITE_URL}/music/`, changeFrequency: 'monthly', priority: 0.5 },
     { url: `${SITE_URL}/fashion/`, changeFrequency: 'monthly', priority: 0.4 },
+    { url: `${SITE_URL}/shipped/`, changeFrequency: 'monthly', priority: 0.5 },
     { url: `${SITE_URL}/work/`, changeFrequency: 'yearly', priority: 0.3 },
   ];
 }

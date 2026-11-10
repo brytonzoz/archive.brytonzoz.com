@@ -16,7 +16,7 @@ export const metadata: Metadata = {
     siteName: 'Bryton Zoz',
     type: 'website',
     // A render of the first scene (re-render it when the numbers change).
-    images: [{ url: '/og-shipped.jpg', width: 1200, height: 630, alt: 'Pocket Factory on Shipped: $2,724 revenue, 48 orders, 39 customers' }],
+    images: [{ url: '/og-shipped.jpg', width: 1200, height: 630, alt: 'Pocket Factory on Shipped: $3,106 revenue, 56 orders, 47 customers' }],
   },
   twitter: {
     card: 'summary_large_image',

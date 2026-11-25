@@ -33,7 +33,7 @@ export type ShippedProject = {
   totals: { revenue: number; people: number; source: string };
 };
 
-export const SHIPPED_AS_OF = '2026-11-21';
+export const SHIPPED_AS_OF = '2026-11-25';
 
 export const SHIPPED_PROJECTS: ShippedProject[] = [
   {
@@ -56,24 +56,24 @@ export const SHIPPED_PROJECTS: ShippedProject[] = [
     stats: [
       {
         label: 'Revenue',
-        value: 5127.19,
+        value: 5930.19,
         format: 'usd',
-        source: 'Shopify net sales (after discounts, before shipping and tax), all orders Sep 15 - Nov 21, 2026: FROM sales SHOW net_sales',
+        source: 'Shopify net sales (after discounts, before shipping and tax), all orders Sep 15 - Nov 25, 2026: FROM sales SHOW net_sales',
       },
       {
         label: 'Orders',
-        value: 93,
+        value: 108,
         format: 'count',
-        source: 'Shopify ordersCount status:any (0 test, 0 cancelled, 0 refunded), Nov 21, 2026',
+        source: 'Shopify ordersCount status:any (0 test, 0 cancelled, 0 refunded), Nov 25, 2026',
       },
       {
         label: 'Customers',
-        value: 80,
+        value: 94,
         format: 'count',
-        source: 'Shopify distinct customers with an order: FROM sales SHOW customers, all time to Nov 21, 2026',
+        source: 'Shopify distinct customers with an order: FROM sales SHOW customers, all time to Nov 25, 2026',
       },
     ],
-    totals: { revenue: 5127.19, people: 80, source: 'The Revenue and Customers numbers above' },
+    totals: { revenue: 5930.19, people: 94, source: 'The Revenue and Customers numbers above' },
   },
   {
     slug: 'mopkin',
@@ -95,26 +95,26 @@ export const SHIPPED_PROJECTS: ShippedProject[] = [
     stats: [
       {
         label: 'Monthly users',
-        value: 468,
+        value: 526,
         format: 'count',
-        source: 'PostHog project "Mopkin": distinct people with any in-app event ($lib posthog-ios) in the 30 days to Nov 21, 2026 17:56 UTC, iOS Simulator runs ($is_emulator) and the test cohort excluded (166 in the last 7 days)',
+        source: 'PostHog project "Mopkin": distinct people with any in-app event ($lib posthog-ios) in the 30 days to Nov 25, 2026 22:24 UTC, iOS Simulator runs ($is_emulator) and the test cohort excluded (205 in the last 7 days)',
       },
       {
         label: 'Tasks done',
-        value: 5878,
+        value: 7017,
         format: 'count',
-        source: 'PostHog project "Mopkin": "task completed" events from real devices (posthog-ios, iOS Simulator excluded), all time to Nov 21, 2026 17:56 UTC',
+        source: 'PostHog project "Mopkin": "task completed" events from real devices (posthog-ios, iOS Simulator excluded), all time to Nov 25, 2026 22:24 UTC',
       },
       {
         label: 'Rating',
         value: 5,
         format: 'rating',
-        source: 'App Store: 5.0 from 22 ratings, all five stars (iTunes lookup id 6792544692, US, Nov 21, 2026)',
+        source: 'App Store: 5.0 from 24 ratings, all five stars (iTunes lookup id 6792544692, US, Nov 25, 2026)',
       },
     ],
-    // Free, no in-app purchases (App Store, Nov 21, 2026).
+    // Free, no in-app purchases (App Store, Nov 25, 2026).
     // The totals add up what the cards show, so Mopkin counts its monthly users.
-    totals: { revenue: 0, people: 468, source: 'The Monthly users number above' },
+    totals: { revenue: 0, people: 526, source: 'The Monthly users number above' },
   },
 ];
 
